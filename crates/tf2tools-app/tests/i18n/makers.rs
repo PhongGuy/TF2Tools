@@ -2,13 +2,14 @@
 
 use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext};
 use tf2tools_app::i18n::names::{
-    board_mode_name, maker_label, meter_name, scene_name, starting_point_about, starting_point_name,
+    board_mode_name, maker_label, maker_part_english, meter_name, scene_name, starting_point_about,
+    starting_point_name,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
 use tf2tools_app::pages::crosshair_maker::model::{Tool, undo_tip, zoom_in_tip, zoom_out_tip};
 use tf2tools_app::pages::hud_maker::HudMakerPage;
-use tf2tools_app::pages::hud_maker::install_tip;
+use tf2tools_app::pages::hud_maker::{install_tip, part_name};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
@@ -199,6 +200,34 @@ fn a_part_reads_its_core_name_and_when_it_shows_in_russian(cx: &mut TestAppConte
         label(cx, &s, ids::HUD_MAKER_PANEL_PART).as_deref(),
         Some("Здоровье")
     );
+}
+
+// A Russian player finds a part by the element name its HUD file gives it, as well as by the
+// Russian name the row shows.
+#[gpui_kit::test]
+fn the_part_filter_finds_a_part_by_its_file_name_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_hud_maker(cx, &[]);
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
+    if !support::present(cx, s.win, ids::HUD_MAKER_PARTS) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
+    }
+    let input = cx.update(|cx| page.read(cx).parts_filter().clone());
+    let filter = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(s.win, |_, window, cx| {
+            input.update(cx, |st, cx| st.set_value(text, window, cx))
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    };
+    let row = |k: &str| ids::hud_maker_row(&PartKey::new(k));
+    filter(cx, "HealthValue");
+    assert!(support::present(cx, s.win, row(HV)));
+    assert!(!support::present(cx, s.win, row("HudWeaponAmmo")));
+    filter(cx, "hudplayerhealth");
+    assert!(support::present(cx, s.win, row(HEALTH)));
+    filter(cx, "цифры здоровья");
+    assert!(support::present(cx, s.win, row(HV)));
 }
 
 // The option files the built-ins need, as tests/hud_maker_options.rs seeds them.
@@ -517,4 +546,39 @@ fn the_hud_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppContext) 
         label(cx, &s, ids::HUD_MAKER_SAVE).as_deref(),
         Some("Сохранить")
     );
+}
+
+#[test]
+fn a_part_names_english_is_read_in_any_language() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        maker_part_english("Health value").to_string(),
+        "Health value"
+    );
+    assert_eq!(maker_part_english("Panelty").to_string(), "Panelty");
+}
+
+#[test]
+fn a_curated_panel_reads_in_russian_and_an_unknown_one_keeps_its_own_name() {
+    let _guard = LocaleGuard::switch("ru");
+    let (known, unknown, glyph) = (
+        part_name("PlayerStatusHealthValue"),
+        part_name("Panelty"),
+        part_name("___"),
+    );
+    tf2tools_app::i18n::apply("en");
+    let english = part_name("PlayerStatusHealthValue");
+    let russian = tf2tools_app::_rust_i18n_try_translate("ru", "hud_maker.part_name.health_value")
+        .expect("health_value in ru.yml")
+        .into_owned();
+    assert_eq!(known, russian);
+    assert!(
+        known
+            .chars()
+            .any(|c| ('а'..='я').contains(&c.to_lowercase().next().unwrap())),
+        "{known}"
+    );
+    assert_eq!(unknown, "Panelty");
+    assert_eq!(glyph, "___");
+    assert_eq!(english, "Health value");
 }
