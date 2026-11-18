@@ -942,6 +942,37 @@ fn the_kept_maps_page_follows_a_language_switch(cx: &mut TestAppContext) {
     );
 }
 
+// The kept Maps page's failed serveme.tf fetch must be worded when it is drawn, not when it failed.
+#[gpui_kit::test]
+fn a_kept_maps_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell(cx, &env, &server);
+    server.reset();
+    server.mount_status("/serveme/maps", 500);
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    let page = cx
+        .update(|cx| s.shell.read(cx).maps_page())
+        .expect("a Maps page");
+    support::wait_real(cx, "the failed fetch", |cx| {
+        cx.update(|cx| page.read(cx).error().is_some() && !page.read(cx).is_syncing())
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_ERROR).as_deref(),
+        Some("serveme.tf is having problems right now. Try again later.")
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    support::click_id(cx, s.win, ids::maps_source("serveme"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_ERROR).as_deref(),
+        Some("На сайте serveme.tf сейчас неполадки. Попробуйте позже.")
+    );
+}
+
 // A GameBanana map card's outdated badge and the Addon Store's install badges read in Russian.
 #[gpui_kit::test]
 fn the_card_badges_read_in_russian(cx: &mut TestAppContext) {
