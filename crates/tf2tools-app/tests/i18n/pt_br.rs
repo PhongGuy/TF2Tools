@@ -120,3 +120,11 @@ fn the_hud_maker_parts_use_the_client_words() {
     assert!(text("hud_maker.meter.drink").contains("Leite Louco"));
     assert!(text("hud_maker.situation.switch.koth").contains("Rei do Pedaço"));
 }
+
+#[test]
+fn the_updater_says_a_damaged_download_as_the_stores_do() {
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("pt-BR", "updater.failure.damaged"),
+        tf2tools_app::_rust_i18n_try_translate("pt-BR", "messages.store.download.damaged")
+    );
+}
