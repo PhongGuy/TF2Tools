@@ -1137,6 +1137,71 @@ hud_maker:
     animations: { one: "Animations: %{count} console command left out.", other: "Animations: %{count} console commands left out." }
     code_keys: { one: "The game sets %{count} of this part's settings itself.", other: "The game sets %{count} of this part's settings itself." }
     unresolved_pins: { one: "%{count} link to a part that isn't coming along, so it may sit in a different place.", other: "%{count} links to parts that aren't coming along, so it may sit in a different place." }
+  scene_menu: "Scene"
+  scene:
+    hud: "HUD"
+    scoreboard: "Scoreboard"
+    main_menu: "Main menu"
+    freeze_cam: "Death and freeze cam"
+    win_panel: "Win panel"
+    class_select: "Class select"
+    spectator: "Spectator"
+  board_mode:
+    casual: "Casual"
+    competitive: "Competitive"
+    mvm: "MvM"
+  scene_note:
+    cant_show:
+      scoreboard: "Can't show the scoreboard"
+      main_menu: "Can't show the main menu"
+      freeze_cam: "Can't show the death and freeze cam"
+      win_panel: "Can't show the win panel"
+      class_select: "Can't show the class select"
+      spectator: "Can't show the spectator"
+    hidden:
+      scoreboard: "This HUD hides the scoreboard"
+      main_menu: "This HUD hides the main menu"
+      freeze_cam: "This HUD hides the death and freeze cam"
+      win_panel: "This HUD hides the win panel"
+      class_select: "This HUD hides the class select"
+      spectator: "This HUD hides the spectator"
+  situation:
+    meter: "Meter: %{name}"
+  meter:
+    plain: "Sandman, Jarate, banners and most items"
+    drink: "Bonk!, Crit-a-Cola and Mad Milk"
+    soda_popper: "Soda Popper and Baby Face's Blaster"
+    cleaver: "Flying Guillotine"
+    minigun: "Heavy's minigun"
+    heads: "Bazaar Bargain heads"
+    focus: "Hitman's Heatmaker focus"
+    sword: "Eyelander heads and Air Strike"
+    cow_mangler: "Cow Mangler"
+    bison: "Righteous Bison"
+    spycicle: "Spy-cicle"
+    sapper: "Sapper"
+    revolver: "Diamondback"
+    revenge: "Frontier Justice and Manmelter"
+    pomson: "Pomson 6000"
+    flamethrower: "Phlogistinator"
+    rocket_pack: "Thermal Thruster"
+    organs: "Vita-Saw"
+    killstreak: "Killstreak count"
+    kart: "Bumper car boost"
+    canteen: "MvM canteen"
+  start:
+    competitive_minimal:
+      name: "Competitive minimal"
+      about: "Hides the class portrait and keeps three killfeed rows."
+    big_numbers:
+      name: "Big numbers"
+      about: "Makes the health and ammo numbers half again as big."
+    streamer_clean:
+      name: "Streamer clean"
+      about: "Moves chat to the top and hides the friends list."
+    centre_hud:
+      name: "Centre HUD"
+      about: "Moves health and ammo next to the crosshair."
 
 messages:
   shared:

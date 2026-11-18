@@ -30,6 +30,7 @@ use super::editor::{Guide, Handle};
 use super::rank_paint::{RankText, rank_paint, rank_text};
 use super::view::{CanvasFit, list_font_px};
 use super::{HudMakerPage, Images};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::labelled;
@@ -3286,14 +3287,33 @@ fn text_watcher(measured: TextBounds, key: PartKey) -> impl IntoElement {
 pub(super) fn scene_note(model: &HudModel) -> Option<String> {
     let rule = model.scene_rule();
     rule.root()?;
-    let scene = rule.label().to_lowercase();
-    if !model.problems().is_empty() {
-        Some(format!("Can't show the {scene}"))
-    } else {
-        model
-            .hidden_by_hud()
-            .map(|_| format!("This HUD hides the {scene}"))
+    let cant_show = !model.problems().is_empty();
+    if !cant_show {
+        model.hidden_by_hud()?;
     }
+    Some(scene_note_text(rule.scene(), rule.label(), cant_show))
+}
+
+// The note's whole sentence for `scene`; a scene core adds later builds the English from its
+// lowercased `label`.
+fn scene_note_text(scene: Scene, label: &str, cant_show: bool) -> String {
+    let text = match (scene, cant_show) {
+        (Scene::Scoreboard, true) => tr!("hud_maker.scene_note.cant_show.scoreboard"),
+        (Scene::MainMenu, true) => tr!("hud_maker.scene_note.cant_show.main_menu"),
+        (Scene::FreezeCam, true) => tr!("hud_maker.scene_note.cant_show.freeze_cam"),
+        (Scene::WinPanel, true) => tr!("hud_maker.scene_note.cant_show.win_panel"),
+        (Scene::ClassSelect, true) => tr!("hud_maker.scene_note.cant_show.class_select"),
+        (Scene::Spectator, true) => tr!("hud_maker.scene_note.cant_show.spectator"),
+        (Scene::Scoreboard, false) => tr!("hud_maker.scene_note.hidden.scoreboard"),
+        (Scene::MainMenu, false) => tr!("hud_maker.scene_note.hidden.main_menu"),
+        (Scene::FreezeCam, false) => tr!("hud_maker.scene_note.hidden.freeze_cam"),
+        (Scene::WinPanel, false) => tr!("hud_maker.scene_note.hidden.win_panel"),
+        (Scene::ClassSelect, false) => tr!("hud_maker.scene_note.hidden.class_select"),
+        (Scene::Spectator, false) => tr!("hud_maker.scene_note.hidden.spectator"),
+        (_, true) => return format!("Can't show the {}", label.to_lowercase()),
+        (_, false) => return format!("This HUD hides the {}", label.to_lowercase()),
+    };
+    text.to_string()
 }
 
 // The HUD's own crosshair label when it shows: its symbol in its font, size and colour, in
@@ -3359,4 +3379,29 @@ fn crosshair(cx: Pixels, cy: Pixels) -> impl IntoElement {
         .size(arm)
         .child(bar(arm, px(2.)))
         .child(bar(px(2.), arm))
+}
+
+#[cfg(test)]
+mod tests {
+    use tf2tools_core::SceneRule;
+
+    use super::scene_note_text;
+
+    // English keeps today's sentences, built from each rooted scene's lowercased label.
+    #[test]
+    fn the_scene_notes_read_as_before_in_english() {
+        let _lock = crate::i18n::test_lock();
+        crate::i18n::apply("en");
+        for rule in SceneRule::every().iter().filter(|r| r.root().is_some()) {
+            let scene = rule.label().to_lowercase();
+            assert_eq!(
+                scene_note_text(rule.scene(), rule.label(), true),
+                format!("Can't show the {scene}")
+            );
+            assert_eq!(
+                scene_note_text(rule.scene(), rule.label(), false),
+                format!("This HUD hides the {scene}")
+            );
+        }
+    }
 }

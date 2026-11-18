@@ -15,6 +15,8 @@ use tf2tools_core::{GameSituation, MeterKind, SituationSwitch, TfClass, WeaponKi
 
 use super::HudMakerPage;
 use super::tip::tipped;
+use crate::i18n::names::meter_name;
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -296,7 +298,7 @@ impl HudMakerPage {
         let meter_row = Button::new(ids::HUD_MAKER_SITUATION_METER)
             .ghost()
             .xsmall()
-            .label(format!("Meter: {}", meter.label()))
+            .label(tr!("hud_maker.situation.meter", name = meter_name(meter)))
             .selected(self.situation_menu.meters_open)
             .on_click(cx.listener(|page, _, _, cx| {
                 page.situation_menu.meters_open = !page.situation_menu.meters_open;
@@ -309,7 +311,7 @@ impl HudMakerPage {
                 Button::new(ids::hud_maker_situation_meter(kind))
                     .ghost()
                     .xsmall()
-                    .label(kind.label())
+                    .label(meter_name(kind))
                     .selected(kind == meter)
                     .on_click(cx.listener(move |page, _, window, cx| {
                         page.situation_menu.open = false;

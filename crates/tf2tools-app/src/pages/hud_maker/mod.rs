@@ -67,6 +67,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::hud_textures::{Decoded, crop, decode_texture};
+use crate::i18n::names::{board_mode_name, scene_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
@@ -152,13 +153,17 @@ const PARTS_MIN_ROWS: f32 = 3.;
 // its hide button, padding and border, so the whole bar fits two rows; narrower, the save row
 // moves into More.
 const TOOLBAR_TWO_ROWS: Pixels = px(416.);
-// Estimates for the scene tab row: pixels per label letter and per tab, and the least kept for
-// the note, which cuts itself short rather than push the tabs into a menu.
+// Estimates for the scene tab row: pixels per label letter (ASCII, then any wider letter such
+// as Cyrillic) and per tab, and the least kept for the note, which cuts itself short rather than
+// push the tabs into a menu.
 const SCENE_TAB_LETTER: f32 = 7.5;
+const SCENE_TAB_WIDE_LETTER: f32 = 10.;
 const SCENE_TAB_PAD: f32 = 28.;
 const SCENE_NOTE_ROOM: f32 = 40.;
-// The match mode dropdown beside the Scoreboard tab: its longest label, icon and padding.
+// The match mode dropdown beside the Scoreboard tab: its least width, and its icon and padding
+// around the widest label.
 const BOARD_MODE_WIDTH: f32 = 150.;
+const BOARD_MODE_CHROME: f32 = 40.;
 // The Minimal HUD chip off the HUD tab: its label, padding and gap.
 const MINMODE_CHIP_WIDTH: f32 = 120.;
 const MINMODE_CHIP_TIP: &str = "The minimal HUD is on. Click to turn it off.";
@@ -3872,7 +3877,7 @@ impl HudMakerPage {
         let pick = |scene: Scene, cx: &mut Context<Self>| {
             Button::new(ids::hud_maker_scene(scene))
                 .small()
-                .label(SceneRule::get(scene).label())
+                .label(scene_name(scene))
                 .selected(current == Some(scene))
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.scene_open = false;
@@ -3956,18 +3961,23 @@ impl HudMakerPage {
     // the strip keeps one layout per width; before the first layout it says yes.
     fn scene_tabs_fit(&self) -> bool {
         let width = f32::from(self.area.get().size.width);
-        let letters: usize = Scene::ALL
+        let labels: f32 = Scene::ALL
             .iter()
-            .map(|&s| SceneRule::get(s).label().chars().count())
+            .map(|&s| label_estimate(&scene_name(s)))
             .sum();
-        let row = letters as f32 * SCENE_TAB_LETTER + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
+        let row = labels + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
+        let modes = BoardMode::ALL
+            .iter()
+            .map(|&m| label_estimate(&board_mode_name(m)))
+            .fold(0., f32::max);
         // Room for the widest extras any scene adds, the Scoreboard's mode dropdown and the
         // Minimal HUD chip; the HUD tab's situation menu takes room from the note instead.
         let chip = match self.minmode {
             true => MINMODE_CHIP_WIDTH,
             false => 0.,
         };
-        width <= 0. || row + BOARD_MODE_WIDTH + chip + SCENE_NOTE_ROOM <= width
+        let modes = BOARD_MODE_WIDTH.max(modes + BOARD_MODE_CHROME);
+        width <= 0. || row + modes + chip + SCENE_NOTE_ROOM <= width
     }
 
     // One button named for the open mode; its menu lists the three modes and a pick switches.
@@ -3978,12 +3988,12 @@ impl HudMakerPage {
             .outline()
             .small()
             .icon(IconName::ChevronsUpDown)
-            .label(current.label());
+            .label(board_mode_name(current));
         let items = BoardMode::ALL.map(|mode| {
             Button::new(ids::hud_maker_board_mode(mode))
                 .ghost()
                 .small()
-                .label(mode.label())
+                .label(board_mode_name(mode))
                 .selected(mode == current)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.board_mode_open = false;
@@ -4012,7 +4022,7 @@ impl HudMakerPage {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let page = cx.entity().downgrade();
-        let name = current.map_or("Scene", |s| SceneRule::get(s).label());
+        let name = current.map_or_else(|| tr!("hud_maker.scene_menu"), scene_name);
         let trigger = Button::new(ids::HUD_MAKER_SCENE_MENU)
             .outline()
             .small()
@@ -4761,9 +4771,41 @@ fn band(lines: &[Bounds<Pixels>]) -> Option<Bounds<Pixels>> {
     Some(drawn.fold(first, |band, line| band.union(line)))
 }
 
+// A label's width in the scene strip: ASCII letters at the English estimate, any other letter
+// at the wider one, so a Cyrillic label never overflows the row it was counted into.
+fn label_estimate(text: &str) -> f32 {
+    text.chars()
+        .map(|c| match c.is_ascii() {
+            true => SCENE_TAB_LETTER,
+            false => SCENE_TAB_WIDE_LETTER,
+        })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_label_estimate_covers_its_real_width_in_inter() {
+        // Inter Medium at 14 px from the font's advance widths, no kerning.
+        let real = [
+            ("Death and freeze cam", 147.4),
+            ("Смерть и стоп-кадр", 140.0),
+            ("Таблица счёта", 101.6),
+            ("Соревновательный", 134.9),
+            ("Минимальный HUD", 135.2),
+        ];
+        for (text, width) in real {
+            assert!(
+                label_estimate(text) >= width,
+                "{text}: {}",
+                label_estimate(text)
+            );
+        }
+        // An English label keeps today's estimate.
+        assert_eq!(label_estimate("Scoreboard"), 75.);
+    }
 
     #[test]
     fn a_font_file_listed_many_times_is_read_once() {

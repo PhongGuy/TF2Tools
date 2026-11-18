@@ -1135,6 +1135,71 @@ hud_maker:
     animations: { one: "Анимации: пропущена %{count} консольная команда.", few: "Анимации: пропущены %{count} консольные команды.", many: "Анимации: пропущено %{count} консольных команд." }
     code_keys: { one: "Игра сама задаёт %{count} настройку этой части.", few: "Игра сама задаёт %{count} настройки этой части.", many: "Игра сама задаёт %{count} настроек этой части." }
     unresolved_pins: { one: "%{count} привязка к части не переносится, поэтому часть может оказаться в другом месте.", few: "%{count} привязки к частям не переносятся, поэтому часть может оказаться в другом месте.", many: "%{count} привязок к частям не переносятся, поэтому часть может оказаться в другом месте." }
+  scene_menu: "Сцена"
+  scene:
+    hud: "HUD"
+    scoreboard: "Таблица счёта"
+    main_menu: "Главное меню"
+    freeze_cam: "Смерть и стоп-кадр"
+    win_panel: "Итоги раунда"
+    class_select: "Выбор класса"
+    spectator: "Наблюдение"
+  board_mode:
+    casual: "Обычный"
+    competitive: "Соревновательный"
+    mvm: "MvM"
+  scene_note:
+    cant_show:
+      scoreboard: "Не удаётся показать таблицу счёта"
+      main_menu: "Не удаётся показать главное меню"
+      freeze_cam: "Не удаётся показать смерть и стоп-кадр"
+      win_panel: "Не удаётся показать итоги раунда"
+      class_select: "Не удаётся показать выбор класса"
+      spectator: "Не удаётся показать экран наблюдения"
+    hidden:
+      scoreboard: "Этот HUD скрывает таблицу счёта"
+      main_menu: "Этот HUD скрывает главное меню"
+      freeze_cam: "Этот HUD скрывает смерть и стоп-кадр"
+      win_panel: "Этот HUD скрывает итоги раунда"
+      class_select: "Этот HUD скрывает выбор класса"
+      spectator: "Этот HUD скрывает экран наблюдения"
+  situation:
+    meter: "Шкала: %{name}"
+  meter:
+    plain: "Sandman, Jarate, знамёна и большинство предметов"
+    drink: "Bonk!, Crit-a-Cola и Mad Milk"
+    soda_popper: "Soda Popper и Baby Face's Blaster"
+    cleaver: "Flying Guillotine"
+    minigun: "Пулемёт Пулемётчика"
+    heads: "Головы Bazaar Bargain"
+    focus: "Концентрация Hitman's Heatmaker"
+    sword: "Головы Eyelander и Air Strike"
+    cow_mangler: "Cow Mangler"
+    bison: "Righteous Bison"
+    spycicle: "Spy-cicle"
+    sapper: "Жучок"
+    revolver: "Diamondback"
+    revenge: "Frontier Justice и Manmelter"
+    pomson: "Pomson 6000"
+    flamethrower: "Phlogistinator"
+    rocket_pack: "Thermal Thruster"
+    organs: "Vita-Saw"
+    killstreak: "Счётчик серии убийств"
+    kart: "Ускорение машинки"
+    canteen: "Фляга MvM"
+  start:
+    competitive_minimal:
+      name: "Соревновательный минимум"
+      about: "Скрывает портрет класса и оставляет три строки ленты убийств."
+    big_numbers:
+      name: "Крупные цифры"
+      about: "Увеличивает цифры здоровья и патронов в полтора раза."
+    streamer_clean:
+      name: "Чистый для стрима"
+      about: "Переносит чат наверх и скрывает список друзей."
+    centre_hud:
+      name: "HUD по центру"
+      about: "Ставит здоровье и патроны рядом с прицелом."
 
 messages:
   shared:

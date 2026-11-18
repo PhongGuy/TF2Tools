@@ -26,6 +26,7 @@ use super::borrow::BorrowNote;
 use super::tip::tipped;
 use super::view::{Panel, PanelPlace};
 use super::{FontBytes, HudMakerPage, colour_view, register_font};
+use crate::i18n::names::{starting_point_about, starting_point_name};
 use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::picker::{PickKind, file_name_for, with_extension};
@@ -303,7 +304,7 @@ impl HudMakerPage {
                 let pick = Button::new(ids::hud_maker_start(which.label()))
                     .outline()
                     .small()
-                    .label(which.label())
+                    .label(starting_point_name(which))
                     .on_click(cx.listener(move |page, _, window, cx| {
                         // Built on the untouched HUD, so the recipe never carries the player's
                         // edits.
@@ -315,11 +316,12 @@ impl HudMakerPage {
                         page.set_more_open(false, cx);
                         page.start_preview(recipe, 0, window, cx);
                     }));
-                v_flex()
-                    .gap_1()
-                    .items_start()
-                    .child(pick)
-                    .child(div().text_xs().text_color(muted).child(which.about()))
+                v_flex().gap_1().items_start().child(pick).child(
+                    div()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(starting_point_about(which)),
+                )
             })
         });
         let borrow = Button::new(ids::HUD_MAKER_BORROW_OPEN)

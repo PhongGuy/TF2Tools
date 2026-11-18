@@ -573,6 +573,7 @@ mod tests {
         let orphans: BTreeSet<&str> = en
             .keys()
             .filter(|k| k.split('.').next().is_some_and(|s| surfaces.contains(s)))
+            .filter(|k| !k.split('.').take(2).eq(["hud_maker", "label"]))
             .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
             .filter(|k| !named.contains(*k))
             .collect();

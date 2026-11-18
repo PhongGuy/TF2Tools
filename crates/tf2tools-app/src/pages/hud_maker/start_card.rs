@@ -12,6 +12,7 @@ use gpui_kit::{
 use tf2tools_core::StartingPoint;
 
 use super::HudMakerPage;
+use crate::i18n::names::{starting_point_about, starting_point_name};
 use crate::ids;
 use crate::shell::route::{NavigateTo, Page};
 
@@ -157,7 +158,7 @@ impl HudMakerPage {
             let pick = Button::new(ids::hud_maker_start_card_point(which.label()))
                 .outline()
                 .small()
-                .label(which.label())
+                .label(starting_point_name(which))
                 .on_click(cx.listener(move |page, _, window, cx| {
                     let Some(recipe) = page.editor().map(|e| e.pristine().starting_point(which))
                     else {
@@ -166,11 +167,12 @@ impl HudMakerPage {
                     page.start_card.closed = true;
                     page.start_preview(recipe, 0, window, cx);
                 }));
-            v_flex()
-                .gap_1()
-                .items_start()
-                .child(pick)
-                .child(div().text_xs().text_color(muted).child(which.about()))
+            v_flex().gap_1().items_start().child(pick).child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(starting_point_about(which)),
+            )
         });
         v_flex()
             .pl(px(36.))
