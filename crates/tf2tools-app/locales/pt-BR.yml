@@ -6,7 +6,7 @@
 #     GameBanana, hud-db, Steam, TF2Tools; class names stay English as the TF2 client shows them.
 #   add-on = "add-on" (plural "add-ons", hyphenated, masculine); Addon Store = "Loja de add-ons".
 #   crosshair = "mira"; Crosshair Maker = "Criador de miras"; HUD Maker = "Criador de HUD".
-#   library = "biblioteca"; store = "loja"; curated = "selecionados".
+#   library = "biblioteca"; store = "loja"; curated = "selecionados"; reset = "redefinir".
 #   install = "instalar", installed = "instalado"; uninstall = "desinstalar".
 #   download = "baixar" ("Baixando..."); update = "atualizar", an update = "atualização".
 #   sync = "sincronizar", a sync = "sincronização"; Resync = "Sincronizar"; Refresh = "Recarregar".
@@ -211,7 +211,7 @@ common:
     secondary: "Secundária"
     melee: "Corpo a corpo"
   slot_short:
-    secondary: "Secundária"
+    secondary: "Secund."
     melee: "Corpo a corpo"
   sound_kind:
     hitsound: "Hitsound"
@@ -756,7 +756,7 @@ crosshairs_page:
     add_to_profile: "Adicionar ao perfil"
     export: "Exportar PNG"
     exporting: "Exportando..."
-    reset: "Restaurar padrão"
+    reset: "Redefinir padrão"
     close: "Fechar"
   selection:
     none: "Nenhuma mira escolhida"
@@ -1276,7 +1276,7 @@ hud_maker:
     every_hud: "Vale para todos os HUDs"
     reset_all: "Redefinir todas as opções"
     reset_group: "Redefinir %{group}"
-    reset_group_tip: "Voltar estas opções às do próprio HUD"
+    reset_group_tip: "Redefinir estas opções para as do próprio HUD"
     hud_heading: "Opções de %{name}"
     this_hud: "Opções deste HUD"
   shortcuts:

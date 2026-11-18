@@ -806,7 +806,7 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
 }
 
 // At the 800x600 minimum the editor's Crosshairs picker keeps every bulk button in `lang`
-// inside it, for the class with the longest Russian name too.
+// inside it, for the class with the longest class name in `lang` too.
 fn bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext, lang: &str) {
     let _guard = LocaleGuard::switch(lang);
     let env = support::env();
@@ -832,7 +832,11 @@ fn bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext, lang: &str) {
         gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
     );
     support::settle(cx, s.win);
-    for class in [TfClass::Scout, TfClass::Heavy] {
+    let longest = TfClass::ALL
+        .into_iter()
+        .max_by_key(|c| names::class_name(*c).chars().count())
+        .unwrap();
+    for class in [TfClass::Scout, longest] {
         support::click_id(cx, s.win, ids::class_tab(&class.name().to_lowercase()));
         support::settle(cx, s.win);
         let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();

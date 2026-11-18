@@ -1,4 +1,5 @@
-//! The HUD Maker and the Crosshair Maker in Russian, with the Portuguese fit checks: core's labels, the pages and their dialogs.
+//! The HUD Maker and the Crosshair Maker in Russian, with the Portuguese fit checks: core's
+//! labels, the pages and their dialogs.
 
 use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext};
 use tf2tools_app::i18n::names::{

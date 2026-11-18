@@ -94,7 +94,7 @@ To add a language:
 
 1. Pick the code. The file name without `.yml` is the locale code. When a language has regional variants, use the region tag the UI kit uses, such as `pt-BR`; gpui-component's `locales/ui.yml` lists the kit's codes.
 2. Copy `en.yml` to `<code>.yml` and translate the values, never the keys. The file must keep exactly the keys of `en.yml`, and the tests check it.
-3. Add the code and its native name with " (preview)" to `LANGUAGES` in `crates/tf2tools-app/src/i18n.rs`, as in `Português do Brasil (preview)`.
+3. Add the code and its native name with " (preview)" to `LANGUAGES` in `crates/tf2tools-app/src/i18n.rs`, as in `Português do Brasil (preview)`, and add the same pair to the pinned list in the test `english_comes_first_and_every_catalogue_is_offered` in that file.
 4. Add a plural rule to `plural_form` in the same file only if the language counts differently from `one` for 1 and `other` for everything else.
 5. Run `cargo test -p tf2tools-app --lib i18n::` and `cargo test -p tf2tools-app --test i18n`, then open a PR.
 
