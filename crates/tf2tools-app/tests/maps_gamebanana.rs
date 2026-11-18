@@ -2,10 +2,10 @@
 
 use crate::support;
 use crate::support::maps::{
-    maps_shell, maps_shell_found, open_gamebanana, open_maps, seed_maps, shown,
+    maps_shell, maps_shell_found, open_gamebanana, open_maps, seed_maps, shown, wheel_into_view,
 };
 
-use gpui_kit::TestAppContext;
+use gpui_kit::{TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::maps::MapsSource;
 use tf2tools_app::shell::route::Page;
@@ -397,4 +397,53 @@ fn search_matches_name_or_author_locally_and_says_when_nothing_does(cx: &mut Tes
         Some("Try another search.")
     );
     assert_eq!(server.requests_where(|p| p.starts_with("/apiv11")), 0);
+}
+
+#[gpui_kit::test]
+fn at_800_by_600_every_map_card_scrolls_wholly_into_view(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    let rows: Vec<String> = (100..124)
+        .map(|id| {
+            format!(
+                "({id}, 'map_{id}', 'vex', {id}, 5373, 'Control Points', 5373, {id}, \
+                 'https://gamebanana.com/mods/{id}', 'x')"
+            )
+        })
+        .collect();
+    support::sql(&env)
+        .execute_batch(&format!(
+            "INSERT INTO store_gb_map_categories (category_id, name, gamemode_id) VALUES \
+                 (5373, 'Control Points', 5373);
+             INSERT INTO store_gb_maps (gb_id, name, author, date_added, category_id, \
+                 category_name, gamemode_id, download_rank, profile_url, fetched_at) VALUES {};",
+            rows.join(", ")
+        ))
+        .unwrap();
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    let ids_shown = shown(cx, &tab);
+    assert_eq!(ids_shown.len(), 24);
+    // The page scrolls the grid's one-row floor into view, then the grid scrolls its rows.
+    let maps = ids::page(Page::Maps);
+    wheel_into_view(cx, &s, maps.clone(), ids::MAPS_GB_GRID);
+    let view = support::bounds_of(cx, s.win, maps).expect("the page");
+    let grid = support::bounds_of(cx, s.win, ids::MAPS_GB_GRID).expect("the grid");
+    assert!(
+        grid.size.height < view.size.height,
+        "the grid stays a scrolling window: {grid:?}"
+    );
+    let bar = support::bounds_of(cx, s.win, ids::grid_scrollbar(ids::MAPS_GB_GRID)).expect("bar");
+    assert!(
+        bar.right() <= view.right(),
+        "the grid's bar {bar:?} lies inside {view:?}"
+    );
+    let last = *ids_shown.last().unwrap();
+    wheel_into_view(
+        cx,
+        &s,
+        ids::MAPS_GB_GRID,
+        ids::addon_gb_card("maps", GbId::new(last)),
+    );
 }
