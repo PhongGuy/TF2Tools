@@ -825,6 +825,11 @@ fn the_german_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
     maps_empty_line_fits_at_800(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "fr");
+}
+
 // Every maps sort label fits the 160 px sort select at 800x600.
 fn maps_sort_fits_at_800(cx: &mut TestAppContext, lang: &str) {
     let _guard = LocaleGuard::switch(lang);
@@ -851,6 +856,11 @@ fn the_spanish_maps_sort_fits_at_800(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_german_maps_sort_fits_at_800(cx: &mut TestAppContext) {
     maps_sort_fits_at_800(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_french_maps_sort_fits_at_800(cx: &mut TestAppContext) {
+    maps_sort_fits_at_800(cx, "fr");
 }
 
 #[test]
