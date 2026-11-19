@@ -40,10 +40,26 @@ fn timed<T>(what: &str, run: impl FnOnce() -> T) -> (T, Duration) {
 
 #[test]
 #[ignore = "changes the real machine; run by windows-checks.yml"]
-fn the_system_font_scan_reads_the_real_registry() {
+fn a_cold_system_font_scan_reads_the_real_registry() {
     require_opt_in();
     let host = system_font_host().expect("Windows has a font host");
-    // The first scan reads every font file cold; the later ones show the warm cost.
+    // Named to run first, so round 1 meets a cold file cache. The folder's size, read from
+    // metadata alone, shows how much a scan of whole files would have cost.
+    let fonts_dir = std::env::var_os("WINDIR")
+        .map(PathBuf::from)
+        .unwrap()
+        .join("Fonts");
+    let (files, bytes) = std::fs::read_dir(&fonts_dir)
+        .unwrap()
+        .flatten()
+        .filter_map(|e| e.metadata().ok())
+        .filter(|m| m.is_file())
+        .fold((0u64, 0u64), |(n, b), m| (n + 1, b + m.len()));
+    println!(
+        "system font dir {}: {files} files, {} MiB",
+        fonts_dir.display(),
+        bytes / (1024 * 1024)
+    );
     for round in 1..=3 {
         let (names, _) = timed(&format!("system font scan round {round}"), || {
             host.installed_names().expect("the font registry reads")
