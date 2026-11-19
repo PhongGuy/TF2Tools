@@ -91,3 +91,7 @@ test = true
 [[example]]
 name = "crosshair_apply_timing"
 test = true
+
+[[example]]
+name = "shoot_setting_pictures"
+test = true
