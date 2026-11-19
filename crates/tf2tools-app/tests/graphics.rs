@@ -37,7 +37,7 @@ fn graphics_follows_addons_in_the_tools_group_with_the_gauge_icon() {
     let at = Page::ALL.iter().position(|p| *p == Page::Graphics).unwrap();
     assert_eq!(Page::ALL.len(), 16);
     assert_eq!(Page::ALL[at - 1], Page::Addons);
-    assert_eq!(Page::ALL[at + 1], Page::HudStore);
+    assert_eq!(Page::ALL[at + 1], Page::Profiles);
     let page = Page::Graphics;
     assert_eq!(
         (page.slug(), page.label().as_ref(), page.title().as_ref()),

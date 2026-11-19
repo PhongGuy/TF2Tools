@@ -20,9 +20,9 @@ const TOOLS: [Page; 6] = [
     Page::Huds,
     Page::Sounds,
     Page::Crosshairs,
-    Page::Profiles,
     Page::Addons,
     Page::Graphics,
+    Page::Profiles,
 ];
 const STORES: [Page; 4] = [
     Page::HudStore,
@@ -197,5 +197,18 @@ pub fn icon(page: Page) -> IconName {
         Page::Maps => IconName::Map,
         Page::LogsTf => IconName::ChartLine,
         Page::Graphics => IconName::Gauge,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Profiles closes the Tools group, and the keyboard order (Page::ALL) mirrors the rail.
+    #[test]
+    fn profiles_is_last_in_tools_and_all_follows_the_rail() {
+        assert_eq!(TOOLS.last(), Some(&Page::Profiles));
+        let rail: Vec<Page> = [&TOOLS[..], &STORES, &MAKERS, &MAPS, &FOOTER].concat();
+        assert_eq!(rail, Page::ALL);
     }
 }
