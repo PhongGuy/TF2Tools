@@ -3286,7 +3286,7 @@ graphics:
     misc: "Varios"
     networking: "Red"
   preset:
-    heading: "Ajuste preestablecido"
+    heading: "Preajuste"
     more_frames: "Más fotogramas"
     better_looking: "Mejor aspecto"
     low:
