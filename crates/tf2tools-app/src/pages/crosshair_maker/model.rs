@@ -631,17 +631,23 @@ impl Editor {
 pub fn position_text(size: CanvasSize, x: u32, y: u32) -> String {
     // The centre falls between cells half-1 and half, so neither side has a zero.
     let half = size.side() / 2;
-    let (across, h) = if x >= half {
-        (x - half + 1, tr!("crosshair_maker.position.right"))
+    // Each catalogue owns the word order and the joiner, so Chinese can lead with the direction.
+    let across = if x >= half {
+        tr!("crosshair_maker.position.right", n = x - half + 1)
     } else {
-        (half - x, tr!("crosshair_maker.position.left"))
+        tr!("crosshair_maker.position.left", n = half - x)
     };
-    let (down, v) = if y >= half {
-        (y - half + 1, tr!("crosshair_maker.position.down"))
+    let down = if y >= half {
+        tr!("crosshair_maker.position.down", n = y - half + 1)
     } else {
-        (half - y, tr!("crosshair_maker.position.up"))
+        tr!("crosshair_maker.position.up", n = half - y)
     };
-    format!("{across} {h}, {down} {v}")
+    tr!(
+        "crosshair_maker.position.joined",
+        across = across,
+        down = down
+    )
+    .into()
 }
 
 /// The largest whole-pixel cell that fits `side` cells into `free` both ways; at least 1 px.

@@ -23,6 +23,7 @@ pub const NOTE_PT_BR: &str = "As partes do TF2Tools ainda não traduzidas ficam 
 pub const NOTE_ES: &str = "Las partes de TF2Tools aún sin traducir se muestran en inglés.";
 pub const NOTE_DE: &str = "Noch nicht übersetzte Teile von TF2Tools erscheinen auf Englisch.";
 pub const NOTE_FR: &str = "Les parties de TF2Tools pas encore traduites restent en anglais.";
+pub const NOTE_ZH: &str = "TF2Tools 尚未翻译的部分将以英文显示。";
 
 /// Opens Settings through the sidebar and waits for its first load.
 pub fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<SettingsPage> {
@@ -282,6 +283,30 @@ fn a_canadian_system_starts_in_french(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_simplified_chinese_system_starts_in_chinese(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["zh_CN.UTF-8"]);
+    assert_eq!(i18n::current(), "zh-CN");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the Chinese note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_ZH)
+    });
+}
+
+#[gpui_kit::test]
+fn a_traditional_chinese_system_starts_in_english(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["zh_TW.UTF-8"]);
+    assert_eq!(i18n::current(), "en");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the English note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_EN)
+    });
+}
+
+#[gpui_kit::test]
 fn an_unsupported_system_language_starts_in_english(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
@@ -511,6 +536,8 @@ fn the_settings_cards_fit_at_800_by_600_in_every_language(cx: &mut TestAppContex
     assert_settings_fit(cx, s.win, "de");
     pick(cx, s.win, "fr");
     assert_settings_fit(cx, s.win, "fr");
+    pick(cx, s.win, "zh-CN");
+    assert_settings_fit(cx, s.win, "zh-CN");
 }
 
 // The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a

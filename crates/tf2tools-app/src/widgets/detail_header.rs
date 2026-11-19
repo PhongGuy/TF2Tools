@@ -3,7 +3,7 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, Div, ElementId, Font, FontWeight, ParentElement as _, Pixels, SharedString,
-    Styled as _, TextRun, Window, black, font, px, rems,
+    Styled as _, TextRun, Window, black, px, rems,
 };
 
 use crate::widgets::labelled;
@@ -65,7 +65,7 @@ pub fn detail_header(
 fn longest_word_width(name: &str, window: &Window, cx: &App) -> Pixels {
     let font = Font {
         weight: FontWeight::SEMIBOLD,
-        ..font(cx.theme().font_family.clone())
+        ..crate::theme::ui_font(cx.theme().font_family.clone())
     };
     let size = rems(1.25).to_pixels(window.rem_size());
     name.split_whitespace()

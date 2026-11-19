@@ -7,7 +7,8 @@ use gpui_kit::SharedString;
 
 use super::tr;
 
-/// How far a compact count was scaled down.
+/// How far a compact count was scaled down: to the first tier (a thousand, or a Chinese ten
+/// thousand) or the second (that step squared).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scale {
     Units,
@@ -25,12 +26,16 @@ pub fn grouped(n: u64) -> String {
     group_with(n, &tr!("common.number.group"))
 }
 
-/// v5's compact like and view count: "999", "1.3K", "1.2M" in English.
+/// v5's compact like and view count: "999", "1.3K", "1.2M" in English, "9,999", "1.3万",
+/// "124万", "1.2亿" in Chinese.
 pub fn compact_count(n: i64) -> String {
-    let (digits, scale) = compact_parts(n);
+    let (digits, scale) = compact_parts(n, compact_step(&tr!("common.count.step")));
     let number = decimal_point(&digits);
     match scale {
-        Scale::Units => number,
+        Scale::Units => match u64::try_from(n) {
+            Ok(n) => grouped(n),
+            Err(_) => number,
+        },
         Scale::Thousands => tr!("common.count.thousand", number = number).into(),
         Scale::Millions => tr!("common.count.million", number = number).into(),
     }
@@ -171,12 +176,24 @@ fn with_point(rounded: &str, point: &str) -> String {
     rounded.replacen('.', point, 1)
 }
 
-// The English digits of a compact count with one decimal, and the tier they were scaled to.
-fn compact_parts(n: i64) -> (String, Scale) {
-    let (unit, scale) = match n {
-        1_000_000.. => (1_000_000, Scale::Millions),
-        1_000.. => (1_000, Scale::Thousands),
-        _ => return (n.to_string(), Scale::Units),
+// The tier size a catalogue's `common.count.step` names: a power of ten from 10 to 10^9, else
+// a thousand.
+fn compact_step(text: &str) -> i64 {
+    match text.parse::<i64>() {
+        Ok(step) if (1..=9).any(|k| 10_i64.pow(k) == step) => step,
+        _ => 1_000,
+    }
+}
+
+// The English digits of a compact count with one decimal, and the tier of size `step` (or
+// `step` squared) they were scaled to.
+fn compact_parts(n: i64, step: i64) -> (String, Scale) {
+    let (unit, scale) = if n >= step * step {
+        (step * step, Scale::Millions)
+    } else if n >= step {
+        (step, Scale::Thousands)
+    } else {
+        return (n.to_string(), Scale::Units);
     };
     // `{:.1}` rounds the exact binary value as `toFixed` does, except on a tie exact in binary
     // (a quarter or three quarters of a unit), where it rounds to even and `toFixed` rounds up.
@@ -186,6 +203,11 @@ fn compact_parts(n: i64) -> (String, Scale) {
     } else {
         format!("{:.1}", n as f64 / unit as f64)
     };
+    // A ten-thousand step writes three or more whole digits without a decimal ("124万").
+    let whole_digits = digits.find('.').unwrap_or(digits.len());
+    if step >= 10_000 && whole_digits >= 3 {
+        return (((n + unit / 2) / unit).to_string(), scale);
+    }
     (digits, scale)
 }
 
@@ -210,9 +232,9 @@ mod tests {
     use chrono::NaiveDate;
 
     use super::{
-        Scale, bytes, compact_count, compact_parts, date_time, day_month_year, decimal_point,
-        group_with, grouped, hours_minutes, month_day_year, month_name, numeric_date, scale_bytes,
-        seconds, tenths, time_left, with_point,
+        Scale, bytes, compact_count, compact_parts, compact_step, date_time, day_month_year,
+        decimal_point, group_with, grouped, hours_minutes, month_day_year, month_name,
+        numeric_date, scale_bytes, seconds, tenths, time_left, with_point,
     };
 
     fn day(y: i32, m: u32, d: u32) -> NaiveDate {
@@ -239,24 +261,71 @@ mod tests {
 
     #[test]
     fn compact_counts_keep_their_thresholds_and_ties() {
-        assert_eq!(compact_parts(999), ("999".to_owned(), Scale::Units));
-        assert_eq!(compact_parts(1_000), ("1.0".to_owned(), Scale::Thousands));
-        assert_eq!(compact_parts(1_049), ("1.0".to_owned(), Scale::Thousands));
-        assert_eq!(compact_parts(1_050), ("1.1".to_owned(), Scale::Thousands));
-        assert_eq!(compact_parts(1_250), ("1.3".to_owned(), Scale::Thousands));
-        assert_eq!(compact_parts(1_150), ("1.1".to_owned(), Scale::Thousands));
+        assert_eq!(compact_parts(999, 1_000), ("999".to_owned(), Scale::Units));
         assert_eq!(
-            compact_parts(999_999),
+            compact_parts(1_000, 1_000),
+            ("1.0".to_owned(), Scale::Thousands)
+        );
+        assert_eq!(
+            compact_parts(1_049, 1_000),
+            ("1.0".to_owned(), Scale::Thousands)
+        );
+        assert_eq!(
+            compact_parts(1_050, 1_000),
+            ("1.1".to_owned(), Scale::Thousands)
+        );
+        assert_eq!(
+            compact_parts(1_250, 1_000),
+            ("1.3".to_owned(), Scale::Thousands)
+        );
+        assert_eq!(
+            compact_parts(1_150, 1_000),
+            ("1.1".to_owned(), Scale::Thousands)
+        );
+        assert_eq!(
+            compact_parts(999_999, 1_000),
             ("1000.0".to_owned(), Scale::Thousands)
         );
         assert_eq!(
-            compact_parts(1_000_000),
+            compact_parts(1_000_000, 1_000),
             ("1.0".to_owned(), Scale::Millions)
         );
         assert_eq!(
-            compact_parts(1_250_000),
+            compact_parts(1_250_000, 1_000),
             ("1.3".to_owned(), Scale::Millions)
         );
+    }
+
+    #[test]
+    fn ten_thousand_steps_compact_by_wan_and_yi() {
+        let wan = |n| compact_parts(n, 10_000);
+        assert_eq!(wan(9_999), ("9999".to_owned(), Scale::Units));
+        assert_eq!(wan(10_000), ("1.0".to_owned(), Scale::Thousands));
+        assert_eq!(wan(12_500), ("1.3".to_owned(), Scale::Thousands));
+        assert_eq!(wan(999_400), ("99.9".to_owned(), Scale::Thousands));
+        assert_eq!(wan(999_950), ("100".to_owned(), Scale::Thousands));
+        assert_eq!(wan(1_240_000), ("124".to_owned(), Scale::Thousands));
+        assert_eq!(wan(1_245_000), ("125".to_owned(), Scale::Thousands));
+        assert_eq!(wan(9_999_500), ("1000".to_owned(), Scale::Thousands));
+        assert_eq!(wan(120_000_000), ("1.2".to_owned(), Scale::Millions));
+    }
+
+    #[test]
+    fn the_compact_step_reads_a_power_of_ten_else_a_thousand() {
+        assert_eq!(compact_step("1000"), 1_000);
+        assert_eq!(compact_step("10000"), 10_000);
+        for bad in [
+            "",
+            "abc",
+            "1500",
+            "0",
+            "1",
+            "-1000",
+            "10000000000",
+            "%{step}",
+        ] {
+            assert_eq!(compact_step(bad), 1_000, "{bad:?}");
+        }
     }
 
     #[test]

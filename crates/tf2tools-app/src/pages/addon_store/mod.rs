@@ -81,6 +81,31 @@ impl InfoLink {
     }
 }
 
+/// Each link word's byte range in `info`, sorted and apart as StyledText needs.
+pub fn info_links(info: &str) -> Vec<(InfoLink, std::ops::Range<usize>)> {
+    // The page name closes the sentence in every language, so Addons takes the word's last use;
+    // an earlier "addons" is just the noun.
+    let mut links: Vec<_> = [InfoLink::Mastercomfig, InfoLink::Addons]
+        .into_iter()
+        .filter_map(|link| {
+            let word = link.word();
+            let start = match link {
+                InfoLink::Mastercomfig => info.find(&*word),
+                InfoLink::Addons => info.rfind(&*word),
+            }?;
+            Some((link, start..start + word.len()))
+        })
+        .collect();
+    links.sort_by_key(|(_, range)| range.start);
+    let mut end = 0;
+    links.retain(|(_, range)| {
+        let apart = range.start >= end;
+        end = end.max(range.end);
+        apart
+    });
+    links
+}
+
 /// Which of the Addon Store's tabs shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AddonStoreTab {
@@ -405,14 +430,7 @@ impl AddonStorePage {
         // The link words are underlined ranges of one wrapping text; a click on either follows it.
         // A word missing from the text just goes without its link.
         let info = info_text();
-        let (links, ranges): (Vec<_>, Vec<_>) = [InfoLink::Mastercomfig, InfoLink::Addons]
-            .into_iter()
-            .filter_map(|link| {
-                let word = link.word();
-                let start = info.find(&*word)?;
-                Some((link, start..start + word.len()))
-            })
-            .unzip();
+        let (links, ranges): (Vec<_>, Vec<_>) = info_links(&info).into_iter().unzip();
         let underline = HighlightStyle {
             underline: Some(UnderlineStyle {
                 thickness: px(1.),

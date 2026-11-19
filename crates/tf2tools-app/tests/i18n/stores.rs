@@ -9,7 +9,7 @@ use tf2tools_app::gb_addon_installs::GbAddonOffer;
 use tf2tools_app::ids;
 use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, search_placeholder};
 use tf2tools_app::pages::addon_store::model::AddonState;
-use tf2tools_app::pages::addon_store::{InfoLink, info_text};
+use tf2tools_app::pages::addon_store::{InfoLink, info_links, info_text};
 use tf2tools_app::pages::hud_store::HudStorePage;
 use tf2tools_app::pages::hud_store::bodies::{curated_body, gamebanana_body};
 use tf2tools_app::pages::sound_store::model::{Category, category_label};
@@ -132,6 +132,11 @@ fn the_store_grid_fits_in_german(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_store_grid_fits_in_french(cx: &mut TestAppContext) {
     store_grid_reads_in(cx, "fr");
+}
+
+#[gpui_kit::test]
+fn the_store_grid_fits_in_chinese(cx: &mut TestAppContext) {
+    store_grid_reads_in(cx, "zh-CN");
 }
 
 #[gpui_kit::test]
@@ -570,6 +575,11 @@ fn the_addon_store_fits_in_french(cx: &mut TestAppContext) {
     addon_store_reads_in(cx, "fr");
 }
 
+#[gpui_kit::test]
+fn the_addon_store_fits_in_chinese(cx: &mut TestAppContext) {
+    addon_store_reads_in(cx, "zh-CN");
+}
+
 #[test]
 fn addon_store_labels_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
@@ -624,6 +634,53 @@ fn addon_store_labels_read_in_russian() {
             link.word()
         );
     }
+}
+
+// StyledText takes its underlines in order and apart, or the app panics laying the box out; the
+// Addons link lands on the page name, the word's last use, in every language.
+#[test]
+fn the_info_links_are_ordered_in_every_language() {
+    for lang in tf2tools_app::i18n::LANGUAGES {
+        let _guard = LocaleGuard::switch(lang.code);
+        let text = info_text();
+        let links = info_links(&text);
+        assert_eq!(links.len(), 2, "{}: {links:?}", lang.code);
+        for pair in links.windows(2) {
+            assert!(
+                pair[0].1.end <= pair[1].1.start,
+                "{}: unordered or overlapping {links:?}",
+                lang.code
+            );
+        }
+        let word = InfoLink::Addons.word();
+        let page = text.rfind(&*word).unwrap();
+        assert!(
+            links.contains(&(InfoLink::Addons, page..page + word.len())),
+            "{}: the Addons link misses the page name in {text}",
+            lang.code
+        );
+    }
+}
+
+// English and French already linked the right words; their ranges stay as they were.
+#[test]
+fn the_english_and_french_info_links_keep_their_ranges() {
+    let _guard = LocaleGuard::hold();
+    assert_eq!(
+        info_links(&info_text()),
+        [
+            (InfoLink::Mastercomfig, 30..42),
+            (InfoLink::Addons, 121..127)
+        ]
+    );
+    tf2tools_app::i18n::apply("fr");
+    assert_eq!(
+        info_links(&info_text()),
+        [
+            (InfoLink::Mastercomfig, 52..64),
+            (InfoLink::Addons, 162..169)
+        ]
+    );
 }
 
 // The add-on tab is kept with the Addon Store, so its search box and Selects retitle after a

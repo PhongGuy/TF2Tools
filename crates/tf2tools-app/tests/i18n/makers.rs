@@ -343,6 +343,11 @@ fn a_long_french_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContex
     a_long_item_colour_keeps_clear_of_its_neighbour(cx, "fr");
 }
 
+#[gpui_kit::test]
+fn a_long_chinese_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext) {
+    a_long_item_colour_keeps_clear_of_its_neighbour(cx, "zh-CN");
+}
+
 fn missing() -> Tf2State {
     Tf2State::Missing { saved: None }
 }
@@ -504,6 +509,11 @@ fn the_unsaved_changes_buttons_fit_their_dialog_in_german(cx: &mut TestAppContex
 #[gpui_kit::test]
 fn the_unsaved_changes_buttons_fit_their_dialog_in_french(cx: &mut TestAppContext) {
     the_unsaved_changes_buttons_fit_their_dialog(cx, "fr");
+}
+
+#[gpui_kit::test]
+fn the_unsaved_changes_buttons_fit_their_dialog_in_chinese(cx: &mut TestAppContext) {
+    the_unsaved_changes_buttons_fit_their_dialog(cx, "zh-CN");
 }
 
 fn texts(c: &Confirm) -> [String; 4] {

@@ -123,6 +123,85 @@ fn bundled_inter_resolves_a_distinct_face_per_weight() {
     assert_ne!(medium, semibold);
 }
 
+/// Chinese UI text, regular and bold, shapes through the theme's fallbacks: no glyph is .notdef
+/// and every Han glyph comes from the first listed family installed. Skips where none is (CI).
+#[test]
+fn chinese_ui_text_draws_through_the_first_installed_fallback() {
+    use std::borrow::Cow;
+    use std::sync::Arc;
+
+    use gpui_kit::{
+        Font, FontId, FontWeight, PlatformTextSystem as _, SharedString, TextRun, TextSystem,
+        WindowTextSystem, font, px,
+    };
+    use gpui_wgpu::CosmicTextSystem;
+    use tf2tools_app::theme::{FONTS, UI_FONT_FALLBACKS, ui_font};
+
+    // A separate probe finds the family, so the shaping system loads no CJK face early.
+    let probe = CosmicTextSystem::new("Inter");
+    let Some(expected) = UI_FONT_FALLBACKS
+        .iter()
+        .copied()
+        .find(|family| probe.font_id(&font(*family)).is_ok())
+    else {
+        eprintln!("skipped: none of {UI_FONT_FALLBACKS:?} is installed");
+        return;
+    };
+    let text = Arc::new(TextSystem::new(Arc::new(CosmicTextSystem::new("Inter"))));
+    let fonts = FONTS.iter().map(|f| Cow::Borrowed(*f)).collect();
+    text.add_fonts(fonts).expect("the bundled fonts load");
+    let shaper = WindowTextSystem::new(Arc::clone(&text));
+    let lines = [
+        "设置",
+        "安装 HUD",
+        "命中音效和击杀音效",
+        "侦察兵的主武器准星",
+        "下载完成：1.3万 次（已安装）。",
+        "“预设”已保存…",
+    ];
+    let weights = [FontWeight::NORMAL, FontWeight::BOLD];
+    let mut han = Vec::new();
+    for weight in weights {
+        for line in lines {
+            let run = TextRun {
+                len: line.len(),
+                font: Font {
+                    weight,
+                    ..ui_font("Inter")
+                },
+                ..Default::default()
+            };
+            let shaped = shaper.shape_line(SharedString::from(line), px(14.), &[run], None);
+            for r in &shaped.runs {
+                for g in &r.glyphs {
+                    let ch = line[g.index..].chars().next().unwrap();
+                    assert_ne!(g.id.0, 0, "{line:?} {weight:?}: {ch:?} is .notdef");
+                    if ('\u{4e00}'..='\u{9fff}').contains(&ch) {
+                        han.push((line, weight, ch, r.font_id));
+                    }
+                }
+            }
+        }
+    }
+    assert!(!han.is_empty());
+    // Resolved only now: the chain's faces share these ids, a last-resort pick would not.
+    let listed: Vec<FontId> = weights
+        .iter()
+        .map(|w| {
+            text.resolve_font(&Font {
+                weight: *w,
+                ..font(expected)
+            })
+        })
+        .collect();
+    for (line, weight, ch, id) in han {
+        assert!(
+            listed.contains(&id),
+            "{line:?} {weight:?}: {ch:?} drew from {id:?}, not {expected:?} {listed:?}"
+        );
+    }
+}
+
 /// `usWeightClass` from a TrueType font's OS/2 table.
 fn weight_class(ttf: &[u8]) -> u16 {
     let be16 = |at: usize| u16::from_be_bytes([ttf[at], ttf[at + 1]]);

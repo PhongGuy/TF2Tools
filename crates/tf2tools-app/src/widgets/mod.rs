@@ -20,7 +20,7 @@ use gpui_kit::component::button::Button;
 use gpui_kit::{
     App, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     Pixels, Rems, SharedString, StatefulInteractiveElement as _, TestSupportExt as _, TextRun,
-    Window, font, rems,
+    Window, rems,
 };
 
 /// Gives an icon-only button its words: the tooltip a player sees on hover and the name a
@@ -64,7 +64,7 @@ pub(crate) fn label_width_at(text: &SharedString, size: Rems, window: &Window, c
         len: text.len(),
         font: gpui_kit::Font {
             weight: FontWeight::MEDIUM,
-            ..font(cx.theme().font_family.clone())
+            ..crate::theme::ui_font(cx.theme().font_family.clone())
         },
         ..Default::default()
     };
