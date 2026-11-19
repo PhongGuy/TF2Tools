@@ -2985,6 +2985,8 @@ graphics:
     offline: "La lista de ajustes necesita conexión a internet la primera vez. Conéctate y vuelve a abrir esta página."
     unsupported: "Esta versión de mastercomfig aún no es compatible. Los preajustes de arriba siguen funcionando."
   not_set: "Que TF2 decida"
+  row:
+    preset_value: "%{preset}: %{value}"
   module:
     lod:
       label: "Calidad de modelos"

@@ -3,6 +3,7 @@
 pub mod jobs;
 pub mod model;
 mod settings;
+pub mod view;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

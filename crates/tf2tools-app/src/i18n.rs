@@ -677,6 +677,7 @@ mod tests {
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.row.preset_value",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -788,6 +789,7 @@ mod tests {
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.row.preset_value",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -901,6 +903,7 @@ mod tests {
         "graphics.module.romevision.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.row.preset_value",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
         "hud_maker.borrow.origin.curated",
@@ -1160,7 +1163,7 @@ mod tests {
     }
 
     // Graphics values Russian legitimately writes as English does: names and bare formats.
-    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &[];
+    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &["graphics.row.preset_value"];
 
     #[test]
     fn russian_leaves_no_graphics_word_in_english() {

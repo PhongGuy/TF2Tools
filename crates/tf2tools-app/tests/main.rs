@@ -68,6 +68,7 @@ mod graphics_settings;
 mod graphics_settings_edit;
 mod graphics_settings_files;
 mod graphics_settings_model;
+mod graphics_view;
 mod help_links;
 mod hud_copy_card;
 mod hud_copy_update;

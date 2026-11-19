@@ -1919,6 +1919,14 @@ pub fn module_catalog() -> tf2tools_core::ModuleCatalog {
     tf2tools_core::ModuleCatalog::parse("9.100.1", MC_MODULES, MC_PRESET_MODULES).unwrap()
 }
 
+pub const MC_MODULES_FULL: &[u8] =
+    include_bytes!("../../../tf2tools-core/tests/fixtures/mastercomfig/modules-9.100.1.json");
+
+/// The full 9.100.1 catalogue over core's trimmed preset data.
+pub fn full_module_catalog() -> tf2tools_core::ModuleCatalog {
+    tf2tools_core::ModuleCatalog::parse("9.100.1", MC_MODULES_FULL, MC_PRESET_MODULES).unwrap()
+}
+
 /// Saves the fixture catalog as release `tag`'s, where the store's cache reads it.
 pub fn seed_mastercomfig_catalog(env: &Env, tag: &str) {
     let dir = env.data.mastercomfig_dir().join(tag);
