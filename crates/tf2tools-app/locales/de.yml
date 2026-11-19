@@ -3018,6 +3018,8 @@ graphics:
     post_processing:
       label: "Nachbearbeitung"
       description: "Bloom und die Farbkorrektur über dem ganzen Bild."
+      value:
+        low: "Nur Bloom"
     color_filter:
       label: "Farbfilter"
       description: "Ein Farbton über dem ganzen Bild."
@@ -3096,6 +3098,8 @@ graphics:
     hud_contracts:
       label: "Aufträge"
       description: "Welche Aufträge das HUD anzeigt."
+      value:
+        custom: "Spieleinstellung"
     hud_panels:
       label: "HUD-Elemente"
       description: "Wie viele zusätzliche Elemente das HUD anzeigt."
@@ -3156,3 +3160,80 @@ graphics:
     download:
       label: "Downloads"
       description: "Welche benutzerdefinierten Inhalte dir Server schicken dürfen."
+      value:
+        custom: "Spieleinstellung"
+  value:
+    low: "Niedrig"
+    medium: "Mittel"
+    high: "Hoch"
+    ultra: "Ultra"
+    very_low: "Sehr niedrig"
+    very_high: "Sehr hoch"
+    off: "Aus"
+    on: "An"
+    rim: "Kantenlicht"
+    default: "Standard"
+    calm: "Ruhig"
+    vivid: "Lebhaft"
+    washed: "Verwaschen"
+    dreamy: "Verträumt"
+    grayscale: "Graustufen"
+    desaturated: "Entsättigt"
+    warm: "Warm"
+    cool: "Kühl"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Beibehalten"
+    auto: "Automatisch"
+    force_on: "Immer"
+    slow: "Langsam"
+    fast: "Schnell"
+    full: "Voll"
+    blocky: "Pixelig"
+    trilinear: "Trilinear"
+    aniso2x: "Anisotropisch 2×"
+    aniso4x: "Anisotropisch 4×"
+    aniso8x: "Anisotropisch 8×"
+    aniso16x: "Anisotropisch 16×"
+    powersaver: "Energiesparen"
+    unlimited: "Unbegrenzt"
+    custom: "Eigener Wert"
+    hide: "Ausblenden"
+    all: "Alle"
+    active: "Nur aktive"
+    everyone: "Alle"
+    friends: "Freunde"
+    dustbowl: "Dustbowl"
+    hidden: "Versteckt"
+    open: "Offen"
+    request: "Auf Anfrage"
+    invite: "Nur Einladung"
+    congestion: "Überlastung"
+    standard: "Normal"
+    x1: "1 Snapshot"
+    x2: "2 Snapshots"
+    anim: "Animation"
+    small: "Klein"
+    conservative: "Vorsichtig"
+    large: "Groß"
+    nosounds: "Ohne Sounds"
+    mapsonly: "Nur Karten"
+    nothing: "Nichts"
+  category:
+    graphics: "Grafik"
+    hud: "HUD"
+    sound: "Ton"
+    misc: "Sonstiges"
+    networking: "Netzwerk"
+  preset:
+    low:
+      label: "Niedrig"
+    medium:
+      label: "Mittel"
+    high:
+      label: "Hoch"
+    ultra:
+      label: "Ultra"
+    custom:
+      label: "Eigene"

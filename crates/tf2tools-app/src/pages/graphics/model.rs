@@ -131,14 +131,14 @@ fn version_parts(tag: &str) -> Option<Vec<u64>> {
     tag.split('.').map(|part| part.parse().ok()).collect()
 }
 
-/// The preset card's title.
-pub fn preset_label(preset: Preset) -> &'static str {
+/// The preset's name in the current language, as the cards, the strip and the rows show it.
+pub fn preset_label(preset: Preset) -> SharedString {
     match preset {
-        Preset::Ultra => "Ultra",
-        Preset::High => "High",
-        Preset::Low => "Low",
-        Preset::Custom => "Custom",
-        Preset::Medium | _ => "Medium",
+        Preset::Ultra => tr!("graphics.preset.ultra.label"),
+        Preset::High => tr!("graphics.preset.high.label"),
+        Preset::Low => tr!("graphics.preset.low.label"),
+        Preset::Custom => tr!("graphics.preset.custom.label"),
+        Preset::Medium | _ => tr!("graphics.preset.medium.label"),
     }
 }
 

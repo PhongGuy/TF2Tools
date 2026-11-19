@@ -3017,6 +3017,8 @@ graphics:
     post_processing:
       label: "后期处理"
       description: "整个画面的泛光和调色。"
+      value:
+        low: "仅泛光"
     color_filter:
       label: "色彩滤镜"
       description: "覆盖整个画面的色调。"
@@ -3095,6 +3097,8 @@ graphics:
     hud_contracts:
       label: "合同"
       description: "HUD 显示哪些合同。"
+      value:
+        custom: "游戏设置"
     hud_panels:
       label: "HUD 面板"
       description: "HUD 显示多少额外面板。"
@@ -3155,3 +3159,80 @@ graphics:
     download:
       label: "下载"
       description: "允许服务器发送哪些自定义内容。"
+      value:
+        custom: "游戏设置"
+  value:
+    low: "低"
+    medium: "中等"
+    high: "高"
+    ultra: "极高"
+    very_low: "非常低"
+    very_high: "非常高"
+    off: "关闭"
+    on: "开启"
+    rim: "轮廓光"
+    default: "默认"
+    calm: "平静"
+    vivid: "鲜艳"
+    washed: "褪色"
+    dreamy: "梦幻"
+    grayscale: "灰度"
+    desaturated: "低饱和"
+    warm: "暖色"
+    cool: "冷色"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "保留"
+    auto: "自动"
+    force_on: "始终"
+    slow: "慢"
+    fast: "快"
+    full: "完全"
+    blocky: "像素化"
+    trilinear: "三线性"
+    aniso2x: "异向 2X"
+    aniso4x: "异向 4X"
+    aniso8x: "异向 8X"
+    aniso16x: "异向 16X"
+    powersaver: "节能"
+    unlimited: "无限制"
+    custom: "自定义"
+    hide: "隐藏"
+    all: "全部"
+    active: "仅进行中"
+    everyone: "所有人"
+    friends: "好友"
+    dustbowl: "Dustbowl"
+    hidden: "不显示"
+    open: "开放"
+    request: "需申请"
+    invite: "仅限邀请"
+    congestion: "拥塞"
+    standard: "标准"
+    x1: "1 个快照"
+    x2: "2 个快照"
+    anim: "动画"
+    small: "小"
+    conservative: "保守"
+    large: "大"
+    nosounds: "不含声音"
+    mapsonly: "仅地图"
+    nothing: "无"
+  category:
+    graphics: "图形"
+    hud: "HUD"
+    sound: "声音"
+    misc: "其他"
+    networking: "网络"
+  preset:
+    low:
+      label: "低"
+    medium:
+      label: "中等"
+    high:
+      label: "高"
+    ultra:
+      label: "极高"
+    custom:
+      label: "自定义"

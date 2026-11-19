@@ -3019,6 +3019,8 @@ graphics:
     post_processing:
       label: "Pós-processamento"
       description: "Bloom e a correção de cor da imagem inteira."
+      value:
+        low: "Só bloom"
     color_filter:
       label: "Filtro de cor"
       description: "Um tom de cor sobre a imagem inteira."
@@ -3097,6 +3099,8 @@ graphics:
     hud_contracts:
       label: "Contratos"
       description: "Quais contratos o HUD mostra."
+      value:
+        custom: "Ajuste do jogo"
     hud_panels:
       label: "Painéis do HUD"
       description: "Quantos painéis extras o HUD mostra."
@@ -3157,3 +3161,80 @@ graphics:
     download:
       label: "Downloads"
       description: "Que conteúdo personalizado os servidores podem enviar para você."
+      value:
+        custom: "Ajuste do jogo"
+  value:
+    low: "Baixo"
+    medium: "Médio"
+    high: "Alto"
+    ultra: "Ultra"
+    very_low: "Muito baixo"
+    very_high: "Muito alto"
+    off: "Desligado"
+    on: "Ligado"
+    rim: "Luz de contorno"
+    default: "Padrão"
+    calm: "Calmo"
+    vivid: "Vívido"
+    washed: "Desbotado"
+    dreamy: "Onírico"
+    grayscale: "Escala de cinza"
+    desaturated: "Dessaturado"
+    warm: "Quente"
+    cool: "Frio"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Manter"
+    auto: "Automático"
+    force_on: "Sempre"
+    slow: "Lento"
+    fast: "Rápido"
+    full: "Completo"
+    blocky: "Pixelado"
+    trilinear: "Trilinear"
+    aniso2x: "Anisotrópico 2X"
+    aniso4x: "Anisotrópico 4X"
+    aniso8x: "Anisotrópico 8X"
+    aniso16x: "Anisotrópico 16X"
+    powersaver: "Economia de energia"
+    unlimited: "Ilimitado"
+    custom: "Personalizado"
+    hide: "Ocultar"
+    all: "Todos"
+    active: "Só ativos"
+    everyone: "Todos"
+    friends: "Amigos"
+    dustbowl: "Dustbowl"
+    hidden: "Oculto"
+    open: "Aberto"
+    request: "Sob pedido"
+    invite: "Só convite"
+    congestion: "Congestionamento"
+    standard: "Padrão"
+    x1: "1 instantâneo"
+    x2: "2 instantâneos"
+    anim: "Animação"
+    small: "Pequeno"
+    conservative: "Conservador"
+    large: "Grande"
+    nosounds: "Sem sons"
+    mapsonly: "Só mapas"
+    nothing: "Nada"
+  category:
+    graphics: "Gráficos"
+    hud: "HUD"
+    sound: "Som"
+    misc: "Diversos"
+    networking: "Rede"
+  preset:
+    low:
+      label: "Baixo"
+    medium:
+      label: "Médio"
+    high:
+      label: "Alto"
+    ultra:
+      label: "Ultra"
+    custom:
+      label: "Personalizado"

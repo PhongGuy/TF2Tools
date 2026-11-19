@@ -2993,6 +2993,8 @@ graphics:
     post_processing:
       label: "Постобработка"
       description: "Свечение и цветокоррекция всего изображения."
+      value:
+        low: "Только блум"
     color_filter:
       label: "Цветовой фильтр"
       description: "Цветовой оттенок поверх всего изображения."
@@ -3071,6 +3073,8 @@ graphics:
     hud_contracts:
       label: "Контракты"
       description: "Какие контракты показывает HUD."
+      value:
+        custom: "Настройка игры"
     hud_panels:
       label: "Панели HUD"
       description: "Сколько дополнительных панелей показывает HUD."
@@ -3131,3 +3135,80 @@ graphics:
     download:
       label: "Загрузки"
       description: "Какой пользовательский контент серверы могут вам отправлять."
+      value:
+        custom: "Настройка игры"
+  value:
+    low: "Низкое"
+    medium: "Среднее"
+    high: "Высокое"
+    ultra: "Ультра"
+    very_low: "Очень низкое"
+    very_high: "Очень высокое"
+    off: "Выкл."
+    on: "Вкл."
+    rim: "Контурный свет"
+    default: "По умолчанию"
+    calm: "Спокойный"
+    vivid: "Яркий"
+    washed: "Блёклый"
+    dreamy: "Мечтательный"
+    grayscale: "Оттенки серого"
+    desaturated: "Обесцвеченный"
+    warm: "Тёплый"
+    cool: "Холодный"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Оставить"
+    auto: "Авто"
+    force_on: "Всегда"
+    slow: "Медленно"
+    fast: "Быстро"
+    full: "Полный"
+    blocky: "Пиксельная"
+    trilinear: "Трилинейная"
+    aniso2x: "Анизотропная 2х"
+    aniso4x: "Анизотропная 4х"
+    aniso8x: "Анизотропная 8х"
+    aniso16x: "Анизотропная 16х"
+    powersaver: "Энергосбережение"
+    unlimited: "Без ограничений"
+    custom: "Свой вариант"
+    hide: "Скрыть"
+    all: "Все"
+    active: "Только активные"
+    everyone: "Все"
+    friends: "Друзья"
+    dustbowl: "Dustbowl"
+    hidden: "Скрыт"
+    open: "Открытый"
+    request: "По запросу"
+    invite: "По приглашению"
+    congestion: "Перегрузка"
+    standard: "Стандартный"
+    x1: "1 снимок"
+    x2: "2 снимка"
+    anim: "Анимация"
+    small: "Малый"
+    conservative: "Осторожный"
+    large: "Большой"
+    nosounds: "Без звуков"
+    mapsonly: "Только карты"
+    nothing: "Ничего"
+  category:
+    graphics: "Графика"
+    hud: "HUD"
+    sound: "Звук"
+    misc: "Прочее"
+    networking: "Сеть"
+  preset:
+    low:
+      label: "Низкое"
+    medium:
+      label: "Среднее"
+    high:
+      label: "Высокое"
+    ultra:
+      label: "Ультра"
+    custom:
+      label: "Своя"

@@ -3020,6 +3020,8 @@ graphics:
     post_processing:
       label: "Post-traitement"
       description: "Le bloom et l'étalonnage des couleurs sur toute l'image."
+      value:
+        low: "Bloom seulement"
     color_filter:
       label: "Filtre de couleur"
       description: "Une teinte de couleur sur toute l'image."
@@ -3098,6 +3100,8 @@ graphics:
     hud_contracts:
       label: "Contrats"
       description: "Les contrats que le HUD affiche."
+      value:
+        custom: "Réglage du jeu"
     hud_panels:
       label: "Panneaux du HUD"
       description: "Le nombre de panneaux supplémentaires que le HUD affiche."
@@ -3158,3 +3162,80 @@ graphics:
     download:
       label: "Téléchargements"
       description: "Le contenu personnalisé que les serveurs peuvent vous envoyer."
+      value:
+        custom: "Réglage du jeu"
+  value:
+    low: "Faible"
+    medium: "Moyenne"
+    high: "Élevée"
+    ultra: "Ultra"
+    very_low: "Très faible"
+    very_high: "Très élevée"
+    off: "Désactivé"
+    on: "Activé"
+    rim: "Lumière de contour"
+    default: "Par défaut"
+    calm: "Calme"
+    vivid: "Vif"
+    washed: "Délavé"
+    dreamy: "Onirique"
+    grayscale: "Niveaux de gris"
+    desaturated: "Désaturé"
+    warm: "Chaud"
+    cool: "Froid"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Conserver"
+    auto: "Automatique"
+    force_on: "Toujours"
+    slow: "Lent"
+    fast: "Rapide"
+    full: "Complet"
+    blocky: "Pixelisé"
+    trilinear: "Trilinéaire"
+    aniso2x: "Anisotrope 2X"
+    aniso4x: "Anisotrope 4X"
+    aniso8x: "Anisotrope 8X"
+    aniso16x: "Anisotrope 16X"
+    powersaver: "Économie d'énergie"
+    unlimited: "Illimité"
+    custom: "Personnalisé"
+    hide: "Masquer"
+    all: "Tous"
+    active: "Actifs seulement"
+    everyone: "Tout le monde"
+    friends: "Amis"
+    dustbowl: "Dustbowl"
+    hidden: "Masqué"
+    open: "Ouvert"
+    request: "Sur demande"
+    invite: "Sur invitation"
+    congestion: "Congestion"
+    standard: "Standard"
+    x1: "1 instantané"
+    x2: "2 instantanés"
+    anim: "Animation"
+    small: "Petit"
+    conservative: "Prudent"
+    large: "Grand"
+    nosounds: "Sans sons"
+    mapsonly: "Cartes seulement"
+    nothing: "Rien"
+  category:
+    graphics: "Graphismes"
+    hud: "HUD"
+    sound: "Son"
+    misc: "Divers"
+    networking: "Réseau"
+  preset:
+    low:
+      label: "Faible"
+    medium:
+      label: "Moyenne"
+    high:
+      label: "Élevée"
+    ultra:
+      label: "Ultra"
+    custom:
+      label: "Personnalisée"

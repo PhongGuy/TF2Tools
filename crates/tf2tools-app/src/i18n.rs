@@ -672,12 +672,20 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.category.hud",
         "graphics.module.download.label",
         "graphics.module.gibs.label",
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
         "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.trilinear",
+        "graphics.value.ultra",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -785,11 +793,18 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.category.hud",
         "graphics.module.gibs.label",
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
         "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.ultra",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -895,6 +910,7 @@ mod tests {
         "crosshair_maker.starter.value",
         "crosshairs_page.sync.in_game",
         "crosshairs_page.sync.skipped",
+        "graphics.category.hud",
         "graphics.module.decals.label",
         "graphics.module.download.label",
         "graphics.module.gibs.label",
@@ -903,7 +919,16 @@ mod tests {
         "graphics.module.romevision.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
         "graphics.row.preset_value",
+        "graphics.value.anim",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.trilinear",
+        "graphics.value.ultra",
+        "graphics.value.warm",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
         "hud_maker.borrow.origin.curated",
@@ -1032,12 +1057,22 @@ mod tests {
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
         "crosshair_maker.tool.rectangle",
+        "graphics.category.hud",
         "graphics.module.gibs.label",
         "graphics.module.hud_avatars.label",
         "graphics.module.pyrovision.label",
         "graphics.module.ragdolls.label",
         "graphics.module.romevision.label",
         "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
+        "graphics.value.anim",
+        "graphics.value.congestion",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.standard",
+        "graphics.value.ultra",
         "hud_maker.animations.title",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
@@ -1131,6 +1166,11 @@ mod tests {
         "common.size.kb",
         "common.size.mb",
         "common.size.tb",
+        "graphics.category.hud",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
         "hud_maker.label.hud",
@@ -1163,7 +1203,14 @@ mod tests {
     }
 
     // Graphics values Russian legitimately writes as English does: names and bare formats.
-    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &["graphics.row.preset_value"];
+    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &[
+        "graphics.category.hud",
+        "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+    ];
 
     #[test]
     fn russian_leaves_no_graphics_word_in_english() {
@@ -1320,6 +1367,8 @@ mod tests {
                 prefix != ["hud_maker", "label"]
                     && prefix != ["hud_maker", "part_name"]
                     && prefix != ["graphics", "module"]
+                    && prefix != ["graphics", "value"]
+                    && prefix != ["graphics", "category"]
             })
             .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
             .filter(|k| !named.contains(*k))

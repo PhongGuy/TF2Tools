@@ -221,4 +221,56 @@ mod tests {
         assert_eq!(super::module_label(new).as_ref(), "New Thing");
         assert_eq!(super::module_description(new), None);
     }
+
+    #[test]
+    fn every_word_value_and_category_of_9_100_1_has_english() {
+        let en = messages("en");
+        let catalog = catalog();
+        let mut missing: Vec<String> = Vec::new();
+        for category in catalog.categories() {
+            if !en.contains_key(&category_key(category.key())) {
+                missing.push(category.key().to_owned());
+            }
+            for module in category.modules() {
+                for v in module.values() {
+                    if v.value().starts_with(|c: char| c.is_ascii_digit()) {
+                        continue;
+                    }
+                    let keys = [
+                        value_override_key(module.name(), v.value()),
+                        value_key(v.value()),
+                    ];
+                    if !keys.iter().any(|k| en.contains_key(k)) {
+                        missing.push(format!("{}={}", module.name(), v.value()));
+                    }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "no English for {missing:?}");
+    }
+
+    #[test]
+    fn an_override_beats_the_shared_word_and_numbers_show_as_is() {
+        let _lock = crate::i18n::test_lock();
+        crate::i18n::apply("en");
+        let catalog = catalog();
+        let label = |m: &str, v: &str| {
+            let module = catalog.module(m).unwrap();
+            let value = module.values().iter().find(|x| x.value() == v).unwrap();
+            super::value_label(module, value).to_string()
+        };
+        assert_eq!(label("post_processing", "low"), "Bloom only");
+        assert_eq!(label("lod", "low"), "Low");
+        assert_eq!(label("phong", "rim"), "Rim light");
+        assert_eq!(label("fpscap", "120"), "120");
+        assert_eq!(label("bandwidth", "1.0Mbps"), "1.0Mbps");
+        let filter = catalog.module("texture_filter").unwrap();
+        let shown = super::choice_label(
+            filter,
+            &tf2tools_core::ModuleChoice::Value("aniso16x".into()),
+        );
+        assert_eq!(shown.as_ref(), "Anisotropic 16x");
+        let hud = &catalog.categories()[1];
+        assert_eq!(super::category_label(hud).as_ref(), "HUD");
+    }
 }

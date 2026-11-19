@@ -2995,6 +2995,8 @@ graphics:
     post_processing:
       label: "Post-processing"
       description: "Bloom and the color grading over the whole picture."
+      value:
+        low: "Bloom only"
     color_filter:
       label: "Color filter"
       description: "A color tint over the whole picture."
@@ -3073,6 +3075,8 @@ graphics:
     hud_contracts:
       label: "Contracts"
       description: "Which contracts the HUD shows."
+      value:
+        custom: "Game setting"
     hud_panels:
       label: "HUD panels"
       description: "How many extra panels the HUD shows."
@@ -3133,3 +3137,80 @@ graphics:
     download:
       label: "Downloads"
       description: "Which custom content servers may send you."
+      value:
+        custom: "Game setting"
+  value:
+    low: "Low"
+    medium: "Medium"
+    high: "High"
+    ultra: "Ultra"
+    very_low: "Very low"
+    very_high: "Very high"
+    off: "Off"
+    on: "On"
+    rim: "Rim light"
+    default: "Default"
+    calm: "Calm"
+    vivid: "Vivid"
+    washed: "Washed out"
+    dreamy: "Dreamy"
+    grayscale: "Grayscale"
+    desaturated: "Desaturated"
+    warm: "Warm"
+    cool: "Cool"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Keep"
+    auto: "Automatic"
+    force_on: "Always"
+    slow: "Slow"
+    fast: "Fast"
+    full: "Full"
+    blocky: "Blocky"
+    trilinear: "Trilinear"
+    aniso2x: "Anisotropic 2x"
+    aniso4x: "Anisotropic 4x"
+    aniso8x: "Anisotropic 8x"
+    aniso16x: "Anisotropic 16x"
+    powersaver: "Power saver"
+    unlimited: "Unlimited"
+    custom: "Custom"
+    hide: "Hide"
+    all: "All"
+    active: "Active only"
+    everyone: "Everyone"
+    friends: "Friends"
+    dustbowl: "Dustbowl"
+    hidden: "Hidden"
+    open: "Open"
+    request: "On request"
+    invite: "Invite only"
+    congestion: "Congestion"
+    standard: "Standard"
+    x1: "1 snapshot"
+    x2: "2 snapshots"
+    anim: "Animation"
+    small: "Small"
+    conservative: "Conservative"
+    large: "Large"
+    nosounds: "No sounds"
+    mapsonly: "Maps only"
+    nothing: "Nothing"
+  category:
+    graphics: "Graphics"
+    hud: "HUD"
+    sound: "Sound"
+    misc: "Misc"
+    networking: "Networking"
+  preset:
+    low:
+      label: "Low"
+    medium:
+      label: "Medium"
+    high:
+      label: "High"
+    ultra:
+      label: "Ultra"
+    custom:
+      label: "Custom"

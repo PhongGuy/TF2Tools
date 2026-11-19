@@ -73,20 +73,19 @@ fn the_card_compares_the_install_with_the_recorded_release() {
 
 #[test]
 fn preset_cards_carry_comfig_app_s_descriptions() {
-    let shown: Vec<(&str, &str)> = Preset::PICKER
+    let shown: Vec<(String, &str)> = Preset::PICKER
         .iter()
-        .map(|p| (preset_label(*p), preset_description(*p)))
+        .map(|p| (preset_label(*p).to_string(), preset_description(*p)))
         .collect();
-    assert_eq!(
-        shown,
-        [
-            ("Ultra", "Absolute maximum graphical quality"),
-            ("High", "High graphical quality"),
-            ("Medium", "Medium graphical quality"),
-            ("Low", "Low graphical quality"),
-            ("Custom", "Skip setting quality options unless set by you"),
-        ]
-    );
+    let want = [
+        ("Ultra", "Absolute maximum graphical quality"),
+        ("High", "High graphical quality"),
+        ("Medium", "Medium graphical quality"),
+        ("Low", "Low graphical quality"),
+        ("Custom", "Skip setting quality options unless set by you"),
+    ]
+    .map(|(l, d)| (l.to_owned(), d));
+    assert_eq!(shown, want);
 }
 
 #[test]
