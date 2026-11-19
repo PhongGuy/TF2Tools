@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tf2tools_core::{
-    FontHost, Platform, check_hud_fonts, install_hud_fonts, scan_hud_fonts, system_font_host,
+    Platform, check_hud_fonts, install_hud_fonts, scan_hud_fonts, system_font_host,
 };
 
 use crate::common::write_file;
