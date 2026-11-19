@@ -1,6 +1,6 @@
 //! Font names: the family, typographic family and full names a font file declares.
 
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::path::Path;
 
 /// OS font families that are never installed; a HUD file carrying one is skipped whole.
@@ -89,20 +89,131 @@ pub(crate) struct FontNames {
 /// unreadable file is its I/O error; bytes no face's `name` table parses from, or a file over
 /// the size cap, are `InvalidData`.
 pub(crate) fn font_names(path: &Path) -> std::io::Result<FontNames> {
-    names_in(&read_capped(path)?)
+    let too_big = || {
+        Error::new(
+            ErrorKind::InvalidData,
+            "not a regular font file within the size cap",
+        )
+    };
+    // Opening a FIFO blocks, so only a regular file is opened.
+    if !std::fs::metadata(path)?.is_file() {
+        return Err(too_big());
+    }
+    let mut file = std::fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    if len > MAX_FONT_BYTES {
+        return Err(too_big());
+    }
+    names_from(&mut file, len)
+}
+
+/// [`names_in`] over a file of `len` bytes, reading only its header, each face's table
+/// directory and `name` table: a system scan then costs kilobytes per font, not whole files.
+/// Its checks follow `ttf_parser::RawFace::parse`, so both reads find the same names.
+fn names_from(file: &mut (impl Read + Seek), len: u64) -> std::io::Result<FontNames> {
+    let mut at = |offset: u64, size: u64| -> std::io::Result<Option<Vec<u8>>> {
+        if offset.checked_add(size).is_none_or(|end| end > len) {
+            return Ok(None);
+        }
+        let mut bytes = vec![0; usize::try_from(size).map_err(Error::other)?];
+        file.seek(SeekFrom::Start(offset))?;
+        file.read_exact(&mut bytes)?;
+        Ok(Some(bytes))
+    };
+    let u32_at = |bytes: &[u8], i: usize| {
+        bytes
+            .get(i..i + 4)
+            .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
+    };
+    let head = at(0, len.min(12))?.unwrap_or_default();
+    let magic = u32_at(&head, 0);
+    let mut faces = Vec::new();
+    if magic == Some(TTCF) {
+        // A collection's whole offset array must fit, as `face_count` and ttf-parser require.
+        if let Some(count) =
+            u32_at(&head, 8).filter(|&n| u64::from(n) <= len.saturating_sub(12) / 4)
+        {
+            let first_face = 12 + 4 * u64::from(count);
+            let walked = count.min(MAX_FACES);
+            let offsets = at(12, 4 * u64::from(walked))?.unwrap_or_default();
+            for i in 0..walked as usize {
+                let offset = u32_at(&offsets, 4 * i).map(u64::from);
+                let face = match offset.filter(|&o| o >= first_face) {
+                    Some(o) => at(o, 4)?
+                        .and_then(|m| u32_at(&m, 0))
+                        .filter(|&m| is_face(m))
+                        .map(|_| o),
+                    None => None,
+                };
+                faces.push(face);
+            }
+        }
+    } else {
+        faces.push(magic.filter(|&m| is_face(m)).map(|_| 0));
+    }
+    let mut tables = Vec::with_capacity(faces.len());
+    for face in faces {
+        tables.push(match face {
+            Some(base) => name_bytes(&mut at, base)?,
+            None => None,
+        });
+    }
+    collect_names(
+        tables.iter().map(Option::as_deref),
+        head.starts_with(b"OTTO"),
+    )
+}
+
+const TTCF: u32 = u32::from_be_bytes(*b"ttcf");
+const NAME: u32 = u32::from_be_bytes(*b"name");
+
+/// A single face's signature: TrueType 1.0, Apple `true` or CFF `OTTO`.
+fn is_face(magic: u32) -> bool {
+    matches!(magic, 0x0001_0000 | 0x7472_7565 | 0x4F54_544F)
+}
+
+/// The `name` table of the face whose header starts at `base`, found in its tag-sorted table
+/// directory by binary search as ttf-parser does; `None` when the directory or table does not
+/// fit in the file.
+fn name_bytes(
+    at: &mut impl FnMut(u64, u64) -> std::io::Result<Option<Vec<u8>>>,
+    base: u64,
+) -> std::io::Result<Option<Vec<u8>>> {
+    let Some(count) = at(base + 4, 2)? else {
+        return Ok(None);
+    };
+    let count = u64::from(u16::from_be_bytes([count[0], count[1]]));
+    let Some(records) = at(base + 12, 16 * count)? else {
+        return Ok(None);
+    };
+    let field = |r: &[u8; 16], i: usize| u32::from_be_bytes([r[i], r[i + 1], r[i + 2], r[i + 3]]);
+    let records = records.as_chunks::<16>().0;
+    let Ok(found) = records.binary_search_by(|r| field(r, 0).cmp(&NAME)) else {
+        return Ok(None);
+    };
+    let record = &records[found];
+    at(u64::from(field(record, 8)), u64::from(field(record, 12)))
 }
 
 /// [`font_names`] over bytes already read, so a caller can check and copy the same bytes.
 pub(crate) fn names_in(data: &[u8]) -> std::io::Result<FontNames> {
-    let faces = face_count(data);
+    let tables = (0..face_count(data)).map(|index| raw_name_table(data, index));
+    collect_names(tables, data.starts_with(b"OTTO"))
+}
+
+/// The names in each face's raw `name` table, faces in order; `None` is a face without one.
+fn collect_names<'a>(
+    tables: impl Iterator<Item = Option<&'a [u8]>>,
+    open_type: bool,
+) -> std::io::Result<FontNames> {
     let mut names: Vec<String> = Vec::new();
     // Folded spellings already kept, so a hostile table of many distinct names stays linear.
     let mut seen = std::collections::HashSet::new();
     let mut full_name = None;
     let mut undecoded = false;
     let mut parsed_any = false;
-    for index in 0..faces {
-        let Some(table) = name_table(data, index) else {
+    for (index, raw) in tables.enumerate() {
+        let Some(table) = raw.and_then(ttf_parser::name::Table::parse) else {
             continue;
         };
         parsed_any = true;
@@ -137,7 +248,7 @@ pub(crate) fn names_in(data: &[u8]) -> std::io::Result<FontNames> {
     Ok(FontNames {
         names,
         full_name,
-        open_type: data.starts_with(b"OTTO"),
+        open_type,
         undecoded,
     })
 }
@@ -155,10 +266,14 @@ fn face_count(data: &[u8]) -> u32 {
 /// Face `index`'s `name` table. Only the table directory and `name` are read, so the other
 /// tables' parsers never see untrusted bytes.
 fn name_table(data: &[u8], index: u32) -> Option<ttf_parser::name::Table<'_>> {
+    raw_name_table(data, index).and_then(ttf_parser::name::Table::parse)
+}
+
+/// Face `index`'s `name` table bytes, unparsed.
+fn raw_name_table(data: &[u8], index: u32) -> Option<&[u8]> {
     ttf_parser::RawFace::parse(data, index)
         .ok()
         .and_then(|raw| raw.table(ttf_parser::Tag::from_bytes(b"name")))
-        .and_then(ttf_parser::name::Table::parse)
 }
 
 /// The primary family of the first face: its first decodable, non-empty Windows-platform
@@ -360,6 +475,76 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The fields a name read yields, or its error kind, so two reads compare whole.
+    fn outcome(read: std::io::Result<FontNames>) -> Result<String, ErrorKind> {
+        read.map(|n| format!("{:?}", (n.names, n.full_name, n.open_type, n.undecoded)))
+            .map_err(|e| e.kind())
+    }
+
+    #[test]
+    fn reading_only_the_name_tables_matches_reading_the_whole_file() {
+        let foo: Vec<u8> = "Foo".encode_utf16().flat_map(u16::to_be_bytes).collect();
+        let fonts = [
+            sfnt_bytes(
+                &[(1, "Surface"), (16, "Surface Pro"), (4, "Surface Bold")],
+                false,
+            ),
+            sfnt_bytes(&[(1, "Code Pro"), (4, "code-pro-bold")], true),
+            ttc_bytes(&[&[(1, "A Fam"), (4, "A Full")], &[(1, "B Fam")]]),
+            sfnt_mac_bytes(&[(1, b"Caf\x8e")]),
+            sfnt_raw_bytes(&[
+                ([3, 1, 0x0409, 1], foo.as_slice()),
+                ([3, 2, 0, 4], &b"\x82\xa0"[..]),
+            ]),
+            b"not a font at all".to_vec(),
+        ];
+        for font in &fonts {
+            for len in 0..=font.len() {
+                let bytes = &font[..len];
+                let mut file = std::io::Cursor::new(bytes);
+                assert_eq!(
+                    outcome(names_from(&mut file, len as u64)),
+                    outcome(names_in(bytes)),
+                    "{len} of {} bytes",
+                    font.len()
+                );
+            }
+        }
+    }
+
+    /// Counts the bytes read through it.
+    struct Counting<R> {
+        inner: R,
+        read: u64,
+    }
+
+    impl<R: std::io::Read> std::io::Read for Counting<R> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let n = self.inner.read(buf)?;
+            self.read += n as u64;
+            Ok(n)
+        }
+    }
+
+    impl<R: std::io::Seek> std::io::Seek for Counting<R> {
+        fn seek(&mut self, to: std::io::SeekFrom) -> std::io::Result<u64> {
+            self.inner.seek(to)
+        }
+    }
+
+    #[test]
+    fn a_large_font_is_read_only_around_its_name_table() {
+        let mut font = sfnt_bytes(&[(1, "Big"), (4, "Big Regular")], false);
+        font.resize(font.len() + 8 * 1024 * 1024, 0);
+        let mut file = Counting {
+            inner: std::io::Cursor::new(&font),
+            read: 0,
+        };
+        let names = names_from(&mut file, font.len() as u64).unwrap();
+        assert_eq!(names.names, ["Big", "Big Regular"], "both names found");
+        assert!(file.read < 4096, "read {} bytes", file.read);
     }
 
     #[test]
