@@ -23,6 +23,7 @@ const BUNDLED: &[(&str, Owner)] = &[
     ("assets/backgrounds", Owner::ValveDerived),
     ("assets/classes", Owner::ValveDerived),
     ("assets/crosshairs", Owner::ValveDerived),
+    ("assets/setting-pictures", Owner::ValveDerived),
     ("assets/weapon-icons", Owner::ValveDerived),
     (
         "crates/tf2tools-app/assets/fonts",

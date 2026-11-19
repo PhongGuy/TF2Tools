@@ -127,3 +127,19 @@ fn an_exe_dir_without_a_parent_adds_no_lib_candidate() {
     let err = AssetRoot::resolve_from(None, Some(PathBuf::from("/")), None).unwrap_err();
     assert_eq!(err.searched, vec![PathBuf::from("/assets")]);
 }
+
+#[test]
+fn setting_pictures_live_in_their_own_folder() {
+    let tmp = tempfile::tempdir().unwrap();
+    let env = valid(&tmp.path().join("env"));
+    let root = AssetRoot::resolve_from(Some(env.clone()), None, None).unwrap();
+    assert_eq!(root.setting_pictures_dir(), env.join("setting-pictures"));
+}
+
+#[test]
+fn the_repo_assets_hold_a_readable_setting_pictures_folder() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/setting-pictures");
+    let pics = tf2tools_core::SettingPictures::open(&dir).unwrap();
+    let placeholder = image::open(pics.placeholder()).unwrap();
+    assert_eq!((placeholder.width(), placeholder.height()), (960, 540));
+}
