@@ -844,7 +844,7 @@ impl CrosshairMakerPage {
         let hint = colour_hint(colour);
         let opacity = tr!(
             "crosshair_maker.opacity_value",
-            percent = format::percent(percent_of_alpha(self.editor.alpha()))
+            percent = format::percent(u64::from(percent_of_alpha(self.editor.alpha())))
         );
         let background = self
             .background

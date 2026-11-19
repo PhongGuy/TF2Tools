@@ -204,7 +204,10 @@ pub fn starting_point_name(point: StartingPoint) -> SharedString {
 pub fn starting_point_about(point: StartingPoint) -> SharedString {
     match point {
         StartingPoint::CompetitiveMinimal => tr!("hud_maker.start.competitive_minimal.about"),
-        StartingPoint::BigNumbers => tr!("hud_maker.start.big_numbers.about"),
+        StartingPoint::BigNumbers => tr!(
+            "hud_maker.start.big_numbers.about",
+            percent = super::format::percent(50)
+        ),
         StartingPoint::StreamerClean => tr!("hud_maker.start.streamer_clean.about"),
         StartingPoint::CentreHud => tr!("hud_maker.start.centre_hud.about"),
         _ => point.about().into(),

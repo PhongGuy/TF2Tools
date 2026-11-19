@@ -1638,7 +1638,7 @@ hud_maker:
       about: "Hides the class portrait and keeps three killfeed rows."
     big_numbers:
       name: "Big numbers"
-      about: "Makes the health and ammo numbers half again as big."
+      about: "Makes the health and ammo numbers %{percent} bigger."
     streamer_clean:
       name: "Streamer clean"
       about: "Moves chat to the top and hides the friends list."

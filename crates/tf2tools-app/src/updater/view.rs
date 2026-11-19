@@ -73,7 +73,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                     .flex_none()
                     .font_features(FontFeatures(Arc::new(vec![("tnum".into(), 1)]))),
                 ids::UPDATE_BANNER_PERCENT,
-                format::percent(percent),
+                format::percent(u64::from(*percent)),
             ),
         )),
         UpdateState::Unavailable
@@ -203,7 +203,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         UpdateState::Downloading { percent, .. } => (
             tr!(
                 "updater.status.downloading",
-                percent = format::percent(percent)
+                percent = format::percent(u64::from(*percent))
             ),
             None,
             [false; 3],

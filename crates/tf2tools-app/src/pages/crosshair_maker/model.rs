@@ -746,9 +746,9 @@ impl Viewport {
         self.cell() * self.side as f32
     }
 
-    /// The zoom as a percentage, "100%" to "1600%".
+    /// The zoom as a percentage, "100%" to "1,600%" in English.
     pub fn label(&self) -> String {
-        format::percent(ZOOMS[self.level] * 100).to_string()
+        format::percent(u64::from(ZOOMS[self.level] * 100)).to_string()
     }
 
     /// Whether a larger zoom level is left.

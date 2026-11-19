@@ -1661,7 +1661,7 @@ hud_maker:
       about: "Blendet das Klassenporträt aus und behält drei Killfeed-Zeilen."
     big_numbers:
       name: "Große Zahlen"
-      about: "Macht die Zahlen für Gesundheit und Munition um die Hälfte größer."
+      about: "Macht die Zahlen für Gesundheit und Munition um %{percent} größer."
     streamer_clean:
       name: "Aufgeräumt für Streamer"
       about: "Verschiebt den Chat nach oben und blendet die Freundesliste aus."

@@ -50,7 +50,7 @@ impl StartingPoint {
             StartingPoint::CompetitiveMinimal => {
                 "Hides the class portrait and keeps three killfeed rows."
             }
-            StartingPoint::BigNumbers => "Makes the health and ammo numbers half again as big.",
+            StartingPoint::BigNumbers => "Makes the health and ammo numbers 50% bigger.",
             StartingPoint::StreamerClean => "Moves chat to the top and hides the friends list.",
             StartingPoint::CentreHud => "Moves health and ammo next to the crosshair.",
         }

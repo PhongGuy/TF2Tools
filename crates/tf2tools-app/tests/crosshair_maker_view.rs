@@ -42,7 +42,7 @@ fn zoom_steps_through_whole_pixel_cells_and_stops_at_both_ends() {
     }
     let want = [7., 14., 21., 28., 42., 56., 84., 112., 112., 112., 112.].map(px);
     assert_eq!(cells, want);
-    assert_eq!(v.label(), "1600%");
+    assert_eq!(v.label(), "1,600%");
     assert!(!v.can_zoom_in() && v.can_zoom_out());
     v.zoom_centre(-3);
     assert_eq!((v.cell(), v.label()), (px(42.), "600%".to_owned()));
