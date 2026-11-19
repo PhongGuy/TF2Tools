@@ -131,7 +131,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 ## Coming from an older version
 
 - **TF2Tools 5:** your library, profiles and settings carry over. TF2Tools 6 uses the same library and upgrades it the first time it opens. Once TF2Tools 6 has compressed your library, TF2Tools 5 can't read it any more.
-- **TF2Tools 4:** TF2Tools 6 starts with an empty library, since it can't read TF2Tools 4's list. What TF2Tools 4 put in your game stays there until you replace it, and installing a HUD from TF2Tools 6 takes out the HUD you have now. On Windows, TF2Tools 6 installs next to TF2Tools 4 and takes over the desktop shortcut. Once you're happy, remove the old one in Windows **Settings > Apps > Installed apps**: it's the TF2Tools entry with version 4.8.0.
+- **TF2Tools 4:** TF2Tools 6 starts with an empty library, since it can't read TF2Tools 4's list. What TF2Tools 4 put in your game stays there until you replace it, and installing a HUD from TF2Tools 6 takes out the HUD you have now. On Windows, TF2Tools 6 installs next to TF2Tools 4 and takes over the desktop shortcut. Once you're happy, pick **Remove it** on the banner TF2Tools 6 shows when it finds TF2Tools 4, and TF2Tools 4 is removed without further questions. You can also remove it in Windows **Settings > Apps > Installed apps**: it's the TF2Tools entry with version 4.8.0.
 - **Still want TF2Tools 4?** Its downloads stay on the [Releases page](https://github.com/PhongGuy/TF2Tools/releases) up to v4.8.0, and its code is on the [v4 branch](https://github.com/PhongGuy/TF2Tools/tree/v4).
 
 ## Privacy

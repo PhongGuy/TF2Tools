@@ -39,34 +39,61 @@ jobs:
           prefix-key: v1-rust
           # Read CI's cache, never replace it with this branch's build.
           save-if: false
-      - name: Download TF2Tools 4.8.0
-        # The web installer uses the package beside it, so both come down together.
+      - name: Download TF2Tools 4
+        # Each web installer uses the package beside it, so both come down together, and each
+        # gets back the name electron-builder gave it: v4.8.0's is uploaded as TF2Tools.exe,
+        # which is v4's app name too. v4.7.5's zip is listed to show what it holds.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download v4.8.0 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/v4" --pattern '*.exe' --pattern '*.7z'
-          ls -la "$RUNNER_TEMP/v4"
-          sha256sum "$RUNNER_TEMP/v4"/*
+          gh release download v4.8.0 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/v4/v4.8.0" --pattern '*.exe' --pattern '*.7z'
+          gh release download v4.7.5 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/v4/v4.7.5" --pattern '*.exe' --pattern '*.7z' --pattern '*.zip'
+          mv "$RUNNER_TEMP/v4/v4.8.0/TF2Tools.exe" "$RUNNER_TEMP/v4/v4.8.0/TF2Tools Web Setup 4.8.0.exe"
+          mv "$RUNNER_TEMP/v4/v4.7.5/TF2Tools.Setup.4.7.5.exe" "$RUNNER_TEMP/v4/v4.7.5/TF2Tools Setup 4.7.5.exe"
+          mv "$RUNNER_TEMP/v4/v4.7.5/TF2Tools.zip" "$RUNNER_TEMP/v4-4.7.5.zip"
+          ls -la "$RUNNER_TEMP"/v4/*
+          # The installers carry the SHA-512 they expect; a mismatch dialog shows it beside these.
+          sha512sum "$RUNNER_TEMP"/v4/*/*.7z | while read -r hex file; do
+            echo "$file sha512 hex $hex base64 $(echo "$hex" | xxd -r -p | base64 -w0)"
+          done
+          7z l "$RUNNER_TEMP/v4-4.7.5.zip" | tail -n 30
       - name: Build the checks
-        run: cargo test --locked -p tf2tools-core -p tf2tools-app --test integration --no-run
+        # The same commands the checks run, so their own steps compile nothing.
+        run: |
+          cargo test --locked -p tf2tools-core --test integration --no-run
+          cargo test --locked -p tf2tools-app --test integration --no-run
       - name: HUD font check
+        timeout-minutes: 10
         run: cargo test --locked -p tf2tools-core --test integration windows_real_fonts -- --ignored --nocapture --test-threads=1
       - name: TF2Tools 4 removal
         if: ${{ !cancelled() }}
+        # Each step inside the test has its own limit; this one only backs them up.
+        timeout-minutes: 25
         run: |
-          shopt -s nullglob
-          installers=("$RUNNER_TEMP"/v4/*.exe)
-          if [ "${#installers[@]}" -ne 1 ]; then
-            echo "expected one v4 installer, found: ${installers[*]}"
-            exit 1
-          fi
-          export TF2TOOLS_V4_INSTALLER="$(cygpath -w "${installers[0]}")"
+          export TF2TOOLS_V4_DIR="$(cygpath -w "$RUNNER_TEMP/v4")"
           export TF2TOOLS_CHECK_OUT="$(cygpath -w "$RUNNER_TEMP/windows-checks")"
           mkdir -p "$RUNNER_TEMP/windows-checks"
           cargo test --locked -p tf2tools-app --test integration windows_real_v4 -- --ignored --nocapture --test-threads=1
-      # A blocked uninstaller is usually waiting on a dialog; the screenshot shows which.
+      - name: Show what v4's installer and uninstaller do
+        # 7-Zip decompiles an NSIS script; the lines kept show prompts, process checks and waits.
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          for exe in "$RUNNER_TEMP"/v4/*/*.exe "$RUNNER_TEMP/windows-checks/v4-uninstaller.exe"; do
+            [ -f "$exe" ] || continue
+            out="$RUNNER_TEMP/nsis/$(basename "$exe" .exe)"
+            echo "== $exe"
+            7z l "$exe" | tail -n 25
+            if 7z x -y -o"$out" "$exe" '[NSIS].nsi' > /dev/null; then
+              grep -n -i -E 'MessageBox|tasklist|taskkill|nsProcess|FindProcess|ExecWait|Silent|Quit|Abort|appRunning|Sleep' "$out/[NSIS].nsi" | head -n 200
+            else
+              echo "no script in $exe"
+            fi
+          done
+      # The uninstaller copy, and on a stuck step the desktop screenshot showing any dialog.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ failure() }}
+        if: ${{ !cancelled() }}
         with:
           name: windows-checks
           path: ${{ runner.temp }}/windows-checks

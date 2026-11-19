@@ -1564,6 +1564,11 @@ mod tests {
     // (file under src, exact literal, why it is not translated).
     const ALLOWED: &[(&str, &str, &str)] = &[
         (
+            "old_v4.rs",
+            "SystemRoot",
+            "developer detail: a Windows environment variable's name",
+        ),
+        (
             "pages/huds.rs",
             "the HUD update task stopped unexpectedly",
             "developer detail of a stopped download",

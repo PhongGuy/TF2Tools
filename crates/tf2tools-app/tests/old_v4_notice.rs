@@ -128,7 +128,11 @@ fn remove_and_close_starts_v4s_uninstaller_then_closes(cx: &mut TestAppContext) 
     cx.run_until_parked();
     assert_eq!(
         *calls.lock().unwrap(),
-        [(PathBuf::from(V4_EXE), vec!["/currentuser".to_owned()])]
+        [(
+            PathBuf::from(V4_EXE),
+            vec!["/currentuser".to_owned(), "/S".to_owned()]
+        )],
+        "silent, since the player already said yes here"
     );
     assert!(asked(&s), "Remove is remembered");
     assert!(!open(cx, &s), "TF2Tools closes so the uninstaller can run");
@@ -191,4 +195,21 @@ fn nothing_shows_off_windows(cx: &mut TestAppContext) {
     let found = pending(&settings, tf2tools_core::detect_old_v4);
     let (_env, s, _) = shell_with(cx, found);
     assert!(!support::present(cx, s.win, ids::OLD_V4_BANNER));
+}
+
+// v4's uninstaller asks `find` whether TF2Tools.exe runs; Git's or MSYS2's find ahead of
+// System32's answers wrongly, so Windows' own folders come first for it.
+#[test]
+fn the_uninstaller_finds_windows_tools_before_the_players_path() {
+    let path = tf2tools_app::old_v4::uninstaller_path(
+        std::ffi::OsStr::new(r"C:\Windows"),
+        std::ffi::OsStr::new(r"C:\Program Files\Git\usr\bin;C:\Windows\System32"),
+    );
+    assert_eq!(
+        path,
+        std::ffi::OsString::from(
+            r"C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\Git\usr\bin;C:\Windows\System32"
+        ),
+        "System32, Windows, Wbem and PowerShell, then the player's own PATH"
+    );
 }
