@@ -2990,6 +2990,9 @@ graphics:
   row:
     preset_value: "%{preset}\u00A0: %{value}"
     reset: "Réinitialiser"
+  pictures:
+    yours: "Le vôtre\u00A0: %{value}"
+    same: "%{value}, comme %{preset}"
   changes:
     title: { one: "%{count} modification par rapport à %{preset}", other: "%{count} modifications par rapport à %{preset}" }
     as_is: "%{preset} est utilisé tel quel. Modifiez un réglage ci-dessous et il apparaîtra ici."

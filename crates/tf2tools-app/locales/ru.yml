@@ -2963,6 +2963,9 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Сбросить"
+  pictures:
+    yours: "Ваше: %{value}"
+    same: "%{value}, как %{preset}"
   changes:
     title: { one: "%{count} изменение относительно пресета «%{preset}»", few: "%{count} изменения относительно пресета «%{preset}»", many: "%{count} изменений относительно пресета «%{preset}»" }
     as_is: "Пресет «%{preset}» используется без изменений. Измените любую настройку ниже, и она появится здесь."

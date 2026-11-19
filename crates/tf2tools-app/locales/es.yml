@@ -2988,6 +2988,9 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Restablecer"
+  pictures:
+    yours: "Tuyo: %{value}"
+    same: "%{value}, igual que %{preset}"
   changes:
     title: { one: "%{count} cambio respecto a %{preset}", other: "%{count} cambios respecto a %{preset}" }
     as_is: "Usando %{preset} tal cual. Cambia cualquier ajuste de abajo y aparecerá aquí."

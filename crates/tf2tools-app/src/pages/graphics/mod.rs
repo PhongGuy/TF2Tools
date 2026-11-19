@@ -2,6 +2,7 @@
 
 pub mod jobs;
 pub mod model;
+pub mod pictures;
 mod settings;
 pub mod view;
 

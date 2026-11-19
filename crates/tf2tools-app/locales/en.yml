@@ -2965,6 +2965,9 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Reset"
+  pictures:
+    yours: "Yours: %{value}"
+    same: "%{value}, as %{preset}"
   changes:
     title: { one: "%{count} change from %{preset}", other: "%{count} changes from %{preset}" }
     as_is: "Using %{preset} as is. Change any setting below and it shows up here."
