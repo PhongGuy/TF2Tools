@@ -3068,10 +3068,10 @@ graphics:
       description: "Les parties libres des cosmétiques qui bougent quand vous vous déplacez."
     sheens_speed:
       label: "Vitesse de l'éclat"
-      description: "La vitesse de l'éclat de série d'éliminations sur les armes."
+      description: "La vitesse de l'éclat Killstreak sur les armes."
     sheens_tint:
       label: "Intensité de l'éclat"
-      description: "L'intensité de la couleur de l'éclat de série d'éliminations."
+      description: "L'intensité de la couleur de l'éclat Killstreak."
     texture_quality:
       label: "Qualité des textures"
       description: "La netteté des surfaces. Plus haut utilise plus de mémoire vidéo."

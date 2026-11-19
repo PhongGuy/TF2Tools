@@ -3020,10 +3020,10 @@ graphics:
       description: "覆盖整个画面的色调。"
     pyrovision:
       label: "火焰兵视觉"
-      description: "透过火焰兵的护目镜看到的 Pyroland 的精细程度。"
+      description: "透过火焰兵护目镜看到的火焰兵幻境的精细程度。"
     romevision:
       label: "罗马视觉"
-      description: "曼恩 vs. 机器模式中机器人身上的罗马盔甲。"
+      description: "曼恩 vs. 机器中机器人身上的罗马盔甲。"
     motion_blur:
       label: "动态模糊"
       description: "快速转身时模糊画面。"
@@ -3046,7 +3046,7 @@ graphics:
       label: "喷漆"
       description: "玩家喷在墙上的图案。"
     gibs:
-      label: "碎尸"
+      label: "碎块"
       description: "爆炸炸出的肢体碎块。"
     sillygibs:
       label: "搞笑碎块"

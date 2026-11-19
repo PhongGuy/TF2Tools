@@ -3024,7 +3024,7 @@ graphics:
       description: "Lo detallado que se ve Pyrolandia a través de las gafas del Pyro."
     romevision:
       label: "Romavisión"
-      description: "Armadura romana en los robots de Mann vs. Machine."
+      description: "Armadura romana en los robots de Mann vs. Máquinas."
     motion_blur:
       label: "Desenfoque de movimiento"
       description: "Desenfoca la pantalla cuando giras rápido."
@@ -3066,10 +3066,10 @@ graphics:
       description: "Partes sueltas de los cosméticos que se balancean al moverte."
     sheens_speed:
       label: "Velocidad del brillo"
-      description: "Lo rápido que se mueve el brillo de racha por las armas."
+      description: "Lo rápido que se mueve el brillo de Cuentarrachas por las armas."
     sheens_tint:
       label: "Intensidad del brillo"
-      description: "Lo intenso que es el color del brillo de racha."
+      description: "Lo intenso que es el color del brillo de Cuentarrachas."
     texture_quality:
       label: "Calidad de texturas"
       description: "Lo nítidas que se ven las superficies. Más alta usa más memoria de vídeo."

@@ -3066,10 +3066,10 @@ graphics:
       description: "Lose Teile von Cosmetics, die bei Bewegung schwingen."
     sheens_speed:
       label: "Glanz-Tempo"
-      description: "Wie schnell der Killstreak-Glanz über Waffen läuft."
+      description: "Wie schnell der Killserien-Glanz über Waffen läuft."
     sheens_tint:
       label: "Glanz-Stärke"
-      description: "Wie kräftig die Farbe des Killstreak-Glanzes ist."
+      description: "Wie kräftig die Farbe des Killserien-Glanzes ist."
     texture_quality:
       label: "Texturqualität"
       description: "Wie scharf Oberflächen aussehen. Höher braucht mehr Grafikspeicher."
@@ -3110,8 +3110,8 @@ graphics:
       label: "Killfeed"
       description: "Die Liste der Kills in der Bildschirmecke."
     killstreaks:
-      label: "Killstreak-Hinweise"
-      description: "Killstreak-Zähler und ihre Ansagen."
+      label: "Killserien-Hinweise"
+      description: "Killserien-Zähler und ihre Ansagen."
     hud_achievement:
       label: "Erfolgsmeldungen"
       description: "Das Banner, wenn jemand einen Erfolg erhält."

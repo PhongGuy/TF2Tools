@@ -3021,11 +3021,11 @@ graphics:
       label: "Filtro de cor"
       description: "Um tom de cor sobre a imagem inteira."
     pyrovision:
-      label: "Pirovisão"
+      label: "Pyrovisão"
       description: "O nível de detalhe da Pyrolândia vista pelos óculos do Pyro."
     romevision:
       label: "Romavisão"
-      description: "Armadura romana nos robôs do Mann vs. Machine."
+      description: "Armadura romana nos robôs do Mann vs. Máquina."
     motion_blur:
       label: "Desfoque de movimento"
       description: "Desfoca a tela quando você gira rápido."
@@ -3067,10 +3067,10 @@ graphics:
       description: "Partes soltas de cosméticos que balançam quando você se move."
     sheens_speed:
       label: "Velocidade do brilho"
-      description: "A velocidade com que o brilho de sequência passa pelas armas."
+      description: "A velocidade com que o brilho de combo passa pelas armas."
     sheens_tint:
       label: "Intensidade do brilho"
-      description: "O quanto a cor do brilho de sequência é forte."
+      description: "O quanto a cor do brilho de combo é forte."
     texture_quality:
       label: "Qualidade das texturas"
       description: "A nitidez das superfícies. Mais alta usa mais memória de vídeo."
@@ -3111,8 +3111,8 @@ graphics:
       label: "Killfeed"
       description: "A lista de abates no canto da tela."
     killstreaks:
-      label: "Avisos de sequência"
-      description: "Contagens de sequências de abates e seus anúncios."
+      label: "Avisos de combo"
+      description: "Contagens de combos e seus anúncios."
     hud_achievement:
       label: "Avisos de conquistas"
       description: "O aviso quando alguém ganha uma conquista."
