@@ -260,6 +260,7 @@ mod readme;
 mod release_profile;
 mod release_workflow;
 mod setting_pictures;
+mod setting_pictures_assets;
 mod setting_pictures_manifest;
 mod setting_pictures_shoot;
 mod settings;
