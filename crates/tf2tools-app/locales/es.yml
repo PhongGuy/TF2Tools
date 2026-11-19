@@ -2991,6 +2991,13 @@ graphics:
     outside: "mastercomfig %{version} está instalado fuera de TF2Tools"
     outside_unknown: "mastercomfig está instalado fuera de TF2Tools"
     take_over_hint: "Toma el control para elegir un preajuste y cambiar los ajustes aquí."
+    install: "Instalar mastercomfig"
+    update_to: "Actualizar a %{version}"
+    check: "Buscar actualizaciones"
+    remove: "Quitar"
+    take_over: "Tomar el control"
+    docs: "Documentación de mastercomfig"
+    credit: "mastercomfig lo crea el equipo de mastercomfig y se comparte bajo la licencia MIT."
   toast:
     installed_title: "mastercomfig instalado"
     installed: "mastercomfig %{version} está listo. Elige un preajuste abajo."

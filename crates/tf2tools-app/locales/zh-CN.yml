@@ -2990,6 +2990,13 @@ graphics:
     outside: "mastercomfig %{version} 并非通过 TF2Tools 安装"
     outside_unknown: "mastercomfig 并非通过 TF2Tools 安装"
     take_over_hint: "接管后即可在此选择预设并更改设置。"
+    install: "安装 mastercomfig"
+    update_to: "更新到 %{version}"
+    check: "检查更新"
+    remove: "移除"
+    take_over: "接管"
+    docs: "mastercomfig 文档"
+    credit: "mastercomfig 由 mastercomfig 团队制作，并以 MIT 许可证分享。"
   toast:
     installed_title: "已安装 mastercomfig"
     installed: "mastercomfig %{version} 已就绪。请在下方选择预设。"

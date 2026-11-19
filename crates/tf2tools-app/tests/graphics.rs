@@ -228,10 +228,6 @@ fn install_fetches_the_recorded_release_and_shows_the_presets(cx: &mut TestAppCo
     }
     assert!(selected(cx, &s, Preset::Medium));
     assert!(!selected(cx, &s, Preset::High));
-    assert_eq!(
-        label(cx, &s, ids::GRAPHICS_FOOTER).as_deref(),
-        Some("Changes apply the next time TF2 starts.")
-    );
 }
 
 #[gpui_kit::test]
@@ -290,6 +286,10 @@ fn a_newer_recorded_release_is_offered_and_installed(cx: &mut TestAppContext) {
         Some("mastercomfig 9.100.1 is installed")
     );
     assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::GRAPHICS_UPDATE).as_deref(),
+        Some("Update to 9.101.0")
+    );
     support::click_id(cx, s.win, ids::GRAPHICS_UPDATE);
     support::wait_real(cx, "the update", |cx| installed(cx, &page, "9.101.0"));
     assert!(selected(cx, &s, Preset::Low));

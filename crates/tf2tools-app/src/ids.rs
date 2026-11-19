@@ -863,8 +863,10 @@ pub const GRAPHICS_STATUS: &str = "graphics-status";
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
 /// The line under the status card's title, labelled with its text; absent when it has none.
 pub const GRAPHICS_DETAIL: &str = "graphics-detail";
-/// The status card's credit to the mastercomfig team and comfig-app.
+/// The status row's credit to the mastercomfig team, present only while it is not installed.
 pub const GRAPHICS_CREDIT: &str = "graphics-credit";
+/// The status row's "mastercomfig docs" link, present in every state.
+pub const GRAPHICS_DOCS: &str = "graphics-docs";
 /// Install, shown when mastercomfig is not in tf/custom.
 pub const GRAPHICS_INSTALL: &str = "graphics-install";
 /// Update, shown for a managed install behind the recorded release.
@@ -875,8 +877,6 @@ pub const GRAPHICS_CHECK: &str = "graphics-check";
 pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 /// Take over, shown for an install TF2Tools did not make.
 pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
-/// "Changes apply the next time TF2 starts.", under the preset cards.
-pub const GRAPHICS_FOOTER: &str = "graphics-footer";
 /// The settings section under the preset cards, present for a managed install.
 pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
 /// The note shown in place of the settings list, labelled with its text.

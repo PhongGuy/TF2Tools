@@ -45,8 +45,8 @@ fn a_saved_catalog_lists_every_module_with_the_preset_s_value(cx: &mut TestAppCo
     assert!(!support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
     assert!(!support::present(cx, s.win, ids::GRAPHICS_SETTINGS_NOTE));
     assert_eq!(
-        support::label_of(cx, s.win, ids::GRAPHICS_FOOTER).as_deref(),
-        Some("Changes apply the next time TF2 starts.")
+        support::label_of(cx, s.win, ids::GRAPHICS_DETAIL).as_deref(),
+        Some("Every change saves at once.")
     );
 }
 

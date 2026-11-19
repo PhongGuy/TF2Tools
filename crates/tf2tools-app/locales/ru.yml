@@ -2966,6 +2966,13 @@ graphics:
     outside: "mastercomfig %{version} установлен не через TF2Tools"
     outside_unknown: "mastercomfig установлен не через TF2Tools"
     take_over_hint: "Возьмите его под управление, чтобы выбирать пресет и менять настройки здесь."
+    install: "Установить mastercomfig"
+    update_to: "Обновить до %{version}"
+    check: "Проверить обновления"
+    remove: "Удалить"
+    take_over: "Взять под управление"
+    docs: "Документация mastercomfig"
+    credit: "mastercomfig создаёт команда mastercomfig и распространяет по лицензии MIT."
   toast:
     installed_title: "mastercomfig установлен"
     installed: "mastercomfig %{version} готов. Выберите пресет ниже."

@@ -5,6 +5,7 @@ pub mod model;
 mod picture_panel;
 pub mod pictures;
 mod settings;
+mod status;
 pub mod view;
 
 use std::collections::BTreeMap;
@@ -44,14 +45,11 @@ use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
 use model::{
     SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
-    detail, dropped_note, foreign_modules_cfg, headline, own_modules_cfg_kept, preset_description,
-    preset_label, shown_choice, status_card, update_to, value_options,
+    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_description, preset_label,
+    shown_choice, status_card, value_options,
 };
 use pictures::PictureIndex;
 use view::Filter;
-
-const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
-const FOOTER: &str = "Changes apply the next time TF2 starts.";
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
@@ -913,7 +911,7 @@ impl Render for GraphicsPage {
             )
             .into_any_element(),
         );
-        children.extend(self.card().map(|card| self.status_card(&card, cx)));
+        children.extend(self.card().map(|card| self.status_row(&card, cx)));
         let mut items = BTreeMap::new();
         if let Some(preset) = self.preset() {
             children.push(self.presets(preset, window, cx));
@@ -925,14 +923,6 @@ impl Render for GraphicsPage {
                 &mut children,
                 &mut items,
                 cx,
-            );
-            children.push(
-                labelled(
-                    div().text_sm().text_color(cx.theme().muted_foreground),
-                    ids::GRAPHICS_FOOTER,
-                    FOOTER,
-                )
-                .into_any_element(),
             );
         }
         self.section_items = items;
@@ -959,100 +949,6 @@ impl Render for GraphicsPage {
 }
 
 impl GraphicsPage {
-    // The headline, its detail line, the buttons this state offers and the credit line.
-    fn status_card(&self, card: &StatusCard, cx: &mut Context<Self>) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
-        let busy = self.busy;
-        let installing = self.running == Some(Job::Install);
-        let checking = self.running == Some(Job::Check);
-        let mut buttons: Vec<AnyElement> = Vec::new();
-        match card {
-            StatusCard::NotInstalled => buttons.push(
-                Button::new(ids::GRAPHICS_INSTALL)
-                    .primary()
-                    .icon(IconName::Download)
-                    .label("Install")
-                    .loading(installing)
-                    .disabled(busy)
-                    .on_click(cx.listener(|page, _, window, cx| page.install(false, window, cx)))
-                    .into_any_element(),
-            ),
-            StatusCard::Installed { .. } => {
-                if update_to(card).is_some() {
-                    buttons.push(
-                        Button::new(ids::GRAPHICS_UPDATE)
-                            .primary()
-                            .icon(IconName::RefreshCw)
-                            .label("Update")
-                            .loading(installing)
-                            .disabled(busy)
-                            .on_click(
-                                cx.listener(|page, _, window, cx| page.install(true, window, cx)),
-                            )
-                            .into_any_element(),
-                    );
-                }
-                buttons.push(
-                    Button::new(ids::GRAPHICS_CHECK)
-                        .outline()
-                        .icon(IconName::RotateCw)
-                        .label("Check for updates")
-                        .loading(checking)
-                        .disabled(busy)
-                        .on_click(cx.listener(|page, _, _, cx| page.check(cx)))
-                        .into_any_element(),
-                );
-                buttons.push(
-                    Button::new(ids::GRAPHICS_REMOVE)
-                        .outline()
-                        .icon(IconName::Trash)
-                        .label("Remove")
-                        .disabled(busy)
-                        .on_click(cx.listener(|page, _, window, cx| page.remove(window, cx)))
-                        .into_any_element(),
-                );
-            }
-            StatusCard::Outside { .. } => buttons.push(
-                Button::new(ids::GRAPHICS_TAKE_OVER)
-                    .primary()
-                    .label("Take over")
-                    .disabled(busy)
-                    .on_click(cx.listener(|page, _, window, cx| page.take_over(window, cx)))
-                    .into_any_element(),
-            ),
-        }
-        let detail = labelled(
-            div().text_sm().text_color(muted),
-            ids::GRAPHICS_DETAIL,
-            detail(card),
-        );
-        card_frame(cx)
-            .id(ids::GRAPHICS_STATUS)
-            .test_support()
-            .p_6()
-            .child(
-                v_flex()
-                    .gap_4()
-                    .child(
-                        v_flex()
-                            .gap_1()
-                            .child(labelled(
-                                div().text_lg().font_weight(FontWeight::SEMIBOLD),
-                                ids::GRAPHICS_HEADLINE,
-                                headline(card),
-                            ))
-                            .child(detail),
-                    )
-                    .child(h_flex().flex_wrap().gap_2().children(buttons))
-                    .child(labelled(
-                        div().text_xs().text_color(muted),
-                        ids::GRAPHICS_CREDIT,
-                        CREDIT,
-                    )),
-            )
-            .into_any_element()
-    }
-
     // The five preset cards in comfig-app's order, the current one in the primary border. Each
     // is a tab stop where Enter or Space picks it; a click does not take focus, as on the pills.
     fn presets(&self, current: Preset, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
