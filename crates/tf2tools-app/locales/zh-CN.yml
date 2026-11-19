@@ -33,7 +33,7 @@ settings:
   tf2:
     title: "TF2 安装位置"
     description: "Team Fortress 2 安装文件夹的路径"
-    placeholder: "/路径/到/Team Fortress 2"
+    placeholder: "Team Fortress 2 文件夹路径"
     browse: "浏览"
     detect: "自动检测"
   audio:
@@ -63,7 +63,7 @@ settings:
     image_cache: "图片缓存"
   logs_tf:
     title: "logs.tf"
-    description: "已打开比赛日志中玩家名称的显示方式，以及完整日志的保留时长"
+    description: "打开的比赛日志中玩家名称的显示方式，以及完整日志的保留时长"
     nicknames: "在比赛日志中显示昵称"
     keep:
       label: "完整日志保留时长"
@@ -258,134 +258,134 @@ common:
     days_ago: { other: "%{count} 天前" }
 
 addon_store:
-  downloads: { other: "%{count} downloads" }
+  downloads: { other: "%{count} 次下载" }
   card:
-    by: "by %{author}"
-    mature: "Mature"
-    outdated: "Outdated"
+    by: "作者：%{author}"
+    mature: "成人内容"
+    outdated: "已过时"
   badge:
-    update: "Update"
-    installed: "Installed"
-  info: "These addons work best with a mastercomfig preset installed. Download addons to your library, then install them from the Addons page."
-  heading: "Mastercomfig performance and quality-of-life addons"
-  no_tf2: "Set the TF2 folder in Settings to install addons."
-  syncing: "Syncing addons..."
-  unloaded: "Could not load addons"
-  empty: "No add-ons found"
+    update: "更新"
+    installed: "已安装"
+  info: "这些插件搭配已安装的 mastercomfig 预设效果最佳。先将插件下载到库中，再在插件页面安装。"
+  heading: "mastercomfig 性能与便利插件"
+  no_tf2: "请在设置中指定 TF2 文件夹以安装插件。"
+  syncing: "正在同步插件…"
+  unloaded: "无法加载插件"
+  empty: "未找到插件"
   button:
-    refresh: "Refresh"
-    syncing: "Syncing..."
-    installing: "Installing..."
-    update: "Update"
-    load_more: "Load more"
+    refresh: "刷新"
+    syncing: "正在同步…"
+    installing: "正在安装…"
+    update: "更新"
+    load_more: "加载更多"
   offer:
-    install: "Install"
-    install_again: "Install again"
+    install: "安装"
+    install_again: "重新安装"
   sort:
-    most_downloaded: "Most downloaded"
-    newest: "Newest"
+    most_downloaded: "下载最多"
+    newest: "最新"
   category:
-    all: "All"
-    all_weapons: "All weapons"
+    all: "全部"
+    all_weapons: "全部武器"
   hint:
-    category: "Try another category."
-    search: "Try another search."
+    category: "试试其他分类。"
+    search: "试试其他搜索词。"
   search:
-    skins: "Search Skins..."
-    effects: "Search Effects..."
-    guis: "Search GUIs..."
-    textures: "Search Textures..."
-    gamefiles: "Search Game files..."
-    items: "Search add-ons..."
+    skins: "搜索皮肤…"
+    effects: "搜索特效…"
+    guis: "搜索界面…"
+    textures: "搜索纹理…"
+    gamefiles: "搜索游戏文件…"
+    items: "搜索插件…"
 
 hud_store:
-  added: "Added %{date}"
+  added: "添加于 %{date}"
   tab:
-    curated: "Curated"
+    curated: "精选"
   curated:
-    source: "Curated HUDs from hud-db."
-    unloaded: "Could not load store"
+    source: "来自 hud-db 的精选 HUD。"
+    unloaded: "无法加载商店"
   filter:
-    os: "OS:"
-    os_tooltip: "HUDs that work on %{os}"
-    hide_prereleases: "Hide prereleases"
-    clear: "Clear filters"
-    more: "More filters"
-    less: "Less filters"
-    features: "Features"
-    tags: "Tags"
-    gamemode: "Gamemode"
-    resolution: "Resolution"
+    os: "系统："
+    os_tooltip: "适用于 %{os} 的 HUD"
+    hide_prereleases: "隐藏预发布版"
+    clear: "清除筛选"
+    more: "更多筛选"
+    less: "收起筛选"
+    features: "功能"
+    tags: "标签"
+    gamemode: "游戏模式"
+    resolution: "分辨率"
   card:
-    visit: "Visit the HUD's page"
+    visit: "访问该 HUD 的页面"
   detail:
-    released: "Released %{date}"
-    os: "OS"
-    gamemodes: "Gamemodes"
-    resolutions: "Resolutions"
-    repository: "Repository"
+    released: "发布于 %{date}"
+    os: "系统"
+    gamemodes: "游戏模式"
+    resolutions: "分辨率"
+    repository: "代码仓库"
     social:
-      support: "Support"
+      support: "支持"
 
 store_download:
   button:
-    download: "Download"
-    in_library: "In Library"
-    redownload: "Re-download"
+    download: "下载"
+    in_library: "已在库中"
+    redownload: "重新下载"
   toast:
     downloaded:
-      huds: "HUD downloaded"
-      sounds: "Sound downloaded"
-      crosshairs: "Crosshair downloaded"
-      addons: "Addon downloaded"
-      items: "Item downloaded"
+      huds: "HUD 已下载"
+      sounds: "音效已下载"
+      crosshairs: "准星已下载"
+      addons: "插件已下载"
+      items: "物品已下载"
     failed:
-      huds: "Failed to download HUD"
-      sounds: "Failed to download sound"
-      crosshairs: "Failed to download crosshair"
-      addons: "Failed to download addon"
-      items: "Failed to download item"
-    added: "%{name} added to your library"
-  stayed: "%{message} Still in your library: %{items}."
-  unknown_item: "an item"
+      huds: "HUD 下载失败"
+      sounds: "音效下载失败"
+      crosshairs: "准星下载失败"
+      addons: "插件下载失败"
+      items: "物品下载失败"
+    added: "%{name} 已添加到库中"
+  stayed: "%{message} 仍在库中：%{items}。"
+  unknown_item: "一个物品"
 
 store_detail:
   button:
-    update_with: "Update with this file"
+    update_with: "用此文件更新"
   files:
-    loading: "Loading files..."
-    none: "No files to download"
+    loading: "正在加载文件…"
+    none: "没有可下载的文件"
   badge:
-    downloaded: "Downloaded"
+    downloaded: "已下载"
 
 addon_detail:
-  mature: "Mature content: %{reasons}"
-  credits: "Credits"
-  files: "Files"
-  maps: "Installed maps"
-  map_unlisted: "%{name} (not listed in Create Server; type map %{name} in the console)"
-  loading: "Loading details..."
-  waiting: "Waiting for GameBanana..."
-  open: "Open on GameBanana"
+  mature: "成人内容：%{reasons}"
+  credits: "制作人员"
+  files: "文件"
+  maps: "已安装的地图"
+  map_unlisted: "%{name}（未列在“创建服务器”中；请在控制台输入 map %{name}）"
+  loading: "正在加载详情…"
+  waiting: "正在等待 GameBanana…"
+  open: "在 GameBanana 上打开"
   button:
-    remove: "Remove"
-    removing: "Removing..."
+    remove: "移除"
+    removing: "正在移除…"
   activity:
-    installed: "Installed addon: %{name}"
+    installed: "已安装插件：%{name}"
   toast:
-    installed: "Addon installed"
+    installed: "插件已安装"
 
 sound_store:
-  source: "Hitsounds and killsounds from GameBanana."
+  source: "来自 GameBanana 的命中音效和击杀音效。"
   category:
-    title: "Category:"
-    all: "All"
-    hitsounds: "Hitsounds"
-    killsounds: "Killsounds"
-    sound: "Sound"
+    title: "分类："
+    all: "全部"
+    hitsounds: "命中音效"
+    killsounds: "击杀音效"
+    sound: "音效"
   preview:
-    play: "Play Preview"
-    stop: "Stop Preview"
+    play: "播放预览"
+    stop: "停止预览"
 
 logs_tf:
   progress:
@@ -536,104 +536,104 @@ logs_tf:
     unknown: "Event"
 
 maps:
-  count: { other: "%{count} maps" }
-  count_of: { other: "%{shown} of %{count} maps" }
-  search: "Search maps..."
-  no_tf2: "Set the TF2 folder in Settings to download maps."
-  serveme_info: "Community maps hosted by serveme.tf. Downloads go into TF2's maps folder."
+  count: { other: "%{count} 张地图" }
+  count_of: { other: "%{shown} / %{count} 张地图" }
+  search: "搜索地图…"
+  no_tf2: "请在设置中指定 TF2 文件夹以下载地图。"
+  serveme_info: "由 serveme.tf 托管的社区地图。下载的地图会放入 TF2 的 maps 文件夹。"
   sort:
-    title: "Sort:"
-    name: "Name"
-    most_played: "Most played"
-    recently_played: "Recently played"
+    title: "排序："
+    name: "名称"
+    most_played: "游玩最多"
+    recently_played: "最近游玩"
   table:
-    map: "Map"
-    times_played: "Times played"
-    last_played: "Last played"
-    size: "Size"
-    never: "Never"
+    map: "地图"
+    times_played: "游玩次数"
+    last_played: "上次游玩"
+    size: "大小"
+    never: "从未"
   empty:
-    loading: "Getting the map list..."
-    none: "No maps yet. Press Refresh to get the list from serveme.tf."
-    no_match: "No maps match your search"
+    loading: "正在获取地图列表…"
+    none: "还没有地图。点击“刷新”从 serveme.tf 获取列表。"
+    no_match: "没有符合搜索的地图"
   badge:
-    downloaded: "Downloaded"
-    in_game: "In game"
-    gone: "No longer on GameBanana"
-    not_installed: "Not installed"
-    update: "Update"
-    installed: "Installed"
+    downloaded: "已下载"
+    in_game: "游戏自带"
+    gone: "已不在 GameBanana 上"
+    not_installed: "未安装"
+    update: "更新"
+    installed: "已安装"
   button:
-    refresh: "Refresh"
-    refreshing: "Refreshing..."
-    download: "Download"
-    remove: "Remove"
+    refresh: "刷新"
+    refreshing: "正在刷新…"
+    download: "下载"
+    remove: "移除"
   toast:
-    downloaded_title: "Map downloaded"
-    downloaded: "%{name} is ready to play in TF2."
-    download_failed: "Download failed"
-    removed_title: "Map removed"
-    removed: "%{name} was deleted from TF2."
+    downloaded_title: "地图已下载"
+    downloaded: "%{name} 已可在 TF2 中游玩。"
+    download_failed: "下载失败"
+    removed_title: "地图已移除"
+    removed: "%{name} 已从 TF2 中删除。"
   gb:
-    info: "Community maps from GameBanana. Open a map to see it there."
-    all_gamemodes: "All gamemodes"
-    loading: "Loading..."
-    installed_empty: "No maps installed"
-    installed_hint: "Install a map from All maps."
-    empty: "No maps found"
+    info: "来自 GameBanana 的社区地图。打开一张地图即可在 GameBanana 上查看。"
+    all_gamemodes: "全部游戏模式"
+    loading: "正在加载…"
+    installed_empty: "没有已安装的地图"
+    installed_hint: "从“全部地图”中安装地图。"
+    empty: "未找到地图"
     sort:
-      most_downloaded: "Most downloaded"
-      newest: "Newest"
+      most_downloaded: "下载最多"
+      newest: "最新"
     show:
-      all: "All maps"
-      installed: "Installed"
+      all: "全部地图"
+      installed: "已安装"
     hint:
-      search: "Try another search."
-      gamemode: "Try another gamemode."
-      sync: "Maps appear here after a sync with GameBanana."
+      search: "试试其他搜索词。"
+      gamemode: "试试其他游戏模式。"
+      sync: "与 GameBanana 同步后，地图会显示在这里。"
     button:
-      sync: "Sync"
+      sync: "同步"
 
 store_grid:
   count:
-    huds: { other: "%{shown} of %{count} HUDs" }
-    sounds: { other: "%{shown} of %{count} sounds" }
-    crosshairs: { other: "%{shown} of %{count} crosshairs" }
-  loading: "Loading..."
+    huds: { other: "%{shown} / %{count} 个 HUD" }
+    sounds: { other: "%{shown} / %{count} 个音效" }
+    crosshairs: { other: "%{shown} / %{count} 个准星" }
+  loading: "正在加载…"
   sort:
-    most_liked: "Most Liked"
-    most_viewed: "Most Viewed"
-    newest: "Newest"
+    most_liked: "最多点赞"
+    most_viewed: "最多浏览"
+    newest: "最新"
   search:
-    huds: "Search HUDs..."
-    sounds: "Search sounds..."
-    crosshairs: "Search crosshairs..."
-    items: "Search items..."
+    huds: "搜索 HUD…"
+    sounds: "搜索音效…"
+    crosshairs: "搜索准星…"
+    items: "搜索物品…"
   syncing:
-    huds: "Syncing HUDs..."
-    sounds: "Syncing sounds..."
-    crosshairs: "Syncing crosshairs..."
-    items: "Syncing items..."
+    huds: "正在同步 HUD…"
+    sounds: "正在同步音效…"
+    crosshairs: "正在同步准星…"
+    items: "正在同步物品…"
   unloaded:
-    huds: "Could not load HUDs"
-    sounds: "Could not load sounds"
-    crosshairs: "Could not load crosshairs"
-    items: "Could not load items"
+    huds: "无法加载 HUD"
+    sounds: "无法加载音效"
+    crosshairs: "无法加载准星"
+    items: "无法加载物品"
   no_match:
     search:
-      huds: "No HUDs match your search"
-      sounds: "No sounds match your search"
-      crosshairs: "No crosshairs match your search"
-      items: "No items match your search"
+      huds: "没有符合搜索的 HUD"
+      sounds: "没有符合搜索的音效"
+      crosshairs: "没有符合搜索的准星"
+      items: "没有符合搜索的物品"
     filters:
-      huds: "No HUDs match your filters"
-      sounds: "No sounds match your filters"
-      crosshairs: "No crosshairs match your filters"
-      items: "No items match your filters"
+      huds: "没有符合筛选条件的 HUD"
+      sounds: "没有符合筛选条件的音效"
+      crosshairs: "没有符合筛选条件的准星"
+      items: "没有符合筛选条件的物品"
   hint:
-    offline: "Check your internet connection and try again."
-    search: "Try adjusting your search criteria."
-    filters: "Try adjusting your search or filter criteria."
+    offline: "请检查网络连接后重试。"
+    search: "试试调整搜索条件。"
+    filters: "试试调整搜索或筛选条件。"
 
 profiles:
   crosshairs: { other: "%{count} crosshairs" }
@@ -2960,19 +2960,19 @@ shell:
     copied_hint: "请将其粘贴到问题报告中。"
     close: "关闭"
   old_v4:
-    notice: "旧版 TF2Tools 仍未卸载。"
+    notice: "旧版 TF2Tools 仍在电脑上。"
     remove: "移除旧版"
     later: "以后再说"
     failed: "无法移除旧版 TF2Tools"
     failed_hint: "请改为在 Windows 设置 > 应用中移除。"
 
 install_parts:
-  title: "Choose what to install"
-  present: "%{label} · Already in the game"
-  install: "Install"
-  addon: "%{name} has several parts. Pick the ones to install."
-  maps: "%{name} holds several maps. Pick the ones to install."
-  maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."
+  title: "选择要安装的内容"
+  present: "%{label} · 已在游戏中"
+  install: "安装"
+  addon: "%{name} 包含多个部分。请选择要安装的部分。"
+  maps: "%{name} 包含多张地图。请选择要安装的地图。"
+  maps_skipped: "%{name} 包含多张地图。请选择要安装的地图。此下载中的部分额外文件已被跳过。"
 
 graphics:
   settings_note:

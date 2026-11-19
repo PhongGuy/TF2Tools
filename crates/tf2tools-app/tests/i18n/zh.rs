@@ -135,3 +135,14 @@ fn the_classes_take_the_client_names() {
     assert_eq!(text("common.class.heavy").as_deref(), Some("机枪手"));
     assert_eq!(text("common.class.engineer").as_deref(), Some("工程师"));
 }
+
+#[test]
+fn the_stores_use_the_glossary_words() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("zh-CN", k).map(|t| t.into_owned());
+    assert_eq!(text("addon_store.button.refresh").as_deref(), Some("刷新"));
+    assert_eq!(text("addon_store.offer.install").as_deref(), Some("安装"));
+    assert_eq!(
+        text("addon_store.badge.installed").as_deref(),
+        Some("已安装")
+    );
+}
