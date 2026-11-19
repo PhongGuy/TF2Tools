@@ -37,6 +37,8 @@ const POLL: Duration = Duration::from_millis(200);
 /// The least time between two step sends, so the server's command quota is never hit.
 const SEND_GAP: Duration = Duration::from_millis(300);
 const GUARD_POLL: Duration = Duration::from_millis(500);
+/// How many wrong position reads in a row the guard takes as a window it cannot place.
+const MISPLACED_READS: u32 = 3;
 /// The pauses around the two join sends after a map loads, in milliseconds.
 const JOIN_SLEEPS: [u64; 3] = [5000, 4000, 2000];
 
@@ -169,6 +171,9 @@ fn shoot_setting(
         value: None,
         assets,
     };
+    // The first value's kick check starts before the camera placement, so a kick while
+    // placing is caught too; each later value checks from where the previous one ended.
+    let mut since = log_len(&session.log());
     shot.execute(session, &shoot::setting_actions(manifest, setting))
         .map_err(|e| format!("{module} (placing the camera): {e}"))?;
     let mut recovered = false;
@@ -178,13 +183,25 @@ fn shoot_setting(
             value: Some(value),
             ..shot
         };
-        shoot_value(session, &shot, value, &mut recovered)?;
+        shoot_value(session, &shot, value, since, &mut recovered)?;
+        since = log_len(&session.log());
         let took = started.elapsed();
         println!("  {value}: {:.1} s", took.as_secs_f64());
         report.shots.push(took);
     }
     shot.execute(session, &shoot::reset_actions(manifest, setting))
         .map_err(|e| format!("{module} (back to base): {e}"))?;
+    // The reset runs in the client, so after a kick there only the server is rejoined.
+    if shoot::kick_seen(&log_since(&session.log(), since)) {
+        if recovered {
+            return Err(format!(
+                "{module} (back to base): kicked from the server a second time"
+            ));
+        }
+        println!("  kicked from the server while back to base; reloading the map");
+        shot.execute(session, &rejoin_actions(manifest, setting))
+            .map_err(|e| format!("{module} (rejoining after a kick): {e}"))?;
+    }
     let distances = pair_distances(assets, setting)?;
     let flagged = flag_same_looks(setting, &distances);
     println!("  rmse between pictures (same look at or under {SAME_LOOK_RMSE}):");
@@ -204,18 +221,18 @@ fn shoot_setting(
     Ok(())
 }
 
-/// Shoots one value. If the server kicked the player meanwhile, it reloads the map, rejoins,
-/// places the camera again and retries the value; a second kick in the setting stops the run.
+/// Shoots one value, checking the log for a kick from `since`. After a kick it reloads the
+/// map, rejoins, places the camera again and retries; a second kick in the setting stops the run.
 fn shoot_value(
     session: &mut Session,
     shot: &Shot,
     value: &str,
+    mut since: u64,
     recovered: &mut bool,
 ) -> Result<(), String> {
     let (manifest, setting) = (shot.manifest, shot.setting);
     let module = setting.module.as_str();
     loop {
-        let since = log_len(&session.log());
         let result = shot.execute(session, &shoot::value_actions(manifest, setting, value));
         if !shoot::kick_seen(&log_since(&session.log(), since)) {
             return result.map_err(|e| format!("{module} = {value}: {e}"));
@@ -227,15 +244,21 @@ fn shoot_value(
         }
         *recovered = true;
         println!("  {value}: kicked from the server; reloading the map and retrying");
-        let map = setting.map.as_deref().unwrap_or(&manifest.map);
-        let mut rejoin = vec![
-            ShotAction::Run(vec![format!("map {map}")]),
-            ShotAction::Rejoin,
-        ];
+        since = log_len(&session.log());
+        let mut rejoin = rejoin_actions(manifest, setting);
         rejoin.extend(shoot::setting_actions(manifest, setting));
         shot.execute(session, &rejoin)
             .map_err(|e| format!("{module} = {value} (rejoining after a kick): {e}"))?;
     }
+}
+
+/// Reloads the setting's map and joins again, the way back onto the server after a kick.
+fn rejoin_actions(manifest: &PictureManifest, setting: &SettingShot) -> Vec<ShotAction> {
+    let map = setting.map.as_deref().unwrap_or(&manifest.map);
+    vec![
+        ShotAction::Run(vec![format!("map {map}")]),
+        ShotAction::Rejoin,
+    ]
 }
 
 /// Two values of a setting and the RMSE between their pictures.
@@ -707,12 +730,17 @@ impl Guard {
         let handle = thread::spawn(move || {
             let started = Instant::now();
             let mut found = false;
+            let mut reads = Misplaced::default();
             while !stop_flag.load(Ordering::Relaxed) {
                 match pid_of(TF2_PROCESS).and_then(|pid| window_of(&pid)) {
                     Some(window) => {
                         found = true;
-                        if let Err(e) = place_window(&window, target) {
-                            let _ = failed.set(e);
+                        let placed = place_window(&window, target);
+                        if reads.read(placed.is_ok())
+                            && let Err(at) = placed
+                        {
+                            let _ = failed
+                                .set(format!("the TF2 window stays at {at:?}, not {target:?}"));
                             return;
                         }
                     }
@@ -772,17 +800,36 @@ fn window_position(window: &str) -> Option<(i32, i32)> {
     )?)
 }
 
-fn place_window(window: &str, target: (i32, i32)) -> Result<(), String> {
+/// Counts the guard's wrong position reads in a row; one stale read right after a move is
+/// normal, so only a run of them means the window cannot be placed.
+#[derive(Default)]
+struct Misplaced {
+    streak: u32,
+}
+
+impl Misplaced {
+    /// Records one read and says whether the window now counts as misplaced.
+    fn read(&mut self, in_place: bool) -> bool {
+        self.streak = if in_place { 0 } else { self.streak + 1 };
+        self.streak >= MISPLACED_READS
+    }
+}
+
+/// Moves the window to `target` if it drifted and reads it back; `Err` holds the wrong
+/// position that was read. A window whose position cannot be read counts as in place.
+fn place_window(window: &str, target: (i32, i32)) -> Result<(), (i32, i32)> {
     match window_position(window) {
         None => Ok(()),
         Some(at) if at == target => Ok(()),
         Some(_) => {
             let (x, y) = (target.0.to_string(), target.1.to_string());
-            let _ = output_of("xdotool", &["windowmove", window, &x, &y]);
+            // `--sync` waits for the window manager; `timeout` bounds it if the move never lands.
+            let _ = output_of(
+                "timeout",
+                &["2", "xdotool", "windowmove", "--sync", window, &x, &y],
+            );
             match window_position(window) {
-                Some(at) if at != target => {
-                    Err(format!("the TF2 window stays at {at:?}, not {target:?}"))
-                }
+                Some(at) if at != target => Err(at),
                 _ => Ok(()),
             }
         }
@@ -1114,6 +1161,17 @@ mod tests {
         let out = "WINDOW=44040239\nX=1440\nY=0\nWIDTH=1440\nHEIGHT=810\nSCREEN=0\n";
         assert_eq!(parse_geometry(out), Some((1440, 0)));
         assert_eq!(parse_geometry("WINDOW=1\n"), None);
+    }
+
+    #[test]
+    fn the_window_is_misplaced_only_after_three_wrong_reads_in_a_row() {
+        let mut reads = Misplaced::default();
+        assert!(!reads.read(false));
+        assert!(!reads.read(false));
+        assert!(!reads.read(true), "a correct read resets the streak");
+        assert!(!reads.read(false));
+        assert!(!reads.read(false));
+        assert!(reads.read(false));
     }
 
     fn tiny_manifest() -> PictureManifest {

@@ -24,9 +24,12 @@ pub enum ShotAction {
 }
 
 /// The cfg the game execs at launch; it arms the loop that polls for step files.
-/// mastercomfig aliases forward commands to the server, so the command quota is raised.
+/// mastercomfig aliases forward commands to the server, so the command quota is raised, and
+/// team balance and respawn waits are off so stock-item puppet bots can join any team.
 pub fn start_cfg() -> String {
-    "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\ncl_disablehtmlmotd 1\n\
+    "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\n\
+     mp_teams_unbalance_limit 0\nmp_autoteambalance 0\nmp_disable_respawn_times 1\nr_drawviewmodel 1\n\
+     cl_disablehtmlmotd 1\n\
      alias tfs_loop \"tfs_poll\"\nalias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
         .to_owned()
 }
@@ -88,13 +91,14 @@ pub fn launch_args(map: &str) -> Vec<String> {
     .collect()
 }
 
-/// The commands that put the shooter on BLU as Scout with a clean view.
+/// The commands that put the shooter on BLU as Soldier, whose stock Rocket Launcher shows
+/// in first person, with the HUD hidden.
 pub fn join_commands() -> Vec<String> {
     [
         "jointeam blue",
-        "joinclass scout",
+        "joinclass soldier",
         "cl_drawhud 0",
-        "r_drawviewmodel 0",
+        "r_drawviewmodel 1",
     ]
     .iter()
     .map(|c| (*c).to_owned())

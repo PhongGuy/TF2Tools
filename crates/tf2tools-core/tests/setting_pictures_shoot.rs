@@ -31,7 +31,9 @@ fn run(cmds: &[&str]) -> ShotAction {
 fn the_start_cfg_arms_the_step_loop() {
     assert_eq!(
         start_cfg(),
-        "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\ncl_disablehtmlmotd 1\n\
+        "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\n\
+         mp_teams_unbalance_limit 0\nmp_autoteambalance 0\nmp_disable_respawn_times 1\nr_drawviewmodel 1\n\
+         cl_disablehtmlmotd 1\n\
          alias tfs_loop \"tfs_poll\"\nalias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
     );
 }
@@ -92,14 +94,14 @@ fn the_launch_is_a_private_local_server_on_the_map() {
 }
 
 #[test]
-fn joining_hides_the_hud_and_viewmodel() {
+fn joining_hides_the_hud_and_shows_the_viewmodel() {
     assert_eq!(
         join_commands(),
         [
             "jointeam blue",
-            "joinclass scout",
+            "joinclass soldier",
             "cl_drawhud 0",
-            "r_drawviewmodel 0"
+            "r_drawviewmodel 1"
         ]
     );
 }
