@@ -144,7 +144,7 @@ fn version_parts(tag: &str) -> Option<Vec<u64>> {
     tag.split('.').map(|part| part.parse().ok()).collect()
 }
 
-/// The preset's name in the current language, as the cards, the strip and the rows show it.
+/// The preset's name in the current language, as the segments, the strip and the rows show it.
 pub fn preset_label(preset: Preset) -> SharedString {
     match preset {
         Preset::Ultra => tr!("graphics.preset.ultra.label"),
@@ -155,14 +155,14 @@ pub fn preset_label(preset: Preset) -> SharedString {
     }
 }
 
-/// The preset card's line, as comfig-app words it.
-pub fn preset_description(preset: Preset) -> &'static str {
+/// The preset's one-line summary in the current language, shown beside the preset heading.
+pub fn preset_line(preset: Preset) -> SharedString {
     match preset {
-        Preset::Ultra => "Absolute maximum graphical quality",
-        Preset::High => "High graphical quality",
-        Preset::Low => "Low graphical quality",
-        Preset::Custom => "Skip setting quality options unless set by you",
-        Preset::Medium | _ => "Medium graphical quality",
+        Preset::Ultra => tr!("graphics.preset.ultra.line"),
+        Preset::High => tr!("graphics.preset.high.line"),
+        Preset::Low => tr!("graphics.preset.low.line"),
+        Preset::Custom => tr!("graphics.preset.custom.line"),
+        Preset::Medium | _ => tr!("graphics.preset.medium.line"),
     }
 }
 

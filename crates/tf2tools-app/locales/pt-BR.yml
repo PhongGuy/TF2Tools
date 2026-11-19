@@ -3287,13 +3287,21 @@ graphics:
     misc: "Diversos"
     networking: "Rede"
   preset:
+    heading: "Predefinição"
+    more_frames: "Mais quadros"
+    better_looking: "Visual melhor"
     low:
       label: "Baixo"
+      line: "Menos efeitos e texturas mais suaves, para PCs mais fracos"
     medium:
       label: "Médio"
+      line: "Equilíbrio entre visual e taxa de quadros para a maioria dos PCs"
     high:
       label: "Alto"
+      line: "Texturas mais nítidas e mais efeitos, para um PC potente"
     ultra:
       label: "Ultra"
+      line: "Tudo ligado, para PCs rápidos e capturas de tela"
     custom:
       label: "Personalizado"
+      line: "Só as configurações que você escolher; o TF2 decide o resto"

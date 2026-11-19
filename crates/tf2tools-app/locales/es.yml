@@ -3286,13 +3286,21 @@ graphics:
     misc: "Varios"
     networking: "Red"
   preset:
+    heading: "Ajuste preestablecido"
+    more_frames: "Más fotogramas"
+    better_looking: "Mejor aspecto"
     low:
       label: "Baja"
+      line: "Menos efectos y texturas más suaves, para PC modestos"
     medium:
       label: "Media"
+      line: "Equilibrio entre aspecto y fotogramas para la mayoría de PC"
     high:
       label: "Alta"
+      line: "Texturas más nítidas y más efectos, para un PC potente"
     ultra:
       label: "Ultra"
+      line: "Todo activado, para PC rápidos y capturas de pantalla"
     custom:
       label: "Personalizada"
+      line: "Solo los ajustes que elijas; TF2 decide el resto"

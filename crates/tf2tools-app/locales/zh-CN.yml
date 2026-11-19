@@ -3285,13 +3285,21 @@ graphics:
     misc: "其他"
     networking: "网络"
   preset:
+    heading: "预设"
+    more_frames: "更高帧率"
+    better_looking: "画面更好"
     low:
       label: "低"
+      line: "更少特效和更柔和的纹理，适合低配电脑"
     medium:
       label: "中等"
+      line: "在画面与帧率之间取得平衡，适合大多数电脑"
     high:
       label: "高"
+      line: "更清晰的纹理和更多特效，适合性能较好的电脑"
     ultra:
       label: "极高"
+      line: "全部开启，适合高性能电脑和截图"
     custom:
       label: "自定义"
+      line: "只应用你选择的设置，其余由 TF2 决定"

@@ -4,6 +4,7 @@ pub mod jobs;
 pub mod model;
 mod picture_panel;
 pub mod pictures;
+mod presets;
 mod settings;
 mod status;
 pub mod view;
@@ -17,12 +18,11 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, Role,
-    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
 use tf2tools_core::{
     Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
@@ -31,7 +31,7 @@ use tf2tools_core::{
 use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
-use crate::pages::common::{card_frame, no_tf2_warning};
+use crate::pages::common::no_tf2_warning;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -45,8 +45,8 @@ use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
 use model::{
     SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
-    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_description, preset_label,
-    shown_choice, status_card, value_options,
+    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_label, shown_choice,
+    status_card, value_options,
 };
 use pictures::PictureIndex;
 use view::Filter;
@@ -935,7 +935,7 @@ impl Render for GraphicsPage {
         }
         let mut items = BTreeMap::new();
         if let Some(preset) = self.preset() {
-            children.push(self.presets(preset, window, cx));
+            children.push(self.presets(preset, narrow, cx));
             children.push(self.changes_strip(preset, cx));
             settings::push(
                 self,
@@ -970,79 +970,6 @@ impl Render for GraphicsPage {
 }
 
 impl GraphicsPage {
-    // The five preset cards in comfig-app's order, the current one in the primary border. Each
-    // is a tab stop where Enter or Space picks it; a click does not take focus, as on the pills.
-    fn presets(&self, current: Preset, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme();
-        let (primary, border, ring, muted, radius) = (
-            theme.primary,
-            theme.border,
-            theme.ring,
-            theme.muted_foreground,
-            theme.radius_lg,
-        );
-        let cards: Vec<AnyElement> = Preset::PICKER
-            .into_iter()
-            .map(|preset| {
-                let chosen = preset == current;
-                let id = ids::graphics_preset(preset);
-                let focus = window
-                    .use_keyed_state(id.clone(), cx, |_, cx| cx.focus_handle().tab_stop(true))
-                    .read(cx)
-                    .clone();
-                let edge = if focus.is_focused(window) {
-                    ring
-                } else if chosen {
-                    primary
-                } else {
-                    border
-                };
-                card_frame(cx)
-                    .id(id)
-                    .role(Role::Button)
-                    .aria_label(preset_label(preset))
-                    .aria_selected(chosen)
-                    .test_support()
-                    .track_focus(&focus)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
-                    .flex_1()
-                    .min_w(px(160.))
-                    .p_4()
-                    .rounded(radius)
-                    .border_color(edge)
-                    .cursor_pointer()
-                    .when(self.busy, |card| card.opacity(0.6))
-                    .on_click(cx.listener(move |page, _, window, cx| page.pick(preset, window, cx)))
-                    .child(
-                        v_flex()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(preset_label(preset)),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(muted)
-                                    .child(preset_description(preset)),
-                            ),
-                    )
-                    .into_any_element()
-            })
-            .collect();
-        v_flex()
-            .gap_3()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Preset"),
-            )
-            .child(h_flex().flex_wrap().gap_4().children(cards))
-            .into_any_element()
-    }
-
     // The player's changes from `preset` as chips with an undo each, and Reset all; a dashed
     // "as is" strip when there are none. Offline the chips only name the saved values, since
     // undoing needs the catalogue.

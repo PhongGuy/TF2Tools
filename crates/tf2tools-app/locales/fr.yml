@@ -3288,13 +3288,21 @@ graphics:
     misc: "Divers"
     networking: "Réseau"
   preset:
+    heading: "Préréglage"
+    more_frames: "Plus d'images"
+    better_looking: "Plus beau"
     low:
       label: "Faible"
+      line: "Moins d'effets et des textures plus douces, pour les PC modestes"
     medium:
       label: "Moyenne"
+      line: "Un équilibre entre rendu et fluidité pour la plupart des PC"
     high:
       label: "Élevée"
+      line: "Des textures plus nettes et plus d'effets, pour un PC performant"
     ultra:
       label: "Ultra"
+      line: "Tout activé, pour les PC rapides et les captures d'écran"
     custom:
       label: "Personnalisée"
+      line: "Seulement les réglages que vous choisissez\u00A0; TF2 décide du reste"

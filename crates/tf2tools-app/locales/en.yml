@@ -3263,13 +3263,21 @@ graphics:
     misc: "Misc"
     networking: "Networking"
   preset:
+    heading: "Preset"
+    more_frames: "More frames"
+    better_looking: "Better looking"
     low:
       label: "Low"
+      line: "Fewer effects and softer textures, for low-end PCs"
     medium:
       label: "Medium"
+      line: "A balance of look and frame rate for most PCs"
     high:
       label: "High"
+      line: "Sharper textures and more effects, for a capable PC"
     ultra:
       label: "Ultra"
+      line: "Everything on, for fast PCs and screenshots"
     custom:
       label: "Custom"
+      line: "Only the settings you pick; TF2 decides the rest"

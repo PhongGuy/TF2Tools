@@ -861,6 +861,14 @@ pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
 pub const GRAPHICS_STATUS: &str = "graphics-status";
 /// The banner under the status row while TF2 runs, labelled with its text.
 pub const GRAPHICS_RUNNING: &str = "graphics-running";
+/// The preset segmented control's frame on the Graphics page.
+pub const GRAPHICS_PRESETS: &str = "graphics-presets";
+/// The preset control's heading, labelled with its text.
+pub const GRAPHICS_PRESET_HEADING: &str = "graphics-preset-heading";
+/// The current preset's line beside the heading, labelled with its text.
+pub const GRAPHICS_PRESET_LINE: &str = "graphics-preset-line";
+/// The "More frames ... Better looking" scale under the four ranked presets.
+pub const GRAPHICS_PRESET_SCALE: &str = "graphics-preset-scale";
 /// The status card's title line, labelled with its text.
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
 /// The line under the status card's title, labelled with its text; absent when it has none.
@@ -1005,7 +1013,7 @@ pub fn grid_scrollbar(grid: &str) -> ElementId {
     keyed("grid-scrollbar", grid)
 }
 
-/// A preset card on the Graphics page: "graphics-preset:<name>".
+/// A preset segment on the Graphics page: "graphics-preset:<name>".
 pub fn graphics_preset(preset: Preset) -> ElementId {
     keyed("graphics-preset", preset.name())
 }

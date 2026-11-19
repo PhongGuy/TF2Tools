@@ -1,7 +1,7 @@
 use crate::support;
 
 use tf2tools_app::pages::graphics::model::{
-    StatusCard, describe_install, detail, headline, preset_description, preset_label, status_card,
+    StatusCard, describe_install, detail, headline, preset_label, preset_line, status_card,
     update_to,
 };
 use tf2tools_core::{InstallMastercomfigError, MastercomfigStatus, Preset};
@@ -80,19 +80,22 @@ fn the_card_compares_the_install_with_the_recorded_release() {
 }
 
 #[test]
-fn preset_cards_carry_comfig_app_s_descriptions() {
-    let shown: Vec<(String, &str)> = Preset::PICKER
+fn preset_lines_are_our_own_words() {
+    let shown: Vec<(String, String)> = Preset::PICKER
         .iter()
-        .map(|p| (preset_label(*p).to_string(), preset_description(*p)))
+        .map(|p| (preset_label(*p).to_string(), preset_line(*p).to_string()))
         .collect();
     let want = [
-        ("Ultra", "Absolute maximum graphical quality"),
-        ("High", "High graphical quality"),
-        ("Medium", "Medium graphical quality"),
-        ("Low", "Low graphical quality"),
-        ("Custom", "Skip setting quality options unless set by you"),
+        ("Ultra", "Everything on, for fast PCs and screenshots"),
+        (
+            "High",
+            "Sharper textures and more effects, for a capable PC",
+        ),
+        ("Medium", "A balance of look and frame rate for most PCs"),
+        ("Low", "Fewer effects and softer textures, for low-end PCs"),
+        ("Custom", "Only the settings you pick; TF2 decides the rest"),
     ]
-    .map(|(l, d)| (l.to_owned(), d));
+    .map(|(l, d)| (l.to_owned(), d.to_owned()));
     assert_eq!(shown, want);
 }
 

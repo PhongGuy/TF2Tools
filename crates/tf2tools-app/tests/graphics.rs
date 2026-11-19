@@ -101,7 +101,7 @@ fn hook(env: &support::Env) -> String {
 }
 
 fn selected(cx: &mut TestAppContext, s: &support::ShellWindow, preset: Preset) -> bool {
-    support::selected_of(cx, s.win, ids::graphics_preset(preset)) == Some(true)
+    support::checked_of(cx, s.win, ids::graphics_preset(preset)) == Some(true)
 }
 
 fn label(cx: &mut TestAppContext, s: &support::ShellWindow, id: &'static str) -> Option<String> {

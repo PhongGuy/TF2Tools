@@ -3286,13 +3286,21 @@ graphics:
     misc: "Sonstiges"
     networking: "Netzwerk"
   preset:
+    heading: "Voreinstellung"
+    more_frames: "Höhere Bildrate"
+    better_looking: "Bessere Optik"
     low:
       label: "Niedrig"
+      line: "Weniger Effekte und weichere Texturen, für schwache PCs"
     medium:
       label: "Mittel"
+      line: "Ein Ausgleich aus Optik und Bildrate für die meisten PCs"
     high:
       label: "Hoch"
+      line: "Schärfere Texturen und mehr Effekte, für einen leistungsstarken PC"
     ultra:
       label: "Ultra"
+      line: "Alles an, für schnelle PCs und Screenshots"
     custom:
       label: "Eigene"
+      line: "Nur die Einstellungen, die du wählst; den Rest bestimmt TF2"
