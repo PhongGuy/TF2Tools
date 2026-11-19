@@ -57,24 +57,30 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
         install_dir.display()
     );
 
-    // Each way of starting the uninstaller runs on an install (reinstalled when the previous way
-    // removed it), the app's own way first, so one run tells the stand-in's name, the detached
-    // start and the arguments apart.
-    let mut outcomes = Vec::new();
-    for way in Way::ALL {
-        if detect_old_v4().is_none() {
-            reinstall(how, &releases);
-        }
-        let old = wait_step("detect", Duration::from_secs(120), detect_old_v4);
-        let removed = remove_by(way, &old);
-        let entry_left = v4_entry_listed();
-        say(&format!(
-            "RESULT {way:?}: folder removed {removed}, entry left {entry_left}"
+    // The app's own way runs first. If it leaves v4 behind, the same install is removed again
+    // after a pause with Defender told to skip the install and temp folders, to separate a
+    // scan holding a file from the uninstaller itself giving up.
+    let removed = remove_by(Way::App, &old);
+    let entry_left = v4_entry_listed();
+    say(&format!(
+        "RESULT App: folder removed {removed}, entry left {entry_left}"
+    ));
+    if !removed {
+        say(&powershell(
+            "Get-MpComputerStatus | Format-List RealTimeProtectionEnabled,AMRunningMode",
         ));
-        outcomes.push((way, removed, entry_left));
+        std::thread::sleep(Duration::from_secs(30));
+        say(&powershell(
+            "Add-MpPreference -ExclusionPath \"$env:LOCALAPPDATA\\Programs\", $env:TEMP; \
+             (Get-MpPreference).ExclusionPath",
+        ));
+        let again = remove_by(Way::Excluded, &old);
+        say(&format!(
+            "RESULT Excluded: folder removed {again}, entry left {}",
+            v4_entry_listed()
+        ));
     }
-    let (_, removed, entry_left) = outcomes[0];
-    assert!(removed, "the app's own way removes v4: {outcomes:?}");
+    assert!(removed, "the app's own way removes v4");
     // The reconstructed entry's key name is derived, not read from a real install, so a key
     // the uninstaller leaves behind is reported rather than failed on.
     if how == Install::Real {
@@ -87,39 +93,23 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
 enum Way {
     /// As the app does: a stand-in v6 named TF2Tools.exe starts it detached and exits.
     App,
-    /// The app's runner and arguments, called from this test, which stays running.
-    RunnerFromTest,
-    /// A plain child with the app's arguments, waited for so its exit code shows.
-    Waited,
-    /// A plain child with `/S` alone, waited for.
-    WaitedSilentOnly,
+    /// A plain child with the app's arguments, after a pause and a Defender exclusion.
+    Excluded,
 }
 
-impl Way {
-    const ALL: [Way; 4] = [
-        Way::App,
-        Way::RunnerFromTest,
-        Way::Waited,
-        Way::WaitedSilentOnly,
-    ];
-}
-
-fn reinstall(how: Install, releases: &Path) {
-    match how {
-        Install::Real => assert!(
-            install_real(&releases.join("v4.7.5")),
-            "v4.7.5 installs again"
-        ),
-        Install::Reconstructed => reconstruct(&releases.join("v4.8.0")),
-    }
-}
-
-/// Starts v4's uninstaller `way` and waits up to two minutes for its folder to go, noting
-/// every installer-like process seen meanwhile; true when the folder went.
+/// Starts v4's uninstaller `way` and waits up to two minutes for its folder to go. Meanwhile a
+/// watcher reports the temp copy `Un_A.exe` (command line, parent, exit code, lifetime); before
+/// and after, any locked file in the folder is listed. True when the folder went.
 fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
     let install_dir = old.uninstaller().parent().unwrap().to_path_buf();
     let step = format!("remove {way:?}");
     say(&format!("STEP {step}: start"));
+    say(&format!(
+        "{step}: TEMP {:?}, locked before: {:?}",
+        std::env::var_os("TEMP"),
+        locked_files(&install_dir)
+    ));
+    let watcher = watch_temp_uninstaller();
     let started = Instant::now();
     match way {
         Way::App => {
@@ -135,19 +125,11 @@ fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
             let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
             assert!(status.success(), "the stand-in v6 exited with {status}");
         }
-        Way::RunnerFromTest => {
-            system_runner()(old.uninstaller(), &old.silent_arguments()).unwrap();
-        }
-        Way::Waited | Way::WaitedSilentOnly => {
-            let args = if way == Way::Waited {
-                old.silent_arguments()
-            } else {
-                vec!["/S".to_owned()]
-            };
+        Way::Excluded => {
             let mut child = Command::new(old.uninstaller());
-            child.args(&args);
+            child.args(old.silent_arguments());
             let status = try_step(&step, child, Duration::from_secs(120), v4_state);
-            say(&format!("{step}: uninstaller {args:?} exited {status:?}"));
+            say(&format!("{step}: uninstaller exited {status:?}"));
         }
     }
     let mut seen = std::collections::BTreeMap::new();
@@ -161,17 +143,156 @@ fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
             break false;
         }
         for name in installer_processes() {
-            seen.entry(name)
-                .or_insert_with(|| started.elapsed().as_secs());
+            let at = started.elapsed().as_secs();
+            seen.entry(name).or_insert((at, at)).1 = at;
         }
         std::thread::sleep(Duration::from_secs(1));
     };
-    let left = std::fs::read_dir(&install_dir).map_or(0, |entries| entries.count());
     say(&format!(
-        "{step}: after {} s folder removed {removed} ({left} entries left); processes first seen at s: {seen:?}",
+        "{step}: after {} s folder removed {removed}; processes seen (first s, last s): {seen:?}",
         started.elapsed().as_secs()
     ));
+    let watched = watcher
+        .recv_timeout(Duration::from_secs(60))
+        .ok()
+        .and_then(Result::ok)
+        .map_or_else(
+            || "watcher did not finish".to_owned(),
+            |out| String::from_utf8_lossy(&out.stdout).into_owned(),
+        );
+    say(&watched);
+    if !removed {
+        say(&format!(
+            "{step}: left in the folder: {:?}",
+            std::fs::read_dir(&install_dir)
+                .map(|entries| entries
+                    .flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>())
+                .unwrap_or_default()
+        ));
+        say(&format!(
+            "{step}: locked after: {:?}",
+            locked_files(&install_dir)
+        ));
+        say(&format!(
+            "{step}: old-install folders: {:?}",
+            old_install_folders(&install_dir)
+        ));
+    }
     removed
+}
+
+/// Waits (up to 30 s) for NSIS's temp copy `Un_A.exe` to start, then reports its command line,
+/// path and parent, and waits up to 150 s more for its exit code and lifetime.
+fn watch_temp_uninstaller() -> mpsc::Receiver<std::io::Result<Output>> {
+    let script = r#"
+$deadline = (Get-Date).AddSeconds(30)
+$p = $null
+while (-not $p -and (Get-Date) -lt $deadline) {
+  $p = @(Get-CimInstance Win32_Process -Filter "Name='Un_A.exe'")[0]
+  if (-not $p) { Start-Sleep -Milliseconds 50 }
+}
+if (-not $p) { 'WATCH no Un_A.exe within 30 s'; exit }
+"WATCH pid $($p.ProcessId) parent $($p.ParentProcessId) path $($p.ExecutablePath)"
+"WATCH cmdline $($p.CommandLine)"
+try {
+  $h = [System.Diagnostics.Process]::GetProcessById($p.ProcessId)
+  $null = $h.Handle
+  $clock = [Diagnostics.Stopwatch]::StartNew()
+  if ($h.WaitForExit(150000)) {
+    "WATCH exit code $($h.ExitCode) after $([int]$clock.Elapsed.TotalSeconds) s of watching"
+  } else { 'WATCH still running after 150 s' }
+} catch { "WATCH exited before its handle was taken: $_" }
+"#;
+    let mut command = Command::new("powershell");
+    command
+        .args(["-NoProfile", "-Command", script])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let (sender, receiver) = mpsc::channel();
+    match command.spawn() {
+        Ok(child) => {
+            std::thread::spawn(move || {
+                let _ = sender.send(child.wait_with_output());
+            });
+        }
+        Err(e) => {
+            let _ = sender.send(Err(e));
+        }
+    }
+    receiver
+}
+
+/// Files under `dir` that cannot be opened without sharing, which is what a scan or a running
+/// program holding them looks like.
+fn locked_files(dir: &Path) -> Vec<String> {
+    let mut locked = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in std::fs::read_dir(&next).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Err(e) = open_unshared(&path) {
+                locked.push(format!("{}: {e}", path.display()));
+            }
+        }
+    }
+    locked
+}
+
+fn open_unshared(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt as _;
+        options.share_mode(0);
+    }
+    options.open(path)
+}
+
+/// Every folder named `old-install` in the install folder and in TEMP's NSIS folders, where
+/// v4's uninstaller moves files before deleting them.
+fn old_install_folders(install_dir: &Path) -> Vec<String> {
+    let temp = std::env::var_os("TEMP")
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let mut found = Vec::new();
+    let mut stack = vec![(install_dir.to_path_buf(), 0), (temp, 0)];
+    while let Some((dir, depth)) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case("old-install")
+            {
+                found.push(path.display().to_string());
+            } else if depth < 2 {
+                stack.push((path, depth + 1));
+            }
+        }
+    }
+    found
+}
+
+fn powershell(script: &str) -> String {
+    bounded_output(Command::new("powershell").args(["-NoProfile", "-Command", script])).map_or_else(
+        || "powershell did not answer".to_owned(),
+        |out| {
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            )
+        },
+    )
 }
 
 /// Names of running processes that look like v4's app or an NSIS installer or its temp copy.
