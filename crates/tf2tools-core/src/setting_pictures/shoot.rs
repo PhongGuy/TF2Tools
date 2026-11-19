@@ -24,9 +24,10 @@ pub enum ShotAction {
 }
 
 /// The cfg the game execs at launch; it arms the loop that polls for step files.
+/// mastercomfig aliases forward commands to the server, so the command quota is raised.
 pub fn start_cfg() -> String {
-    "echo TFS_START\nsv_cheats 1\ncl_disablehtmlmotd 1\nalias tfs_loop \"tfs_poll\"\n\
-     alias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
+    "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\ncl_disablehtmlmotd 1\n\
+     alias tfs_loop \"tfs_poll\"\nalias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
         .to_owned()
 }
 
@@ -50,6 +51,13 @@ pub fn marker_seen(log: &str, n: u32) -> bool {
     log.lines().any(|line| line.trim() == marker)
 }
 
+/// Whether the console log shows the server dropping the player, such as for too many commands.
+pub fn kick_seen(log: &str) -> bool {
+    log.lines().map(str::trim).any(|line| {
+        line.starts_with("Disconnect:") || line == "Issued too many commands to server."
+    })
+}
+
 /// The Steam arguments for a private, windowed, silent local server on `map`.
 pub fn launch_args(map: &str) -> Vec<String> {
     [
@@ -68,6 +76,8 @@ pub fn launch_args(map: &str) -> Vec<String> {
         "1",
         "+maxplayers",
         "1",
+        "+sv_quota_stringcmdspersecond",
+        "1000",
         "+map",
         map,
         "+exec",

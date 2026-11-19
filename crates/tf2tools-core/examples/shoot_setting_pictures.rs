@@ -34,6 +34,8 @@ const STEP_DONE: Duration = Duration::from_secs(30);
 const SHOT_SAVED: Duration = Duration::from_secs(10);
 const GAME_QUITS: Duration = Duration::from_secs(60);
 const POLL: Duration = Duration::from_millis(200);
+/// The least time between two step sends, so the server's command quota is never hit.
+const SEND_GAP: Duration = Duration::from_millis(300);
 const GUARD_POLL: Duration = Duration::from_millis(500);
 /// The pauses around the two join sends after a map loads, in milliseconds.
 const JOIN_SLEEPS: [u64; 3] = [5000, 4000, 2000];
@@ -169,14 +171,14 @@ fn shoot_setting(
     };
     shot.execute(session, &shoot::setting_actions(manifest, setting))
         .map_err(|e| format!("{module} (placing the camera): {e}"))?;
+    let mut recovered = false;
     for value in values_to_shoot(setting) {
         let started = Instant::now();
         let shot = Shot {
             value: Some(value),
             ..shot
         };
-        shot.execute(session, &shoot::value_actions(manifest, setting, value))
-            .map_err(|e| format!("{module} = {value}: {e}"))?;
+        shoot_value(session, &shot, value, &mut recovered)?;
         let took = started.elapsed();
         println!("  {value}: {:.1} s", took.as_secs_f64());
         report.shots.push(took);
@@ -200,6 +202,40 @@ fn shoot_setting(
             .map(|(a, b)| format!("{module}: {a} ~ {b}")),
     );
     Ok(())
+}
+
+/// Shoots one value. If the server kicked the player meanwhile, it reloads the map, rejoins,
+/// places the camera again and retries the value; a second kick in the setting stops the run.
+fn shoot_value(
+    session: &mut Session,
+    shot: &Shot,
+    value: &str,
+    recovered: &mut bool,
+) -> Result<(), String> {
+    let (manifest, setting) = (shot.manifest, shot.setting);
+    let module = setting.module.as_str();
+    loop {
+        let since = log_len(&session.log());
+        let result = shot.execute(session, &shoot::value_actions(manifest, setting, value));
+        if !shoot::kick_seen(&log_since(&session.log(), since)) {
+            return result.map_err(|e| format!("{module} = {value}: {e}"));
+        }
+        if *recovered {
+            return Err(format!(
+                "{module} = {value}: kicked from the server a second time"
+            ));
+        }
+        *recovered = true;
+        println!("  {value}: kicked from the server; reloading the map and retrying");
+        let map = setting.map.as_deref().unwrap_or(&manifest.map);
+        let mut rejoin = vec![
+            ShotAction::Run(vec![format!("map {map}")]),
+            ShotAction::Rejoin,
+        ];
+        rejoin.extend(shoot::setting_actions(manifest, setting));
+        shot.execute(session, &rejoin)
+            .map_err(|e| format!("{module} = {value} (rejoining after a kick): {e}"))?;
+    }
 }
 
 /// Two values of a setting and the RMSE between their pictures.
@@ -809,6 +845,8 @@ struct Session {
     step: u32,
     /// The log length just before the last step file was written.
     last_send: u64,
+    /// When the last step file was written, to pace the next one.
+    last_sent_at: Option<Instant>,
     /// Whether TF2 has been seen running since the last launch.
     tf2_seen: bool,
     guard: Option<Guard>,
@@ -821,6 +859,7 @@ impl Session {
             window_at,
             step: 1,
             last_send: 0,
+            last_sent_at: None,
             tf2_seen: false,
             guard: None,
         }
@@ -874,8 +913,12 @@ impl Session {
         })
     }
 
-    /// Writes step `n` through a temp file and rename so the game never reads half a file.
+    /// Writes step `n` through a temp file and rename so the game never reads half a file,
+    /// at least `SEND_GAP` after the previous step.
     fn write_step(&mut self, commands: &[String]) -> Result<u32, String> {
+        if let Some(last) = self.last_sent_at {
+            thread::sleep(send_gap(last, Instant::now()));
+        }
         let n = self.step;
         let tfs = tfs_dir(&self.tf);
         let temp = tfs.join(STEP_TEMP);
@@ -884,6 +927,7 @@ impl Session {
             .and_then(|()| fs::rename(&temp, tfs.join(format!("step_{n}.cfg"))))
             .map_err(|e| format!("writing step {n}: {e}"))?;
         self.step += 1;
+        self.last_sent_at = Some(Instant::now());
         Ok(n)
     }
 
@@ -998,6 +1042,11 @@ impl Session {
             Err("TF2 is still running".to_owned())
         }
     }
+}
+
+/// How long to wait before the next send so it lands `SEND_GAP` after the one at `last`.
+fn send_gap(last: Instant, now: Instant) -> Duration {
+    SEND_GAP.saturating_sub(now.saturating_duration_since(last))
 }
 
 fn wait_for_exit(timeout: Duration) -> bool {
@@ -1173,6 +1222,20 @@ mod tests {
                 "80",
                 "/b/y.webp"
             ]
+        );
+    }
+
+    #[test]
+    fn sends_are_spaced_at_least_300_ms_apart() {
+        let last = Instant::now();
+        assert_eq!(send_gap(last, last), Duration::from_millis(300));
+        assert_eq!(
+            send_gap(last, last + Duration::from_millis(100)),
+            Duration::from_millis(200)
+        );
+        assert_eq!(
+            send_gap(last, last + Duration::from_secs(2)),
+            Duration::ZERO
         );
     }
 

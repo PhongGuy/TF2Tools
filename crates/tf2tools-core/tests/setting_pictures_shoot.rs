@@ -2,8 +2,8 @@
 
 use tf2tools_core::PictureManifest;
 use tf2tools_core::shoot::{
-    ShotAction, join_commands, launch_args, marker_seen, modules_cfg, reset_actions, rmse,
-    setting_actions, shot_name, start_cfg, step_cfg, value_actions,
+    ShotAction, join_commands, kick_seen, launch_args, marker_seen, modules_cfg, reset_actions,
+    rmse, setting_actions, shot_name, start_cfg, step_cfg, value_actions,
 };
 
 const MANIFEST: &str = r#"{
@@ -31,9 +31,21 @@ fn run(cmds: &[&str]) -> ShotAction {
 fn the_start_cfg_arms_the_step_loop() {
     assert_eq!(
         start_cfg(),
-        "echo TFS_START\nsv_cheats 1\ncl_disablehtmlmotd 1\nalias tfs_loop \"tfs_poll\"\n\
-         alias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
+        "echo TFS_START\nsv_cheats 1\nsv_quota_stringcmdspersecond 1000\ncl_disablehtmlmotd 1\n\
+         alias tfs_loop \"tfs_poll\"\nalias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
     );
+}
+
+#[test]
+fn a_kick_is_seen_in_the_log() {
+    assert!(kick_seen(
+        "x\nDisconnect: #GameUI_Disconnect_TooManyCommands.\n"
+    ));
+    assert!(kick_seen("Issued too many commands to server.\n"));
+    assert!(!kick_seen(
+        "TFS_DONE_3 \n'tfs/step_4' not present; not executing.\n"
+    ));
+    assert!(!kick_seen("echo Disconnect: is a word\n"));
 }
 
 #[test]
@@ -66,6 +78,7 @@ fn the_launch_is_a_private_local_server_on_the_map() {
         "-insecure",
         "+sv_lan 1",
         "+maxplayers 1",
+        "+sv_quota_stringcmdspersecond 1000",
         "+map ctf_2fort",
         "+exec tfs/start",
         "-condebug",
