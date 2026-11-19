@@ -259,6 +259,7 @@ mod public_types;
 mod readme;
 mod release_profile;
 mod release_workflow;
+mod setting_pictures;
 mod settings;
 mod sound_install;
 mod store_cards;

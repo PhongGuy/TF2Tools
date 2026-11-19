@@ -2566,3 +2566,23 @@ pub enum LogParseError {
         message: String,
     },
 }
+
+/// Why the setting pictures manifest could not be opened.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum SettingPicturesError {
+    /// The manifest file could not be read.
+    #[error("cannot read {path}: {source}")]
+    Read {
+        /// The file that failed.
+        path: PathBuf,
+        /// The operating system's error.
+        source: std::io::Error,
+    },
+    /// The manifest is not valid JSON of the expected shape.
+    #[error("the setting pictures manifest is not readable: {reason}")]
+    Format {
+        /// What the JSON reader objected to.
+        reason: String,
+    },
+}
