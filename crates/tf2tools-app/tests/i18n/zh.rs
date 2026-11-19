@@ -171,3 +171,18 @@ fn the_hud_maker_timeline_uses_the_client_words() {
     assert_ne!(charged, "ÜberCharge ready");
     assert_ne!(text("hud_maker.history.save"), "Save snapshot");
 }
+
+#[test]
+fn the_hud_maker_meters_use_the_client_names() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("zh-CN", k)
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    let drink = text("hud_maker.meter.drink");
+    assert!(
+        drink.contains("爆击可乐") && drink.contains("疯狂的牛奶"),
+        "{drink}"
+    );
+    assert!(text("hud_maker.situation.switch.koth").contains("山丘之王"));
+}

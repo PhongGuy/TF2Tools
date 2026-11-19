@@ -787,3 +787,8 @@ fn the_german_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
 fn the_french_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
     minmode_tip_fits_at_800_by_600(cx, "fr");
 }
+
+#[gpui_kit::test]
+fn the_chinese_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "zh-CN");
+}
