@@ -41,3 +41,16 @@ fn a_russian_search_finds_the_translated_name_in_any_case(cx: &mut TestAppContex
     assert!(support::present(cx, s.win, ids::graphics_row("shadows")));
     assert!(!support::present(cx, s.win, ids::graphics_row("lod")));
 }
+
+#[gpui_kit::test]
+fn every_russian_control_fits_its_row_at_800_and_1280_px(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    graphics::assert_controls_fit(cx, &s, 800.);
+    graphics::assert_controls_fit(cx, &s, 1280.);
+}

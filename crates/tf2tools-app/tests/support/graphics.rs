@@ -158,6 +158,38 @@ pub fn search(
     super::settle(cx, s.win);
 }
 
+/// Asserts every row's control lies inside its row and the window, after the window is made
+/// `width` px wide; the page needs the full catalogue on screen.
+pub fn assert_controls_fit(cx: &mut TestAppContext, s: &super::ShellWindow, width: f32) {
+    use tf2tools_app::pages::graphics::view::{ControlKind, control_kind};
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(900.)),
+    );
+    super::settle(cx, s.win);
+    let catalog = super::full_module_catalog();
+    for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+        let name = module.name();
+        let control = match control_kind(module) {
+            ControlKind::Switch => tf2tools_app::ids::graphics_switch(name),
+            ControlKind::Segmented => tf2tools_app::ids::graphics_segments(name),
+            ControlKind::Select => tf2tools_app::ids::graphics_module_select(name),
+        };
+        let row = super::bounds_of(cx, s.win, tf2tools_app::ids::graphics_row(name))
+            .unwrap_or_else(|| panic!("no row for {name}"));
+        let c =
+            super::bounds_of(cx, s.win, control).unwrap_or_else(|| panic!("no control for {name}"));
+        assert!(
+            c.left() >= row.left() && c.right() <= row.right(),
+            "{name}'s control {c:?} spills out of its row {row:?}"
+        );
+        assert!(
+            c.right() <= gpui_kit::px(width) && c.size.width > gpui_kit::px(0.),
+            "{name}'s control {c:?} is cut off at {width} px"
+        );
+    }
+}
+
 pub fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {
     super::wait_real(cx, "the page to settle", |cx| {
         cx.update(|cx| !page.read(cx).is_busy())

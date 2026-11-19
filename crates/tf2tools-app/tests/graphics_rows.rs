@@ -232,3 +232,11 @@ fn every_row_shows_the_ultra_preset_s_value(cx: &mut TestAppContext) {
 fn every_row_shows_the_custom_preset_s_value(cx: &mut TestAppContext) {
     every_row_shows_the_preset_s_value(cx, Preset::Custom);
 }
+
+#[gpui_kit::test]
+fn every_control_fits_its_row_at_800_and_1280_px(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    support::graphics::assert_controls_fit(cx, &s, 800.);
+    support::graphics::assert_controls_fit(cx, &s, 1280.);
+}

@@ -59,7 +59,7 @@ pub(super) fn push(
     children.push(toolbar(page, cx));
     for section in sections.iter().filter(|s| !s.rows.is_empty()) {
         items.insert(section.key.clone(), children.len());
-        children.push(section_view(page, section, cx));
+        children.push(section_view(page, section, narrow, cx));
     }
     if let Some(empty) = empty(page, sections, cx) {
         children.push(empty);
@@ -99,12 +99,13 @@ fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
 fn section_view(
     page: &GraphicsPage,
     section: &SectionView,
+    narrow: bool,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
     let rows: Vec<AnyElement> = section
         .rows
         .iter()
-        .map(|r| row(page, r.clone(), cx))
+        .map(|r| row(page, r.clone(), narrow, cx))
         .collect();
     v_flex()
         .id(ids::graphics_section(&section.key))
@@ -230,7 +231,12 @@ const CHANGED: u32 = 0x1447e6;
 
 // The title and description, plus the preset's value when changed, on the left; Reset when
 // changed and the row's control on the right.
-fn row(page: &GraphicsPage, row: RowView, cx: &mut Context<GraphicsPage>) -> AnyElement {
+fn row(
+    page: &GraphicsPage,
+    row: RowView,
+    narrow: bool,
+    cx: &mut Context<GraphicsPage>,
+) -> AnyElement {
     let name = row.module.as_str();
     let muted = cx.theme().muted_foreground;
     let description = row.description.clone().map(|text| {
@@ -262,30 +268,36 @@ fn row(page: &GraphicsPage, row: RowView, cx: &mut Context<GraphicsPage>) -> Any
         ControlKind::Select => select(page, &row),
     };
     let tint = Hsla::from(rgb(CHANGED));
-    h_flex()
+    let text = v_flex()
+        .flex_1()
+        .min_w_0()
+        .gap_0p5()
+        .child(labelled(
+            div().text_sm(),
+            ids::graphics_module(name),
+            row.label.clone(),
+        ))
+        .children(description)
+        .children(preset);
+    let controls = h_flex().flex_none().gap_2().children(reset).child(control);
+    // On a narrow page (the one without the rail) the control sits under the text, since a
+    // segmented control beside a wrapped description would not fit; otherwise it sits beside it.
+    let frame = if narrow {
+        v_flex().items_start().gap_2()
+    } else {
+        h_flex().justify_between().gap_4()
+    };
+    frame
         .id(ids::graphics_row(name))
         .test_support()
-        .justify_between()
-        .gap_4()
         .pl_3()
         .border_l(px(3.))
         .border_color(transparent_black())
         .when(row.changed, |this| {
             this.border_color(tint).bg(tint.opacity(0.06))
         })
-        .child(
-            v_flex()
-                .flex_1()
-                .gap_0p5()
-                .child(labelled(
-                    div().text_sm(),
-                    ids::graphics_module(name),
-                    row.label.clone(),
-                ))
-                .children(description)
-                .children(preset),
-        )
-        .child(h_flex().gap_2().children(reset).child(control))
+        .child(text)
+        .child(controls)
         .into_any_element()
 }
 
