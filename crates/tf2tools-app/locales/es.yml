@@ -226,6 +226,7 @@ common:
     decimal: ","
     group: "."
   count:
+    step: "1000"
     thousand: "%{number} mil"
     million: "%{number} M"
   size:

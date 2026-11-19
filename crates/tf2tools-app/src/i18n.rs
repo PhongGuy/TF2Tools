@@ -41,6 +41,10 @@ pub const LANGUAGES: &[Language] = &[
         code: "fr",
         name: "Français (preview)",
     },
+    Language {
+        code: "zh-CN",
+        name: "简体中文 (preview)",
+    },
 ];
 
 // The offered language with this code, so callers get a `'static` code back.
@@ -50,8 +54,10 @@ fn offered(code: &str) -> Option<&'static str> {
 
 /// The first of the preferred locales (most preferred first) that names an offered language,
 /// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language and
-/// `pt_BR.UTF-8` maps to `pt-BR`, `es_MX.UTF-8` to `es`, `de_AT.UTF-8` to `de` and `fr_CA.UTF-8`
-/// to `fr`; `C` and empty entries match nothing and the walk goes on.
+/// `pt_BR.UTF-8` maps to `pt-BR`, `es_MX.UTF-8` to `es`, `de_AT.UTF-8` to `de`, `fr_CA.UTF-8`
+/// to `fr` and Simplified tags such as `zh_CN.UTF-8` or `zh-Hans` to `zh-CN`. Traditional Chinese
+/// tags (`zh-Hant`, `zh_TW`, `zh_HK`, `zh_MO`), `C` and empty entries match nothing and the walk
+/// goes on.
 pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
     locales
         .into_iter()
@@ -60,6 +66,9 @@ pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &
             // so `pt-PT` still lands on the closest offered Portuguese.
             let tag = tag.as_ref().to_lowercase().replace('_', "-");
             let tag = tag.split(['.', '@']).next().unwrap_or_default();
+            if traditional_chinese(tag) {
+                return None;
+            }
             let primary = |code: &str| code.split('-').next().unwrap_or_default().to_owned();
             let codes = || LANGUAGES.iter().map(|l| l.code);
             codes()
@@ -67,6 +76,20 @@ pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &
                 .or_else(|| codes().find(|c| primary(&c.to_lowercase()) == primary(tag)))
         })
         .unwrap_or("en")
+}
+
+// A normalised `zh` tag written in Traditional characters: a `hant` script, or no script and a
+// Taiwan, Hong Kong or Macau region.
+fn traditional_chinese(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    if parts.next() != Some("zh") {
+        return false;
+    }
+    match parts.next() {
+        Some(script) if script.len() == 4 => script == "hant",
+        Some(region) => matches!(region, "tw" | "hk" | "mo"),
+        None => false,
+    }
 }
 
 /// The system's preferred locales, most preferred first, as the OS reports them.
@@ -108,9 +131,12 @@ impl PluralForm {
     }
 }
 
-/// The form `n` takes in language `code`: Russian's one/few/many, French's one for 0 and 1,
-/// English's one/other for every other code.
+/// The form `n` takes in language `code`: Russian's one/few/many, Chinese's single other,
+/// French's one for 0 and 1, English's one/other for every other code.
 pub fn plural_form(code: &str, n: u64) -> PluralForm {
+    if code == "zh-CN" {
+        return PluralForm::Other;
+    }
     if code == "fr" {
         return if n <= 1 {
             PluralForm::One
@@ -519,6 +545,13 @@ mod tests {
     }
 
     #[test]
+    fn chinese_counts_every_number_alike() {
+        for n in [0, 1, 2, 5, 11, 21, 101, 1000, 1_000_000] {
+            assert_eq!(plural_form("zh-CN", n), PluralForm::Other, "zh-CN {n}");
+        }
+    }
+
+    #[test]
     fn an_unknown_language_counts_like_english() {
         assert_eq!(plural_form("xx", 1), PluralForm::One);
         assert_eq!(plural_form("xx", 21), PluralForm::Other);
@@ -535,7 +568,8 @@ mod tests {
                 ("pt-BR", "Português do Brasil (preview)"),
                 ("es", "Español (preview)"),
                 ("de", "Deutsch (preview)"),
-                ("fr", "Français (preview)")
+                ("fr", "Français (preview)"),
+                ("zh-CN", "简体中文 (preview)")
             ]
         );
         let offered: BTreeSet<&str> = LANGUAGES.iter().map(|l| l.code).collect();
@@ -611,6 +645,7 @@ mod tests {
         "common.class_short.heavy",
         "common.class_short.pyro",
         "common.class_short.scout",
+        "common.count.step",
         "common.date.date_time",
         "common.list.separator",
         "common.sound_kind.hitsound",
@@ -714,6 +749,7 @@ mod tests {
         "common.class_short.heavy",
         "common.class_short.pyro",
         "common.class_short.scout",
+        "common.count.step",
         "common.date.date_time",
         "common.date.day_month_year",
         "common.list.separator",
@@ -813,6 +849,7 @@ mod tests {
         "common.class_short.heavy",
         "common.class_short.pyro",
         "common.class_short.scout",
+        "common.count.step",
         "common.date.date_time",
         "common.list.separator",
         "common.sound_kind.hitsound",
@@ -941,6 +978,7 @@ mod tests {
         "common.class_short.heavy",
         "common.class_short.pyro",
         "common.class_short.scout",
+        "common.count.step",
         "common.date.date_time",
         "common.date.day_month_year",
         "common.list.separator",

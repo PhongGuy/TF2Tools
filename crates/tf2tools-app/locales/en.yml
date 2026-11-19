@@ -203,6 +203,7 @@ common:
     decimal: "."
     group: ","
   count:
+    step: "1000"
     thousand: "%{number}K"
     million: "%{number}M"
   size:

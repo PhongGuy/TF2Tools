@@ -457,6 +457,11 @@ fn contributing_explains_how_to_translate() {
         "German",
         "fr_CA",
         "French",
+        "zh-CN",
+        "zh_TW",
+        "zh-Hant",
+        "Simplified Chinese",
+        "only `other`",
         "\"0 HUD\"",
     ] {
         assert!(
@@ -483,6 +488,8 @@ fn the_readme_tells_players_they_can_pick_a_language() {
     assert!(settings.contains("Spanish"), "{settings}");
     assert!(settings.contains("German"), "{settings}");
     assert!(settings.contains("French"), "{settings}");
+    assert!(settings.contains("Simplified Chinese"), "{settings}");
+    assert!(settings.contains("Chinese font"), "{settings}");
     assert!(settings.contains("your system's language"), "{settings}");
     assert!(
         settings.contains("](CONTRIBUTING.md#translations)"),

@@ -201,6 +201,7 @@ common:
     decimal: ","
     group: "\u00A0"
   count:
+    step: "1000"
     thousand: "%{number}\u00A0тыс."
     million: "%{number}\u00A0млн"
   size:
