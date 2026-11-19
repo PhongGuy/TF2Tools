@@ -2411,7 +2411,7 @@ pub const HUD_MAKER_PANEL_CUT_OFF: &str = "hud-maker-panel-cut-off";
 pub const HUD_MAKER_GROW_PARENT: &str = "hud-maker-grow-parent";
 /// The timeline strip under the canvas, while any event plays.
 pub const HUD_MAKER_TIMELINE: &str = "hud-maker-timeline";
-/// The timeline's list of the events playing, joined by ", ".
+/// The timeline's list of the events playing, joined by the language's list separator.
 pub const HUD_MAKER_TIMELINE_EVENTS: &str = "hud-maker-timeline-events";
 /// The timeline's Play and Pause button.
 pub const HUD_MAKER_TIMELINE_PLAY: &str = "hud-maker-timeline-play";

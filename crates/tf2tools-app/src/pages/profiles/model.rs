@@ -151,13 +151,7 @@ pub fn kept_parts(kinds: &[MissingKind]) -> Vec<SharedString> {
 /// The success toast's description: v5's "Installed: ..." or "All customizations cleared";
 /// with skipped slots, which ones kept what the player had.
 pub fn activated_description(installed: &[SharedString], kept: &[SharedString]) -> String {
-    let join = |parts: &[SharedString]| {
-        parts
-            .iter()
-            .map(|p| p.as_ref())
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
+    let join = |parts: &[SharedString]| crate::i18n::separated(parts);
     let lead: SharedString = match (installed.is_empty(), kept.is_empty()) {
         (true, true) => return tr!("profiles.toast.cleared").into(),
         (true, false) => tr!("profiles.toast.nothing_new"),
@@ -175,8 +169,8 @@ pub fn failed_description(failed: &[(ApplyStep, String)]) -> String {
     let steps = failed
         .iter()
         .map(|(step, _)| step_label(*step))
-        .collect::<Vec<_>>()
-        .join(", ");
+        .collect::<Vec<_>>();
+    let steps = crate::i18n::separated(&steps);
     tr!("profiles.toast.failed_steps", steps = steps).into()
 }
 
@@ -192,11 +186,11 @@ pub fn report_details(
         let steps: Vec<_> = applied.iter().map(|s| step_label(*s)).collect();
         parts.push(tr!(
             "profiles.activity.details.applied",
-            list = steps.join(", ")
+            list = crate::i18n::separated(&steps)
         ));
     }
     if !skipped.is_empty() {
-        let list = skipped.join(", ");
+        let list = crate::i18n::separated(skipped);
         parts.push(tr!("profiles.activity.details.skipped", list = list));
     }
     if !failed.is_empty() {
@@ -206,7 +200,7 @@ pub fn report_details(
             .collect();
         parts.push(tr!(
             "profiles.activity.details.failed",
-            list = steps.join(", ")
+            list = crate::i18n::separated(&steps)
         ));
     }
     if parts.is_empty() {

@@ -330,7 +330,7 @@ impl AddonDetail {
         if !profile.ratings().is_empty() {
             let text = tr!(
                 "addon_detail.mature",
-                reasons = profile.ratings().join(", ")
+                reasons = crate::i18n::separated(profile.ratings())
             );
             body.push(
                 labelled(

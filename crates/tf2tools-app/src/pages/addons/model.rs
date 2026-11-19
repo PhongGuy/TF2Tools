@@ -62,7 +62,13 @@ pub fn movement_on_text(keys: &[String], missing: &[&str], running: bool) -> Str
         return tr!("addons.movement.none").to_string();
     }
     let names: Vec<String> = keys.iter().map(|k| key_label(k)).collect();
-    let mut sentences = vec![tr!("addons.movement.keys", keys = names.join(", ")).to_string()];
+    let mut sentences = vec![
+        tr!(
+            "addons.movement.keys",
+            keys = crate::i18n::separated(&names)
+        )
+        .to_string(),
+    ];
     if !missing.is_empty() {
         let words: Vec<String> = missing.iter().map(|id| direction(id).to_string()).collect();
         let directions = words.join(tr!("addons.movement.or").as_ref());
