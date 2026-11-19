@@ -1,6 +1,8 @@
 //! The lookup behind the Graphics page's setting pictures, and the manifest the
 //! shooter reads to take them. Pure data and path logic; no file is decoded here.
 
+pub mod shoot;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

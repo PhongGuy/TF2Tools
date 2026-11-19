@@ -126,6 +126,7 @@ pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
+pub use setting_pictures::shoot;
 pub use setting_pictures::{
     PictureManifest, REASON_KEYS, Reload, SettingPicture, SettingPictures, SettingShot, ShotStep,
     ValueShot,

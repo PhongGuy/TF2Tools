@@ -1,0 +1,183 @@
+//! The pure parts of the setting pictures shooter: cfg text, log markers, launch
+//! arguments and per-value action lists. The `shoot_setting_pictures` example runs them.
+
+use super::{PictureManifest, Reload, SettingShot};
+
+/// The RMSE (0-255 scale) at or under which two shots count as the same look.
+pub const SAME_LOOK_RMSE: f64 = 0.5;
+
+/// One thing the shooter does, in order, to take a picture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ShotAction {
+    /// Console commands to run as one cfg step.
+    Run(Vec<String>),
+    /// Wait this many milliseconds.
+    Sleep(u64),
+    /// Join the server again after a map change.
+    Rejoin,
+    /// Restart the game.
+    Restart,
+    /// Take a jpeg screenshot with this name.
+    Jpeg(String),
+}
+
+/// The cfg the game execs at launch; it arms the loop that polls for step files.
+pub fn start_cfg() -> String {
+    "echo TFS_START\nsv_cheats 1\ncl_disablehtmlmotd 1\nalias tfs_loop \"tfs_poll\"\n\
+     alias tfs_poll \"exec tfs/step_1; wait 30; tfs_loop\"\ntfs_loop\n"
+        .to_owned()
+}
+
+/// The cfg for step `n`: it points the loop at step `n + 1`, runs `commands`, then echoes its marker.
+pub fn step_cfg(n: u32, commands: &[String]) -> String {
+    let mut cfg = format!(
+        "alias tfs_poll \"exec tfs/step_{}; wait 30; tfs_loop\"\n",
+        n + 1
+    );
+    for command in commands {
+        cfg.push_str(command);
+        cfg.push('\n');
+    }
+    cfg.push_str(&format!("echo TFS_DONE_{n}\n"));
+    cfg
+}
+
+/// Whether the console log holds step `n`'s marker as a whole line, so `_12` never matches `_1`.
+pub fn marker_seen(log: &str, n: u32) -> bool {
+    let marker = format!("TFS_DONE_{n}");
+    log.lines().any(|line| line.trim() == marker)
+}
+
+/// The Steam arguments for a private, windowed, silent local server on `map`.
+pub fn launch_args(map: &str) -> Vec<String> {
+    [
+        "-applaunch",
+        "440",
+        "-insecure",
+        "-windowed",
+        "-w",
+        "1440",
+        "-h",
+        "810",
+        "-condebug",
+        "+volume",
+        "0",
+        "+sv_lan",
+        "1",
+        "+maxplayers",
+        "1",
+        "+map",
+        map,
+        "+exec",
+        "tfs/start",
+    ]
+    .iter()
+    .map(|a| (*a).to_owned())
+    .collect()
+}
+
+/// The commands that put the shooter on BLU as Scout with a clean view.
+pub fn join_commands() -> Vec<String> {
+    [
+        "jointeam blue",
+        "joinclass scout",
+        "cl_drawhud 0",
+        "r_drawviewmodel 0",
+    ]
+    .iter()
+    .map(|c| (*c).to_owned())
+    .collect()
+}
+
+/// The screenshot name for a module's value.
+pub fn shot_name(module: &str, value: &str) -> String {
+    format!("tfs_{module}_{value}")
+}
+
+/// Puts the game in the base look for `setting`, then places the camera and runs its setup.
+pub fn setting_actions(manifest: &PictureManifest, setting: &SettingShot) -> Vec<ShotAction> {
+    let base = manifest
+        .base
+        .iter()
+        .filter(|(module, _)| **module != setting.module)
+        .map(|(module, value)| format!("{module}_{value}"))
+        .collect();
+    let mut place = Vec::new();
+    if let Some([x, y, z]) = setting.setpos {
+        place.push(format!("setpos {x} {y} {z}"));
+    }
+    if let Some([p, y, r]) = setting.setang {
+        place.push(format!("setang {p} {y} {r}"));
+    }
+    place.extend(setting.setup.iter().cloned());
+    vec![
+        ShotAction::Run(base),
+        ShotAction::Run(place),
+        ShotAction::Sleep(1000),
+    ]
+}
+
+/// Everything the shooter does to apply one value of `setting` and take its picture.
+pub fn value_actions(
+    manifest: &PictureManifest,
+    setting: &SettingShot,
+    value: &str,
+) -> Vec<ShotAction> {
+    let alias = format!("{}_{value}", setting.module);
+    let map = setting.map.as_deref().unwrap_or(&manifest.map);
+    let mut actions = match setting.reload {
+        Reload::None => vec![ShotAction::Run(vec![alias])],
+        Reload::Materials => {
+            vec![ShotAction::Run(vec![
+                alias,
+                "mat_reloadallmaterials".to_owned(),
+            ])]
+        }
+        Reload::Map => {
+            let mut a = vec![
+                ShotAction::Run(vec![alias.clone()]),
+                ShotAction::Run(vec![format!("map {map}")]),
+                ShotAction::Rejoin,
+            ];
+            a.extend(setting_actions(manifest, setting));
+            a.push(ShotAction::Run(vec![alias]));
+            a
+        }
+        Reload::Restart => {
+            let mut a = vec![ShotAction::Run(vec![alias.clone()]), ShotAction::Restart];
+            a.extend(setting_actions(manifest, setting));
+            a.push(ShotAction::Run(vec![alias]));
+            a
+        }
+    };
+    actions.push(ShotAction::Sleep(1000));
+    for step in &setting.steps {
+        actions.push(ShotAction::Run(vec![step.run.clone()]));
+        actions.push(ShotAction::Sleep(step.wait_ms));
+    }
+    if setting.pause {
+        actions.push(ShotAction::Run(vec!["setpause".to_owned()]));
+    }
+    actions.push(ShotAction::Jpeg(shot_name(&setting.module, value)));
+    if setting.pause {
+        actions.push(ShotAction::Run(vec!["unpause".to_owned()]));
+    }
+    actions
+}
+
+/// The root-mean-square difference of two equal-length pixel buffers; `None` if empty or unequal.
+pub fn rmse(a: &[u8], b: &[u8]) -> Option<f64> {
+    if a.is_empty() || a.len() != b.len() {
+        return None;
+    }
+    let sum: f64 = a
+        .iter()
+        .zip(b)
+        .map(|(x, y)| {
+            let d = f64::from(*x) - f64::from(*y);
+            d * d
+        })
+        .sum();
+    Some((sum / a.len() as f64).sqrt())
+}

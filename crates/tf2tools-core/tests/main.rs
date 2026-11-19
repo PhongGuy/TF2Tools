@@ -261,6 +261,7 @@ mod release_profile;
 mod release_workflow;
 mod setting_pictures;
 mod setting_pictures_manifest;
+mod setting_pictures_shoot;
 mod settings;
 mod sound_install;
 mod store_cards;
