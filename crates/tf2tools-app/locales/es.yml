@@ -3085,3 +3085,72 @@ graphics:
     vsync:
       label: "VSync"
       description: "Ajusta los fotogramas a tu pantalla para evitar el tearing. Añade retraso de entrada."
+    hud_player_model:
+      label: "Modelo del jugador"
+      description: "Tu modelo de clase junto a tu salud."
+    hud_server_text:
+      label: "Mensajes del servidor"
+      description: "El texto que el servidor muestra en el centro de la pantalla."
+    hud_contracts:
+      label: "Contratos"
+      description: "Qué contratos muestra el HUD."
+    hud_panels:
+      label: "Paneles del HUD"
+      description: "Cuántos paneles extra muestra el HUD."
+    hud_avatars:
+      label: "Avatares"
+      description: "Fotos de perfil de Steam en la tabla de puntuaciones y el registro de muertes."
+    match_hud:
+      label: "HUD de partida"
+      description: "La barra de estado de los equipos arriba de la pantalla en las partidas."
+    messages:
+      label: "Mensajes del chat"
+      description: "El chat de texto de otros jugadores."
+    killfeed:
+      label: "Registro de muertes"
+      description: "La lista de muertes en la esquina de la pantalla."
+    killstreaks:
+      label: "Avisos de racha"
+      description: "Los contadores de rachas y sus anuncios."
+    hud_achievement:
+      label: "Avisos de logros"
+      description: "El aviso cuando alguien consigue un logro."
+    console:
+      label: "Consola de desarrollador"
+      description: "Abre la consola con la tecla `."
+    htmlmotd:
+      label: "Página de bienvenida"
+      description: "La página web que muestra un servidor al entrar."
+    outlines:
+      label: "Contornos"
+      description: "Contornos brillantes alrededor de compañeros y objetivos."
+    dynamic_background:
+      label: "Fondo del menú"
+      description: "El mapa en movimiento detrás del menú principal."
+    sound:
+      label: "Calidad de sonido"
+      description: "Cuántos sonidos suenan a la vez y su nivel de detalle."
+    voice_chat:
+      label: "Chat de voz"
+      description: "Escucha a otros jugadores hablar por su micrófono."
+    party_mode:
+      label: "Unirse al grupo"
+      description: "Quién puede unirse a tu grupo."
+    logo:
+      label: "Logo de inicio"
+      description: "El logo que aparece al iniciar el juego."
+    packet_rate:
+      label: "Tasa de paquetes"
+      description: "Con qué frecuencia envías y recibes datos del servidor."
+    snapshot_buffer:
+      label: "Búfer de instantáneas"
+      description: "Cuánto suaviza el juego las actualizaciones que recibe del servidor."
+    packet_size:
+      label: "Tamaño de paquete"
+      description: "Lo grandes que son los paquetes y cómo se dividen."
+    bandwidth:
+      label: "Ancho de banda"
+      description: "El máximo de datos que envía el juego por segundo. Ajústalo a tu conexión."
+    download:
+      label: "Descargas"
+      description: "Qué contenido personalizado pueden enviarte los servidores."

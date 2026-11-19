@@ -3062,3 +3062,72 @@ graphics:
     vsync:
       label: "VSync"
       description: "Matches frames to your screen to stop tearing. Adds input delay."
+    hud_player_model:
+      label: "Player model"
+      description: "Your class model next to your health."
+    hud_server_text:
+      label: "Server messages"
+      description: "Text the server prints in the middle of the screen."
+    hud_contracts:
+      label: "Contracts"
+      description: "Which contracts the HUD shows."
+    hud_panels:
+      label: "HUD panels"
+      description: "How many extra panels the HUD shows."
+    hud_avatars:
+      label: "Avatars"
+      description: "Steam profile pictures on the scoreboard and kill feed."
+    match_hud:
+      label: "Match HUD"
+      description: "The team status bar at the top of the screen in matches."
+    messages:
+      label: "Chat messages"
+      description: "Text chat from other players."
+    killfeed:
+      label: "Kill feed"
+      description: "The list of kills in the corner of the screen."
+    killstreaks:
+      label: "Killstreak notices"
+      description: "Killstreak counts and their announcements."
+    hud_achievement:
+      label: "Achievement popups"
+      description: "The banner when someone earns an achievement."
+    console:
+      label: "Developer console"
+      description: "Opens the console with the ` key."
+    htmlmotd:
+      label: "Server welcome page"
+      description: "The web page a server shows when you join."
+    outlines:
+      label: "Outlines"
+      description: "Glowing outlines around teammates and objectives."
+    dynamic_background:
+      label: "Menu background"
+      description: "The moving map behind the main menu."
+    sound:
+      label: "Sound quality"
+      description: "How many sounds play at once, and their detail."
+    voice_chat:
+      label: "Voice chat"
+      description: "Hear other players talking on their microphones."
+    party_mode:
+      label: "Party joining"
+      description: "Who can join your party."
+    logo:
+      label: "Startup logo"
+      description: "The logo shown when the game starts."
+    packet_rate:
+      label: "Packet rate"
+      description: "How often you send to and receive from the server."
+    snapshot_buffer:
+      label: "Snapshot buffer"
+      description: "How much the game smooths the updates it gets from the server."
+    packet_size:
+      label: "Packet size"
+      description: "How big packets are and how they are split up."
+    bandwidth:
+      label: "Bandwidth"
+      description: "The most data the game sends each second. Match it to your connection."
+    download:
+      label: "Downloads"
+      description: "Which custom content servers may send you."

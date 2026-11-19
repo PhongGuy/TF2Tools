@@ -3084,3 +3084,72 @@ graphics:
     vsync:
       label: "垂直同步"
       description: "让画面与显示器同步以防止撕裂。会增加输入延迟。"
+    hud_player_model:
+      label: "玩家模型"
+      description: "生命值旁边显示的职业模型。"
+    hud_server_text:
+      label: "服务器消息"
+      description: "服务器在屏幕中央显示的文字。"
+    hud_contracts:
+      label: "合约"
+      description: "HUD 显示哪些合约。"
+    hud_panels:
+      label: "HUD 面板"
+      description: "HUD 显示多少额外面板。"
+    hud_avatars:
+      label: "头像"
+      description: "记分板和击杀信息中的 Steam 头像。"
+    match_hud:
+      label: "比赛 HUD"
+      description: "比赛中屏幕顶部的队伍状态栏。"
+    messages:
+      label: "聊天消息"
+      description: "其他玩家的文字聊天。"
+    killfeed:
+      label: "击杀信息"
+      description: "屏幕角落的击杀列表。"
+    killstreaks:
+      label: "连杀提示"
+      description: "连杀计数及其播报。"
+    hud_achievement:
+      label: "成就弹窗"
+      description: "有人获得成就时显示的横幅。"
+    console:
+      label: "开发者控制台"
+      description: "按 ` 键打开控制台。"
+    htmlmotd:
+      label: "服务器欢迎页"
+      description: "加入服务器时显示的网页。"
+    outlines:
+      label: "轮廓"
+      description: "队友和目标周围的发光轮廓。"
+    dynamic_background:
+      label: "菜单背景"
+      description: "主菜单后面的动态地图。"
+    sound:
+      label: "音质"
+      description: "同时播放的声音数量及其细节。"
+    voice_chat:
+      label: "语音聊天"
+      description: "听到其他玩家通过麦克风说话。"
+    party_mode:
+      label: "加入小队"
+      description: "谁可以加入你的小队。"
+    logo:
+      label: "启动标志"
+      description: "游戏启动时显示的标志。"
+    packet_rate:
+      label: "数据包速率"
+      description: "向服务器发送和从服务器接收数据的频率。"
+    snapshot_buffer:
+      label: "快照缓冲"
+      description: "游戏对服务器更新的平滑程度。"
+    packet_size:
+      label: "数据包大小"
+      description: "数据包的大小及其拆分方式。"
+    bandwidth:
+      label: "带宽"
+      description: "游戏每秒最多发送的数据量。请按网络连接设置。"
+    download:
+      label: "下载"
+      description: "允许服务器发送哪些自定义内容。"

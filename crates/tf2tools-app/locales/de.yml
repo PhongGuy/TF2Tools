@@ -3085,3 +3085,72 @@ graphics:
     vsync:
       label: "VSync"
       description: "Passt die Bilder an deinen Bildschirm an, damit nichts zerreißt. Erhöht die Eingabeverzögerung."
+    hud_player_model:
+      label: "Spielermodell"
+      description: "Dein Klassenmodell neben deiner Gesundheit."
+    hud_server_text:
+      label: "Servernachrichten"
+      description: "Text, den der Server in der Bildschirmmitte anzeigt."
+    hud_contracts:
+      label: "Verträge"
+      description: "Welche Verträge das HUD anzeigt."
+    hud_panels:
+      label: "HUD-Elemente"
+      description: "Wie viele zusätzliche Elemente das HUD anzeigt."
+    hud_avatars:
+      label: "Avatare"
+      description: "Steam-Profilbilder auf der Punktetafel und im Killfeed."
+    match_hud:
+      label: "Match-HUD"
+      description: "Die Team-Statusleiste oben am Bildschirm in Matches."
+    messages:
+      label: "Chatnachrichten"
+      description: "Der Textchat anderer Spieler."
+    killfeed:
+      label: "Killfeed"
+      description: "Die Liste der Kills in der Bildschirmecke."
+    killstreaks:
+      label: "Killstreak-Hinweise"
+      description: "Killstreak-Zähler und ihre Ansagen."
+    hud_achievement:
+      label: "Erfolgsmeldungen"
+      description: "Das Banner, wenn jemand einen Erfolg erhält."
+    console:
+      label: "Entwicklerkonsole"
+      description: "Öffnet die Konsole mit der Taste `."
+    htmlmotd:
+      label: "Willkommensseite des Servers"
+      description: "Die Webseite, die ein Server beim Beitreten zeigt."
+    outlines:
+      label: "Umrisse"
+      description: "Leuchtende Umrisse um Teammitglieder und Ziele."
+    dynamic_background:
+      label: "Menühintergrund"
+      description: "Die bewegte Karte hinter dem Hauptmenü."
+    sound:
+      label: "Soundqualität"
+      description: "Wie viele Sounds gleichzeitig spielen und wie detailliert sie sind."
+    voice_chat:
+      label: "Sprachchat"
+      description: "Hör andere Spieler über ihr Mikrofon sprechen."
+    party_mode:
+      label: "Party-Beitritt"
+      description: "Wer deiner Party beitreten darf."
+    logo:
+      label: "Startlogo"
+      description: "Das Logo, das beim Spielstart erscheint."
+    packet_rate:
+      label: "Paketrate"
+      description: "Wie oft du Daten an den Server sendest und von ihm empfängst."
+    snapshot_buffer:
+      label: "Snapshot-Puffer"
+      description: "Wie stark das Spiel die Updates vom Server glättet."
+    packet_size:
+      label: "Paketgröße"
+      description: "Wie groß Pakete sind und wie sie aufgeteilt werden."
+    bandwidth:
+      label: "Bandbreite"
+      description: "Wie viele Daten das Spiel höchstens pro Sekunde sendet. Pass sie an deine Verbindung an."
+    download:
+      label: "Downloads"
+      description: "Welche benutzerdefinierten Inhalte dir Server schicken dürfen."

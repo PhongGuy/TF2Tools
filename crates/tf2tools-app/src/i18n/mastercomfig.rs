@@ -179,6 +179,12 @@ mod tests {
     }
 
     #[test]
+    fn every_other_module_of_9_100_1_has_an_english_label_and_description() {
+        let missing = unworded(|key| key != "graphics");
+        assert!(missing.is_empty(), "no English for {missing:?}");
+    }
+
+    #[test]
     fn a_saved_choice_is_named_without_a_catalogue() {
         use tf2tools_core::ModuleChoice;
         let _lock = crate::i18n::test_lock();
