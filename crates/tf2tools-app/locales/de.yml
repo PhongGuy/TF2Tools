@@ -3027,7 +3027,7 @@ graphics:
     hide: "Bilder ausblenden"
     thumb: "Bilder von %{name}"
     yours: "Deins: %{value}"
-    same: "%{value}, wie %{preset}"
+    same: "%{value} (wie bei %{preset})"
     zoom: "Zoom"
     full: "Ganzes Bild"
     wipe: "Zwischen dem Bild der Voreinstellung und deinem schieben"

@@ -110,7 +110,7 @@ fn the_preset_s_value_shows_one_picture_without_a_slider(cx: &mut TestAppContext
     toggle_pictures(cx, &s, "lod");
     assert_eq!(
         label(cx, &s, ids::graphics_compare_pill("lod", "same")).as_deref(),
-        Some("Medium, as Medium: Medium")
+        Some("Medium (same as Medium)")
     );
     for gone in [
         ids::graphics_compare_slider("lod"),

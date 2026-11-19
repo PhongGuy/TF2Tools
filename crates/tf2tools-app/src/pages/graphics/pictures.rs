@@ -168,7 +168,7 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
             pill: tr!(
                 "graphics.pictures.same",
                 value = label(&row.shown),
-                preset = row.preset_text
+                preset = row.preset_name
             ),
         },
         (Some(preset), Some(yours)) => Compare::Wipe {

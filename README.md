@@ -38,9 +38,9 @@ Install mastercomfig's addons from the Addon Store. The Addons page shows what y
 
 ### Graphics
 
-The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a preset from Low to Ultra, then change any setting with a switch, a few buttons or a list. Pictures show what each value looks like, with a slider to compare the preset's look with yours. A strip at the top lists what you changed, search finds any setting, and every change saves at once and applies the next time TF2 starts.
+The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a preset on a scale from more frames to better looking, then change any setting with a switch, a few buttons or a list. A strip at the top shows how many changes you made from your preset and undoes any of them in one click. Search finds any setting, and a filter shows only the ones you changed. Pictures show what each value looks like, with a slider to compare the preset's look with yours and a zoom on the details. Every change saves at once and applies the next time TF2 starts.
 
-![The Graphics page: mastercomfig's status, the graphics presets and the settings below](.github/readme/graphics.webp)
+![The Graphics page: the mastercomfig status row, the preset scale, the strip of changes from the High preset, and the settings with their pictures](.github/readme/graphics.webp)
 
 ### The stores
 

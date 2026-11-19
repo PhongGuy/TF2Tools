@@ -3026,7 +3026,7 @@ graphics:
     hide: "隐藏图片"
     thumb: "%{name} 的图片"
     yours: "你的：%{value}"
-    same: "%{value}，与 %{preset} 相同"
+    same: "%{value}（与 %{preset} 相同）"
     zoom: "放大"
     full: "完整图片"
     wipe: "滑动以对比预设的图片和你的图片"

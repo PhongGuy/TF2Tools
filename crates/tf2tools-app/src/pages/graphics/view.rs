@@ -54,6 +54,8 @@ pub struct RowView {
     pub changed: bool,
     /// "Preset: value", naming what the preset would set.
     pub preset_text: SharedString,
+    /// The preset's own name, for labels that already show the value.
+    pub preset_name: SharedString,
     /// A Select's entries start with NotSet; switches and segments offer only values.
     pub options: Vec<ChoiceView>,
 }
@@ -68,9 +70,10 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
     let changed = choices
         .get(name)
         .is_some_and(|saved| *saved != preset_value);
+    let preset_name = preset_label(choices.preset());
     let preset_text = tr!(
         "graphics.row.preset_value",
-        preset = preset_label(choices.preset()),
+        preset = preset_name.clone(),
         value = choice_label(module, &preset_value)
     );
     let unset = (kind == ControlKind::Select).then_some(ModuleChoice::NotSet);
@@ -96,6 +99,7 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
         preset_value,
         changed,
         preset_text,
+        preset_name,
         options,
     }
 }

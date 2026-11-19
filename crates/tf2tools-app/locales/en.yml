@@ -3004,7 +3004,7 @@ graphics:
     hide: "Hide pictures"
     thumb: "Pictures of %{name}"
     yours: "Yours: %{value}"
-    same: "%{value}, as %{preset}"
+    same: "%{value} (same as %{preset})"
     zoom: "Zoom"
     full: "Full picture"
     wipe: "Slide between the preset's picture and yours"

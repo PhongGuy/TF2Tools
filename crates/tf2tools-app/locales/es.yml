@@ -3027,7 +3027,7 @@ graphics:
     hide: "Ocultar imágenes"
     thumb: "Imágenes de %{name}"
     yours: "Tuyo: %{value}"
-    same: "%{value}, igual que %{preset}"
+    same: "%{value} (igual que %{preset})"
     zoom: "Ampliar"
     full: "Imagen completa"
     wipe: "Desliza entre la imagen del preajuste y la tuya"

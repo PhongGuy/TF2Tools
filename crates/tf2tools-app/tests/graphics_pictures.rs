@@ -111,7 +111,7 @@ fn the_preset_s_own_value_shows_one_picture_and_the_strip_tags_it() {
         lod.compare,
         Compare::Same {
             picture: dir.join("lod/medium.webp"),
-            pill: "Medium, as Medium: Medium".into()
+            pill: "Medium (same as Medium)".into()
         }
     );
     let strip: Vec<(&str, &str, bool, bool)> = lod
@@ -164,7 +164,7 @@ fn a_changed_value_wipes_between_the_preset_s_picture_and_yours() {
         decals.compare,
         Compare::Same {
             picture: dir.join("decals/low.webp"),
-            pill: "Low, as Medium: Low".into()
+            pill: "Low (same as Medium)".into()
         },
         "a module without crops stays whole under zoom"
     );

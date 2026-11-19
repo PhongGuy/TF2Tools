@@ -3029,7 +3029,7 @@ graphics:
     hide: "Masquer les images"
     thumb: "Images de %{name}"
     yours: "Le vôtre\u00A0: %{value}"
-    same: "%{value}, comme %{preset}"
+    same: "%{value} (identique au préréglage %{preset})"
     zoom: "Zoom"
     full: "Image entière"
     wipe: "Glisser entre l'image du préréglage et la vôtre"
