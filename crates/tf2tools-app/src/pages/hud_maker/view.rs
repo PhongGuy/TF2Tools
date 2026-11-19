@@ -1,6 +1,6 @@
 //! Pure geometry for the HUD Maker's canvas and the things floating over it.
 
-use gpui_kit::{Bounds, Pixels, Point, Size, point, px, size};
+use gpui_kit::{Bounds, Pixels, Point, SharedString, Size, point, px, size};
 use tf2tools_core::{PlayerListLayout, Scheme, Screen, font_tall_px};
 
 /// The player lists' text height in screen pixels: the scheme's `Default` font at `screen`,
@@ -154,8 +154,8 @@ impl Zoom {
     }
 
     /// The level as a player reads it, the fit being 100%.
-    pub fn label(&self) -> String {
-        format!("{}%", (self.level() * 100.).round())
+    pub fn label(&self) -> SharedString {
+        crate::i18n::format::percent((self.level() * 100.).round())
     }
 
     /// `steps` levels in (or out, when negative), keeping the screen pixel under window point

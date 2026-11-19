@@ -384,7 +384,7 @@ fn the_crosshair_maker_reads_in_russian(cx: &mut TestAppContext) {
         "Импорт PNG",
         "Карандаш",
         "Принимает цвет вашего прицела",
-        "Непрозрачность: 100%",
+        "Непрозрачность: 100\u{a0}%",
         "Превью на карте 2fort",
         "2fort",
     ];

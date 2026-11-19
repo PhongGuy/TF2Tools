@@ -16,7 +16,7 @@ use tf2tools_core::{GameSituation, MeterKind, SituationSwitch, TfClass, WeaponKi
 use super::HudMakerPage;
 use super::tip::tipped;
 use crate::i18n::names::{class_name, meter_name};
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 use crate::widgets::{Named as _, label_width_at, labelled};
@@ -293,7 +293,7 @@ impl HudMakerPage {
             minmode,
         );
         let muted = cx.theme().muted_foreground;
-        let slider = |which: SituationSlider, label: SharedString, value: String| {
+        let slider = |which: SituationSlider, label: SharedString, value: SharedString| {
             v_flex()
                 .gap_1()
                 .child(div().text_xs().text_color(muted).child(label))
@@ -314,7 +314,7 @@ impl HudMakerPage {
                         .child(labelled(
                             div().w_10().text_xs().text_color(muted),
                             ids::hud_maker_situation_value(which.slug()),
-                            SharedString::from(value),
+                            value,
                         )),
                 )
         };
@@ -391,17 +391,17 @@ impl HudMakerPage {
             .child(slider(
                 SituationSlider::Health,
                 tr!("hud_maker.situation.health"),
-                s.health().to_string(),
+                s.health().to_string().into(),
             ))
             .child(slider(
                 SituationSlider::Ammo,
                 tr!("hud_maker.situation.ammo"),
-                format!("{}%", s.ammo_percent()),
+                format::percent(s.ammo_percent()),
             ))
             .child(slider(
                 SituationSlider::Charge,
                 tr!("hud_maker.situation.charge"),
-                format!("{}%", s.charge()),
+                format::percent(s.charge()),
             ))
             .child(h_flex().flex_wrap().gap_1().children(weapons))
             .child(

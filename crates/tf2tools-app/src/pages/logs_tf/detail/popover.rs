@@ -21,12 +21,13 @@ use crate::pages::logs_tf::text::duration_text;
 
 // logs.tf opens its card a tenth of a second after the pointer arrives.
 const OPEN_DELAY: Duration = Duration::from_millis(100);
-// The kills and damage columns fit the fixtures' widest, "46 (100%)" and "14029 (100%)"; the
+// The kills and damage columns fit the fixtures' widest, "46 (100%)" and "14029 (100%)", and
+// accuracy fits "100 %" with the no-break space some languages put before the sign; the
 // weapon name takes what is left, and the card widens by the icon slot when it has one.
 const CARD_WIDTH: Pixels = px(360.);
 const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
-const ACCURACY: Pixels = px(40.);
+const ACCURACY: Pixels = px(48.);
 
 // What one card shows, worded once the card opens; each weapon carries its kill icon if any.
 struct Card {

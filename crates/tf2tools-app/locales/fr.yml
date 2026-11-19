@@ -42,7 +42,7 @@ settings:
   audio:
     title: "Audio"
     description: "Volume de l'aperçu des hitsounds et des killsounds"
-    volume: "Volume\u00A0: %{percent}\u00A0%"
+    volume: "Volume\u00A0: %{percent}"
   cache:
     duration: "Durée du cache\u00A0: %{duration}"
     hint: "Les magasins se resynchronisent automatiquement quand le cache expire. Par défaut\u00A0: 7 jours (168 heures)."
@@ -75,6 +75,7 @@ settings:
       frees: "%{option}, libère environ %{size}"
     cost: "Chaque log complet occupe environ 10\u00A0Ko. L'espace augmente avec le nombre de logs de vos joueurs suivis, donc Toujours peut devenir volumineux."
     usage: "Le cache des logs occupe environ %{cache}\u00A0; %{logs} environ %{full}."
+    usage_empty: "Aucun log complet en cache pour l'instant. Le cache des logs occupe environ %{cache}."
     full_logs: { one: "%{count} log complet occupe", other: "%{count} logs complets occupent" }
     measuring: "Mesure en cours..."
     unmeasured: "Impossible de mesurer la taille du cache des logs."
@@ -121,7 +122,7 @@ updater:
     checking: "Recherche de mises à jour..."
     available: "v%{version} disponible"
     available_page: "v%{version} disponible. Téléchargez-la depuis la page des versions."
-    downloading: "Téléchargement... %{percent}\u00A0%"
+    downloading: "Téléchargement... %{percent}"
     ready: "Mise à jour prête — redémarrez pour l'appliquer"
     installing: "Installation de la mise à jour..."
     unavailable: "Les mises à jour automatiques ne sont pas disponibles dans cette version. Obtenez les nouvelles versions sur la page des versions."
@@ -227,6 +228,7 @@ common:
   number:
     decimal: ","
     group: "\u202F"
+    percent: "%{number}\u00A0%"
   count:
     thousand: "%{number}\u00A0k"
     million: "%{number}\u00A0M"
@@ -2421,7 +2423,7 @@ crosshair_maker:
   paint_colour: "Couleur de peinture"
   any_colour: "Couleur libre"
   opacity: "Opacité"
-  opacity_value: "Opacité\u00A0: %{percent}\u00A0%"
+  opacity_value: "Opacité\u00A0: %{percent}"
   opacity_tip: "Peinture transparente. Peindre sur un pixel le remplace\u00A0; les couleurs ne se mélangent jamais."
   outline: "Contour"
   outline_colour: "Couleur du contour"

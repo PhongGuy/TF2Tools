@@ -12,7 +12,7 @@ use gpui_kit::{
 };
 
 use super::{UpdateState, Updater, reopen, updater};
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::shell::leave;
 use crate::widgets::Named as _;
@@ -73,7 +73,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                     .flex_none()
                     .font_features(FontFeatures(Arc::new(vec![("tnum".into(), 1)]))),
                 ids::UPDATE_BANNER_PERCENT,
-                format!("{percent}%"),
+                format::percent(percent),
             ),
         )),
         UpdateState::Unavailable
@@ -201,7 +201,10 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
             [true, true, false],
         ),
         UpdateState::Downloading { percent, .. } => (
-            tr!("updater.status.downloading", percent = percent),
+            tr!(
+                "updater.status.downloading",
+                percent = format::percent(percent)
+            ),
             None,
             [false; 3],
         ),

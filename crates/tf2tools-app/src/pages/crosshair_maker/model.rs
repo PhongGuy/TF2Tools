@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use gpui_kit::{Hsla, Pixels, Point, Rgba, ScrollDelta, SharedString, Size, point, px};
 use tf2tools_core::{CrosshairId, FitChange, RgbaImage};
 
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 
 /// How many steps the undo and redo stacks each keep.
 pub const UNDO_LIMIT: usize = 100;
@@ -742,7 +742,7 @@ impl Viewport {
 
     /// The zoom as a percentage, "100%" to "1600%".
     pub fn label(&self) -> String {
-        format!("{}%", ZOOMS[self.level] * 100)
+        format::percent(ZOOMS[self.level] * 100).to_string()
     }
 
     /// Whether a larger zoom level is left.

@@ -40,7 +40,7 @@ settings:
   audio:
     title: "Audio"
     description: "Lautstärke der Vorschau für Hitsounds und Killsounds"
-    volume: "Lautstärke: %{percent}%"
+    volume: "Lautstärke: %{percent}"
   cache:
     duration: "Cache-Dauer: %{duration}"
     hint: "Die Shops synchronisieren sich automatisch neu, wenn der Cache abläuft. Standard: 7 Tage (168 Stunden)."
@@ -73,6 +73,7 @@ settings:
       frees: "%{option}, gibt etwa %{size} frei"
     cost: "Jedes vollständige Log belegt etwa 10 KB. Der Platz wächst mit der Zahl der Logs deiner verfolgten Spieler, daher kann „Unbegrenzt“ viel Platz belegen."
     usage: "Der Log-Cache belegt etwa %{cache}; %{logs} etwa %{full}."
+    usage_empty: "Es sind noch keine vollständigen Logs zwischengespeichert. Der Log-Cache belegt etwa %{cache}."
     full_logs: { one: "%{count} vollständiges Log belegt", other: "%{count} vollständige Logs belegen" }
     measuring: "Wird gemessen..."
     unmeasured: "Die Größe des Log-Caches konnte nicht gemessen werden."
@@ -119,7 +120,7 @@ updater:
     checking: "Suche nach Updates..."
     available: "v%{version} verfügbar"
     available_page: "v%{version} verfügbar. Lade sie von der Release-Seite herunter."
-    downloading: "Wird heruntergeladen... %{percent}%"
+    downloading: "Wird heruntergeladen... %{percent}"
     ready: "Update bereit — zum Anwenden neu starten"
     installing: "Update wird installiert..."
     unavailable: "Automatische Updates sind in dieser Version nicht verfügbar. Neue Versionen gibt es auf der Release-Seite."
@@ -225,6 +226,7 @@ common:
   number:
     decimal: ","
     group: "."
+    percent: "%{number}\u00A0%"
   count:
     thousand: "%{number} Tsd."
     million: "%{number} Mio."
@@ -1293,7 +1295,7 @@ hud_maker:
       shift_arrows: "Umschalt + Pfeiltasten"
       ctrl_drag: "Strg + Ziehen"
       hide: "H oder Entf"
-      escape: "Escape"
+      escape: "Esc"
       alt_click: "Alt + Klick"
       shift_click: "Umschalt + Klick"
       box: "Auf leerer Fläche ziehen"
@@ -2419,7 +2421,7 @@ crosshair_maker:
   paint_colour: "Malfarbe"
   any_colour: "Beliebige Farbe"
   opacity: "Deckkraft"
-  opacity_value: "Deckkraft: %{percent}%"
+  opacity_value: "Deckkraft: %{percent}"
   opacity_tip: "Durchscheinende Farbe. Übermalen ersetzt ein Pixel; Farben mischen sich nie."
   outline: "Kontur"
   outline_colour: "Konturfarbe"

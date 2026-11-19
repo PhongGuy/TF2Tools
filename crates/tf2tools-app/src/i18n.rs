@@ -613,6 +613,7 @@ mod tests {
         "common.class_short.scout",
         "common.date.date_time",
         "common.list.separator",
+        "common.number.percent",
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "hud_maker.board_mode.casual",
