@@ -15,8 +15,8 @@ use std::sync::{Arc, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use tf2tools_core::shoot::{self, ShotAction};
-use tf2tools_core::{PictureManifest, SettingShot, Tf2Install, tf2_running};
+use tf2tools_core::shoot::{self, SAME_LOOK_RMSE, ShotAction};
+use tf2tools_core::{PictureManifest, Reload, SettingShot, Tf2Install, tf2_running};
 use walkdir::WalkDir;
 
 const USAGE: &str = "usage: shoot_setting_pictures [--only <module>] [--window-at X,Y] [--assets <dir>] [--dry-run]";
@@ -28,8 +28,10 @@ const TF2_PROCESS: &str = "tf_linux64";
 const STEAM_START: Duration = Duration::from_secs(60);
 /// Steam may process shaders before the game starts, which took over two minutes.
 const MAP_READY: Duration = Duration::from_secs(420);
-const WINDOW_APPEARS: Duration = Duration::from_secs(180);
+/// The window waits on the same shader processing as the map, so it gets the same time.
+const WINDOW_APPEARS: Duration = Duration::from_secs(420);
 const STEP_DONE: Duration = Duration::from_secs(30);
+const SHOT_SAVED: Duration = Duration::from_secs(10);
 const GAME_QUITS: Duration = Duration::from_secs(60);
 const POLL: Duration = Duration::from_millis(200);
 const GUARD_POLL: Duration = Duration::from_millis(500);
@@ -100,7 +102,7 @@ fn run() -> Result<(), Failure> {
 
     // Every path from here on ends in `finish`, so the player's files come back.
     let mut session = Session::new(install.tf_dir(), args.window_at);
-    let shot = shoot_all(&mut session, &manifest, &settings);
+    let shot = shoot_all(&mut session, &manifest, &settings, &args.assets);
     let finished = finish(&mut session, &backup);
     match (shot, finished) {
         (Ok(()), Ok(())) => Ok(()),
@@ -109,15 +111,229 @@ fn run() -> Result<(), Failure> {
     }
 }
 
-/// Launches the session for the selected settings.
+/// Launches TF2 once and shoots every selected setting, then prints the timings and the
+/// look-alike pairs, also when the run stopped part way.
 fn shoot_all(
     session: &mut Session,
     manifest: &PictureManifest,
     settings: &[&SettingShot],
+    assets: &Path,
 ) -> Result<(), String> {
-    session.launch(manifest, &manifest.map, None)?;
-    println!("TF2 is ready; {} settings selected", settings.len());
+    let mut report = Report::new();
+    let shot = session
+        .launch(manifest, &manifest.map, None)
+        .and_then(|()| {
+            println!("TF2 is ready; {} settings selected", settings.len());
+            shoot_order(settings).into_iter().try_for_each(|setting| {
+                shoot_setting(session, manifest, setting, assets, &mut report)
+            })
+        });
+    report.print();
+    shot
+}
+
+/// Settings that change live go first and the ones needing a restart last, each group in
+/// manifest order, so the game restarts as late and as rarely as possible.
+fn shoot_order<'m>(settings: &[&'m SettingShot]) -> Vec<&'m SettingShot> {
+    let (live, restart): (Vec<&SettingShot>, Vec<&SettingShot>) =
+        settings.iter().partition(|s| s.reload != Reload::Restart);
+    live.into_iter().chain(restart).collect()
+}
+
+/// The values that get their own picture; a `same_as` value borrows another's.
+fn values_to_shoot(setting: &SettingShot) -> Vec<&str> {
+    setting
+        .values
+        .iter()
+        .filter(|v| v.same_as.is_none())
+        .map(|v| v.value.as_str())
+        .collect()
+}
+
+/// Shoots each of the setting's values, puts the module back on its base value and prints
+/// how far apart every pair of the new pictures is.
+fn shoot_setting(
+    session: &mut Session,
+    manifest: &PictureManifest,
+    setting: &SettingShot,
+    assets: &Path,
+    report: &mut Report,
+) -> Result<(), String> {
+    let module = setting.module.as_str();
+    println!("===== {module} =====");
+    let shot = Shot {
+        manifest,
+        setting,
+        value: None,
+        assets,
+    };
+    shot.execute(session, &shoot::setting_actions(manifest, setting))
+        .map_err(|e| format!("{module} (placing the camera): {e}"))?;
+    for value in values_to_shoot(setting) {
+        let started = Instant::now();
+        let shot = Shot {
+            value: Some(value),
+            ..shot
+        };
+        shot.execute(session, &shoot::value_actions(manifest, setting, value))
+            .map_err(|e| format!("{module} = {value}: {e}"))?;
+        let took = started.elapsed();
+        println!("  {value}: {:.1} s", took.as_secs_f64());
+        report.shots.push(took);
+    }
+    shot.execute(session, &shoot::reset_actions(manifest, setting))
+        .map_err(|e| format!("{module} (back to base): {e}"))?;
+    let distances = pair_distances(assets, setting)?;
+    let flagged = flag_same_looks(setting, &distances);
+    println!("  rmse between pictures (same look at or under {SAME_LOOK_RMSE}):");
+    for ((a, b), d) in &distances {
+        let mark = if flagged.contains(&(a.clone(), b.clone())) {
+            "  LOOKS THE SAME"
+        } else {
+            ""
+        };
+        println!("    {a:<16} {b:<16} {d:>8.2}{mark}");
+    }
+    report.flagged.extend(
+        flagged
+            .into_iter()
+            .map(|(a, b)| format!("{module}: {a} ~ {b}")),
+    );
     Ok(())
+}
+
+/// Two values of a setting and the RMSE between their pictures.
+type Distance = ((String, String), f64);
+
+/// The RMSE of every pair of the setting's new pictures, decoded to RGB; a pair whose sizes
+/// differ is left out with a note.
+fn pair_distances(assets: &Path, setting: &SettingShot) -> Result<Vec<Distance>, String> {
+    let values = values_to_shoot(setting);
+    let mut pixels = Vec::new();
+    for value in &values {
+        let path = assets.join(&setting.module).join(format!("{value}.webp"));
+        let image = image::open(&path).map_err(|e| format!("decoding {}: {e}", path.display()))?;
+        pixels.push(image.to_rgb8().into_raw());
+    }
+    let mut distances = Vec::new();
+    for (i, a) in values.iter().enumerate() {
+        for (j, b) in values.iter().enumerate().skip(i + 1) {
+            match shoot::rmse(&pixels[i], &pixels[j]) {
+                Some(d) => distances.push((((*a).to_owned(), (*b).to_owned()), d)),
+                None => println!("    {a} and {b} differ in size; not compared"),
+            }
+        }
+    }
+    Ok(distances)
+}
+
+/// The pairs at or under `SAME_LOOK_RMSE` that the manifest does not already join by `same_as`.
+fn flag_same_looks(setting: &SettingShot, distances: &[Distance]) -> Vec<(String, String)> {
+    let same_as = |value: &str, other: &str| {
+        setting
+            .values
+            .iter()
+            .any(|v| v.value == value && v.same_as.as_deref() == Some(other))
+    };
+    distances
+        .iter()
+        .filter(|((a, b), d)| *d <= SAME_LOOK_RMSE && !same_as(a, b) && !same_as(b, a))
+        .map(|(pair, _)| pair.clone())
+        .collect()
+}
+
+/// The `magick` arguments that turn a screenshot into a picture of exactly `size`.
+fn convert_args(jpg: &Path, webp: &Path, [width, height]: [u32; 2]) -> Vec<String> {
+    vec![
+        jpg.display().to_string(),
+        "-resize".to_owned(),
+        format!("{width}x{height}!"),
+        "-quality".to_owned(),
+        "80".to_owned(),
+        webp.display().to_string(),
+    ]
+}
+
+/// What the run prints at the end: every shot's duration and the look-alike pairs.
+struct Report {
+    started: Instant,
+    shots: Vec<Duration>,
+    flagged: Vec<String>,
+}
+
+impl Report {
+    fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            shots: Vec::new(),
+            flagged: Vec::new(),
+        }
+    }
+
+    fn print(&self) {
+        let seconds: Vec<f64> = self.shots.iter().map(Duration::as_secs_f64).collect();
+        let mean = seconds.iter().sum::<f64>() / seconds.len().max(1) as f64;
+        let max = seconds.iter().copied().fold(0.0, f64::max);
+        println!("===== summary =====");
+        println!("shots:          {}", seconds.len());
+        println!("per shot:       mean {mean:.1} s, max {max:.1} s");
+        println!(
+            "total:          {:.1} s",
+            self.started.elapsed().as_secs_f64()
+        );
+        println!("look-alike pairs (rmse at or under {SAME_LOOK_RMSE}, not marked same_as):");
+        if self.flagged.is_empty() {
+            println!("  none");
+        }
+        for pair in &self.flagged {
+            println!("  {pair}");
+        }
+    }
+}
+
+/// The context one action list runs in: the setting, and the value when one is being shot.
+#[derive(Clone, Copy)]
+struct Shot<'a> {
+    manifest: &'a PictureManifest,
+    setting: &'a SettingShot,
+    value: Option<&'a str>,
+    assets: &'a Path,
+}
+
+impl Shot<'_> {
+    /// Runs the actions in order against the live game; the first failure stops the list.
+    fn execute(&self, session: &mut Session, actions: &[ShotAction]) -> Result<(), String> {
+        for action in actions {
+            match action {
+                ShotAction::Run(commands) => session.send(commands)?,
+                ShotAction::Sleep(ms) => thread::sleep(Duration::from_millis(*ms)),
+                ShotAction::Rejoin => {
+                    let since = session.last_send;
+                    session.join_when_ready(since)?;
+                }
+                ShotAction::Restart => {
+                    let value = self.value()?;
+                    session.quit_game()?;
+                    let map = self.setting.map.as_deref().unwrap_or(&self.manifest.map);
+                    session.launch(self.manifest, map, Some((&self.setting.module, value)))?;
+                }
+                ShotAction::Jpeg(name) => {
+                    let webp = self
+                        .assets
+                        .join(&self.setting.module)
+                        .join(format!("{}.webp", self.value()?));
+                    session.take_picture(name, &webp, self.manifest.size)?;
+                }
+                other => return Err(format!("the shooter cannot run {other:?}")),
+            }
+        }
+        Ok(())
+    }
+
+    fn value(&self) -> Result<&str, String> {
+        self.value
+            .ok_or_else(|| "a restart or screenshot outside a value".to_owned())
+    }
 }
 
 fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Args, String> {
@@ -198,7 +414,7 @@ fn dry_run(manifest: &PictureManifest, settings: &[&SettingShot]) -> String {
     );
     let mut step = 1;
     render_join(&mut out, &mut step);
-    for setting in settings {
+    for setting in shoot_order(settings) {
         out.push_str(&format!("// ===== {} =====\n", setting.module));
         render(
             &mut out,
@@ -206,19 +422,22 @@ fn dry_run(manifest: &PictureManifest, settings: &[&SettingShot]) -> String {
             &shoot::setting_actions(manifest, setting),
             None,
         );
-        for value in setting.values.iter().filter(|v| v.same_as.is_none()) {
-            out.push_str(&format!(
-                "// ----- {} = {} -----\n",
-                setting.module, value.value
-            ));
-            let actions = shoot::value_actions(manifest, setting, &value.value);
+        for value in values_to_shoot(setting) {
+            out.push_str(&format!("// ----- {} = {value} -----\n", setting.module));
+            let actions = shoot::value_actions(manifest, setting, value);
             render(
                 &mut out,
                 &mut step,
                 &actions,
-                Some((&setting.module, &value.value)),
+                Some((&setting.module, value)),
             );
         }
+        render(
+            &mut out,
+            &mut step,
+            &shoot::reset_actions(manifest, setting),
+            None,
+        );
     }
     out
 }
@@ -462,7 +681,10 @@ impl Guard {
                         }
                     }
                     None if !found && started.elapsed() > WINDOW_APPEARS => {
-                        let _ = failed.set("no TF2 window within 180 s of launch".to_owned());
+                        let _ = failed.set(format!(
+                            "no TF2 window within {} s of launch",
+                            WINDOW_APPEARS.as_secs()
+                        ));
                         return;
                     }
                     None => {}
@@ -708,6 +930,55 @@ impl Session {
         }
     }
 
+    /// Takes screenshot `name`, waits for the game to finish writing it, converts it to
+    /// `webp` at `size` with magick and removes the screenshot.
+    fn take_picture(&mut self, name: &str, webp: &Path, size: [u32; 2]) -> Result<(), String> {
+        let jpg = self.tf.join("screenshots").join(format!("{name}.jpg"));
+        if jpg.exists() {
+            fs::remove_file(&jpg).map_err(|e| format!("removing {}: {e}", jpg.display()))?;
+        }
+        self.send(&[format!("jpeg {name} 95")])?;
+        self.wait_saved(&jpg)?;
+        if let Some(dir) = webp.parent() {
+            fs::create_dir_all(dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+        }
+        let out = Command::new("magick")
+            .args(convert_args(&jpg, webp, size))
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| format!("starting magick: {e}"))?;
+        if !out.status.success() {
+            return Err(format!(
+                "magick could not convert {}: {}",
+                jpg.display(),
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
+        }
+        fs::remove_file(&jpg).map_err(|e| format!("removing {}: {e}", jpg.display()))
+    }
+
+    /// Waits until the screenshot exists and its size holds across two polls.
+    fn wait_saved(&mut self, jpg: &Path) -> Result<(), String> {
+        let deadline = Instant::now() + SHOT_SAVED;
+        let mut last = None;
+        loop {
+            let size = fs::metadata(jpg).ok().map(|m| m.len()).filter(|&n| n > 0);
+            if size.is_some() && size == last {
+                return Ok(());
+            }
+            last = size;
+            self.check_alive()?;
+            if Instant::now() >= deadline {
+                return Err(format!(
+                    "{} was not saved within {} s",
+                    jpg.display(),
+                    SHOT_SAVED.as_secs()
+                ));
+            }
+            thread::sleep(POLL);
+        }
+    }
+
     /// Quits TF2 after re-reading the player's config, so the config TF2 writes on quit is
     /// theirs; kills it if it has not exited within a minute.
     fn quit_game(&mut self) -> Result<(), String> {
@@ -861,5 +1132,60 @@ mod tests {
             "old shots are removed"
         );
         assert!(shots.join("theirs.jpg").exists(), "the player's shots stay");
+    }
+
+    #[test]
+    fn flagged_pairs_skip_values_already_marked_same() {
+        let m = tf2tools_core::PictureManifest::parse(br#"{"version":1,"mastercomfig":"9.100.1","size":[960,540],"map":"ctf_2fort","base":{},
+            "settings":[{"module":"gibs","values":[{"value":"off"},{"value":"low"},{"value":"high","same_as":"low","reason":"same-in-still"}]}]}"#).unwrap();
+        let gibs = m.setting("gibs").unwrap();
+        let distances = vec![
+            (("off".to_owned(), "low".to_owned()), 12.0),
+            (("low".to_owned(), "off".to_owned()), 0.1),
+        ];
+        assert_eq!(
+            flag_same_looks(gibs, &distances),
+            vec![("low".to_owned(), "off".to_owned())]
+        );
+    }
+
+    #[test]
+    fn the_shot_values_leave_out_same_as_values() {
+        let m = tf2tools_core::PictureManifest::parse(br#"{"version":1,"mastercomfig":"9.100.1","size":[960,540],"map":"ctf_2fort","base":{},
+            "settings":[{"module":"gibs","values":[{"value":"off"},{"value":"high","same_as":"off","reason":"same-in-still"}]}]}"#).unwrap();
+        assert_eq!(values_to_shoot(m.setting("gibs").unwrap()), vec!["off"]);
+    }
+
+    #[test]
+    fn magick_resizes_to_the_manifest_size() {
+        let cmd = convert_args(
+            std::path::Path::new("/a/x.jpg"),
+            std::path::Path::new("/b/y.webp"),
+            [960, 540],
+        );
+        assert_eq!(
+            cmd,
+            [
+                "/a/x.jpg",
+                "-resize",
+                "960x540!",
+                "-quality",
+                "80",
+                "/b/y.webp"
+            ]
+        );
+    }
+
+    #[test]
+    fn restart_settings_are_shot_last_in_manifest_order() {
+        let m = PictureManifest::parse(br#"{"version":1,"mastercomfig":"9.100.1","size":[960,540],"map":"ctf_2fort","base":{},
+            "settings":[{"module":"a","reload":"restart","values":[{"value":"x"}]},{"module":"b","values":[{"value":"x"}]},
+            {"module":"c","reload":"restart","values":[{"value":"x"}]},{"module":"d","reload":"map","values":[{"value":"x"}]}]}"#).unwrap();
+        let all: Vec<_> = m.settings.iter().collect();
+        let order: Vec<_> = shoot_order(&all)
+            .iter()
+            .map(|s| s.module.as_str())
+            .collect();
+        assert_eq!(order, ["b", "d", "a", "c"]);
     }
 }
