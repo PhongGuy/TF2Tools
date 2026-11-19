@@ -128,7 +128,11 @@ fn remove_and_close_starts_v4s_uninstaller_then_closes(cx: &mut TestAppContext) 
     cx.run_until_parked();
     assert_eq!(
         *calls.lock().unwrap(),
-        [(PathBuf::from(V4_EXE), vec!["/currentuser".to_owned()])]
+        [(
+            PathBuf::from(V4_EXE),
+            vec!["/currentuser".to_owned(), "/S".to_owned()]
+        )],
+        "silent, since the player already said yes here"
     );
     assert!(asked(&s), "Remove is remembered");
     assert!(!open(cx, &s), "TF2Tools closes so the uninstaller can run");

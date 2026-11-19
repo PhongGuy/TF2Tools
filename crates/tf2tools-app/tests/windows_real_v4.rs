@@ -175,7 +175,8 @@ fn only_file(dir: &Path, ext: &str) -> PathBuf {
     found.into_iter().next().unwrap()
 }
 
-/// The stand-in v6's part: detect v4 and start its uninstaller through the app's own runner.
+/// The stand-in v6's part: detect v4 and start its uninstaller as the app does, through its
+/// runner with the silent arguments.
 /// Run directly, without the stand-in variable, it does nothing.
 #[test]
 #[ignore = "runs only as the stand-in v6 of the test above"]
@@ -184,7 +185,7 @@ fn stand_in_v6_starts_the_v4_uninstaller() {
         return;
     }
     let old = detect_old_v4().expect("the stand-in finds v4");
-    system_runner()(old.uninstaller(), old.arguments()).expect("the uninstaller starts");
+    system_runner()(old.uninstaller(), &old.silent_arguments()).expect("the uninstaller starts");
 }
 
 /// Prints one line and flushes, so a step's progress reaches the log even if the job is killed.

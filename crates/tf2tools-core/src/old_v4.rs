@@ -73,6 +73,16 @@ impl OldV4 {
     pub fn arguments(&self) -> &[String] {
         &self.arguments
     }
+
+    /// [`arguments`](Self::arguments) plus NSIS's `/S`, so v4's uninstaller skips its own
+    /// "Are you sure" prompt after v6 has asked; an `/S` already there is not doubled.
+    pub fn silent_arguments(&self) -> Vec<String> {
+        let mut args = self.arguments.clone();
+        if !args.iter().any(|a| a == "/S") {
+            args.push("/S".to_owned());
+        }
+        args
+    }
 }
 
 /// The first entry that is TF2Tools 4 with its uninstaller present (`exists`), else `None`.

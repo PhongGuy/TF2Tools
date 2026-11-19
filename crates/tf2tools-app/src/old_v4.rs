@@ -113,7 +113,8 @@ impl OldV4Notice {
 }
 
 // v4's uninstaller looks for a running "TF2Tools.exe", which is this app too, so Remove warns
-// first, passes the unsaved-work guard, starts the uninstaller and only then closes the window.
+// first, passes the unsaved-work guard, starts the uninstaller silently (this was the one ask)
+// and only then closes the window.
 fn ask_then_remove(notice: &Entity<OldV4Notice>, window: &mut Window, cx: &mut App) {
     let answer = confirm(Confirm::remove_old_v4(), window, cx);
     let notice = notice.clone();
@@ -139,7 +140,7 @@ fn remove_and_close(notice: &Entity<OldV4Notice>, window: &mut Window, cx: &mut 
         let Some(old) = n.found.clone() else { return };
         (old, Arc::clone(&n.runner))
     };
-    if runner(old.uninstaller(), old.arguments()).is_err() {
+    if runner(old.uninstaller(), &old.silent_arguments()).is_err() {
         toast(
             window,
             cx,

@@ -37,6 +37,27 @@ fn finds_v4_and_its_own_uninstaller() {
     assert_eq!(found.arguments(), ["/currentuser".to_owned()]);
 }
 
+// v6 has already asked, so v4's NSIS uninstaller runs silent rather than asking again.
+#[test]
+fn the_silent_arguments_add_s_once() {
+    let found = find_old_v4(&[v4_entry()], exists_only(V4_EXE)).unwrap();
+    assert_eq!(
+        found.silent_arguments(),
+        ["/currentuser".to_owned(), "/S".to_owned()],
+        "the entry's own arguments, then /S"
+    );
+    let already = UninstallEntry::new("q")
+        .display_name("TF2Tools 4.8.0")
+        .display_version("4.8.0")
+        .uninstall_string(format!(r#""{V4_EXE}" /currentuser /S"#));
+    let found = find_old_v4(&[already], exists_only(V4_EXE)).unwrap();
+    assert_eq!(
+        found.silent_arguments(),
+        ["/currentuser".to_owned(), "/S".to_owned()],
+        "an /S already there is not doubled"
+    );
+}
+
 #[test]
 fn nothing_found_without_a_v4_entry() {
     assert!(find_old_v4(&[], |_| true).is_none());
