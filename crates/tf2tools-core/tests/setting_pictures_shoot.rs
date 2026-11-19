@@ -84,7 +84,8 @@ fn the_launch_is_a_private_local_server_on_the_map() {
         "+map ctf_2fort",
         "+exec tfs/start",
         "-condebug",
-        "-windowed",
+        "-windowed -noborder",
+        "-sdl_displayindex 1",
         "-w 1440 -h 810",
         "+volume 0",
     ] {

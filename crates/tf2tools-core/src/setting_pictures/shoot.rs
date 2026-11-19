@@ -61,13 +61,16 @@ pub fn kick_seen(log: &str) -> bool {
     })
 }
 
-/// The Steam arguments for a private, windowed, silent local server on `map`.
+/// The Steam arguments for a private, windowed, silent local server on `map`, opened on the second display.
 pub fn launch_args(map: &str) -> Vec<String> {
     [
         "-applaunch",
         "440",
         "-insecure",
         "-windowed",
+        "-noborder",
+        "-sdl_displayindex",
+        "1",
         "-w",
         "1440",
         "-h",
