@@ -1068,6 +1068,31 @@ pub fn graphics_row(module: &str) -> ElementId {
     keyed("graphics-row", module)
 }
 
+/// A row's thumbnail Button, which opens its pictures: "graphics-thumb:<module>".
+pub fn graphics_thumb(module: &str) -> ElementId {
+    keyed("graphics-thumb", module)
+}
+
+/// The thumbnail's picture area inside its Button: "graphics-thumb-area:<module>".
+pub fn graphics_thumb_area(module: &str) -> ElementId {
+    keyed("graphics-thumb-area", module)
+}
+
+/// The thumbnail's image, drawn only once decoded: "graphics-thumb-image:<module>".
+pub fn graphics_thumb_image(module: &str) -> ElementId {
+    keyed("graphics-thumb-image", module)
+}
+
+/// A row's Show/Hide pictures Button: "graphics-pictures-toggle:<module>".
+pub fn graphics_pictures_toggle(module: &str) -> ElementId {
+    keyed("graphics-pictures-toggle", module)
+}
+
+/// A row's open pictures panel: "graphics-pictures:<module>".
+pub fn graphics_pictures(module: &str) -> ElementId {
+    keyed("graphics-pictures", module)
+}
+
 /// An off/on row's Switch: "graphics-switch:<module>".
 pub fn graphics_switch(module: &str) -> ElementId {
     keyed("graphics-switch", module)

@@ -123,13 +123,17 @@ pub fn pick(
     choose(cx, page, module, Some(choice));
 }
 
-/// Scrolls the Graphics page down a line at a time until `id` is on screen; panics if it never is.
+/// Scrolls the Graphics page down a line at a time until `id`'s centre, where a click lands,
+/// is inside the page; panics if it never is.
 pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
     let area = tf2tools_app::ids::page(Page::Graphics);
     for _ in 0..200 {
         let seen = cx
             .update_window(s.win, |_, w, _| {
-                w.try_find(id.clone()).is_some_and(|e| e.visible())
+                let page = w.try_find(area.clone()).map(|e| e.bounds());
+                w.try_find(id.clone()).is_some_and(|e| {
+                    e.visible() && page.is_some_and(|page| page.contains(&e.bounds().center()))
+                })
             })
             .unwrap();
         if seen {
@@ -141,6 +145,25 @@ pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
         super::settle(cx, s.win);
     }
     panic!("{id:?} never showed on the Graphics page");
+}
+
+/// Opens or closes `module`'s pictures with its Show/Hide pictures button.
+pub fn toggle_pictures(cx: &mut TestAppContext, s: &super::ShellWindow, module: &str) {
+    reveal(cx, s, tf2tools_app::ids::graphics_pictures_toggle(module));
+    super::click_id(
+        cx,
+        s.win,
+        tf2tools_app::ids::graphics_pictures_toggle(module),
+    );
+}
+
+/// Scrolls the Graphics page back to its top, where the status card and changes strip are.
+pub fn scroll_to_top(cx: &mut TestAppContext, s: &super::ShellWindow) {
+    let area = tf2tools_app::ids::page(Page::Graphics);
+    let up = ScrollDelta::Lines(point(0., 10_000.));
+    cx.update_window(s.win, |_, w, cx| w.scroll(area, up, cx))
+        .unwrap();
+    super::settle(cx, s.win);
 }
 
 /// Types `text` into the settings search as the player would.

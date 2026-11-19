@@ -4,8 +4,8 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, pick, reveal, row_value, saved, shown, toasted,
-    value, wait_for_list,
+    HEADER, choose, found, idle, modules_cfg, open, pick, reveal, row_value, saved, scroll_to_top,
+    shown, toasted, value, wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
@@ -107,6 +107,7 @@ fn reset_and_reset_all_go_back_to_the_preset(cx: &mut TestAppContext) {
         Some(format!("{HEADER}alias lod\nhud_avatars=off\n").as_str())
     );
     assert_eq!(shown(cx, &page, "fpscap"), Some(value("400")));
+    scroll_to_top(cx, &s);
     support::click_id(cx, s.win, ids::GRAPHICS_RESET_ALL);
     support::wait_real(cx, "the reset all", |cx| {
         cx.update(|cx| {

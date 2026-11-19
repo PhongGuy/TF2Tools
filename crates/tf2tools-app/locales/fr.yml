@@ -2991,6 +2991,9 @@ graphics:
     preset_value: "%{preset}\u00A0: %{value}"
     reset: "Réinitialiser"
   pictures:
+    show: "Afficher les images"
+    hide: "Masquer les images"
+    thumb: "Images de %{name}"
     yours: "Le vôtre\u00A0: %{value}"
     same: "%{value}, comme %{preset}"
   changes:

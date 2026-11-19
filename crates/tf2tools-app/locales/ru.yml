@@ -2964,6 +2964,9 @@ graphics:
     preset_value: "%{preset}: %{value}"
     reset: "Сбросить"
   pictures:
+    show: "Показать изображения"
+    hide: "Скрыть изображения"
+    thumb: "Изображения: %{name}"
     yours: "Ваше: %{value}"
     same: "%{value}, как %{preset}"
   changes:

@@ -2,6 +2,7 @@
 
 pub mod jobs;
 pub mod model;
+mod picture_panel;
 pub mod pictures;
 mod settings;
 pub mod view;
@@ -115,6 +116,8 @@ pub struct GraphicsPage {
     wanted: Vec<ImageKey>,
     /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
     image_viewer: String,
+    /// The module whose pictures are open; at most one row's at a time.
+    open_row: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -165,6 +168,7 @@ impl GraphicsPage {
             pictures: None,
             wanted: Vec::new(),
             image_viewer,
+            open_row: None,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -198,6 +202,21 @@ impl GraphicsPage {
             query: self.search.read(cx).value().to_string(),
             changed_only: self.changed_only,
         }
+    }
+
+    /// The module whose pictures are open, if any.
+    pub fn open_row(&self) -> Option<&str> {
+        self.open_row.as_deref()
+    }
+
+    // Opens `module`'s pictures, closing any other row's, or closes them when already open.
+    fn toggle_pictures(&mut self, module: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        self.open_row = if self.open_row.as_deref() == Some(module) {
+            None
+        } else {
+            Some(module.to_owned())
+        };
+        cx.notify();
     }
 
     fn set_changed_only(&mut self, on: bool, cx: &mut Context<Self>) {

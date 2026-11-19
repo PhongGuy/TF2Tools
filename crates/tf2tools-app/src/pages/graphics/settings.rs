@@ -19,9 +19,9 @@ use gpui_kit::{
 };
 use tf2tools_core::ModuleChoice;
 
-use super::GraphicsPage;
 use super::model::{SettingsNote, preset_label, settings_note_text};
 use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
+use super::{GraphicsPage, picture_panel, pictures};
 use crate::i18n::tr;
 use crate::ids;
 use crate::shell::CONTENT_PADDING;
@@ -231,7 +231,8 @@ const RAIL_WIDTH: f32 = 200.;
 const CHANGED: u32 = 0x1447e6;
 
 // The title and description, plus the preset's value when changed, on the left; Reset when
-// changed and the row's control on the right.
+// changed and the row's control on the right. A module with pictures adds its thumbnail
+// before the text and Show pictures under it, and the open row's panel goes below the line.
 fn row(
     page: &GraphicsPage,
     row: RowView,
@@ -268,6 +269,20 @@ fn row(
         ControlKind::Segmented => segments(page, &row, cx),
         ControlKind::Select => select(page, &row),
     };
+    let pictures = page.pictures.as_deref().and_then(|index| {
+        let label = page.preset().map(preset_label).unwrap_or_default();
+        pictures::row_pictures(index, &row, &label, false)
+    });
+    let thumb = pictures
+        .as_ref()
+        .map(|p| picture_panel::thumbnail(page, name, &row.label, p, cx));
+    let toggle = pictures
+        .as_ref()
+        .map(|_| h_flex().child(picture_panel::toggle(page, name, cx)));
+    let panel = pictures
+        .as_ref()
+        .filter(|_| page.open_row() == Some(name))
+        .map(|p| picture_panel::panel(name, p));
     let tint = Hsla::from(rgb(CHANGED));
     let text = v_flex()
         .flex_1()
@@ -279,16 +294,35 @@ fn row(
             row.label.clone(),
         ))
         .children(description)
-        .children(preset);
+        .children(preset)
+        .children(toggle);
     let controls = h_flex().flex_none().gap_2().children(reset).child(control);
-    // On a narrow page (the one without the rail) the control sits under the text, since a
-    // segmented control beside a wrapped description would not fit; otherwise it sits beside it.
-    let frame = if narrow {
-        v_flex().items_start().gap_2()
+    // On a narrow page (the one without the rail) the thumbnail sits above the text and the
+    // control under it, since a segmented control beside a wrapped description would not fit;
+    // otherwise all three sit side by side.
+    let line = if narrow {
+        v_flex()
+            .items_start()
+            .gap_2()
+            .children(thumb)
+            .child(text)
+            .child(controls)
     } else {
-        h_flex().justify_between().gap_4()
+        h_flex()
+            .justify_between()
+            .gap_4()
+            .child(
+                h_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .items_start()
+                    .gap_3()
+                    .children(thumb)
+                    .child(text),
+            )
+            .child(controls)
     };
-    frame
+    v_flex()
         .id(ids::graphics_row(name))
         .test_support()
         .pl_3()
@@ -297,8 +331,9 @@ fn row(
         .when(row.changed, |this| {
             this.border_color(tint).bg(tint.opacity(0.06))
         })
-        .child(text)
-        .child(controls)
+        .gap_3()
+        .child(line)
+        .children(panel)
         .into_any_element()
 }
 
@@ -327,15 +362,16 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
     let border = cx.theme().border;
     let muted = cx.theme().muted_foreground;
     let (fill, on_fill) = selected_segment(cx.theme());
-    let toggles = row.options.iter().enumerate().map(|(i, option)| {
+    let toggles = row.options.iter().enumerate().filter_map(|(i, option)| {
+        // Segments offer only values; anything else has no segment to draw.
         let ModuleChoice::Value(value) = &option.choice else {
-            unreachable!("segments offer only values")
+            return None;
         };
         let module = row.module.clone();
         let choice = option.choice.clone();
         let entity = cx.entity().downgrade();
         let checked = row.shown == option.choice;
-        Toggle::new(ids::graphics_segment(&row.module, value))
+        let toggle = Toggle::new(ids::graphics_segment(&row.module, value))
             .small()
             .label(option.label.clone())
             .tooltip(option.label.clone())
@@ -354,7 +390,8 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
                 let _ = entity.update(cx, |page, cx| {
                     page.change(|c, catalog| c.set(catalog, &module, choice), cx)
                 });
-            })
+            });
+        Some(toggle)
     });
     h_flex()
         .id(ids::graphics_segments(&row.module))
