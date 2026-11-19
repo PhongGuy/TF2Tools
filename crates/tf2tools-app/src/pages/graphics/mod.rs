@@ -28,6 +28,7 @@ use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::pages::common::{card_frame, no_tf2_warning};
 use crate::pages::profiles::probe::Tf2Probe;
+use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -42,6 +43,7 @@ use model::{
     describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
     preset_label, shown_choice, status_card, update_to, value_options,
 };
+use pictures::PictureIndex;
 use view::Filter;
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -107,6 +109,12 @@ pub struct GraphicsPage {
     /// Each shown section's child index in the scroll column, from the last render.
     section_items: BTreeMap<String, usize>,
     scroll: ScrollHandle,
+    /// The bundled setting pictures, once read off the UI thread.
+    pictures: Option<Arc<PictureIndex>>,
+    /// The image keys the last frame asked for.
+    wanted: Vec<ImageKey>,
+    /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
+    image_viewer: String,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -125,6 +133,16 @@ impl GraphicsPage {
                 cx.notify();
             }
         });
+        let mut subscriptions = vec![tf2, searched];
+        // Pictures redraw the page as they land, and the page's wants go with it.
+        let image_viewer = format!("graphics:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
         let mut page = Self {
             win: window.window_handle(),
             status: None,
@@ -144,10 +162,24 @@ impl GraphicsPage {
             changed_only: false,
             section_items: BTreeMap::new(),
             scroll: ScrollHandle::new(),
-            _subscriptions: vec![tf2, searched],
+            pictures: None,
+            wanted: Vec::new(),
+            image_viewer,
+            _subscriptions: subscriptions,
         };
         page.reload(cx);
+        page.load_pictures(cx);
         page
+    }
+
+    /// The bundled setting pictures once read; an empty index when the folder cannot be read.
+    pub fn pictures(&self) -> Option<&PictureIndex> {
+        self.pictures.as_deref()
+    }
+
+    /// The image keys the last frame asked the image cache for.
+    pub fn wanted_images(&self) -> &[ImageKey] {
+        &self.wanted
     }
 
     /// The settings search box's state.
@@ -697,6 +729,60 @@ impl GraphicsPage {
         self.change(|c, _| c.reset(module), cx);
     }
 
+    // Reads the pictures' manifest and checks their files in the background, once per page.
+    fn load_pictures(&mut self, cx: &mut Context<Self>) {
+        let reading = run_blocking(cx, |s| {
+            Ok(PictureIndex::open(&s.assets.setting_pictures_dir()))
+        });
+        cx.spawn(async move |page, cx| {
+            let index = reading.await.unwrap_or_default();
+            let _ = page.update(cx, |page, cx| {
+                page.pictures = Some(Arc::new(index));
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    // The current thumbnail of every row with pictures; all are wanted, not just the visible.
+    fn image_keys(&self) -> Vec<ImageKey> {
+        let (Some(index), Some(catalog), Some(preset)) = (
+            self.pictures.as_deref(),
+            self.catalog.as_deref(),
+            self.preset(),
+        ) else {
+            return Vec::new();
+        };
+        let label = model::preset_label(preset);
+        let choices = self.shown_against();
+        catalog
+            .categories()
+            .iter()
+            .flat_map(|category| category.modules())
+            .filter(|module| index.has_pictures(module.name()))
+            .filter_map(|module| {
+                let row = view::row(catalog, &choices, module);
+                pictures::row_pictures(index, &row, &label, false)?.thumb
+            })
+            .map(|thumb| ImageKey::card(&index.url(&thumb)))
+            .collect()
+    }
+
+    // Records this frame's keys and, when they changed, hands them to the image cache after
+    // the draw, so no entity is updated mid-render.
+    fn want_images(&mut self, cx: &mut Context<Self>) {
+        let keys = self.image_keys();
+        if keys == self.wanted {
+            return;
+        }
+        self.wanted = keys.clone();
+        let Some(images) = RemoteImages::global(cx) else {
+            return;
+        };
+        let viewer = self.image_viewer.clone();
+        cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
+    }
+
     // Drops every saved choice and keeps the preset.
     fn reset_all(&mut self, cx: &mut Context<Self>) {
         self.change(|c, _| c.clear(), cx);
@@ -737,6 +823,7 @@ impl Render for GraphicsPage {
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
+        self.want_images(cx);
         let filter = self.filter(cx);
         let sections = self
             .catalog

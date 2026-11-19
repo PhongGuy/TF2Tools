@@ -208,3 +208,88 @@ pub fn toasted(cx: &mut TestAppContext, s: &super::ShellWindow, text: &str) {
 pub fn modules_cfg(env: &super::Env) -> Option<String> {
     std::fs::read_to_string(env.game.join("tf/cfg/overrides/modules.cfg")).ok()
 }
+
+/// Waits until the page has read the bundled pictures, found or not.
+pub fn wait_for_pictures(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<GraphicsPage>,
+) {
+    super::wait_real(cx, "the pictures", |cx| {
+        cx.update(|cx| page.read(cx).pictures().is_some())
+    });
+    super::settle(cx, s.win);
+}
+
+/// A full-catalogue page on `preset` with `choices` saved, its list and pictures loaded.
+pub fn picture_page(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    preset: &str,
+    choices: &str,
+) -> (super::ShellWindow, Entity<GraphicsPage>) {
+    let s = super::shell_window(cx, env, found(env));
+    super::seed_managed_mastercomfig(env, "9.100.1", preset);
+    super::seed_full_mastercomfig_catalog(env, "9.100.1");
+    super::seed_mastercomfig_choices(env, choices);
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    wait_for_pictures(cx, &s, &page);
+    (s, page)
+}
+
+/// The key URL of `<setting-pictures>/<module>/<file>` as the page builds it.
+pub fn picture_url(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<GraphicsPage>,
+    module: &str,
+    file: &str,
+) -> String {
+    let path = s
+        .services
+        .assets
+        .setting_pictures_dir()
+        .join(module)
+        .join(file);
+    cx.update(|cx| page.read(cx).pictures().expect("pictures").url(&path))
+}
+
+/// Whether the page's last frame asked the image cache for `key`.
+pub fn wants(
+    cx: &mut TestAppContext,
+    page: &Entity<GraphicsPage>,
+    key: &tf2tools_app::remote_images::ImageKey,
+) -> bool {
+    cx.update(|cx| page.read(cx).wanted_images().contains(key))
+}
+
+/// An asset root holding only the crosshair file `AssetRoot` checks for.
+pub fn bare_assets(env: &super::Env) -> std::path::PathBuf {
+    let root = env.tmp.path().join("bare-assets");
+    std::fs::create_dir_all(root.join("crosshairs")).unwrap();
+    std::fs::write(root.join("crosshairs/crosshairs.json"), "[]").unwrap();
+    root
+}
+
+/// A bare asset root whose pictures folder holds only lod (low, medium) with `medium` as given.
+pub fn lod_only_assets(env: &super::Env, medium: &[u8]) -> tf2tools_app::assets::AssetRoot {
+    let root = bare_assets(env);
+    let pictures = root.join("setting-pictures");
+    std::fs::create_dir_all(pictures.join("lod")).unwrap();
+    std::fs::write(
+        pictures.join("manifest.json"),
+        r#"{"version": 1, "mastercomfig": "9.100.1", "size": [960, 540], "map": "itemtest", "base": {},
+           "settings": [{"module": "lod", "values": [{"value": "low"}, {"value": "medium"}]}]}"#,
+    )
+    .unwrap();
+    std::fs::write(pictures.join("lod/medium.webp"), medium).unwrap();
+    tf2tools_app::assets::AssetRoot::resolve_from(Some(root), None, None).unwrap()
+}
+
+/// Fails every network fetch; the page's pictures are all on disk.
+pub fn no_network() -> tf2tools_app::remote_images::ImageFetch {
+    std::sync::Arc::new(|_url: String| {
+        Box::pin(async { Err(tf2tools_app::remote_images::FetchFailure::Permanent) })
+    })
+}

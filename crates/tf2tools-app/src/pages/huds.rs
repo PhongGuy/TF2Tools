@@ -1507,11 +1507,11 @@ impl HudsPage {
     }
 }
 
-/// The 16:9 picture area with the image at `url` once ready, else the muted placeholder.
+/// The 16:9 picture area with the image under `key` once ready, else the muted placeholder.
 pub(crate) fn hud_picture(
     area_id: ElementId,
     image_id: ElementId,
-    url: Option<&str>,
+    key: Option<&ImageKey>,
     cx: &App,
 ) -> ObservedElement<Stateful<Div>> {
     let area = div()
@@ -1522,9 +1522,9 @@ pub(crate) fn hud_picture(
         .aspect_ratio(16. / 9.)
         .overflow_hidden()
         .bg(cx.theme().muted);
-    let ready = url
+    let ready = key
         .zip(RemoteImages::global(cx))
-        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url)));
+        .map(|(key, images)| images.read(cx).image(key));
     match ready {
         Some(RemoteImage::Ready(image)) => area.child(
             img(image)
@@ -1562,15 +1562,21 @@ fn screenshot(
     let title = SharedString::from(hud.name().to_owned());
     let provenance = hud.provenance().clone();
     let page = page.clone();
-    hud_picture(ids::hud_shot(folder), ids::hud_image(folder), url, cx)
-        .when(is_store(hud), |area| {
-            area.cursor_pointer().on_click(move |_, window, cx| {
-                let _ = page.update(cx, |page, cx| {
-                    page.open_gallery(title.clone(), provenance.clone(), window, cx)
-                });
-            })
+    let key = url.map(ImageKey::card);
+    hud_picture(
+        ids::hud_shot(folder),
+        ids::hud_image(folder),
+        key.as_ref(),
+        cx,
+    )
+    .when(is_store(hud), |area| {
+        area.cursor_pointer().on_click(move |_, window, cx| {
+            let _ = page.update(cx, |page, cx| {
+                page.open_gallery(title.clone(), provenance.clone(), window, cx)
+            });
         })
-        .into_any_element()
+    })
+    .into_any_element()
 }
 
 /// What one library card shows beyond its HUD entry.

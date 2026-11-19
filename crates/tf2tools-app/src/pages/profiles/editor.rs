@@ -987,11 +987,11 @@ impl ProfileEditor {
             });
         // A set HUD shows its picture, or the HUDs page's muted placeholder until it loads.
         let picture = (slot == Slot::Hud && matches!(state, SlotState::Set(_))).then(|| {
-            let url = self.slot_hud_url();
+            let key = self.slot_hud_url().map(ImageKey::card);
             div().flex_none().w(SLOT_PICTURE_WIDTH).child(hud_picture(
                 ids::PROFILE_SLOT_HUD_SHOT.into(),
                 ids::PROFILE_SLOT_HUD_IMAGE.into(),
-                url,
+                key.as_ref(),
                 cx,
             ))
         });
@@ -1178,7 +1178,7 @@ impl ProfileEditor {
             .child(self.grid.render_sized(count, height, move |ix, _, cx| {
                 let hud = &shown[ix];
                 let folder = hud.folder_name();
-                let url = images.get(folder).map(String::as_str);
+                let key = images.get(folder).map(|url| ImageKey::card(url));
                 let id = hud.id().clone();
                 let editor = editor.clone();
                 card_frame(cx)
@@ -1195,7 +1195,7 @@ impl ProfileEditor {
                     .child(hud_picture(
                         ids::hud_shot(folder),
                         ids::hud_image(folder),
-                        url,
+                        key.as_ref(),
                         cx,
                     ))
                     .child(div().px_3().py_2().child(hud_title(hud)))

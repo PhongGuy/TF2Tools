@@ -65,6 +65,7 @@ mod global_player;
 mod graphics;
 mod graphics_changes;
 mod graphics_filter;
+mod graphics_images;
 mod graphics_model;
 mod graphics_pictures;
 mod graphics_rows;
