@@ -2,6 +2,7 @@
 //! Run only by `.github/workflows/windows-checks.yml`, which downloads v4.8.0's installer from
 //! this repo's release; it installs v4 on the machine it runs on and removes it again.
 
+use std::ffi::{OsStr, OsString};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Output};
@@ -57,30 +58,31 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
         install_dir.display()
     );
 
-    // The app's own way runs first. If it leaves v4 behind, the same install is removed again
-    // after a pause with Defender told to skip the install and temp folders, to separate a
-    // scan holding a file from the uninstaller itself giving up.
-    let removed = remove_by(Way::App, &old);
+    // v4's uninstaller asks `cmd /c tasklist ... | find "TF2Tools.exe"` whether v4 still runs,
+    // and gives up with exit code 2 when it seems to. This job's PATH, inherited from Git Bash,
+    // may resolve `find` to Git's own find, unlike a player's PATH where System32 comes first.
+    say(&find_check(&install_dir, &runner_path()));
+    say(&find_check(&install_dir, &player_path()));
+
+    // First with the runner's PATH as a control, then as a player's PC starts v6.
+    let control = remove_by(Way::RunnerPath, &old);
+    say(&format!(
+        "RESULT RunnerPath: folder removed {control}, entry left {}",
+        v4_entry_listed()
+    ));
+    if detect_old_v4().is_none() {
+        assert!(
+            install_real(&releases.join("v4.7.5")),
+            "v4.7.5 installs again"
+        );
+    }
+    let old = wait_step("detect", Duration::from_secs(120), detect_old_v4);
+    let removed = remove_by(Way::PlayerPath, &old);
     let entry_left = v4_entry_listed();
     say(&format!(
-        "RESULT App: folder removed {removed}, entry left {entry_left}"
+        "RESULT PlayerPath: folder removed {removed}, entry left {entry_left}"
     ));
-    if !removed {
-        say(&powershell(
-            "Get-MpComputerStatus | Format-List RealTimeProtectionEnabled,AMRunningMode",
-        ));
-        std::thread::sleep(Duration::from_secs(30));
-        say(&powershell(
-            "Add-MpPreference -ExclusionPath \"$env:LOCALAPPDATA\\Programs\", $env:TEMP; \
-             (Get-MpPreference).ExclusionPath",
-        ));
-        let again = remove_by(Way::Excluded, &old);
-        say(&format!(
-            "RESULT Excluded: folder removed {again}, entry left {}",
-            v4_entry_listed()
-        ));
-    }
-    assert!(removed, "the app's own way removes v4");
+    assert!(removed, "the app's own way removes v4 on a player's PATH");
     // The reconstructed entry's key name is derived, not read from a real install, so a key
     // the uninstaller leaves behind is reported rather than failed on.
     if how == Install::Real {
@@ -88,50 +90,96 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
     }
 }
 
-/// How the uninstaller is started.
+/// The PATH the stand-in v6 runs with; both start the uninstaller the app's way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Way {
-    /// As the app does: a stand-in v6 named TF2Tools.exe starts it detached and exits.
-    App,
-    /// A plain child with the app's arguments, after a pause and a Defender exclusion.
-    Excluded,
+    /// This job's PATH, as inherited from Git Bash.
+    RunnerPath,
+    /// System32 first, as Windows gives a program started from Explorer.
+    PlayerPath,
 }
 
-/// Starts v4's uninstaller `way` and waits up to two minutes for its folder to go. Meanwhile a
-/// watcher reports the temp copy `Un_A.exe` (command line, parent, exit code, lifetime); before
-/// and after, any locked file in the folder is listed. True when the folder went.
+fn runner_path() -> OsString {
+    std::env::var_os("PATH").unwrap_or_default()
+}
+
+/// Windows' own folders first, then the rest of this job's PATH.
+fn player_path() -> OsString {
+    let root =
+        std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from);
+    let first = [
+        root.join("System32"),
+        root.clone(),
+        root.join(r"System32\Wbem"),
+        root.join(r"System32\WindowsPowerShell\v1.0"),
+    ];
+    let rest: Vec<PathBuf> = std::env::split_paths(&runner_path()).collect();
+    std::env::join_paths(first.into_iter().chain(rest)).unwrap()
+}
+
+/// Which `find` cmd picks with `path`, and what v4's running check answers from the install
+/// folder: exit code 0 means it believes TF2Tools.exe is running.
+fn find_check(dir: &Path, path: &OsStr) -> String {
+    let run = |line: &str| {
+        let mut command = Command::new("cmd");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt as _;
+            command.raw_arg(format!("/c {line}"));
+        }
+        #[cfg(not(windows))]
+        command.arg(line);
+        command.current_dir(dir).env("PATH", path);
+        bounded_output(&mut command).map_or_else(
+            || format!("{line}: no answer"),
+            |out| {
+                format!(
+                    "{line}: exit {:?}, out {:?}, err {:?}",
+                    out.status.code(),
+                    String::from_utf8_lossy(&out.stdout).trim(),
+                    String::from_utf8_lossy(&out.stderr).trim()
+                )
+            },
+        )
+    };
+    let first = std::env::split_paths(path).next().unwrap_or_default();
+    format!(
+        "FIND with PATH starting {}\n  {}\n  {}",
+        first.display(),
+        run("where find"),
+        run(
+            r#"tasklist /FI "USERNAME eq %USERNAME%" /FI "IMAGENAME eq TF2Tools.exe" | find "TF2Tools.exe""#
+        )
+    )
+}
+
+/// Starts v4's uninstaller the app's way with `way`'s PATH and waits up to two minutes for its
+/// folder to go, while a watcher reports the temp copy `Un_A.exe` (command line, parent, exit
+/// code, lifetime). True when the folder went.
 fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
     let install_dir = old.uninstaller().parent().unwrap().to_path_buf();
     let step = format!("remove {way:?}");
     say(&format!("STEP {step}: start"));
-    say(&format!(
-        "{step}: TEMP {:?}, locked before: {:?}",
-        std::env::var_os("TEMP"),
-        locked_files(&install_dir)
-    ));
     let watcher = watch_temp_uninstaller();
     let started = Instant::now();
-    match way {
-        Way::App => {
-            // A copy of this binary named TF2Tools.exe stands in for v6, since v4's
-            // uninstaller looks for a running TF2Tools.exe and v6 exits right after starting it.
-            let tmp = tempfile::tempdir().unwrap();
-            let stand_in = tmp.path().join("TF2Tools.exe");
-            std::fs::copy(std::env::current_exe().unwrap(), &stand_in).unwrap();
-            let mut close = Command::new(&stand_in);
-            close
-                .args([STAND_IN_TEST, "--exact", "--ignored", "--nocapture"])
-                .env(STAND_IN, "1");
-            let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
-            assert!(status.success(), "the stand-in v6 exited with {status}");
-        }
-        Way::Excluded => {
-            let mut child = Command::new(old.uninstaller());
-            child.args(old.silent_arguments());
-            let status = try_step(&step, child, Duration::from_secs(120), v4_state);
-            say(&format!("{step}: uninstaller exited {status:?}"));
-        }
-    }
+    // A copy of this binary named TF2Tools.exe stands in for v6, since v4's uninstaller looks
+    // for a running TF2Tools.exe and v6 exits right after starting it.
+    let tmp = tempfile::tempdir().unwrap();
+    let stand_in = tmp.path().join("TF2Tools.exe");
+    std::fs::copy(std::env::current_exe().unwrap(), &stand_in).unwrap();
+    let mut close = Command::new(&stand_in);
+    close
+        .args([STAND_IN_TEST, "--exact", "--ignored", "--nocapture"])
+        .env(STAND_IN, "1")
+        .env(
+            "PATH",
+            match way {
+                Way::RunnerPath => runner_path(),
+                Way::PlayerPath => player_path(),
+            },
+        );
+    let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
+    assert!(status.success(), "the stand-in v6 exited with {status}");
     let mut seen = std::collections::BTreeMap::new();
     let limit = Duration::from_secs(120);
     let removed = loop {
@@ -161,25 +209,6 @@ fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
             |out| String::from_utf8_lossy(&out.stdout).into_owned(),
         );
     say(&watched);
-    if !removed {
-        say(&format!(
-            "{step}: left in the folder: {:?}",
-            std::fs::read_dir(&install_dir)
-                .map(|entries| entries
-                    .flatten()
-                    .map(|e| e.file_name().to_string_lossy().into_owned())
-                    .collect::<Vec<_>>())
-                .unwrap_or_default()
-        ));
-        say(&format!(
-            "{step}: locked after: {:?}",
-            locked_files(&install_dir)
-        ));
-        say(&format!(
-            "{step}: old-install folders: {:?}",
-            old_install_folders(&install_dir)
-        ));
-    }
     removed
 }
 
@@ -223,76 +252,6 @@ try {
         }
     }
     receiver
-}
-
-/// Files under `dir` that cannot be opened without sharing, which is what a scan or a running
-/// program holding them looks like.
-fn locked_files(dir: &Path) -> Vec<String> {
-    let mut locked = Vec::new();
-    let mut stack = vec![dir.to_path_buf()];
-    while let Some(next) = stack.pop() {
-        for entry in std::fs::read_dir(&next).into_iter().flatten().flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else if let Err(e) = open_unshared(&path) {
-                locked.push(format!("{}: {e}", path.display()));
-            }
-        }
-    }
-    locked
-}
-
-fn open_unshared(path: &Path) -> std::io::Result<std::fs::File> {
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt as _;
-        options.share_mode(0);
-    }
-    options.open(path)
-}
-
-/// Every folder named `old-install` in the install folder and in TEMP's NSIS folders, where
-/// v4's uninstaller moves files before deleting them.
-fn old_install_folders(install_dir: &Path) -> Vec<String> {
-    let temp = std::env::var_os("TEMP")
-        .map(PathBuf::from)
-        .unwrap_or_default();
-    let mut found = Vec::new();
-    let mut stack = vec![(install_dir.to_path_buf(), 0), (temp, 0)];
-    while let Some((dir, depth)) = stack.pop() {
-        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            if entry
-                .file_name()
-                .to_string_lossy()
-                .eq_ignore_ascii_case("old-install")
-            {
-                found.push(path.display().to_string());
-            } else if depth < 2 {
-                stack.push((path, depth + 1));
-            }
-        }
-    }
-    found
-}
-
-fn powershell(script: &str) -> String {
-    bounded_output(Command::new("powershell").args(["-NoProfile", "-Command", script])).map_or_else(
-        || "powershell did not answer".to_owned(),
-        |out| {
-            format!(
-                "{}{}",
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            )
-        },
-    )
 }
 
 /// Names of running processes that look like v4's app or an NSIS installer or its temp copy.
