@@ -25,6 +25,7 @@ use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
 use crate::i18n::tr;
 use crate::ids;
 use crate::shell::CONTENT_PADDING;
+use crate::theme::selected_segment;
 use crate::widgets::labelled;
 
 /// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
@@ -324,6 +325,8 @@ fn switch(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) ->
 // Space click. A click on the checked segment reports false and changes nothing.
 fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) -> AnyElement {
     let border = cx.theme().border;
+    let muted = cx.theme().muted_foreground;
+    let (fill, on_fill) = selected_segment(cx.theme());
     let toggles = row.options.iter().enumerate().map(|(i, option)| {
         let ModuleChoice::Value(value) = &option.choice else {
             unreachable!("segments offer only values")
@@ -331,14 +334,17 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
         let module = row.module.clone();
         let choice = option.choice.clone();
         let entity = cx.entity().downgrade();
+        let checked = row.shown == option.choice;
         Toggle::new(ids::graphics_segment(&row.module, value))
             .small()
             .label(option.label.clone())
             .tooltip(option.label.clone())
-            .checked(row.shown == option.choice)
+            .checked(checked)
             .disabled(page.busy)
             .rounded_none()
             .px_3()
+            .text_color(muted)
+            .when(checked, |t| t.bg(fill).text_color(on_fill))
             .when(i > 0, |t| t.border_l_1().border_color(border))
             .on_click(move |&next, _, cx| {
                 if !next {
