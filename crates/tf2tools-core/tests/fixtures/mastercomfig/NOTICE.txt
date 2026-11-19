@@ -1,1 +1,2 @@
 Trimmed from mastercomfig 9.100.1 data/modules.json and data/preset_modules.json, https://github.com/mastercomfig/mastercomfig, MIT licence, by the mastercomfig team.
+modules-9.100.1.json is mastercomfig 9.100.1 data/modules.json, unmodified, same source and licence.

@@ -78,6 +78,11 @@ impl AssetRoot {
         self.0.join("crosshairs")
     }
 
+    /// `<root>/setting-pictures`, the Graphics page's pictures and their manifest.
+    pub fn setting_pictures_dir(&self) -> PathBuf {
+        self.0.join("setting-pictures")
+    }
+
     /// `<root>/backgrounds/<name>.png`.
     pub fn background(&self, name: &str) -> PathBuf {
         self.0.join("backgrounds").join(format!("{name}.png"))

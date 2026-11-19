@@ -25,6 +25,7 @@ mod pak;
 pub mod panic_mark;
 mod paths;
 mod payloads;
+mod setting_pictures;
 mod settings;
 mod store;
 mod templates;
@@ -51,9 +52,9 @@ pub use error::{
     MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
     PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
     ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, ResolveError,
-    RestoreMastercomfigError, SchemaError, SettingsError, StorageError, SyncError, TakeOverError,
-    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
-    WavError, WeaponIconsError, WeaponNamesError,
+    RestoreMastercomfigError, SchemaError, SettingPicturesError, SettingsError, StorageError,
+    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -125,6 +126,11 @@ pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
+pub use setting_pictures::shoot;
+pub use setting_pictures::{
+    Crop, PictureManifest, REASON_KEYS, Reload, SettingPicture, SettingPictures, SettingShot,
+    ShotStep, ValueShot,
+};
 pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
