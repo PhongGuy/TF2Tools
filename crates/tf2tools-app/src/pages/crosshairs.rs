@@ -1632,7 +1632,7 @@ fn weapons_title(class: TfClass, slot: WeaponSlot) -> SharedString {
         WeaponSlot::Primary => tr!("crosshairs_page.details.title.primary", class = class),
         WeaponSlot::Secondary => tr!("crosshairs_page.details.title.secondary", class = class),
         WeaponSlot::Melee => tr!("crosshairs_page.details.title.melee", class = class),
-        _ => format!("{class}: {}", slot_name(slot)).into(),
+        _ => crate::i18n::labelled(class, slot_name(slot)).into(),
     }
 }
 

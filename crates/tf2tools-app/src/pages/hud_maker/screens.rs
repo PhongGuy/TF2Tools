@@ -278,7 +278,8 @@ fn caption(index: usize, check: &ScreenCheck, flagged: usize) -> String {
         problems_text(flagged)
     };
     let ratio = SCREEN_LABELS.get(index).copied().unwrap_or_default();
-    format!("{ratio}, {}x{}: {count}", shape.wide(), shape.tall())
+    let screen = format!("{ratio}, {}x{}", shape.wide(), shape.tall());
+    crate::i18n::labelled(screen, count)
 }
 
 // "No problems", "1 part has a problem", "3 parts have problems".

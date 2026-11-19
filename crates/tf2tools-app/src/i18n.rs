@@ -243,6 +243,17 @@ pub fn separated(items: &[impl AsRef<str>]) -> String {
     items.join(&*tr!("common.list.separator"))
 }
 
+/// A label and its value as the language writes them: "OS: Windows" in English, "系统：Windows"
+/// in Chinese.
+pub fn labelled(label: impl AsRef<str>, value: impl AsRef<str>) -> String {
+    tr!(
+        "common.label_value",
+        label = label.as_ref(),
+        value = value.as_ref()
+    )
+    .to_string()
+}
+
 /// Serialises tests that switch the process-wide locale; a panicked holder does not wedge it.
 #[doc(hidden)]
 pub fn test_lock() -> MutexGuard<'static, ()> {
@@ -654,6 +665,7 @@ mod tests {
         "common.class_short.scout",
         "common.count.step",
         "common.date.date_time",
+        "common.label_value",
         "common.list.separator",
         "common.number.percent",
         "common.sound_kind.hitsound",
@@ -761,6 +773,7 @@ mod tests {
         "common.count.step",
         "common.date.date_time",
         "common.date.day_month_year",
+        "common.label_value",
         "common.list.separator",
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
@@ -861,6 +874,7 @@ mod tests {
         "common.class_short.scout",
         "common.count.step",
         "common.date.date_time",
+        "common.label_value",
         "common.list.separator",
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",

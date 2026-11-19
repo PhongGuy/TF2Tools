@@ -222,6 +222,7 @@ common:
     title: "TF2 introuvable"
     open_settings: "Ouvrir les paramètres"
     needs_tf2: "Indiquez d'abord le dossier TF2 dans les paramètres"
+  label_value: "%{label}\u00A0: %{value}"
   list:
     separator: ", "
     last: "%{rest} et %{last}"

@@ -365,3 +365,58 @@ fn no_player_facing_list_is_joined_with_a_hard_coded_comma() {
     );
     assert!(hits.is_empty(), "{hits:#?}");
 }
+
+// A HUD Store trait row joins its label and value through the language's label format, names
+// the systems it knows and passes an unknown one through as hud-db wrote it.
+#[test]
+fn hud_store_trait_rows_read_in_each_language() {
+    use tf2tools_app::pages::hud_store::bodies::trait_rows;
+    use tf2tools_app::pages::hud_store::curated::CuratedHud;
+    let hud = CuratedHud::parse(
+        "budhud",
+        "budhud",
+        "Whisker",
+        None,
+        vec![],
+        r#"{"traits":{"os":["windows","mac","linux","bsd"],"res":["16/9"]}}"#,
+    );
+    for (lang, os, res) in [
+        ("en", "OS: Windows, macOS, Linux, bsd", "Resolutions: 16/9"),
+        ("zh-CN", "系统：Windows、macOS、Linux、bsd", "分辨率：16/9"),
+    ] {
+        let _guard = LocaleGuard::switch(lang);
+        assert_eq!(
+            trait_rows(&hud),
+            vec![os.to_owned(), res.to_owned()],
+            "{lang}"
+        );
+        assert_eq!(
+            i18n::labelled("a", "b"),
+            format!("a{}b", if lang == "en" { ": " } else { "：" })
+        );
+    }
+}
+
+// Other code-built "label: value" lines take the same format: the Storage card's total and rows
+// and a logs.tf medigun's charges.
+#[test]
+fn code_built_label_value_lines_take_the_language_colon() {
+    use tf2tools_app::pages::logs_tf::text::charge_text;
+    use tf2tools_app::pages::settings::{storage_row_label, storage_total_label};
+    use tf2tools_core::Medigun;
+    for (lang, colon) in [("en", ": "), ("zh-CN", "：")] {
+        let _guard = LocaleGuard::switch(lang);
+        let total = storage_total_label(2_100_000_000);
+        assert!(
+            total.ends_with(&format!("{colon}2.0 GB")),
+            "{lang}: {total}"
+        );
+        let row = storage_row_label("HUDs", 1_048_576, 1_048_576);
+        assert!(row.starts_with(&format!("HUDs{colon}")), "{lang}: {row}");
+        let charges = charge_text(&Medigun::Kritzkrieg, 12, 12);
+        assert!(
+            charges.starts_with(&format!("Kritzkrieg{colon}12")),
+            "{lang}: {charges}"
+        );
+    }
+}

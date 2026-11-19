@@ -233,14 +233,14 @@ fn unpacked_line(bytes: u64, unpacked: u64) -> Option<SharedString> {
 pub fn storage_row_label(name: &str, bytes: u64, unpacked: u64) -> String {
     let size = size_text(bytes);
     match unpacked_line(bytes, unpacked) {
-        Some(line) => format!("{name}: {size}. {line}"),
-        None => format!("{name}: {size}"),
+        Some(line) => format!("{}. {line}", i18n::labelled(name, size)),
+        None => i18n::labelled(name, size),
     }
 }
 
 /// The Storage card's total, as the donut's centre and the card's label read it.
 pub fn storage_total_label(total: u64) -> String {
-    format!("{}: {}", tr!("settings.storage.total"), size_text(total))
+    i18n::labelled(tr!("settings.storage.total"), size_text(total))
 }
 
 /// The donut's slices: each kind that takes any bytes, with its size and colour, in row order.

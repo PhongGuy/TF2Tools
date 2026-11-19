@@ -197,6 +197,7 @@ common:
     title: "TF2 not found"
     open_settings: "Open Settings"
     needs_tf2: "Set the TF2 folder in Settings first"
+  label_value: "%{label}: %{value}"
   list:
     separator: ", "
     last: "%{rest} and %{last}"
