@@ -7938,6 +7938,7 @@ dependencies = [
  "tempfile",
  "tf2tools-app",
  "tf2tools-core",
+ "tokio",
  "zip",
 ]
 
