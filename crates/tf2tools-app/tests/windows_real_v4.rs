@@ -26,18 +26,18 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
         Ok("1"),
         "set TF2TOOLS_REAL_WINDOWS=1 to let this test install TF2Tools 4"
     );
-    let installer = PathBuf::from(std::env::var_os("TF2TOOLS_V4_INSTALLER").expect("installer"));
-    say(&format!(
-        "installer {} ({} bytes)",
-        installer.display(),
-        std::fs::metadata(&installer).map_or(0, |m| m.len())
-    ));
+    let releases = PathBuf::from(std::env::var_os("TF2TOOLS_V4_DIR").expect("v4 releases"));
     assert!(detect_old_v4().is_none(), "the runner starts without v4");
 
-    let mut install = Command::new(&installer);
-    install.arg("/S");
-    let status = run_step("install", install, Duration::from_secs(300), v4_state);
-    assert!(status.success(), "v4's installer exited with {status}");
+    // v4.8.0's web installer rejects the package on its release, so a real install is tried
+    // with v4.7.5 first; failing that, v4.8.0 is put together from its own release files.
+    let (how, expected) = if install_real(&releases.join("v4.7.5")) {
+        (Install::Real, "4.7.5")
+    } else {
+        reconstruct(&releases.join("v4.8.0"));
+        (Install::Reconstructed, "4.8.0")
+    };
+    say(&format!("RESULT install path: {how:?} v4 {expected}"));
     let old = wait_step("detect", Duration::from_secs(120), detect_old_v4);
     say(&v4_entries());
     say(&format!(
@@ -49,7 +49,7 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
     // A v4 the installer left running would make its uninstaller ask to close it.
     say(&tasklist(&["/v", "/FI", "IMAGENAME eq TF2Tools.exe"]));
     keep_for_inspection(old.uninstaller());
-    assert_eq!(old.version(), "4.8.0", "the release's version");
+    assert_eq!(old.version(), expected, "the installed version");
     let install_dir = old.uninstaller().parent().unwrap().to_path_buf();
     assert!(
         install_dir.join("TF2Tools.exe").is_file(),
@@ -69,9 +69,110 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
     let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
     assert!(status.success(), "the stand-in v6 exited with {status}");
 
-    let gone = || (!v4_entry_listed() && !install_dir.exists()).then_some(());
-    wait_step("removal", Duration::from_secs(300), gone);
+    wait_step("removal", Duration::from_secs(300), || {
+        (!install_dir.exists()).then_some(())
+    });
     assert!(detect_old_v4().is_none(), "nothing left to offer");
+    // The reconstructed entry's key name is derived, not read from a real install, so a key
+    // the uninstaller leaves behind is reported rather than failed on.
+    let entry_left = v4_entry_listed();
+    say(&format!(
+        "RESULT {how:?}: folder removed, entry left {entry_left}"
+    ));
+    if how == Install::Real {
+        assert!(!entry_left, "v4's uninstaller removes its own entry");
+    }
+}
+
+/// How v4 got onto the runner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Install {
+    /// Its own web installer ran.
+    Real,
+    /// Its package and uninstaller were placed and its entry written by this test.
+    Reconstructed,
+}
+
+/// Runs the release's web installer silently beside its package; false when it never yields
+/// a v4 v6 can find (a checksum dialog shows up as the step running out of time).
+fn install_real(release: &Path) -> bool {
+    let stub = only_file(release, "exe");
+    say(&format!(
+        "installer {} ({} bytes)",
+        stub.display(),
+        std::fs::metadata(&stub).map_or(0, |m| m.len())
+    ));
+    let mut install = Command::new(&stub);
+    install.arg("/S");
+    let Some(status) = try_step("real install", install, Duration::from_secs(180), v4_state) else {
+        return false;
+    };
+    say(&format!("real install exited {status}"));
+    status.success() && detect_old_v4().is_some()
+}
+
+/// Places v4 as its installer would: the package's files and the stub's own uninstaller in the
+/// per-user install folder, then the Uninstall entry electron-builder writes.
+fn reconstruct(release: &Path) {
+    let dir = Path::new(&std::env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA"))
+        .join("Programs")
+        .join("tf2tools");
+    let out = format!("-o{}", dir.display());
+    let mut unpack = Command::new("7z");
+    unpack.args(["x", "-y", &out]).arg(only_file(release, "7z"));
+    let status = run_step("unpack package", unpack, Duration::from_secs(300), v4_state);
+    assert!(status.success(), "7z unpacked the package: {status}");
+    let mut uninstaller = Command::new("7z");
+    uninstaller
+        .args(["e", "-y", &out])
+        .arg(only_file(release, "exe"))
+        .arg(r"$R0\Uninstall TF2Tools.exe");
+    let status = run_step(
+        "take uninstaller",
+        uninstaller,
+        Duration::from_secs(60),
+        v4_state,
+    );
+    assert!(status.success(), "7z took the uninstaller: {status}");
+    let exe = dir.join("Uninstall TF2Tools.exe");
+    assert!(exe.is_file(), "the stub holds {}", exe.display());
+
+    // electron-builder names the key by UUID v5 of the default app id, com.electron.tf2tools.
+    let key = format!(r"{UNINSTALL_KEY}\4fef478b-7619-503a-a35c-72a914c5ac20");
+    let quoted = format!("\"{}\" /currentuser", exe.display());
+    let values = [
+        ("DisplayName", "REG_SZ", "TF2Tools 4.8.0".to_owned()),
+        ("DisplayVersion", "REG_SZ", "4.8.0".to_owned()),
+        ("Publisher", "REG_SZ", "PhongGuy".to_owned()),
+        ("UninstallString", "REG_SZ", quoted.clone()),
+        ("QuietUninstallString", "REG_SZ", format!("{quoted} /S")),
+        (
+            "DisplayIcon",
+            "REG_SZ",
+            format!("{},0", dir.join("TF2Tools.exe").display()),
+        ),
+        ("NoModify", "REG_DWORD", "1".to_owned()),
+        ("NoRepair", "REG_DWORD", "1".to_owned()),
+    ];
+    for (name, kind, data) in values {
+        let added = bounded_output(
+            Command::new("reg").args(["add", &key, "/v", name, "/t", kind, "/d", &data, "/f"]),
+        )
+        .is_some_and(|out| out.status.success());
+        assert!(added, "reg add {name}");
+    }
+}
+
+/// The one file in `dir` with extension `ext`.
+fn only_file(dir: &Path, ext: &str) -> PathBuf {
+    let found: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case(ext)))
+        .collect();
+    assert_eq!(found.len(), 1, "one .{ext} in {}: {found:?}", dir.display());
+    found.into_iter().next().unwrap()
 }
 
 /// The stand-in v6's part: detect v4 and start its uninstaller through the app's own runner.
@@ -93,13 +194,13 @@ fn say(line: &str) {
 }
 
 /// Runs `command` as `step` for at most `limit`, reporting `probe()` every `HEARTBEAT`. Past the
-/// limit it records the desktop and processes, kills the child and fails naming the step.
-fn run_step(
+/// limit it records the desktop and processes, kills the child and returns `None`.
+fn try_step(
     step: &str,
     mut command: Command,
     limit: Duration,
     probe: impl Fn() -> String,
-) -> ExitStatus {
+) -> Option<ExitStatus> {
     say(&format!("STEP {step}: start"));
     let mut child = command.spawn().unwrap();
     let started = Instant::now();
@@ -110,13 +211,17 @@ fn run_step(
                 "STEP {step}: exited {status} after {} s",
                 started.elapsed().as_secs()
             ));
-            return status;
+            return Some(status);
         }
         if started.elapsed() >= limit {
             diagnose(step);
             let _ = child.kill();
             let _ = child.wait();
-            panic!("STEP {step}: still running after {} s", limit.as_secs());
+            say(&format!(
+                "STEP {step}: still running after {} s",
+                limit.as_secs()
+            ));
+            return None;
         }
         if beat.elapsed() >= HEARTBEAT {
             beat = Instant::now();
@@ -128,6 +233,17 @@ fn run_step(
         }
         std::thread::sleep(Duration::from_millis(500));
     }
+}
+
+/// [`try_step`] that fails the test when the step runs out of time.
+fn run_step(
+    step: &str,
+    command: Command,
+    limit: Duration,
+    probe: impl Fn() -> String,
+) -> ExitStatus {
+    try_step(step, command, limit, probe)
+        .unwrap_or_else(|| panic!("STEP {step}: still running after {} s", limit.as_secs()))
 }
 
 /// Polls `check` as `step` every half second for at most `limit`, failing like `run_step`.
