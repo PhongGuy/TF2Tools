@@ -57,31 +57,136 @@ fn a_real_v4_install_is_found_and_removed_by_its_own_uninstaller() {
         install_dir.display()
     );
 
-    // A copy of this binary named TF2Tools.exe stands in for v6: v4's uninstaller looks for a
-    // running TF2Tools.exe, and the stand-in exits right after starting it, as v6 closes.
-    let tmp = tempfile::tempdir().unwrap();
-    let stand_in = tmp.path().join("TF2Tools.exe");
-    std::fs::copy(std::env::current_exe().unwrap(), &stand_in).unwrap();
-    let mut close = Command::new(&stand_in);
-    close
-        .args([STAND_IN_TEST, "--exact", "--ignored", "--nocapture"])
-        .env(STAND_IN, "1");
-    let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
-    assert!(status.success(), "the stand-in v6 exited with {status}");
-
-    wait_step("removal", Duration::from_secs(300), || {
-        (!install_dir.exists()).then_some(())
-    });
-    assert!(detect_old_v4().is_none(), "nothing left to offer");
+    // Each way of starting the uninstaller runs on an install (reinstalled when the previous way
+    // removed it), the app's own way first, so one run tells the stand-in's name, the detached
+    // start and the arguments apart.
+    let mut outcomes = Vec::new();
+    for way in Way::ALL {
+        if detect_old_v4().is_none() {
+            reinstall(how, &releases);
+        }
+        let old = wait_step("detect", Duration::from_secs(120), detect_old_v4);
+        let removed = remove_by(way, &old);
+        let entry_left = v4_entry_listed();
+        say(&format!(
+            "RESULT {way:?}: folder removed {removed}, entry left {entry_left}"
+        ));
+        outcomes.push((way, removed, entry_left));
+    }
+    let (_, removed, entry_left) = outcomes[0];
+    assert!(removed, "the app's own way removes v4: {outcomes:?}");
     // The reconstructed entry's key name is derived, not read from a real install, so a key
     // the uninstaller leaves behind is reported rather than failed on.
-    let entry_left = v4_entry_listed();
-    say(&format!(
-        "RESULT {how:?}: folder removed, entry left {entry_left}"
-    ));
     if how == Install::Real {
         assert!(!entry_left, "v4's uninstaller removes its own entry");
     }
+}
+
+/// How the uninstaller is started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Way {
+    /// As the app does: a stand-in v6 named TF2Tools.exe starts it detached and exits.
+    App,
+    /// The app's runner and arguments, called from this test, which stays running.
+    RunnerFromTest,
+    /// A plain child with the app's arguments, waited for so its exit code shows.
+    Waited,
+    /// A plain child with `/S` alone, waited for.
+    WaitedSilentOnly,
+}
+
+impl Way {
+    const ALL: [Way; 4] = [
+        Way::App,
+        Way::RunnerFromTest,
+        Way::Waited,
+        Way::WaitedSilentOnly,
+    ];
+}
+
+fn reinstall(how: Install, releases: &Path) {
+    match how {
+        Install::Real => assert!(
+            install_real(&releases.join("v4.7.5")),
+            "v4.7.5 installs again"
+        ),
+        Install::Reconstructed => reconstruct(&releases.join("v4.8.0")),
+    }
+}
+
+/// Starts v4's uninstaller `way` and waits up to two minutes for its folder to go, noting
+/// every installer-like process seen meanwhile; true when the folder went.
+fn remove_by(way: Way, old: &tf2tools_core::OldV4) -> bool {
+    let install_dir = old.uninstaller().parent().unwrap().to_path_buf();
+    let step = format!("remove {way:?}");
+    say(&format!("STEP {step}: start"));
+    let started = Instant::now();
+    match way {
+        Way::App => {
+            // A copy of this binary named TF2Tools.exe stands in for v6, since v4's
+            // uninstaller looks for a running TF2Tools.exe and v6 exits right after starting it.
+            let tmp = tempfile::tempdir().unwrap();
+            let stand_in = tmp.path().join("TF2Tools.exe");
+            std::fs::copy(std::env::current_exe().unwrap(), &stand_in).unwrap();
+            let mut close = Command::new(&stand_in);
+            close
+                .args([STAND_IN_TEST, "--exact", "--ignored", "--nocapture"])
+                .env(STAND_IN, "1");
+            let status = run_step("stand-in v6", close, Duration::from_secs(60), v4_state);
+            assert!(status.success(), "the stand-in v6 exited with {status}");
+        }
+        Way::RunnerFromTest => {
+            system_runner()(old.uninstaller(), &old.silent_arguments()).unwrap();
+        }
+        Way::Waited | Way::WaitedSilentOnly => {
+            let args = if way == Way::Waited {
+                old.silent_arguments()
+            } else {
+                vec!["/S".to_owned()]
+            };
+            let mut child = Command::new(old.uninstaller());
+            child.args(&args);
+            let status = try_step(&step, child, Duration::from_secs(120), v4_state);
+            say(&format!("{step}: uninstaller {args:?} exited {status:?}"));
+        }
+    }
+    let mut seen = std::collections::BTreeMap::new();
+    let limit = Duration::from_secs(120);
+    let removed = loop {
+        if !install_dir.exists() {
+            break true;
+        }
+        if started.elapsed() >= limit {
+            diagnose(&step);
+            break false;
+        }
+        for name in installer_processes() {
+            seen.entry(name)
+                .or_insert_with(|| started.elapsed().as_secs());
+        }
+        std::thread::sleep(Duration::from_secs(1));
+    };
+    let left = std::fs::read_dir(&install_dir).map_or(0, |entries| entries.count());
+    say(&format!(
+        "{step}: after {} s folder removed {removed} ({left} entries left); processes first seen at s: {seen:?}",
+        started.elapsed().as_secs()
+    ));
+    removed
+}
+
+/// Names of running processes that look like v4's app or an NSIS installer or its temp copy.
+fn installer_processes() -> Vec<String> {
+    tasklist(&["/FO", "CSV", "/NH"])
+        .lines()
+        .filter_map(|line| line.split(',').next())
+        .map(|name| name.trim_matches('"').to_owned())
+        .filter(|name| {
+            let lower = name.to_ascii_lowercase();
+            ["un_", "au_", "uninstall", "tf2tools", "setup"]
+                .iter()
+                .any(|hint| lower.contains(hint))
+        })
+        .collect()
 }
 
 /// How v4 got onto the runner.
