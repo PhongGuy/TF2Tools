@@ -1,5 +1,6 @@
 //! The pure parts of the setting pictures shooter: cfg text, log markers, launch
-//! arguments and per-value action lists. The `shoot_setting_pictures` example runs them.
+//! arguments, per-value action lists and the modules.cfg that applies the base at launch.
+//! The `shoot_setting_pictures` example runs them.
 
 use super::{PictureManifest, Reload, SettingShot};
 
@@ -95,14 +96,8 @@ pub fn shot_name(module: &str, value: &str) -> String {
     format!("tfs_{module}_{value}")
 }
 
-/// Puts the game in the base look for `setting`, then places the camera and runs its setup.
-pub fn setting_actions(manifest: &PictureManifest, setting: &SettingShot) -> Vec<ShotAction> {
-    let base = manifest
-        .base
-        .iter()
-        .filter(|(module, _)| **module != setting.module)
-        .map(|(module, value)| format!("{module}_{value}"))
-        .collect();
+/// Places the camera and runs the setting's setup; the base look is applied at launch.
+pub fn setting_actions(_manifest: &PictureManifest, setting: &SettingShot) -> Vec<ShotAction> {
     let mut place = Vec::new();
     if let Some([x, y, z]) = setting.setpos {
         place.push(format!("setpos {x} {y} {z}"));
@@ -111,11 +106,37 @@ pub fn setting_actions(manifest: &PictureManifest, setting: &SettingShot) -> Vec
         place.push(format!("setang {p} {y} {r}"));
     }
     place.extend(setting.setup.iter().cloned());
-    vec![
-        ShotAction::Run(base),
-        ShotAction::Run(place),
-        ShotAction::Sleep(1000),
-    ]
+    vec![ShotAction::Run(place), ShotAction::Sleep(1000)]
+}
+
+/// Puts a live-reloaded setting's module back on its base value so the next setting starts clean.
+pub fn reset_actions(manifest: &PictureManifest, setting: &SettingShot) -> Vec<ShotAction> {
+    if setting.reload == Reload::Restart {
+        return Vec::new();
+    }
+    match manifest.base.get(&setting.module) {
+        Some(base) => vec![ShotAction::Run(vec![format!("{}_{base}", setting.module)])],
+        None => Vec::new(),
+    }
+}
+
+/// The modules.cfg text mastercomfig reads at startup: the base, with `value` (module, value)
+/// replacing that module's base entry or added last when the module has none.
+pub fn modules_cfg(manifest: &PictureManifest, value: Option<(&str, &str)>) -> String {
+    let mut cfg = String::new();
+    for (module, base) in &manifest.base {
+        let shown = match value {
+            Some((m, v)) if m == module => v,
+            _ => base,
+        };
+        cfg.push_str(&format!("{module}={shown}\n"));
+    }
+    if let Some((m, v)) = value
+        && !manifest.base.contains_key(m)
+    {
+        cfg.push_str(&format!("{m}={v}\n"));
+    }
+    cfg
 }
 
 /// Everything the shooter does to apply one value of `setting` and take its picture.
@@ -145,9 +166,9 @@ pub fn value_actions(
             a
         }
         Reload::Restart => {
-            let mut a = vec![ShotAction::Run(vec![alias.clone()]), ShotAction::Restart];
+            // The executor writes the value into modules.cfg before relaunching; never live.
+            let mut a = vec![ShotAction::Restart];
             a.extend(setting_actions(manifest, setting));
-            a.push(ShotAction::Run(vec![alias]));
             a
         }
     };

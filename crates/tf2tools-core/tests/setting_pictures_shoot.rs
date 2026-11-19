@@ -2,8 +2,8 @@
 
 use tf2tools_core::PictureManifest;
 use tf2tools_core::shoot::{
-    ShotAction, join_commands, launch_args, marker_seen, rmse, setting_actions, shot_name,
-    start_cfg, step_cfg, value_actions,
+    ShotAction, join_commands, launch_args, marker_seen, modules_cfg, reset_actions, rmse,
+    setting_actions, shot_name, start_cfg, step_cfg, value_actions,
 };
 
 const MANIFEST: &str = r#"{
@@ -97,13 +97,12 @@ fn shot_names_carry_module_and_value() {
 }
 
 #[test]
-fn a_setting_starts_from_the_base_without_its_own_module() {
+fn a_setting_starts_from_its_position_and_setup() {
     let m = manifest();
     let shadows = m.setting("shadows").unwrap();
     assert_eq!(
         setting_actions(&m, shadows),
         vec![
-            run(&["gibs_low"]),
             run(&["setpos -1888 -1280.5 321", "setang 0 -30 0", "thirdperson"]),
             ShotAction::Sleep(1000),
         ]
@@ -136,7 +135,6 @@ fn a_map_reload_value_rejoins_and_sets_up_again_on_the_settings_map() {
             run(&["gibs_high"]),
             run(&["map cp_badlands"]),
             ShotAction::Rejoin,
-            run(&["shadows_high"]),
             run(&[]),
             ShotAction::Sleep(1000),
             run(&["gibs_high"]),
@@ -159,14 +157,60 @@ fn a_materials_value_reloads_materials_with_the_alias() {
 }
 
 #[test]
-fn a_restart_value_restarts_after_the_alias() {
+fn a_restart_value_never_runs_its_alias_live() {
     let m = manifest();
     let aa = m.setting("anti_aliasing").unwrap();
-    let actions = value_actions(&m, aa, "msaa_8x");
-    assert_eq!(actions[0], run(&["anti_aliasing_msaa_8x"]));
-    assert_eq!(actions[1], ShotAction::Restart);
-    assert_eq!(actions[2], run(&["gibs_low", "shadows_high"]));
-    assert_eq!(actions.last(), Some(&run(&["unpause"])));
+    assert_eq!(
+        value_actions(&m, aa, "msaa_8x"),
+        vec![
+            ShotAction::Restart,
+            run(&[]),
+            ShotAction::Sleep(1000),
+            ShotAction::Sleep(1000),
+            run(&["setpause"]),
+            ShotAction::Jpeg("tfs_anti_aliasing_msaa_8x".to_owned()),
+            run(&["unpause"]),
+        ]
+    );
+}
+
+#[test]
+fn a_live_setting_resets_its_module_to_the_base_afterwards() {
+    let m = manifest();
+    assert_eq!(
+        reset_actions(&m, m.setting("shadows").unwrap()),
+        vec![run(&["shadows_high"])]
+    );
+    assert_eq!(reset_actions(&m, m.setting("lod").unwrap()), vec![]);
+    assert_eq!(
+        reset_actions(&m, m.setting("anti_aliasing").unwrap()),
+        vec![]
+    );
+}
+
+#[test]
+fn modules_cfg_lists_the_base_in_mastercomfig_syntax() {
+    let m = manifest();
+    assert_eq!(modules_cfg(&m, None), "gibs=low\nshadows=high\n");
+}
+
+#[test]
+fn modules_cfg_puts_the_shot_value_in_place_of_its_base() {
+    let m = manifest();
+    assert_eq!(
+        modules_cfg(&m, Some(("shadows", "off"))),
+        "gibs=low\nshadows=off\n"
+    );
+    assert_eq!(
+        modules_cfg(&m, Some(("lighting", "ultra"))),
+        "gibs=low\nshadows=high\nlighting=ultra\n"
+    );
+}
+
+#[test]
+fn rmse_is_the_root_of_the_mean_square() {
+    let got = rmse(&[0, 0], &[3, 4]).unwrap();
+    assert!((got - 12.5_f64.sqrt()).abs() < 1e-9, "{got}");
 }
 
 #[test]
