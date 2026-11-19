@@ -41,6 +41,7 @@ fn the_graphics_seed_manages_mastercomfig_with_changed_choices() {
         .expect("the 9.100.1 catalogue is cached");
     let modules: usize = catalog.categories().iter().map(|c| c.modules().len()).sum();
     assert_eq!(modules, 56);
+    assert_eq!(catalog.resolve("shading", Preset::High), Some("high"));
 
     let choices = lib.mastercomfig_choices().unwrap().unwrap();
     assert_eq!(choices.preset(), Preset::High);

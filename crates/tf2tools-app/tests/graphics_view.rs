@@ -70,11 +70,10 @@ fn a_row_shows_the_saved_choice_against_the_preset_s_value() {
     assert_eq!((decals.shown, decals.changed), (value("low"), false));
     let shadows = at("shadows");
     assert_eq!(
-        shadows.preset_value,
-        ModuleChoice::NotSet,
-        "the trimmed presets skip shadows"
+        (shadows.shown, shadows.preset_value, shadows.changed),
+        (value("medium"), value("medium"), false),
+        "an unsaved row shows the preset's value"
     );
-    assert!(!shadows.changed);
 }
 
 #[test]

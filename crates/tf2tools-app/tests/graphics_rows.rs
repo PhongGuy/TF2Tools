@@ -4,11 +4,12 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, found, idle, modules_cfg, open, reveal, row_value, saved, value, wait_for_list,
+    HEADER, found, idle, modules_cfg, open, reveal, row_value, saved, shown, value, wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
-use tf2tools_core::ModuleChoice;
+use tf2tools_app::pages::graphics::view::{ControlKind, control_kind};
+use tf2tools_core::{ModuleChoice, Preset};
 
 fn full_page(
     cx: &mut TestAppContext,
@@ -61,15 +62,22 @@ fn a_switch_row_flips_between_on_and_off(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_module_preset("vsync")).as_deref(),
-        Some("Medium: Let TF2 decide")
+        Some("Medium: Off")
     );
-    // The first change grows the changes strip above the list, pushing the row down.
+    // The first change grows the changes strip above the list, pushing the row down. Medium
+    // sets vsync off, so flipping back to off clears the saved choice.
     reveal(cx, &s, ids::graphics_switch("vsync"));
     support::click_id(cx, s.win, ids::graphics_switch("vsync"));
-    support::wait_real(cx, "vsync off", |cx| {
-        saved(cx, &page, "vsync") == Some(value("off"))
+    support::wait_real(cx, "vsync off", |cx| saved(cx, &page, "vsync").is_none());
+    idle(cx, &page);
+    assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
+    reveal(cx, &s, ids::graphics_switch("vsync"));
+    support::click_id(cx, s.win, ids::graphics_switch("vsync"));
+    support::wait_real(cx, "vsync on again", |cx| {
+        saved(cx, &page, "vsync") == Some(value("on"))
     });
     idle(cx, &page);
+    reveal(cx, &s, ids::graphics_module_reset("vsync"));
     support::click_id(cx, s.win, ids::graphics_module_reset("vsync"));
     support::wait_real(cx, "the reset", |cx| saved(cx, &page, "vsync").is_none());
     idle(cx, &page);
@@ -152,4 +160,75 @@ fn a_segment_is_picked_with_the_keyboard(cx: &mut TestAppContext) {
     support::wait_real(cx, "the Space pick", |cx| {
         saved(cx, &page, "phong") == Some(value("off"))
     });
+}
+
+// Under `preset`, every row with nothing saved shows what mastercomfig's real preset data sets:
+// that segment or switch state, or that Select entry, and "Let TF2 decide" only when it sets nothing.
+fn every_row_shows_the_preset_s_value(cx: &mut TestAppContext, preset: Preset) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", preset.name());
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    let catalog = support::full_module_catalog();
+    for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+        let name = module.name();
+        let resolved = catalog.resolve(name, preset);
+        let expected = resolved.map_or(ModuleChoice::NotSet, value);
+        assert_eq!(row_value(cx, &page, name), Some(expected.clone()), "{name}");
+        match control_kind(module) {
+            ControlKind::Switch => assert_eq!(
+                support::checked_of(cx, s.win, ids::graphics_switch(name)),
+                Some(resolved == Some("on")),
+                "{name}"
+            ),
+            ControlKind::Segmented => {
+                for v in module.values() {
+                    assert_eq!(
+                        checked(cx, &s, name, v.value()),
+                        Some(resolved == Some(v.value())),
+                        "{name}={}",
+                        v.value()
+                    );
+                }
+            }
+            ControlKind::Select => {
+                assert_eq!(shown(cx, &page, name), Some(expected), "{name}")
+            }
+        }
+    }
+}
+
+#[test]
+fn the_full_catalogue_resolves_settings_outside_the_trimmed_seven() {
+    let catalog = support::full_module_catalog();
+    for module in ["shading", "anti_aliasing", "lighting"] {
+        assert!(catalog.resolve(module, Preset::High).is_some(), "{module}");
+    }
+}
+
+#[gpui_kit::test]
+fn every_row_shows_the_low_preset_s_value(cx: &mut TestAppContext) {
+    every_row_shows_the_preset_s_value(cx, Preset::Low);
+}
+
+#[gpui_kit::test]
+fn every_row_shows_the_medium_preset_s_value(cx: &mut TestAppContext) {
+    every_row_shows_the_preset_s_value(cx, Preset::Medium);
+}
+
+#[gpui_kit::test]
+fn every_row_shows_the_high_preset_s_value(cx: &mut TestAppContext) {
+    every_row_shows_the_preset_s_value(cx, Preset::High);
+}
+
+#[gpui_kit::test]
+fn every_row_shows_the_ultra_preset_s_value(cx: &mut TestAppContext) {
+    every_row_shows_the_preset_s_value(cx, Preset::Ultra);
+}
+
+#[gpui_kit::test]
+fn every_row_shows_the_custom_preset_s_value(cx: &mut TestAppContext) {
+    every_row_shows_the_preset_s_value(cx, Preset::Custom);
 }

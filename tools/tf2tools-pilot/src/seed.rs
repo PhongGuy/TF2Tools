@@ -182,13 +182,15 @@ fn fill(
     seed_store(dir, empty_store)
 }
 
-/// The mastercomfig release the Graphics seed installs; its full catalogue is a core fixture.
+/// The mastercomfig release the Graphics seed installs; its full catalogue and preset data
+/// are core fixtures.
 const MC_TAG: &str = "9.100.1";
 const MC_MODULES: &[u8] = include_bytes!(
     "../../../crates/tf2tools-core/tests/fixtures/mastercomfig/modules-9.100.1.json"
 );
-const MC_PRESETS: &[u8] =
-    include_bytes!("../../../crates/tf2tools-core/tests/fixtures/mastercomfig/preset_modules.json");
+const MC_PRESETS: &[u8] = include_bytes!(
+    "../../../crates/tf2tools-core/tests/fixtures/mastercomfig/preset_modules-9.100.1.json"
+);
 
 /// Adds mastercomfig 9.100.1 to a seeded library and its fake game, managed by TF2Tools on
 /// High: a base VPK naming its version, setup_hook.cfg, the full catalogue cached, and
