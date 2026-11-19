@@ -12,11 +12,11 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, Bounds, Context, CursorStyle, DispatchPhase, Hsla, InteractiveElement as _,
+    AnyElement, App, Bounds, Context, CursorStyle, DispatchPhase, Hsla, InteractiveElement as _,
     IntoElement, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent,
     ObjectFit, ParentElement as _, Pixels, Point, RenderImage, SharedString, Size,
-    StatefulInteractiveElement as _, Styled as _, StyledImage as _, TestSupportExt as _,
-    TextSystem, Window, canvas, div, font as font_named, img, point, px, rgb,
+    StatefulInteractiveElement as _, Styled, StyledImage as _, TestSupportExt as _, TextSystem,
+    Window, canvas, div, font as font_named, img, point, px, rgb,
 };
 use tf2tools_core::{
     ALIGNMENTS, AnimFrame, Animated, ChatSample, ColumnKind, FontVariant, GameSituation, GameText,
@@ -873,11 +873,12 @@ impl HudMakerPage {
                 ids::HUD_MAKER_COMPARE_LABEL_NOW,
                 tr!("hud_maker.canvas.now"),
             ));
-        // The chip stays at the shown screen's top right, clear of the panel on the left. It occludes, so a
-        // press on it never reaches the canvas.
-        let stop = div().occlude().child(
+        // The chip stays at the shown screen's top right, clear of the panel on the left. It wears
+        // the toolbar's opaque chrome, since an outline button's dark fill lets the HUD show
+        // through, and it occludes, so a press on it never reaches the canvas.
+        let stop = floating_chrome(div().occlude(), cx).child(
             Button::new(ids::HUD_MAKER_COMPARE_STOP)
-                .outline()
+                .ghost()
                 .small()
                 .label(tr!("hud_maker.history.stop_comparing"))
                 .on_click(cx.listener(|page, _, _, cx| page.stop_comparing(cx))),
@@ -942,21 +943,15 @@ impl HudMakerPage {
         };
         let at = self.toolbar_shown();
         let widest = (self.screen_area().size.width - super::TOOLBAR_GAP * 2.).max(px(0.));
-        let theme = cx.theme();
-        div()
+        let bar = div()
             .id(ids::HUD_MAKER_TOOLBAR)
             .test_support()
             .occlude()
             .absolute()
             .left(at.x)
             .top(at.y)
-            .max_w(widest)
-            .p_1()
-            .rounded_md()
-            .border_1()
-            .border_color(theme.border)
-            .bg(theme.background)
-            .shadow_md()
+            .max_w(widest);
+        floating_chrome(bar, cx)
             .child(watch)
             .child(content)
             .into_any_element()
@@ -3388,6 +3383,18 @@ fn crosshair(cx: Pixels, cy: Pixels) -> impl IntoElement {
         .size(arm)
         .child(bar(arm, px(2.)))
         .child(bar(px(2.), arm))
+}
+
+/// The chrome every control floating over the canvas wears: an opaque, bordered and shadowed
+/// card in the theme's background, so the HUD under it never shows through.
+fn floating_chrome<E: Styled>(base: E, cx: &App) -> E {
+    let theme = cx.theme();
+    base.p_1()
+        .rounded_md()
+        .border_1()
+        .border_color(theme.border)
+        .bg(theme.background)
+        .shadow_md()
 }
 
 #[cfg(test)]
