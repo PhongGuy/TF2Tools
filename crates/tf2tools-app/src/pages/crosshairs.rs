@@ -1450,7 +1450,7 @@ pub(crate) fn skipped_description(report: &ApplyReport) -> Option<String> {
         tr!(
             "crosshairs_page.skip.line",
             count = skipped.len(),
-            list = lines.join(", ")
+            list = crate::i18n::separated(&lines)
         )
         .to_string(),
     )

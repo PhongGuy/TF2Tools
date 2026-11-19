@@ -117,7 +117,7 @@ pub fn font_check_dialog(
                 .iter()
                 .map(|file| file.display().to_string())
                 .collect();
-            format!("{}: {}", font.name(), files.join(", ")).into()
+            format!("{}: {}", font.name(), crate::i18n::separated(&files)).into()
         })
         .chain(
             prompt

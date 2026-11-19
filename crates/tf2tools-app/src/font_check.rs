@@ -196,7 +196,7 @@ fn installed(
     let (n, k) = (report.installed().len(), report.skipped().len());
     let mut lines = Vec::new();
     if n > 0 {
-        let fonts = report.installed().join(", ");
+        let fonts = crate::i18n::separated(report.installed());
         lines.push(tr!("font_check.activity.installed_list", fonts = fonts).to_string());
     }
     if k > 0 {
@@ -205,7 +205,7 @@ fn installed(
             .iter()
             .map(|(path, reason)| format!("{path} ({})", skip_text(reason)))
             .collect();
-        let fonts = skipped.join(", ");
+        let fonts = crate::i18n::separated(&skipped);
         lines.push(tr!("font_check.activity.skipped_list", fonts = fonts).to_string());
     }
     let message = if n == 0 {

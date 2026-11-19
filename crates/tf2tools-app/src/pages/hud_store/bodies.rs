@@ -47,7 +47,9 @@ pub fn curated_body() -> DetailBody {
                 traits
                     .into_iter()
                     .filter(|(_, values)| !values.is_empty())
-                    .map(|(name, values)| text_row(cx, format!("{name}: {}", values.join(", ")))),
+                    .map(|(name, values)| {
+                        text_row(cx, format!("{name}: {}", crate::i18n::separated(values)))
+                    }),
             )
             .children(tag_row("tags", &hud.tags, true, cx))
             .children((!socials.is_empty()).then(|| link_row(socials)))

@@ -140,9 +140,9 @@ impl HudMakerPage {
             return None;
         }
         let names: Vec<String> = fired.iter().map(|f| event_name(f.event())).collect();
-        let names = SharedString::from(names.join(", "));
+        let names = SharedString::from(crate::i18n::separated(&names));
         let in_game = (editor.moment() > 0.)
-            .then(|| editor.frame().in_game_only().join(", "))
+            .then(|| crate::i18n::separated(editor.frame().in_game_only()))
             .filter(|fields| !fields.is_empty());
         // The events' real end, though the slider runs at least a second; a hundredth is plenty.
         let end = editor.end();

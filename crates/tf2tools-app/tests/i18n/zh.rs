@@ -312,3 +312,56 @@ fn the_crosshair_position_reads_in_each_languages_order() {
         );
     }
 }
+
+// Lists the app joins in code take the language's separator: the enumeration comma in Chinese.
+#[test]
+fn joined_lists_take_the_language_separator() {
+    use gpui_kit::SharedString;
+    use tf2tools_app::pages::addons::model::movement_on_text;
+    use tf2tools_app::pages::profiles::model::activated_description;
+    let installed: Vec<SharedString> = vec!["A".into(), "B".into()];
+    let keys = vec!["w".to_owned(), "s".to_owned()];
+    for (lang, sep) in [("en", ", "), ("zh-CN", "、")] {
+        let _guard = LocaleGuard::switch(lang);
+        assert_eq!(
+            i18n::separated(&["a", "b", "c"]),
+            format!("a{sep}b{sep}c"),
+            "{lang}"
+        );
+        assert_eq!(i18n::separated(&["a"]), "a", "{lang}");
+        let toast = activated_description(&installed, &[]);
+        assert!(toast.contains(&format!("A{sep}B")), "{lang}: {toast}");
+        let line = movement_on_text(&keys, &[], false);
+        assert!(line.contains(&format!("W{sep}S")), "{lang}: {line}");
+    }
+}
+
+// Code joins a player-facing list through `i18n::separated`, never a hard-coded comma; the
+// allowed files join text that is not translated.
+#[test]
+fn no_player_facing_list_is_joined_with_a_hard_coded_comma() {
+    const ALLOWED: [&str; 2] = ["assets.rs", "graphics/model.rs"];
+    fn scan(dir: &std::path::Path, hits: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                scan(&path, hits);
+            } else if path.extension().is_some_and(|e| e == "rs")
+                && !ALLOWED.iter().any(|a| path.ends_with(a))
+            {
+                let text = std::fs::read_to_string(&path).unwrap();
+                for (n, line) in text.lines().enumerate() {
+                    if line.contains(r#"join(", ")"#) {
+                        hits.push(format!("{}:{}", path.display(), n + 1));
+                    }
+                }
+            }
+        }
+    }
+    let mut hits = Vec::new();
+    scan(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src")),
+        &mut hits,
+    );
+    assert!(hits.is_empty(), "{hits:#?}");
+}

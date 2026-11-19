@@ -236,6 +236,13 @@ pub fn list(items: &[impl AsRef<str>]) -> SharedString {
     }
 }
 
+/// The items joined with the language's list separator and no closing "and": "a, b, c" in
+/// English, "a、b、c" in Chinese.
+pub fn separated(items: &[impl AsRef<str>]) -> String {
+    let items: Vec<&str> = items.iter().map(AsRef::as_ref).collect();
+    items.join(&*tr!("common.list.separator"))
+}
+
 /// Serialises tests that switch the process-wide locale; a panicked holder does not wedge it.
 #[doc(hidden)]
 pub fn test_lock() -> MutexGuard<'static, ()> {
