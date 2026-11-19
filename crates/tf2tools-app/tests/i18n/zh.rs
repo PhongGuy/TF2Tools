@@ -198,3 +198,88 @@ fn the_hud_maker_names_its_parts_in_chinese() {
     assert_ne!(text("kill_streak_icon"), "Killstreak icon");
     assert!(text("rune_haste").contains("急速"));
 }
+
+#[test]
+fn the_updater_says_a_damaged_download_as_the_stores_do() {
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("zh-CN", "updater.failure.damaged"),
+        tf2tools_app::_rust_i18n_try_translate("zh-CN", "messages.store.download.damaged")
+    );
+}
+
+fn han(c: char) -> bool {
+    matches!(c, '\u{3400}'..='\u{4dbf}' | '\u{4e00}'..='\u{9fff}')
+}
+
+// Each place a value puts ASCII , . : ; ! ? ( ) right after a Han character, or an ASCII space
+// between two Han characters; Chinese sentences take the full-width forms and no space.
+fn punctuation_slips(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut slips = Vec::new();
+    for (i, &c) in chars.iter().enumerate() {
+        let prev = i.checked_sub(1).map(|j| chars[j]);
+        let next = chars.get(i + 1).copied();
+        if prev.is_some_and(han) && matches!(c, ',' | '.' | ':' | ';' | '!' | '?' | '(' | ')') {
+            slips.push(format!("ASCII {c:?} after Han at {i}"));
+        }
+        if c == ' ' && prev.is_some_and(han) && next.is_some_and(han) {
+            slips.push(format!("space between Han at {i}"));
+        }
+    }
+    slips
+}
+
+#[test]
+fn the_punctuation_scan_flags_only_half_width_slips() {
+    for ok in [
+        "设置",
+        "安装 HUD",
+        "%{name} 已安装。",
+        "1.3万",
+        "保存：%{name}",
+        "flawhud（副本 3）",
+        "快捷键 (?)",
+        "Bonk! 原子能饮料",
+        "下载中… %{done} / %{total}",
+        "“预设”",
+        "https://logs.tf",
+        "%{name}",
+        "%{logs}约 %{full}",
+    ] {
+        assert!(
+            punctuation_slips(ok).is_empty(),
+            "{ok:?}: {:?}",
+            punctuation_slips(ok)
+        );
+    }
+    for bad in [
+        "设置:",
+        "完成.",
+        "安装,下载",
+        "是吗?",
+        "什么!",
+        "下载中...",
+        "flawhud (副本)",
+        "副本(3)",
+        "安装 设置",
+        "下载;",
+    ] {
+        assert!(!punctuation_slips(bad).is_empty(), "{bad:?}");
+    }
+}
+
+#[test]
+fn chinese_takes_full_width_punctuation() {
+    let messages = tf2tools_app::_rust_i18n_backend()
+        .messages_for_locale("zh-CN")
+        .unwrap_or_default();
+    assert!(!messages.is_empty(), "zh-CN.yml is missing or empty");
+    let slips: Vec<String> = messages
+        .iter()
+        .filter_map(|(key, text)| {
+            let found = punctuation_slips(text);
+            (!found.is_empty()).then(|| format!("{key}: {found:?}"))
+        })
+        .collect();
+    assert!(slips.is_empty(), "zh-CN punctuation: {slips:#?}");
+}

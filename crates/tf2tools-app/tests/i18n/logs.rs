@@ -162,6 +162,11 @@ fn the_logs_page_fits_in_french(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn the_logs_page_fits_in_chinese(cx: &mut TestAppContext) {
+    logs_page_reads_and_fits(cx, "zh-CN");
+}
+
+#[gpui_kit::test]
 fn a_russian_log_row_names_its_category_action_and_level(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
@@ -248,11 +253,16 @@ fn the_apply_action_reads_in_every_language() {
         let _guard = LocaleGuard::switch("fr");
         action_label("apply").to_string()
     };
+    let zh = {
+        let _guard = LocaleGuard::switch("zh-CN");
+        action_label("apply").to_string()
+    };
     assert_eq!(ru, "Применение");
     assert_eq!(pt, "Aplicar");
     assert_eq!(es, "Aplicar");
     assert_eq!(de, "Anwenden");
     assert_eq!(fr, "Appliquer");
+    assert_eq!(zh, "应用");
 }
 
 fn info(cat: &str, action: &str, msg: &str) -> NewLogEntry {
@@ -609,6 +619,11 @@ fn an_open_german_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn an_open_french_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     open_log_keeps_its_ids_and_fits(cx, "fr");
+}
+
+#[gpui_kit::test]
+fn an_open_chinese_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
+    open_log_keeps_its_ids_and_fits(cx, "zh-CN");
 }
 
 fn type_into_add(

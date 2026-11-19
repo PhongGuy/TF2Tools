@@ -1066,6 +1066,50 @@ mod tests {
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }
 
+    // Values Chinese legitimately writes as English does: names, key caps and bare formats.
+    const ZH_SAME_AS_ENGLISH: &[&str] = &[
+        "activity_log.category.hud",
+        "common.date.date_time",
+        "common.date.numeric",
+        "common.number.decimal",
+        "common.number.group",
+        "common.number.percent",
+        "common.size.b",
+        "common.size.gb",
+        "common.size.kb",
+        "common.size.mb",
+        "common.size.tb",
+        "hud_maker.board_mode.mvm",
+        "hud_maker.borrow.origin.curated",
+        "hud_maker.label.hud",
+        "hud_maker.label.valve",
+        "hud_maker.part_name.k_d",
+        "hud_maker.part_name.vs",
+        "hud_maker.scene.hud",
+        "hud_maker.shortcuts.keys.escape",
+        "nav.crosshair_maker",
+        "nav.hud_maker",
+        "nav.logs_tf",
+        "settings.logs_tf.title",
+    ];
+
+    #[test]
+    fn chinese_leaves_nothing_in_english() {
+        let (en, zh) = (messages("en"), messages("zh-CN"));
+        let left: Vec<&str> = zh
+            .iter()
+            .filter(|(k, v)| en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !ZH_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(left.is_empty(), "zh-CN values still in English: {left:?}");
+        let stale: Vec<&&str> = ZH_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != zh.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
     #[test]
     fn translations_keep_the_english_variables() {
         let en = messages("en");
