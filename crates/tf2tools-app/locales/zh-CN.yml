@@ -2983,3 +2983,104 @@ graphics:
     loading: "正在加载设置列表…"
     offline: "首次加载设置列表需要联网。请连接网络后重新打开此页面。"
     unsupported: "尚不支持此 mastercomfig 版本。上方的预设仍可使用。"
+  not_set: "由 TF2 决定"
+  module:
+    lod:
+      label: "模型质量"
+      description: "玩家、武器和道具近看时的精细程度。"
+    lighting:
+      label: "光照"
+      description: "灯光及其投下阴影的精细程度。"
+    shading:
+      label: "着色"
+      description: "表面的额外着色。更改后游戏会重新加载材质。"
+    phong:
+      label: "表面光泽"
+      description: "玩家和武器上的光泽高光，游戏中称为 phong。"
+    shadows:
+      label: "阴影"
+      description: "玩家和道具投下的阴影。"
+    flashlight:
+      label: "手电筒"
+      description: "只有部分社区服务器模式会用到。除非服务器需要，否则保持关闭。"
+    effects:
+      label: "粒子效果"
+      description: "爆炸、火焰、烟雾和稀有特效。"
+    tracers:
+      label: "弹道轨迹"
+      description: "即中武器的子弹轨迹。"
+    water:
+      label: "水面"
+      description: "水的外观以及它反射的内容。"
+    post_processing:
+      label: "后期处理"
+      description: "整个画面的泛光和调色。"
+    color_filter:
+      label: "色彩滤镜"
+      description: "覆盖整个画面的色调。"
+    pyrovision:
+      label: "火焰兵视觉"
+      description: "透过火焰兵的护目镜看到的 Pyroland 的精细程度。"
+    romevision:
+      label: "罗马视觉"
+      description: "曼恩 vs. 机器模式中机器人身上的罗马盔甲。"
+    motion_blur:
+      label: "动态模糊"
+      description: "快速转身时模糊画面。"
+    anti_aliasing:
+      label: "抗锯齿"
+      description: "平滑锯齿边缘。在较弱的显卡上会降低帧数。"
+    characters:
+      label: "角色"
+      description: "玩家模型的精细程度。"
+    decals:
+      label: "贴花"
+      description: "墙上的弹孔、焦痕和血迹。"
+    decals_models:
+      label: "模型贴花"
+      description: "玩家和道具身上的血迹和痕迹。"
+    decals_art:
+      label: "地图美术"
+      description: "地图作者放置的标牌和图案。"
+    sprays:
+      label: "喷漆"
+      description: "玩家喷在墙上的图案。"
+    gibs:
+      label: "碎尸"
+      description: "爆炸炸出的肢体碎块。"
+    sillygibs:
+      label: "搞笑碎块"
+      description: "把血液和肢体换成无害的玩具碎块。"
+    props:
+      label: "道具"
+      description: "小型道具的精细程度和显示数量。"
+    ragdolls:
+      label: "布娃娃效果"
+      description: "身体会瘫软倒下，而不是播放死亡动画。"
+    "3dsky":
+      label: "3D 天空"
+      description: "地图边界外的景物。关闭可在开阔地图上提高帧数。"
+    jigglebones:
+      label: "晃动骨骼"
+      description: "饰品上随移动摆动的松散部件。"
+    sheens_speed:
+      label: "光泽速度"
+      description: "连杀光泽在武器上流动的速度。"
+    sheens_tint:
+      label: "光泽强度"
+      description: "连杀光泽颜色的浓烈程度。"
+    texture_quality:
+      label: "纹理质量"
+      description: "表面看起来的清晰程度。越高占用的显存越多。"
+    texture_filter:
+      label: "纹理过滤"
+      description: "斜看时保持地面和墙壁清晰。"
+    ropes:
+      label: "绳索"
+      description: "地图上悬挂的电缆和绳索。"
+    fpscap:
+      label: "帧率上限"
+      description: "游戏每秒最多绘制的帧数。"
+    vsync:
+      label: "垂直同步"
+      description: "让画面与显示器同步以防止撕裂。会增加输入延迟。"

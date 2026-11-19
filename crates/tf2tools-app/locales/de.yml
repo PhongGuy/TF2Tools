@@ -2984,3 +2984,104 @@ graphics:
     loading: "Die Einstellungsliste wird geladen..."
     offline: "Die Einstellungsliste braucht beim ersten Mal eine Internetverbindung. Stell eine Verbindung her und öffne diese Seite dann erneut."
     unsupported: "Diese mastercomfig-Version wird noch nicht unterstützt. Die Voreinstellungen oben funktionieren trotzdem."
+  not_set: "TF2 entscheiden lassen"
+  module:
+    lod:
+      label: "Modellqualität"
+      description: "Wie detailliert Spieler, Waffen und Requisiten aus der Nähe sind."
+    lighting:
+      label: "Beleuchtung"
+      description: "Wie detailliert Lichter und die Schattierung sind, die sie werfen."
+    shading:
+      label: "Schattierung"
+      description: "Zusätzliche Schattierung auf Oberflächen. Eine Änderung lädt die Materialien des Spiels neu."
+    phong:
+      label: "Glänzende Oberflächen"
+      description: "Glanzlichter auf Spielern und Waffen, im Spiel Phong genannt."
+    shadows:
+      label: "Schatten"
+      description: "Schatten, die Spieler und Requisiten werfen."
+    flashlight:
+      label: "Taschenlampe"
+      description: "Nur einige Community-Server-Modi nutzen sie. Lass sie aus, außer ein Server braucht sie."
+    effects:
+      label: "Partikel"
+      description: "Explosionen, Feuer, Rauch und Unusual-Effekte."
+    tracers:
+      label: "Leuchtspuren"
+      description: "Kugelspuren von Hitscan-Waffen."
+    water:
+      label: "Wasser"
+      description: "Wie Wasser aussieht und was es spiegelt."
+    post_processing:
+      label: "Nachbearbeitung"
+      description: "Bloom und die Farbkorrektur über dem ganzen Bild."
+    color_filter:
+      label: "Farbfilter"
+      description: "Ein Farbton über dem ganzen Bild."
+    pyrovision:
+      label: "Pyrovision"
+      description: "Wie detailliert Pyroland durch die Brille des Pyro aussieht."
+    romevision:
+      label: "Romevision"
+      description: "Römische Rüstung für Roboter in Mann vs. Machine."
+    motion_blur:
+      label: "Bewegungsunschärfe"
+      description: "Verwischt das Bild, während du dich schnell drehst."
+    anti_aliasing:
+      label: "Kantenglättung"
+      description: "Glättet gezackte Kanten. Kostet auf schwächeren Grafikkarten FPS."
+    characters:
+      label: "Charaktere"
+      description: "Wie detailliert Spielermodelle aussehen."
+    decals:
+      label: "Decals"
+      description: "Einschusslöcher, Brandspuren und Blut an Wänden."
+    decals_models:
+      label: "Decals auf Modellen"
+      description: "Blut und Spuren auf Spielern und Requisiten."
+    decals_art:
+      label: "Map-Kunst"
+      description: "Bemalte Schilder und Kunst, die der Mapper platziert hat."
+    sprays:
+      label: "Sprays"
+      description: "Bilder, die Spieler an Wände sprühen."
+    gibs:
+      label: "Gibs"
+      description: "Körperteile von Explosionen."
+    sillygibs:
+      label: "Alberne Gibs"
+      description: "Ersetzt Blut und Körperteile durch harmlose Spielzeugteile."
+    props:
+      label: "Requisiten"
+      description: "Wie detailliert kleine Requisiten sind und wie viele erscheinen."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Körper fallen schlaff um, statt eine Todesanimation abzuspielen."
+    "3dsky":
+      label: "3D-Himmel"
+      description: "Landschaft hinter dem Rand der Map. Aus bringt FPS auf offenen Maps."
+    jigglebones:
+      label: "Wackelteile"
+      description: "Lose Teile von Cosmetics, die bei Bewegung schwingen."
+    sheens_speed:
+      label: "Glanz-Tempo"
+      description: "Wie schnell der Killstreak-Glanz über Waffen läuft."
+    sheens_tint:
+      label: "Glanz-Stärke"
+      description: "Wie kräftig die Farbe des Killstreak-Glanzes ist."
+    texture_quality:
+      label: "Texturqualität"
+      description: "Wie scharf Oberflächen aussehen. Höher braucht mehr Grafikspeicher."
+    texture_filter:
+      label: "Texturfilterung"
+      description: "Hält Böden und Wände scharf, wenn du sie schräg siehst."
+    ropes:
+      label: "Seile"
+      description: "Kabel und Seile, die über Maps hängen."
+    fpscap:
+      label: "FPS-Limit"
+      description: "Wie viele Bilder pro Sekunde das Spiel höchstens zeichnet."
+    vsync:
+      label: "VSync"
+      description: "Passt die Bilder an deinen Bildschirm an, damit nichts zerreißt. Erhöht die Eingabeverzögerung."

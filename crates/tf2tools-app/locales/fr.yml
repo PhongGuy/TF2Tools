@@ -2986,3 +2986,104 @@ graphics:
     loading: "Chargement de la liste des paramètres..."
     offline: "La liste des paramètres nécessite une connexion Internet la première fois. Connectez-vous, puis rouvrez cette page."
     unsupported: "Cette version de mastercomfig n'est pas encore prise en charge. Les préréglages ci-dessus fonctionnent toujours."
+  not_set: "Laisser TF2 décider"
+  module:
+    lod:
+      label: "Qualité des modèles"
+      description: "Le niveau de détail des joueurs, des armes et des objets vus de près."
+    lighting:
+      label: "Éclairage"
+      description: "Le niveau de détail des lumières et des ombrages qu'elles projettent."
+    shading:
+      label: "Ombrage"
+      description: "Un ombrage supplémentaire sur les surfaces. Le modifier recharge les matériaux du jeu."
+    phong:
+      label: "Surfaces brillantes"
+      description: "Des reflets brillants sur les joueurs et les armes, appelés phong dans le jeu."
+    shadows:
+      label: "Ombres"
+      description: "Les ombres des joueurs et des objets."
+    flashlight:
+      label: "Lampe torche"
+      description: "Seuls certains modes de serveurs communautaires l'utilisent. Laissez-la désactivée sauf si un serveur en a besoin."
+    effects:
+      label: "Particules"
+      description: "Explosions, feu, fumée et effets inhabituels."
+    tracers:
+      label: "Traceurs"
+      description: "Les traînées des balles des armes hitscan."
+    water:
+      label: "Eau"
+      description: "L'apparence de l'eau et ce qu'elle reflète."
+    post_processing:
+      label: "Post-traitement"
+      description: "Le bloom et l'étalonnage des couleurs sur toute l'image."
+    color_filter:
+      label: "Filtre de couleur"
+      description: "Une teinte de couleur sur toute l'image."
+    pyrovision:
+      label: "Pyrovision"
+      description: "Le niveau de détail de Pyroland à travers les lunettes du Pyro."
+    romevision:
+      label: "Romevision"
+      description: "Une armure romaine sur les robots en Mann vs. Machine."
+    motion_blur:
+      label: "Flou de mouvement"
+      description: "Floute l'écran quand vous tournez vite."
+    anti_aliasing:
+      label: "Anticrénelage"
+      description: "Lisse les bords crénelés. Coûte des FPS sur les cartes graphiques modestes."
+    characters:
+      label: "Personnages"
+      description: "Le niveau de détail des modèles des joueurs."
+    decals:
+      label: "Décalques"
+      description: "Impacts de balles, traces de brûlure et sang sur les murs."
+    decals_models:
+      label: "Décalques sur les modèles"
+      description: "Le sang et les traces sur les joueurs et les objets."
+    decals_art:
+      label: "Art de la carte"
+      description: "Les panneaux peints et les œuvres placés par le créateur de la carte."
+    sprays:
+      label: "Graffitis"
+      description: "Les images que les joueurs taguent sur les murs."
+    gibs:
+      label: "Gibs"
+      description: "Les morceaux de corps projetés par les explosions."
+    sillygibs:
+      label: "Gibs rigolos"
+      description: "Remplace le sang et les morceaux de corps par des pièces inoffensives façon jouet."
+    props:
+      label: "Objets"
+      description: "Le niveau de détail des petits objets et leur nombre."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Les corps s'effondrent mollement au lieu de jouer une animation de mort."
+    "3dsky":
+      label: "Ciel 3D"
+      description: "Le décor au-delà des bords de la carte. Le désactiver fait gagner des FPS sur les cartes ouvertes."
+    jigglebones:
+      label: "Os mobiles"
+      description: "Les parties libres des cosmétiques qui bougent quand vous vous déplacez."
+    sheens_speed:
+      label: "Vitesse de l'éclat"
+      description: "La vitesse de l'éclat de série d'éliminations sur les armes."
+    sheens_tint:
+      label: "Intensité de l'éclat"
+      description: "L'intensité de la couleur de l'éclat de série d'éliminations."
+    texture_quality:
+      label: "Qualité des textures"
+      description: "La netteté des surfaces. Plus haut utilise plus de mémoire vidéo."
+    texture_filter:
+      label: "Filtrage des textures"
+      description: "Garde les sols et les murs nets quand on les voit en biais."
+    ropes:
+      label: "Cordes"
+      description: "Les câbles et cordes suspendus dans les cartes."
+    fpscap:
+      label: "Limite de FPS"
+      description: "Le nombre maximal d'images par seconde que le jeu affiche."
+    vsync:
+      label: "VSync"
+      description: "Cale les images sur votre écran pour éviter le déchirement. Ajoute de la latence."

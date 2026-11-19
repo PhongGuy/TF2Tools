@@ -101,7 +101,7 @@ fn slug(text: &str) -> Option<String> {
 }
 
 // The message at `key` in `locale`, or `fallback` when there is no key or no message.
-fn lookup(locale: &str, key: Option<String>, fallback: &str) -> SharedString {
+pub(super) fn lookup(locale: &str, key: Option<String>, fallback: &str) -> SharedString {
     match key.and_then(|key| crate::_rust_i18n_try_translate(locale, &key)) {
         Some(text) => text.into_owned().into(),
         None => fallback.to_owned().into(),

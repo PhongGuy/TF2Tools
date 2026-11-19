@@ -2984,3 +2984,104 @@ graphics:
     loading: "Cargando la lista de ajustes..."
     offline: "La lista de ajustes necesita conexión a internet la primera vez. Conéctate y vuelve a abrir esta página."
     unsupported: "Esta versión de mastercomfig aún no es compatible. Los preajustes de arriba siguen funcionando."
+  not_set: "Que TF2 decida"
+  module:
+    lod:
+      label: "Calidad de modelos"
+      description: "Lo detallados que se ven de cerca los jugadores, las armas y los objetos."
+    lighting:
+      label: "Iluminación"
+      description: "Lo detalladas que son las luces y el sombreado que proyectan."
+    shading:
+      label: "Sombreado"
+      description: "Sombreado extra en las superficies. Cambiarlo recarga los materiales del juego."
+    phong:
+      label: "Superficies brillantes"
+      description: "Reflejos brillantes en jugadores y armas; en el juego se llama phong."
+    shadows:
+      label: "Sombras"
+      description: "Sombras que proyectan los jugadores y los objetos."
+    flashlight:
+      label: "Linterna"
+      description: "Solo la usan algunos modos de servidores de la comunidad. Déjala apagada salvo que un servidor la necesite."
+    effects:
+      label: "Partículas"
+      description: "Explosiones, fuego, humo y efectos inusuales."
+    tracers:
+      label: "Trazadoras"
+      description: "Estelas de bala de las armas hitscan."
+    water:
+      label: "Agua"
+      description: "Cómo se ve el agua y lo que refleja."
+    post_processing:
+      label: "Posprocesado"
+      description: "Bloom y la corrección de color de toda la imagen."
+    color_filter:
+      label: "Filtro de color"
+      description: "Un tinte de color sobre toda la imagen."
+    pyrovision:
+      label: "Pyrovisión"
+      description: "Lo detallado que se ve Pyrolandia a través de las gafas del Pyro."
+    romevision:
+      label: "Romavisión"
+      description: "Armadura romana en los robots de Mann vs. Machine."
+    motion_blur:
+      label: "Desenfoque de movimiento"
+      description: "Desenfoca la pantalla cuando giras rápido."
+    anti_aliasing:
+      label: "Antialiasing"
+      description: "Suaviza los bordes dentados. Cuesta FPS en tarjetas gráficas más débiles."
+    characters:
+      label: "Personajes"
+      description: "Lo detallados que se ven los modelos de los jugadores."
+    decals:
+      label: "Calcomanías"
+      description: "Agujeros de bala, marcas de quemaduras y sangre en las paredes."
+    decals_models:
+      label: "Calcomanías en modelos"
+      description: "Sangre y marcas en jugadores y objetos."
+    decals_art:
+      label: "Arte del mapa"
+      description: "Carteles pintados y arte que colocó el autor del mapa."
+    sprays:
+      label: "Sprays"
+      description: "Imágenes que los jugadores pintan en las paredes."
+    gibs:
+      label: "Gibs"
+      description: "Trozos de cuerpos que salen de las explosiones."
+    sillygibs:
+      label: "Gibs de broma"
+      description: "Cambia la sangre y los trozos de cuerpos por piezas de juguete inofensivas."
+    props:
+      label: "Objetos"
+      description: "Lo detallados que son los objetos pequeños y cuántos aparecen."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Los cuerpos caen sin fuerza en vez de reproducir una animación de muerte."
+    "3dsky":
+      label: "Cielo 3D"
+      description: "El paisaje más allá del borde del mapa. Desactivarlo da FPS en mapas abiertos."
+    jigglebones:
+      label: "Huesos con física"
+      description: "Partes sueltas de los cosméticos que se balancean al moverte."
+    sheens_speed:
+      label: "Velocidad del brillo"
+      description: "Lo rápido que se mueve el brillo de racha por las armas."
+    sheens_tint:
+      label: "Intensidad del brillo"
+      description: "Lo intenso que es el color del brillo de racha."
+    texture_quality:
+      label: "Calidad de texturas"
+      description: "Lo nítidas que se ven las superficies. Más alta usa más memoria de vídeo."
+    texture_filter:
+      label: "Filtrado de texturas"
+      description: "Mantiene nítidos el suelo y las paredes vistos en ángulo."
+    ropes:
+      label: "Cuerdas"
+      description: "Cables y cuerdas que cuelgan en los mapas."
+    fpscap:
+      label: "Límite de FPS"
+      description: "El máximo de fotogramas por segundo que dibuja el juego."
+    vsync:
+      label: "VSync"
+      description: "Ajusta los fotogramas a tu pantalla para evitar el tearing. Añade retraso de entrada."

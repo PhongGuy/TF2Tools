@@ -2961,3 +2961,104 @@ graphics:
     loading: "Loading the settings list..."
     offline: "The settings list needs an internet connection the first time. Connect, then open this page again."
     unsupported: "This mastercomfig version isn't supported yet. The presets above still work."
+  not_set: "Let TF2 decide"
+  module:
+    lod:
+      label: "Model quality"
+      description: "How detailed players, weapons and props are up close."
+    lighting:
+      label: "Lighting"
+      description: "How detailed lights and the shading they cast are."
+    shading:
+      label: "Shading"
+      description: "Extra shading on surfaces. Changing it reloads the game's materials."
+    phong:
+      label: "Shiny surfaces"
+      description: "Glossy highlights on players and weapons, called phong in the game."
+    shadows:
+      label: "Shadows"
+      description: "Shadows cast by players and props."
+    flashlight:
+      label: "Flashlight"
+      description: "Only some community server modes use it. Leave it off unless a server needs it."
+    effects:
+      label: "Particles"
+      description: "Explosions, fire, smoke and unusual effects."
+    tracers:
+      label: "Tracers"
+      description: "Bullet trails from hitscan weapons."
+    water:
+      label: "Water"
+      description: "How water looks and what it reflects."
+    post_processing:
+      label: "Post-processing"
+      description: "Bloom and the color grading over the whole picture."
+    color_filter:
+      label: "Color filter"
+      description: "A color tint over the whole picture."
+    pyrovision:
+      label: "Pyrovision"
+      description: "How detailed Pyroland looks through Pyro's goggles."
+    romevision:
+      label: "Romevision"
+      description: "Roman armor on robots in Mann vs. Machine."
+    motion_blur:
+      label: "Motion blur"
+      description: "Blurs the screen while you turn fast."
+    anti_aliasing:
+      label: "Anti-aliasing"
+      description: "Smooths jagged edges. Costs frames on weaker graphics cards."
+    characters:
+      label: "Characters"
+      description: "How detailed player models look."
+    decals:
+      label: "Decals"
+      description: "Bullet holes, scorch marks and blood on walls."
+    decals_models:
+      label: "Decals on models"
+      description: "Blood and marks on players and props."
+    decals_art:
+      label: "Map art"
+      description: "Painted signs and art the mapper placed."
+    sprays:
+      label: "Sprays"
+      description: "Images players spray on walls."
+    gibs:
+      label: "Gibs"
+      description: "Body parts from explosions."
+    sillygibs:
+      label: "Silly gibs"
+      description: "Swaps blood and body parts for harmless toy-like pieces."
+    props:
+      label: "Props"
+      description: "How detailed small props are and how many show."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Bodies fall limp instead of playing a death animation."
+    "3dsky":
+      label: "3D sky"
+      description: "Scenery past the edge of the map. Off gains frames on open maps."
+    jigglebones:
+      label: "Jiggle bones"
+      description: "Loose parts of cosmetics that sway as you move."
+    sheens_speed:
+      label: "Sheen speed"
+      description: "How fast the killstreak sheen moves over weapons."
+    sheens_tint:
+      label: "Sheen strength"
+      description: "How strong the killstreak sheen's color is."
+    texture_quality:
+      label: "Texture quality"
+      description: "How sharp surfaces look. Higher uses more video memory."
+    texture_filter:
+      label: "Texture filtering"
+      description: "Keeps floors and walls sharp when seen at an angle."
+    ropes:
+      label: "Ropes"
+      description: "Cables and ropes hanging across maps."
+    fpscap:
+      label: "Frame rate cap"
+      description: "The most frames per second the game draws."
+    vsync:
+      label: "VSync"
+      description: "Matches frames to your screen to stop tearing. Adds input delay."

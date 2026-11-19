@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use gpui_kit::SharedString;
 
 pub mod format;
+pub mod mastercomfig;
 pub mod names;
 
 /// A language the app offers, by its catalogue code and its name in that language.
@@ -671,6 +672,10 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.module.gibs.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -778,6 +783,10 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.module.gibs.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -883,6 +892,13 @@ mod tests {
         "crosshair_maker.starter.value",
         "crosshairs_page.sync.in_game",
         "crosshairs_page.sync.skipped",
+        "graphics.module.decals.label",
+        "graphics.module.gibs.label",
+        "graphics.module.pyrovision.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.romevision.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
         "hud_maker.borrow.origin.curated",
@@ -1011,6 +1027,11 @@ mod tests {
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
         "crosshair_maker.tool.rectangle",
+        "graphics.module.gibs.label",
+        "graphics.module.pyrovision.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.romevision.label",
+        "graphics.module.vsync.label",
         "hud_maker.animations.title",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
@@ -1131,6 +1152,30 @@ mod tests {
         let stale: Vec<&&str> = ZH_SAME_AS_ENGLISH
             .iter()
             .filter(|k| en.get(**k) != zh.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
+    // Graphics values Russian legitimately writes as English does: names and bare formats.
+    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &[];
+
+    #[test]
+    fn russian_leaves_no_graphics_word_in_english() {
+        let (en, ru) = (messages("en"), messages("ru"));
+        let left: Vec<&str> = ru
+            .iter()
+            // The section is compared by its first segment, so the key scans read no literal key.
+            .filter(|(k, v)| k.split('.').next() == Some("graphics") && en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !RU_GRAPHICS_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(
+            left.is_empty(),
+            "ru graphics values still in English: {left:?}"
+        );
+        let stale: Vec<&&str> = RU_GRAPHICS_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != ru.get(**k))
             .collect();
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }
@@ -1265,7 +1310,10 @@ mod tests {
             .filter(|k| k.split('.').next().is_some_and(|s| surfaces.contains(s)))
             .filter(|k| {
                 let prefix: Vec<&str> = k.split('.').take(2).collect();
-                prefix != ["hud_maker", "label"] && prefix != ["hud_maker", "part_name"]
+                // Built at runtime from mastercomfig's module names, so no literal names them.
+                prefix != ["hud_maker", "label"]
+                    && prefix != ["hud_maker", "part_name"]
+                    && prefix != ["graphics", "module"]
             })
             .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
             .filter(|k| !named.contains(*k))
