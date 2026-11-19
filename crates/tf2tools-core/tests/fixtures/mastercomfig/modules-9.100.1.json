@@ -1,0 +1,1014 @@
+{
+  "graphics": {
+    "modules": [
+      {
+        "name": "lod",
+        "display": "Model Quality",
+        "description": "Controls how detailed models are.",
+        "cpu": 1,
+        "gpu": 2,
+        "values": [
+          {
+            "value": "low",
+            "description": "Low model detail"
+          },
+          {
+            "value": "medium",
+            "description": "Medium model detail"
+          },
+          {
+            "value": "high",
+            "description": "High model detail"
+          },
+          {
+            "value": "ultra",
+            "description": "Forces high model detail regardless of distance"
+          }
+        ]
+      },
+      {
+        "name": "lighting",
+        "description": "Controls lighting fidelity",
+        "cpu": 2,
+        "gpu": 3,
+        "values": [
+          {
+            "value": "very_low",
+            "description": "No dynamic lightmaps and skips all movable lighting. No lightwarps or rimlights."
+          },
+          {
+            "value": "low",
+            "description": "No dynamic lightmaps and only applies ambient movable lighting. No lightwarps or rimlights."
+          },
+          {
+            "value": "medium",
+            "description": "No dynamic lightmaps and applies detailed movable lighting"
+          },
+          {
+            "value": "high",
+            "description": "1 dynamic lightmap and applies detailed movable lighting."
+          },
+          {
+            "value": "ultra",
+            "description": "Maximum dynamic lightmaps and applies extremely detailed movable lighting."
+          }
+        ]
+      },
+      {
+        "name": "shading",
+        "display": "Shading",
+        "description": "Controls advanced shading commands which cause a material system reload.",
+        "cpu": 1,
+        "gpu": 3,
+        "values": [
+          {
+            "value": "low",
+            "description": "Disables bumpmaps and specular, and uses low quality shader fallbacks in some cases."
+          },
+          {
+            "value": "medium",
+            "description": "Disables bumpmaps and specular, and uses low quality shader fallbacks in some cases."
+          },
+          {
+            "value": "high",
+            "description": "Enables bumpmaps and specular."
+          }
+        ]
+      },
+      {
+        "name": "phong",
+        "display": "Phong Shading",
+        "description": "Controls phong highlights for shading.",
+        "cpu": 1,
+        "gpu": 3,
+        "values": [
+          {
+            "value": "off",
+            "description": "Uses diffuse shading."
+          },
+          {
+            "value": "on",
+            "description": "Uses phong shading."
+          },
+          {
+            "value": "rim",
+            "display": "On + Rimlighting",
+            "description": "Uses phong shading, with rimlighting."
+          }
+        ]
+      },
+      {
+        "name": "shadows",
+        "description": "Controls shadow quality. Shadow limits affect rendered shadows. Shadows above the limit will be blobby.",
+        "cpu": 3,
+        "gpu": 2,
+        "values": [
+          {
+            "value": "off",
+            "description": "No dynamic shadows"
+          },
+          {
+            "value": "low",
+            "description": "Blobby shadows"
+          },
+          {
+            "value": "medium",
+            "description": "Up to 3 low quality shadows"
+          },
+          {
+            "value": "high",
+            "description": "Up to 23 high quality shadows and limited NPC shadow distance"
+          },
+          {
+            "value": "ultra",
+            "description": "Up to 160 ultra quality movable shadows and unlimited NPC shadow distance"
+          }
+        ]
+      },
+      {
+        "name": "flashlight",
+        "type": "switch",
+        "description": "Controls flashlight support. Flashlights are not used in TF2, so you should keep it disabled unless you need it for a certain community server mod, like Slender, or some Deathrun servers.",
+        "notes": [
+          {
+            "level": "warning",
+            "content": "Turning on flashlight support will cause rendering artifacts on some maps, especially when Pyroland is enabled"
+          }
+        ],
+        "cpu": 1,
+        "gpu": 2,
+        "values": [
+          {
+            "value": "off",
+            "description": "Disables flashlight support."
+          },
+          {
+            "value": "on",
+            "description": "Enables flashlight support. If the `shadows` module is `off`, this will set it to the `low` level."
+          }
+        ]
+      },
+      {
+        "name": "effects",
+        "values": [
+          {
+            "value": "very_low"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "tracers",
+        "display": "Tracer Effects",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "water",
+        "values": [
+          {
+            "value": "very_low"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "post_processing",
+        "display": "General Post-Processing",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low",
+            "display": "Bloom only"
+          },
+          {
+            "value": "default"
+          },
+          {
+            "value": "calm",
+            "display": "Calm (recommended)"
+          },
+          {
+            "value": "vivid"
+          },
+          {
+            "value": "washed"
+          },
+          {
+            "value": "dreamy"
+          }
+        ]
+      },
+      {
+        "name": "color_filter",
+        "display": "Color Filter",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "grayscale"
+          },
+          {
+            "value": "desaturated"
+          },
+          {
+            "value": "warm"
+          },
+          {
+            "value": "cool"
+          }
+        ]
+      },
+      {
+        "name": "pyrovision",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "romevision",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "motion_blur",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "anti_aliasing",
+        "display": "Anti-Aliasing",
+        "type": "slider",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "msaa_2x",
+            "display": "MSAA 2x"
+          },
+          {
+            "value": "msaa_4x",
+            "display": "MSAA 4x"
+          },
+          {
+            "value": "msaa_8x",
+            "display": "MSAA 8x"
+          }
+        ]
+      },
+      {
+        "name": "characters",
+        "values": [
+          {
+            "value": "very_low"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "decals",
+        "display": "General Decals",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "decals_models",
+        "display": "Model Decals",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "decals_art",
+        "display": "Map Decals",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "sprays",
+        "display": "Spray Decals",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          },
+          {
+            "value": "keep"
+          }
+        ]
+      },
+      {
+        "name": "gibs",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "sillygibs",
+        "display": "Silly Gibs",
+        "values": [
+          {
+            "value": "auto",
+            "display": "Automatic (recommended)"
+          },
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "props",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "ragdolls",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "3dsky",
+        "display": "3D Sky",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "jigglebones",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          },
+          {
+            "value": "force_on"
+          }
+        ]
+      },
+      {
+        "name": "sheens_speed",
+        "display": "Killstreak Sheens Speed",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "slow"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "fast"
+          }
+        ]
+      },
+      {
+        "name": "sheens_tint",
+        "display": "Killstreak Sheens Tint Intensity",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "full"
+          }
+        ]
+      },
+      {
+        "name": "texture_quality",
+        "display": "Texture Quality",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "very_high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "texture_filter",
+        "display": "Texture Filtering",
+        "type": "slider",
+        "values": [
+          {
+            "value": "blocky",
+            "display": "Blocky textures and world lighting"
+          },
+          {
+            "value": "trilinear",
+            "display": "Trilinear filtering"
+          },
+          {
+            "value": "aniso2x",
+            "display": "Anisotropic filtering 2x"
+          },
+          {
+            "value": "aniso4x",
+            "display": "Anisotropic filtering 4x"
+          },
+          {
+            "value": "aniso8x",
+            "display": "Anisotropic filtering 8x"
+          },
+          {
+            "value": "aniso16x",
+            "display": "Anisotropic filtering 16x"
+          }
+        ]
+      },
+      {
+        "name": "ropes",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "fpscap",
+        "display": "FPS Cap",
+        "type": "slider",
+        "values": [
+          "powersaver",
+          "30",
+          "60",
+          "75",
+          "120",
+          "144",
+          "160",
+          "165",
+          "180",
+          "200",
+          "240",
+          "300",
+          "360",
+          "400",
+          "1000",
+          "unlimited"
+        ]
+      },
+      {
+        "name": "vsync",
+        "display": "VSync",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      }
+    ]
+  },
+  "hud": {
+    "display": "HUD",
+    "modules": [
+      {
+        "name": "hud_player_model",
+        "display": "Player Model",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "hud_server_text",
+        "display": "Server Messages",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "hud_contracts",
+        "display": "Contracts",
+        "values": [
+          {
+            "value": "custom",
+            "display": "Use game settings"
+          },
+          {
+            "value": "hide",
+            "display": "Hide contracts"
+          },
+          {
+            "value": "all",
+            "display": "Show all contracts available"
+          },
+          {
+            "value": "active",
+            "display": "Only show active contracts"
+          }
+        ]
+      },
+      {
+        "name": "hud_panels",
+        "display": "Panels",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "hud_avatars",
+        "display": "Avatars",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "everyone"
+          },
+          {
+            "value": "friends"
+          }
+        ]
+      },
+      {
+        "name": "match_hud",
+        "display": "Match HUD",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "messages",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "hide"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "killfeed",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "killstreaks",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "high"
+          }
+        ]
+      },
+      {
+        "name": "hud_achievement",
+        "display": "HUD Achievements",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "console",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "htmlmotd",
+        "display": "HTML MOTD",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "name": "outlines",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "dynamic_background",
+        "display": "Map Background",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "dustbowl"
+          }
+        ]
+      }
+    ]
+  },
+  "sound": {
+    "modules": [
+      {
+        "name": "sound",
+        "values": [
+          {
+            "value": "low"
+          },
+          {
+            "value": "medium"
+          },
+          {
+            "value": "high"
+          },
+          {
+            "value": "very_high"
+          },
+          {
+            "value": "ultra"
+          }
+        ]
+      },
+      {
+        "name": "voice_chat",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "hidden"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      }
+    ]
+  },
+  "misc": {
+    "modules": [
+      {
+        "name": "party_mode",
+        "display": "Party Join Mode",
+        "values": [
+          {
+            "value": "open",
+            "display": "Open party"
+          },
+          {
+            "value": "request",
+            "display": "Request-only party"
+          },
+          {
+            "value": "invite",
+            "display": "Invite-only party"
+          }
+        ]
+      },
+      {
+        "name": "logo",
+        "type": "switch",
+        "values": [
+          {
+            "value": "off"
+          },
+          {
+            "value": "on"
+          }
+        ]
+      }
+    ]
+  },
+  "networking": {
+    "modules": [
+      {
+        "name": "packet_rate",
+        "description": "Controls how fast you send to and receive from the server.",
+        "values": [
+          {
+            "value": "congestion"
+          },
+          {
+            "value": "standard"
+          }
+        ]
+      },
+      {
+        "name": "snapshot_buffer",
+        "description": "Controls how reliable to consider the snapshots you receive from the server to apply client-side buffering/smoothing between snapshot receives.",
+        "advanced_display": "Also known as linear interpolation (lerp or interp).",
+        "tags": [
+          "advanced"
+        ],
+        "values": [
+          {
+            "value": "auto",
+            "display": "Automatic (recommended)"
+          },
+          {
+            "value": "off",
+            "display": "Off (not recommended)"
+          },
+          {
+            "value": "x1"
+          },
+          {
+            "value": "x2"
+          },
+          {
+            "value": "custom"
+          },
+          {
+            "value": "anim"
+          }
+        ]
+      },
+      {
+        "name": "packet_size",
+        "description": "Controls how big packets are and how they are split up/compressed.",
+        "values": [
+          {
+            "value": "small"
+          },
+          {
+            "value": "conservative"
+          },
+          {
+            "value": "large"
+          }
+        ]
+      },
+      {
+        "name": "bandwidth",
+        "description": "Controls the max speed of packet sending to restrict it to your internet speed to prevent packet overflow. Values in bits (Kilobits or Megabits per second).",
+        "advanced_display": "This does not increase data usage, only restricts how quickly data can be sent.",
+        "type": "slider",
+        "values": [
+          "128Kbps",
+          "192Kbps",
+          "384Kbps",
+          "512Kbps",
+          "762Kbps",
+          "1.0Mbps",
+          "1.5Mbps",
+          "2.0Mbps",
+          "2.5Mbps",
+          "3.0Mbps",
+          "4.0Mbps",
+          "6.0Mbps"
+        ]
+      },
+      {
+        "name": "download",
+        "display": "Downloads",
+        "description": "Filters what custom content is allowed to be downloaded from the server.",
+        "values": [
+          {
+            "value": "custom",
+            "display": "Use game settings"
+          },
+          {
+            "value": "all"
+          },
+          {
+            "value": "nosounds",
+            "display": "No sounds"
+          },
+          {
+            "value": "mapsonly",
+            "display": "Maps only"
+          },
+          {
+            "value": "nothing"
+          }
+        ]
+      }
+    ]
+  }
+}
