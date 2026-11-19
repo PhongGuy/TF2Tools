@@ -146,3 +146,15 @@ fn the_stores_use_the_glossary_words() {
         Some("已安装")
     );
 }
+
+#[test]
+fn chinese_says_a_damaged_download_one_way() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("zh-CN", k).map(|t| t.into_owned());
+    let store = text("messages.store.download.damaged");
+    assert_eq!(store, text("messages.store.gb_fetch.damaged"));
+    assert_ne!(
+        store,
+        tf2tools_app::_rust_i18n_try_translate("en", "messages.store.download.damaged")
+            .map(|t| t.into_owned())
+    );
+}
