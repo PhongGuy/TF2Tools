@@ -1,6 +1,7 @@
 //! The banner under the header offering to remove the old TF2Tools 4 on Windows. It asks once:
 //! Remove starts v4's own uninstaller and closes the app, Not now just hides it; either is saved.
 
+use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
@@ -49,6 +50,9 @@ pub fn system_runner() -> UninstallRunner {
             const DETACHED_PROCESS: u32 = 0x0000_0008;
             const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
             command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+            let root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
+            let path = std::env::var_os("PATH").unwrap_or_default();
+            command.env("PATH", uninstaller_path(&root, &path));
         }
         #[cfg(unix)]
         {
@@ -57,6 +61,24 @@ pub fn system_runner() -> UninstallRunner {
         }
         command.spawn().map(drop)
     })
+}
+
+/// The PATH v4's uninstaller runs with: Windows' own folders under `system_root`, then the
+/// player's `path`. Its "is TF2Tools running" check pipes into `find`, and a Unix `find` from
+/// Git, MSYS2 or Cygwin ahead of System32's makes it give up without removing anything.
+pub fn uninstaller_path(system_root: &OsStr, path: &OsStr) -> OsString {
+    let mut out = OsString::new();
+    for dir in [
+        r"\System32;",
+        ";",
+        r"\System32\Wbem;",
+        r"\System32\WindowsPowerShell\v1.0\;",
+    ] {
+        out.push(system_root);
+        out.push(dir);
+    }
+    out.push(path);
+    out
 }
 
 /// The install to offer removing: `detect` runs only while the player has not answered yet.

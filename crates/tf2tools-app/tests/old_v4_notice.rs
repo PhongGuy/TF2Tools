@@ -196,3 +196,20 @@ fn nothing_shows_off_windows(cx: &mut TestAppContext) {
     let (_env, s, _) = shell_with(cx, found);
     assert!(!support::present(cx, s.win, ids::OLD_V4_BANNER));
 }
+
+// v4's uninstaller asks `find` whether TF2Tools.exe runs; Git's or MSYS2's find ahead of
+// System32's answers wrongly, so Windows' own folders come first for it.
+#[test]
+fn the_uninstaller_finds_windows_tools_before_the_players_path() {
+    let path = tf2tools_app::old_v4::uninstaller_path(
+        std::ffi::OsStr::new(r"C:\Windows"),
+        std::ffi::OsStr::new(r"C:\Program Files\Git\usr\bin;C:\Windows\System32"),
+    );
+    assert_eq!(
+        path,
+        std::ffi::OsString::from(
+            r"C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\Git\usr\bin;C:\Windows\System32"
+        ),
+        "System32, Windows, Wbem and PowerShell, then the player's own PATH"
+    );
+}
