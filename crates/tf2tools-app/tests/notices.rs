@@ -149,10 +149,6 @@ fn known_notices_get_plain_titles() {
         "Built-in crosshairs"
     );
     assert_eq!(
-        notices::title_for("comfig-app-MIT.txt"),
-        "mastercomfig app preset text (MIT)"
-    );
-    assert_eq!(
         notices::title_for("THIRD-PARTY-NOTICES.txt"),
         "Rust crates TF2Tools is built from"
     );
@@ -178,11 +174,6 @@ const SOURCES: &[(&str, &str, &str)] = &[
     ("logs.tf page", "logstf-notice.txt", "logs.tf"),
     ("game artwork", "Valve-notice.txt", "Valve Corporation"),
     ("built-in crosshairs", "crosshairs-notice.txt", "Kenney"),
-    (
-        "Graphics preset text",
-        "comfig-app-MIT.txt",
-        "Copyright (c) 2016-2026 mastercoms",
-    ),
 ];
 
 #[test]

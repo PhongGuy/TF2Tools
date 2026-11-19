@@ -3082,7 +3082,7 @@ graphics:
       label: "色彩滤镜"
       description: "覆盖整个画面的色调。"
     pyrovision:
-      label: "火焰兵视觉"
+      label: "火焰兵幻境"
       description: "透过火焰兵护目镜看到的火焰兵幻境的精细程度。"
     romevision:
       label: "罗马视觉"

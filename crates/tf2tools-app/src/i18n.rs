@@ -1674,10 +1674,24 @@ mod tests {
         "pages/hud_maker/menu_art.rs",
         "pages/hud_maker/snapping.rs",
         "pages/hud_maker/tint.rs",
+        "pages/graphics/jobs.rs",
+        "pages/graphics/mod.rs",
+        "pages/graphics/model.rs",
+        "pages/graphics/picture_panel.rs",
+        "pages/graphics/pictures.rs",
+        "pages/graphics/presets.rs",
+        "pages/graphics/settings.rs",
+        "pages/graphics/status.rs",
+        "pages/graphics/view.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
     const ALLOWED: &[(&str, &str, &str)] = &[
+        (
+            "pages/graphics/model.rs",
+            "GitHub",
+            "a site's name, passed into the shared source sentences",
+        ),
         (
             "old_v4.rs",
             "SystemRoot",
@@ -2299,12 +2313,12 @@ mod tests {
         );
     }
 
-    // A file added to either maker later must join the English scan, or its words go unchecked.
+    // A file added to either maker or the Graphics page later must join the English scan.
     #[test]
-    fn every_maker_file_is_in_the_english_scan() {
+    fn every_maker_and_graphics_file_is_in_the_english_scan() {
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut files = Vec::new();
-        for dir in ["pages/hud_maker", "pages/crosshair_maker"] {
+        for dir in ["pages/hud_maker", "pages/crosshair_maker", "pages/graphics"] {
             rust_files(&src.join(dir), &mut files);
         }
         let missing: Vec<String> = files
@@ -2319,7 +2333,7 @@ mod tests {
             .collect();
         assert!(
             missing.is_empty(),
-            "maker files the English scan skips: {missing:?}"
+            "maker and graphics files the English scan skips: {missing:?}"
         );
     }
 

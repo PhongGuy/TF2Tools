@@ -38,7 +38,7 @@ Install mastercomfig's addons from the Addon Store. The Addons page shows what y
 
 ### Graphics
 
-The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a graphics preset, from Ultra down to Low, then change any of its settings one by one, or reset them to the preset. Changes apply the next time TF2 starts.
+The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a preset from Low to Ultra, then change any setting with a switch, a few buttons or a list. Pictures show what each value looks like, with a slider to compare the preset's look with yours. A strip at the top lists what you changed, search finds any setting, and every change saves at once and applies the next time TF2 starts.
 
 ![The Graphics page: mastercomfig's status, the graphics presets and the settings below](.github/readme/graphics.webp)
 
@@ -150,7 +150,6 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 - **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
 - **logs.tf:** the stats and logs on the logs.tf page come from [logs.tf](https://logs.tf). TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.
 - **Built-in crosshairs:** made by players over many years. crosshair001 to crosshair200 are Kenney's [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) (CC0). The cpma, ql, wings and similar sets come from [joshuawn's guide](https://www.teamfortress.tv/30866/guide-weapon-specific-custom-crosshairs), with crosshairs by Watson, Quik, povohat and RainofLight. crosshair1 to crosshair7 are Valve's own. We could not trace the makers of the rest; if you made one, open an issue and we will credit you or take it out. The full list is in `licenses/crosshairs-notice.txt`.
-- **Graphics page:** the preset descriptions come from the [mastercomfig app](https://github.com/mastercomfig/comfig-app), Copyright (c) 2016-2026 mastercoms, under the MIT License, in `licenses/comfig-app-MIT.txt`.
 - **HUD Maker:** the HUD option data comes from CriticalFlaw's HUD editor project, under the MIT License, in `licenses/HUD-option-schemas-MIT.txt`.
 - **RAR files:** TF2Tools opens RAR downloads with the rars library, under the Apache License 2.0, in `licenses/rars-Apache-2.0.txt`.
 

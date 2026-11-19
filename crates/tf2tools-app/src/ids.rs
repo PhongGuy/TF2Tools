@@ -857,7 +857,7 @@ pub const ADDONS_GB: &str = "addons-gb";
 pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
 pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
-/// The mastercomfig status card.
+/// The mastercomfig status row.
 pub const GRAPHICS_STATUS: &str = "graphics-status";
 /// The banner under the status row while TF2 runs, labelled with its text.
 pub const GRAPHICS_RUNNING: &str = "graphics-running";
@@ -869,9 +869,9 @@ pub const GRAPHICS_PRESET_HEADING: &str = "graphics-preset-heading";
 pub const GRAPHICS_PRESET_LINE: &str = "graphics-preset-line";
 /// The "More frames ... Better looking" scale under the four ranked presets.
 pub const GRAPHICS_PRESET_SCALE: &str = "graphics-preset-scale";
-/// The status card's title line, labelled with its text.
+/// The status row's headline, labelled with its text.
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
-/// The line under the status card's title, labelled with its text; absent when it has none.
+/// The line under the status row's headline, labelled with its text; absent when it has none.
 pub const GRAPHICS_DETAIL: &str = "graphics-detail";
 /// The status row's credit to the mastercomfig team, present only while it is not installed.
 pub const GRAPHICS_CREDIT: &str = "graphics-credit";
@@ -887,7 +887,7 @@ pub const GRAPHICS_CHECK: &str = "graphics-check";
 pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 /// Take over, shown for an install TF2Tools did not make.
 pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
-/// The settings section under the preset cards, present for a managed install.
+/// The settings search toolbar, or the note standing in for it without a catalogue; managed only.
 pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
 /// The note shown in place of the settings list, labelled with its text.
 pub const GRAPHICS_SETTINGS_NOTE: &str = "graphics-settings-note";
