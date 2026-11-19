@@ -39,7 +39,7 @@ settings:
   audio:
     title: "音频"
     description: "命中音效和击杀音效的试听音量"
-    volume: "音量：%{percent}%"
+    volume: "音量：%{percent}"
   cache:
     duration: "缓存时长：%{duration}"
     hint: "缓存过期后，商店会自动重新同步。默认：7 天（168 小时）。"
@@ -72,6 +72,7 @@ settings:
       frees: "%{option}，可释放约 %{size}"
     cost: "每份完整日志约占 10 KB。已追踪玩家的日志越多，占用空间越大，因此选择“永久”可能占用大量空间。"
     usage: "日志缓存约占 %{cache}；%{logs}约 %{full}。"
+    usage_empty: "尚未缓存完整日志。日志缓存约占 %{cache}。"
     full_logs: { other: "其中 %{count} 份完整日志占用" }
     measuring: "正在计算…"
     unmeasured: "无法计算日志缓存大小。"
@@ -118,7 +119,7 @@ updater:
     checking: "Checking for updates..."
     available: "v%{version} available"
     available_page: "v%{version} available. Download it from the release page."
-    downloading: "Downloading... %{percent}%"
+    downloading: "正在下载… %{percent}"
     ready: "Update ready — restart to apply"
     installing: "Installing update..."
     unavailable: "Automatic updates aren't available in this version. Get new versions from the release page."
@@ -224,6 +225,7 @@ common:
   number:
     decimal: "."
     group: ","
+    percent: "%{number}%"
   count:
     step: "10000"
     thousand: "%{number}万"
@@ -2419,7 +2421,7 @@ crosshair_maker:
   paint_colour: "Paint colour"
   any_colour: "Any colour"
   opacity: "Opacity"
-  opacity_value: "Opacity: %{percent}%"
+  opacity_value: "不透明度：%{percent}"
   opacity_tip: "See-through paint. Painting over a pixel replaces it; colours never blend."
   outline: "Outline"
   outline_colour: "Outline colour"

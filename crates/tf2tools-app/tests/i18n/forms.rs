@@ -8,8 +8,9 @@ use tf2tools_app::pages::hud_maker::view::Zoom;
 use crate::LocaleGuard;
 
 // CLDR's percent pattern per language; the spaced ones use a no-break space so 100 % never wraps.
-const PERCENTS: [(&str, &str); 6] = [
+const PERCENTS: [(&str, &str); 7] = [
     ("en", "100%"),
+    ("zh-CN", "100%"),
     ("pt-BR", "100%"),
     ("fr", "100\u{a0}%"),
     ("de", "100\u{a0}%"),
@@ -59,6 +60,7 @@ fn the_shortcuts_sheet_names_escape_as_each_keyboard_prints_it() {
         ("es", "Esc"),
         ("ru", "Esc"),
         ("pt-BR", "Esc"),
+        ("zh-CN", "Esc"),
         ("fr", "Échap"),
     ] {
         let _guard = LocaleGuard::switch(lang);
