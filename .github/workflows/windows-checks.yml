@@ -1,0 +1,73 @@
+# Real-machine checks of the Windows-only paths: the HUD font check against the system fonts and
+# removing a real TF2Tools 4 install. Manual only, since both change the runner they run on.
+name: Windows checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Debug info and incremental state would overflow the runner's disk.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  # Named like CI's Windows job, so rust-cache restores that job's build.
+  windows:
+    runs-on: windows-2025
+    # The app's test build takes about 20 minutes cold; each check waits at most 10 more.
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      # aws-lc-sys assembles with NASM, which the image lacks; use its prebuilt objects.
+      AWS_LC_SYS_PREBUILT_NASM: "1"
+      TF2TOOLS_REAL_WINDOWS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: v1-rust
+          # Read CI's cache, never replace it with this branch's build.
+          save-if: false
+      - name: Download TF2Tools 4.8.0
+        # The web installer uses the package beside it, so both come down together.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v4.8.0 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/v4" --pattern '*.exe' --pattern '*.7z'
+          ls -la "$RUNNER_TEMP/v4"
+          sha256sum "$RUNNER_TEMP/v4"/*
+      - name: Build the checks
+        run: cargo test --locked -p tf2tools-core -p tf2tools-app --test integration --no-run
+      - name: HUD font check
+        run: cargo test --locked -p tf2tools-core --test integration windows_real_fonts -- --ignored --nocapture --test-threads=1
+      - name: TF2Tools 4 removal
+        if: ${{ !cancelled() }}
+        run: |
+          shopt -s nullglob
+          installers=("$RUNNER_TEMP"/v4/*.exe)
+          if [ "${#installers[@]}" -ne 1 ]; then
+            echo "expected one v4 installer, found: ${installers[*]}"
+            exit 1
+          fi
+          export TF2TOOLS_V4_INSTALLER="$(cygpath -w "${installers[0]}")"
+          export TF2TOOLS_CHECK_OUT="$(cygpath -w "$RUNNER_TEMP/windows-checks")"
+          mkdir -p "$RUNNER_TEMP/windows-checks"
+          cargo test --locked -p tf2tools-app --test integration windows_real_v4 -- --ignored --nocapture --test-threads=1
+      # A blocked uninstaller is usually waiting on a dialog; the screenshot shows which.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ failure() }}
+        with:
+          name: windows-checks
+          path: ${{ runner.temp }}/windows-checks
+          if-no-files-found: ignore

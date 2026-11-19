@@ -282,3 +282,7 @@ mod vtf;
 mod wav;
 mod weapon_names;
 mod weapons;
+mod windows_checks_workflow;
+// Changes the real machine; run only by windows-checks.yml.
+#[cfg(windows)]
+mod windows_real_fonts;

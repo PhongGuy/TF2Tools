@@ -243,3 +243,6 @@ mod version;
 mod weapon_assigner;
 mod weapon_icons;
 mod weapon_names;
+// Changes the real machine; run only by windows-checks.yml.
+#[cfg(windows)]
+mod windows_real_v4;
