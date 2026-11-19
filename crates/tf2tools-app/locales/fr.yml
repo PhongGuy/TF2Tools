@@ -1663,7 +1663,7 @@ hud_maker:
       about: "Masque le portrait de classe et garde trois lignes de killfeed."
     big_numbers:
       name: "Grands chiffres"
-      about: "Agrandit de moitié les chiffres de santé et de munitions."
+      about: "Agrandit de %{percent} les chiffres de santé et de munitions."
     streamer_clean:
       name: "Épuré pour le stream"
       about: "Place le chat en haut et masque la liste d'amis."

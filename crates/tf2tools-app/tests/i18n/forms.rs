@@ -93,15 +93,22 @@ fn no_catalogue_writes_a_literal_percentage() {
     }
 }
 
-// The Big numbers starting point states its 50% through the percent format where it shows one.
+// The Big numbers starting point states its 50% through the percent format in every language.
 #[test]
 fn the_big_numbers_line_writes_its_percent_in_the_language_format() {
     use tf2tools_app::i18n::names::starting_point_about;
     use tf2tools_core::StartingPoint;
-    for (lang, want) in [("es", "50\u{a0}%"), ("pt-BR", "50%")] {
+    for (lang, want) in [("es", "50\u{a0}%"), ("pt-BR", "50%"), ("en", "50%")] {
+        let _guard = LocaleGuard::switch(lang);
+        assert!(
+            starting_point_about(StartingPoint::BigNumbers).contains(want),
+            "{lang}"
+        );
+    }
+    for lang in PERCENTS.map(|(lang, _)| lang) {
         let _guard = LocaleGuard::switch(lang);
         let about = starting_point_about(StartingPoint::BigNumbers);
-        assert!(about.contains(want), "{lang}: {about}");
+        assert!(about.contains(&*format::percent(50)), "{lang}: {about}");
     }
 }
 

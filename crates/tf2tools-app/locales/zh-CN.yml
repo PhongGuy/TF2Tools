@@ -1660,7 +1660,7 @@ hud_maker:
       about: "隐藏兵种头像，并保留三行击杀信息。"
     big_numbers:
       name: "大号数字"
-      about: "将生命值和弹药数字放大到 1.5 倍。"
+      about: "将生命值和弹药数字放大%{percent}。"
     streamer_clean:
       name: "主播简洁"
       about: "将聊天移到顶部，并隐藏好友列表。"
