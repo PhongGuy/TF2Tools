@@ -31,6 +31,9 @@ const MAP_READY: Duration = Duration::from_secs(420);
 /// The window waits on the same shader processing as the map, so it gets the same time.
 const WINDOW_APPEARS: Duration = Duration::from_secs(420);
 const STEP_DONE: Duration = Duration::from_secs(30);
+/// TF2 is still settling just after a map load, so early steps get longer.
+const STEP_DONE_SETTLING: Duration = Duration::from_secs(120);
+const SETTLING_WINDOW: Duration = Duration::from_secs(120);
 const SHOT_SAVED: Duration = Duration::from_secs(10);
 const GAME_QUITS: Duration = Duration::from_secs(60);
 const POLL: Duration = Duration::from_millis(200);
@@ -938,6 +941,8 @@ struct Session {
     last_sent_at: Option<Instant>,
     /// Whether TF2 has been seen running since the last launch.
     tf2_seen: bool,
+    /// When the map last finished loading (SV_ActivateServer seen).
+    map_loaded_at: Option<Instant>,
     guard: Option<Guard>,
 }
 
@@ -950,6 +955,7 @@ impl Session {
             last_send: 0,
             last_sent_at: None,
             tf2_seen: false,
+            map_loaded_at: None,
             guard: None,
         }
     }
@@ -984,6 +990,7 @@ impl Session {
         self.wait_log(since, MAP_READY, "the map to load", |log| {
             log.contains("SV_ActivateServer")
         })?;
+        self.map_loaded_at = Some(Instant::now());
         let [settle, between, after] = JOIN_SLEEPS.map(Duration::from_millis);
         thread::sleep(settle);
         self.send(&shoot::join_commands())?;
@@ -997,7 +1004,10 @@ impl Session {
     fn send(&mut self, commands: &[String]) -> Result<(), String> {
         let n = self.write_step(commands)?;
         let since = self.last_send;
-        self.wait_log(since, STEP_DONE, &format!("step {n}"), |log| {
+        let timeout = self
+            .map_loaded_at
+            .map_or(STEP_DONE, |t| step_timeout(t.elapsed()));
+        self.wait_log(since, timeout, &format!("step {n}"), |log| {
             shoot::marker_seen(log, n)
         })
     }
@@ -1138,6 +1148,16 @@ impl Session {
 /// How long to wait before the next send so it lands `SEND_GAP` after the one at `last`.
 fn send_gap(last: Instant, now: Instant) -> Duration {
     SEND_GAP.saturating_sub(now.saturating_duration_since(last))
+}
+
+/// A step sent soon after a map load may wait for the settling game; later ones keep the
+/// normal limit.
+fn step_timeout(since_load: Duration) -> Duration {
+    if since_load < SETTLING_WINDOW {
+        STEP_DONE_SETTLING
+    } else {
+        STEP_DONE
+    }
 }
 
 fn wait_for_exit(timeout: Duration) -> bool {
@@ -1362,6 +1382,23 @@ mod tests {
                 "80",
                 "/b/y.webp"
             ]
+        );
+    }
+
+    #[test]
+    fn steps_just_after_a_map_load_wait_longer() {
+        assert_eq!(step_timeout(Duration::ZERO), Duration::from_secs(120));
+        assert_eq!(
+            step_timeout(Duration::from_secs(119)),
+            Duration::from_secs(120)
+        );
+        assert_eq!(
+            step_timeout(Duration::from_secs(120)),
+            Duration::from_secs(30)
+        );
+        assert_eq!(
+            step_timeout(Duration::from_secs(600)),
+            Duration::from_secs(30)
         );
     }
 
