@@ -3092,8 +3092,8 @@ graphics:
       label: "Servernachrichten"
       description: "Text, den der Server in der Bildschirmmitte anzeigt."
     hud_contracts:
-      label: "Verträge"
-      description: "Welche Verträge das HUD anzeigt."
+      label: "Aufträge"
+      description: "Welche Aufträge das HUD anzeigt."
     hud_panels:
       label: "HUD-Elemente"
       description: "Wie viele zusätzliche Elemente das HUD anzeigt."
@@ -3113,8 +3113,8 @@ graphics:
       label: "Killserien-Hinweise"
       description: "Killserien-Zähler und ihre Ansagen."
     hud_achievement:
-      label: "Erfolgsmeldungen"
-      description: "Das Banner, wenn jemand einen Erfolg erhält."
+      label: "Errungenschafts-Meldungen"
+      description: "Das Banner, wenn jemand eine Errungenschaft erhält."
     console:
       label: "Entwicklerkonsole"
       description: "Öffnet die Konsole mit der Taste `."

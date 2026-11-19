@@ -3102,7 +3102,7 @@ graphics:
       description: "Fotos de perfil de Steam en la tabla de puntuaciones y el registro de muertes."
     match_hud:
       label: "HUD de partida"
-      description: "La barra de estado de los equipos arriba de la pantalla en las partidas."
+      description: "La barra de estado de los equipos en la parte superior de la pantalla en las partidas."
     messages:
       label: "Mensajes del chat"
       description: "El chat de texto de otros jugadores."

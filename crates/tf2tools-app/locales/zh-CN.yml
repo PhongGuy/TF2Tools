@@ -3091,8 +3091,8 @@ graphics:
       label: "服务器消息"
       description: "服务器在屏幕中央显示的文字。"
     hud_contracts:
-      label: "合约"
-      description: "HUD 显示哪些合约。"
+      label: "合同"
+      description: "HUD 显示哪些合同。"
     hud_panels:
       label: "HUD 面板"
       description: "HUD 显示多少额外面板。"
