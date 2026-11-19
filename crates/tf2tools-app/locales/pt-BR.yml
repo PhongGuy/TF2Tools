@@ -1662,7 +1662,7 @@ hud_maker:
       about: "Oculta o retrato da classe e mantém três linhas no killfeed."
     big_numbers:
       name: "Números grandes"
-      about: "Deixa os números de vida e munição 50% maiores."
+      about: "Deixa os números de vida e munição %{percent} maiores."
     streamer_clean:
       name: "Limpo para streamer"
       about: "Move o chat para o topo e oculta a lista de amigos."

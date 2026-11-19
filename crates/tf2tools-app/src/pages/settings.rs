@@ -1455,7 +1455,10 @@ impl Render for SettingsPage {
             .text_sm()
             .child(labelled(
                 ids::SETTINGS_VOLUME_LABEL,
-                tr!("settings.audio.volume", percent = format::percent(volume)),
+                tr!(
+                    "settings.audio.volume",
+                    percent = format::percent(u64::from(volume))
+                ),
             ))
             .child(
                 div()

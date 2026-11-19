@@ -1661,7 +1661,7 @@ hud_maker:
       about: "Oculta el retrato de la clase y deja tres filas en el registro de muertes."
     big_numbers:
       name: "Números grandes"
-      about: "Agranda un 50 % los números de salud y munición."
+      about: "Agranda un %{percent} los números de salud y munición."
     streamer_clean:
       name: "Limpio para streamers"
       about: "Mueve el chat arriba y oculta la lista de amigos."

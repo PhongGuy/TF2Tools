@@ -1994,7 +1994,7 @@ fn the_zoom_buttons_grow_the_cells_and_a_click_lands_on_the_cell_under_it(cx: &m
         Some(position_text(CanvasSize::Large, x, y))
     );
     assert_guides_centred(cx, &s);
-    for want in ["300%", "400%", "600%", "800%", "1200%", "1600%"] {
+    for want in ["300%", "400%", "600%", "800%", "1,200%", "1,600%"] {
         support::click_id(cx, s.win, ids::CROSSHAIR_MAKER_ZOOM_IN);
         assert_eq!(zoom_label(cx, &s).as_deref(), Some(want));
     }

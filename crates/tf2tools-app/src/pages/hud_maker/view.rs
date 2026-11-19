@@ -155,7 +155,7 @@ impl Zoom {
 
     /// The level as a player reads it, the fit being 100%.
     pub fn label(&self) -> SharedString {
-        crate::i18n::format::percent((self.level() * 100.).round())
+        crate::i18n::format::percent((self.level() * 100.).round() as u64)
     }
 
     /// `steps` levels in (or out, when negative), keeping the screen pixel under window point

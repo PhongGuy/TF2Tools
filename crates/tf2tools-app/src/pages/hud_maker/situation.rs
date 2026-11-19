@@ -396,12 +396,12 @@ impl HudMakerPage {
             .child(slider(
                 SituationSlider::Ammo,
                 tr!("hud_maker.situation.ammo"),
-                format::percent(s.ammo_percent()),
+                format::percent(u64::from(s.ammo_percent())),
             ))
             .child(slider(
                 SituationSlider::Charge,
                 tr!("hud_maker.situation.charge"),
-                format::percent(s.charge()),
+                format::percent(u64::from(s.charge())),
             ))
             .child(h_flex().flex_wrap().gap_1().children(weapons))
             .child(
