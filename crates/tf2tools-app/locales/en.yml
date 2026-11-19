@@ -17,7 +17,7 @@ settings:
   audio:
     title: "Audio"
     description: "Preview volume for hitsounds and killsounds"
-    volume: "Volume: %{percent}%"
+    volume: "Volume: %{percent}"
   cache:
     duration: "Cache duration: %{duration}"
     hint: "Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."
@@ -50,6 +50,7 @@ settings:
       frees: "%{option}, frees about %{size}"
     cost: "Each full log takes about 10 KB. The space grows with how many logs your tracked players have, so Forever can grow large."
     usage: "The logs cache uses about %{cache}; %{logs} about %{full}."
+    usage_empty: "No full logs are cached yet. The logs cache uses about %{cache}."
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
@@ -96,7 +97,7 @@ updater:
     checking: "Checking for updates..."
     available: "v%{version} available"
     available_page: "v%{version} available. Download it from the release page."
-    downloading: "Downloading... %{percent}%"
+    downloading: "Downloading... %{percent}"
     ready: "Update ready — restart to apply"
     installing: "Installing update..."
     unavailable: "Automatic updates aren't available in this version. Get new versions from the release page."
@@ -202,6 +203,7 @@ common:
   number:
     decimal: "."
     group: ","
+    percent: "%{number}%"
   count:
     step: "1000"
     thousand: "%{number}K"
@@ -1271,7 +1273,7 @@ hud_maker:
       shift_arrows: "Shift + arrow keys"
       ctrl_drag: "Ctrl + drag"
       hide: "H or Delete"
-      escape: "Escape"
+      escape: "Esc"
       alt_click: "Alt + click"
       shift_click: "Shift + click"
       box: "Drag on empty space"
@@ -2397,7 +2399,7 @@ crosshair_maker:
   paint_colour: "Paint colour"
   any_colour: "Any colour"
   opacity: "Opacity"
-  opacity_value: "Opacity: %{percent}%"
+  opacity_value: "Opacity: %{percent}"
   opacity_tip: "See-through paint. Painting over a pixel replaces it; colours never blend."
   outline: "Outline"
   outline_colour: "Outline colour"

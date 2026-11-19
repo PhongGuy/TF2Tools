@@ -15,7 +15,7 @@ settings:
   audio:
     title: "Звук"
     description: "Громкость превью хитсаундов и килсаундов"
-    volume: "Громкость: %{percent}%"
+    volume: "Громкость: %{percent}"
   cache:
     duration: "Срок хранения кэша: %{duration}"
     hint: "Магазины синхронизируются заново, когда истекает срок кэша. По умолчанию: 7 дней (168 часов)."
@@ -48,6 +48,7 @@ settings:
       frees: "%{option}, освободит около %{size}"
     cost: "Каждый полный лог занимает около 10 КБ. Место растёт с числом логов отслеживаемых игроков, поэтому «Всегда» может занять много места."
     usage: "Кэш логов занимает около %{cache}; %{logs} около %{full}."
+    usage_empty: "Полных логов в кэше пока нет. Кэш логов занимает около %{cache}."
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
@@ -94,7 +95,7 @@ updater:
     checking: "Проверка обновлений..."
     available: "Доступна версия v%{version}"
     available_page: "Доступна версия v%{version}. Скачайте её со страницы релиза."
-    downloading: "Загрузка... %{percent}%"
+    downloading: "Загрузка... %{percent}"
     ready: "Обновление готово — перезапустите, чтобы применить"
     installing: "Установка обновления..."
     unavailable: "В этой версии автоматические обновления недоступны. Новые версии есть на странице релизов."
@@ -200,6 +201,7 @@ common:
   number:
     decimal: ","
     group: "\u00A0"
+    percent: "%{number}\u00A0%"
   count:
     step: "1000"
     thousand: "%{number}\u00A0тыс."
@@ -1269,7 +1271,7 @@ hud_maker:
       shift_arrows: "Shift + стрелки"
       ctrl_drag: "Ctrl + тянуть"
       hide: "H или Delete"
-      escape: "Escape"
+      escape: "Esc"
       alt_click: "Alt + щелчок"
       shift_click: "Shift + щелчок"
       box: "Тянуть по пустому месту"
@@ -2395,7 +2397,7 @@ crosshair_maker:
   paint_colour: "Цвет краски"
   any_colour: "Любой цвет"
   opacity: "Непрозрачность"
-  opacity_value: "Непрозрачность: %{percent}%"
+  opacity_value: "Непрозрачность: %{percent}"
   opacity_tip: "Полупрозрачная краска. Новый цвет заменяет пиксель под ним, цвета не смешиваются."
   outline: "Обводка"
   outline_colour: "Цвет обводки"

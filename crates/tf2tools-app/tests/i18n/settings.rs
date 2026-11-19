@@ -90,7 +90,7 @@ fn picking_russian_switches_settings_at_once_and_saves_it(cx: &mut TestAppContex
     assert_eq!(note(cx, s.win).as_deref(), Some(NOTE_RU));
     assert_eq!(
         support::label_of(cx, s.win, ids::SETTINGS_VOLUME_LABEL).as_deref(),
-        Some("Громкость: 70%")
+        Some("Громкость: 70\u{a0}%")
     );
     assert_eq!(placeholder(cx, &page), "/путь/к/Team Fortress 2");
     assert_eq!(i18n::current(), "ru");

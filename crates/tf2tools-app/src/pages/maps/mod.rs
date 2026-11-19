@@ -730,7 +730,9 @@ fn map_row(
                     done,
                     total: Some(total),
                     ..
-                }) if *total > 0 => format!("{}%", (done * 100 / total).min(100)),
+                }) if *total > 0 => {
+                    i18n::format::percent((done * 100 / total).min(100)).to_string()
+                }
                 Some(_) => tr!("common.size.downloading").to_string(),
                 None => tr!("maps.button.download").to_string(),
             };
