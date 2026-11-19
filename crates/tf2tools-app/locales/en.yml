@@ -2957,6 +2957,32 @@ install_parts:
   maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."
 
 graphics:
+  subtitle: "Graphics and game settings from mastercomfig"
+  no_tf2: "Set the TF2 folder in Settings to use mastercomfig."
+  status:
+    not_installed: "mastercomfig isn't installed"
+    install_hint: "Install it to pick a graphics preset."
+    installed: "mastercomfig %{version} is installed"
+    up_to_date: "mastercomfig %{version} is installed and up to date"
+    saves: "Every change saves at once."
+    outside: "mastercomfig %{version} is installed outside TF2Tools"
+    outside_unknown: "mastercomfig is installed outside TF2Tools"
+    take_over_hint: "Take over to pick a preset and change settings here."
+  toast:
+    installed_title: "mastercomfig installed"
+    installed: "mastercomfig %{version} is ready. Pick a preset below."
+    updated_title: "mastercomfig updated"
+    updated: "Now on %{version}."
+    checked_title: "Checked for updates"
+    taken_over_title: "mastercomfig taken over"
+    taken_over: "TF2Tools now looks after mastercomfig."
+    removed_title: "mastercomfig removed"
+    removed: "mastercomfig is no longer in TF2."
+    preset_title: "Preset applied"
+    preset: "%{preset} applies the next time TF2 starts."
+    dropped_title: "Some settings went back to the preset"
+    dropped: "These settings aren't in this mastercomfig version and went back to the preset: %{names}."
+    own_kept: "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead."
   settings_note:
     loading: "Loading the settings list..."
     offline: "The settings list needs an internet connection the first time. Connect, then open this page again."

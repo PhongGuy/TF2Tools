@@ -2980,6 +2980,32 @@ install_parts:
   maps_skipped: "%{name} enthält mehrere Karten. Wähle die aus, die installiert werden sollen. Einige zusätzliche Dateien in diesem Download wurden übersprungen."
 
 graphics:
+  subtitle: "Grafik- und Spieleinstellungen von mastercomfig"
+  no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um mastercomfig zu nutzen."
+  status:
+    not_installed: "mastercomfig ist nicht installiert"
+    install_hint: "Installiere es, um eine Grafik-Voreinstellung zu wählen."
+    installed: "mastercomfig %{version} ist installiert"
+    up_to_date: "mastercomfig %{version} ist installiert und aktuell"
+    saves: "Jede Änderung wird sofort gespeichert."
+    outside: "mastercomfig %{version} wurde außerhalb von TF2Tools installiert"
+    outside_unknown: "mastercomfig wurde außerhalb von TF2Tools installiert"
+    take_over_hint: "Übernimm es, um hier eine Voreinstellung zu wählen und Einstellungen zu ändern."
+  toast:
+    installed_title: "mastercomfig installiert"
+    installed: "mastercomfig %{version} ist bereit. Wähle unten eine Voreinstellung."
+    updated_title: "mastercomfig aktualisiert"
+    updated: "Jetzt auf %{version}."
+    checked_title: "Nach Updates gesucht"
+    taken_over_title: "mastercomfig übernommen"
+    taken_over: "TF2Tools kümmert sich jetzt um mastercomfig."
+    removed_title: "mastercomfig entfernt"
+    removed: "mastercomfig ist nicht mehr in TF2."
+    preset_title: "Voreinstellung angewendet"
+    preset: "%{preset} gilt ab dem nächsten Start von TF2."
+    dropped_title: "Einige Einstellungen sind zur Voreinstellung zurückgekehrt"
+    dropped: "Diese Einstellungen gibt es in dieser mastercomfig-Version nicht, daher gilt wieder die Voreinstellung: %{names}."
+    own_kept: "Deine eigene modules.cfg wurde behalten, daher werden die Einstellungen unten nicht verwendet. Ändere eine davon, um sie stattdessen zu verwenden."
   settings_note:
     loading: "Die Einstellungsliste wird geladen..."
     offline: "Die Einstellungsliste braucht beim ersten Mal eine Internetverbindung. Stell eine Verbindung her und öffne diese Seite dann erneut."

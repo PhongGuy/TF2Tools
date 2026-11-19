@@ -2979,6 +2979,32 @@ install_parts:
   maps_skipped: "%{name} 包含多张地图。请选择要安装的地图。此下载中的部分额外文件已被跳过。"
 
 graphics:
+  subtitle: "来自 mastercomfig 的图形与游戏设置"
+  no_tf2: "请在设置中指定 TF2 文件夹以使用 mastercomfig。"
+  status:
+    not_installed: "未安装 mastercomfig"
+    install_hint: "安装后即可选择图形预设。"
+    installed: "已安装 mastercomfig %{version}"
+    up_to_date: "已安装 mastercomfig %{version}，已是最新版本"
+    saves: "每项更改都会立即保存。"
+    outside: "mastercomfig %{version} 并非通过 TF2Tools 安装"
+    outside_unknown: "mastercomfig 并非通过 TF2Tools 安装"
+    take_over_hint: "接管后即可在此选择预设并更改设置。"
+  toast:
+    installed_title: "已安装 mastercomfig"
+    installed: "mastercomfig %{version} 已就绪。请在下方选择预设。"
+    updated_title: "已更新 mastercomfig"
+    updated: "现为 %{version}。"
+    checked_title: "已检查更新"
+    taken_over_title: "已接管 mastercomfig"
+    taken_over: "现在由 TF2Tools 管理 mastercomfig。"
+    removed_title: "已移除 mastercomfig"
+    removed: "TF2 中已不再有 mastercomfig。"
+    preset_title: "已应用预设"
+    preset: "预设“%{preset}”将在下次启动 TF2 时生效。"
+    dropped_title: "部分设置已恢复为预设值"
+    dropped: "此 mastercomfig 版本中没有以下设置，已恢复为预设值：%{names}。"
+    own_kept: "已保留您自己的 modules.cfg，因此下方的设置不会生效。更改其中任意一项即可改用这些设置。"
   settings_note:
     loading: "正在加载设置列表…"
     offline: "首次加载设置列表需要联网。请连接网络后重新打开此页面。"

@@ -217,8 +217,8 @@ fn install_fetches_the_recorded_release_and_shows_the_presets(cx: &mut TestAppCo
         support::mastercomfig_base("9.100.1")
     );
     assert_eq!(
-        label(cx, &s, ids::GRAPHICS_DETAIL).as_deref(),
-        Some("Up to date")
+        label(cx, &s, ids::GRAPHICS_HEADLINE).as_deref(),
+        Some("mastercomfig 9.100.1 is installed and up to date")
     );
     for preset in Preset::PICKER {
         assert!(
@@ -244,7 +244,7 @@ fn a_hand_install_is_taken_over_with_its_own_preset(cx: &mut TestAppContext) {
     let page = open_graphics(cx, &s);
     assert_eq!(
         label(cx, &s, ids::GRAPHICS_DETAIL).as_deref(),
-        Some("Managed outside TF2Tools")
+        Some("Take over to pick a preset and change settings here.")
     );
     assert!(!support::present(
         cx,
@@ -286,9 +286,10 @@ fn a_newer_recorded_release_is_offered_and_installed(cx: &mut TestAppContext) {
     support::seed_mastercomfig_release(&env, &server.uri(), "9.101.0");
     let page = open_graphics(cx, &s);
     assert_eq!(
-        label(cx, &s, ids::GRAPHICS_DETAIL).as_deref(),
-        Some("Update to 9.101.0")
+        label(cx, &s, ids::GRAPHICS_HEADLINE).as_deref(),
+        Some("mastercomfig 9.100.1 is installed")
     );
+    assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
     support::click_id(cx, s.win, ids::GRAPHICS_UPDATE);
     support::wait_real(cx, "the update", |cx| installed(cx, &page, "9.101.0"));
     assert!(selected(cx, &s, Preset::Low));
@@ -391,9 +392,10 @@ fn check_for_updates_records_a_newer_release(cx: &mut TestAppContext) {
     toasted(cx, &s, "Checked for updates");
     idle(cx, &page);
     assert_eq!(
-        label(cx, &s, ids::GRAPHICS_DETAIL).as_deref(),
-        Some("Update to 9.101.0")
+        label(cx, &s, ids::GRAPHICS_HEADLINE).as_deref(),
+        Some("mastercomfig 9.100.1 is installed")
     );
+    assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
     assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
 }
 

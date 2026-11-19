@@ -18,48 +18,56 @@ fn the_card_compares_the_install_with_the_recorded_release() {
     let outside = |v: Option<&str>| MastercomfigStatus::Outside {
         version: v.map(str::to_owned),
     };
+    let saves = "Every change saves at once.";
+    let take_over = "Take over to pick a preset and change settings here.";
     let cases = [
         (
             MastercomfigStatus::NotInstalled,
             Some("9.100.1"),
             "mastercomfig isn't installed",
-            Some("Install it to pick a graphics preset."),
+            "Install it to pick a graphics preset.",
             None,
         ),
-        (managed("9.100.1"), None, "mastercomfig 9.100.1", None, None),
+        (
+            managed("9.100.1"),
+            None,
+            "mastercomfig 9.100.1 is installed",
+            saves,
+            None,
+        ),
         (
             managed("9.100.1"),
             Some("9.100.1"),
-            "mastercomfig 9.100.1",
-            Some("Up to date"),
+            "mastercomfig 9.100.1 is installed and up to date",
+            saves,
             None,
         ),
         (
             managed("9.100.1"),
             Some("9.101.0"),
-            "mastercomfig 9.100.1",
-            Some("Update to 9.101.0"),
+            "mastercomfig 9.100.1 is installed",
+            saves,
             Some("9.101.0"),
         ),
         (
             outside(Some("9.99.0")),
             Some("9.100.1"),
-            "mastercomfig 9.99.0",
-            Some("Managed outside TF2Tools"),
+            "mastercomfig 9.99.0 is installed outside TF2Tools",
+            take_over,
             None,
         ),
         (
             outside(None),
             None,
-            "mastercomfig",
-            Some("Managed outside TF2Tools"),
+            "mastercomfig is installed outside TF2Tools",
+            take_over,
             None,
         ),
     ];
     for (status, latest, head, line, update) in cases {
         let card = status_card(&status, latest);
-        assert_eq!(headline(&card), head, "{status:?}");
-        assert_eq!(detail(&card).as_deref(), line, "{status:?}");
+        assert_eq!(headline(&card).as_ref(), head, "{status:?}");
+        assert_eq!(detail(&card).as_ref(), line, "{status:?}");
         assert_eq!(update_to(&card), update, "{status:?}");
     }
     assert_eq!(

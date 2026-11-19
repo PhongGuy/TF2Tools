@@ -3,7 +3,7 @@
 use crate::support;
 
 use gpui_kit::{ElementId, Entity, TestAppContext, px, size};
-use support::graphics::{found, idle, open, saved, search, wait_for_list};
+use support::graphics::{found, idle, open, reveal, saved, search, wait_for_list};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::shell::route::Page;
@@ -143,6 +143,8 @@ fn every_plan_a_id_is_on_a_seeded_page(cx: &mut TestAppContext) {
     search(cx, &s, &page, "zzz");
     assert!(support::present(cx, s.win, ids::GRAPHICS_EMPTY));
     assert!(support::present(cx, s.win, ids::GRAPHICS_SHOW_ALL));
+    // The always-drawn status detail line puts the empty state below the fold.
+    reveal(cx, &s, ids::GRAPHICS_SHOW_ALL.into());
     support::click_id(cx, s.win, ids::GRAPHICS_SHOW_ALL);
     support::click_id(cx, s.win, ids::GRAPHICS_RESET_ALL);
     support::wait_real(cx, "the reset all", |cx| {

@@ -43,8 +43,8 @@ use crate::widgets::scroll::scroll_area;
 use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
 use model::{
-    OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
-    describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
+    SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
+    detail, dropped_note, foreign_modules_cfg, headline, own_modules_cfg_kept, preset_description,
     preset_label, shown_choice, status_card, update_to, value_options,
 };
 use pictures::PictureIndex;
@@ -384,32 +384,33 @@ impl GraphicsPage {
                     own_file_kept,
                 } = job.await?;
                 let (title, mut text) = if update {
-                    ("mastercomfig updated", format!("Now on {version}."))
+                    let now = tr!("graphics.toast.updated", version = version);
+                    (tr!("graphics.toast.updated_title"), now)
                 } else {
-                    let ready = format!("mastercomfig {version} is ready. Pick a preset below.");
-                    ("mastercomfig installed", ready)
+                    let ready = tr!("graphics.toast.installed", version = version);
+                    (tr!("graphics.toast.installed_title"), ready)
                 };
                 if let Some(note) = dropped_note(&dropped) {
-                    text = format!("{text} {note}");
+                    text = format!("{text} {note}").into();
                 }
                 if own_file_kept {
-                    text = format!("{text} {OWN_MODULES_CFG_KEPT}");
+                    text = format!("{text} {}", own_modules_cfg_kept()).into();
                 }
-                Ok((title.into(), text.into()))
+                Ok((title, text))
             },
             cx,
         );
     }
 
-    // Forces the addon-store sync; the reloaded card then says "Up to date" or "Update to X",
-    // so the toast names no version.
+    // Forces the addon-store sync; the reloaded status row then says whether an update is
+    // offered, so the toast names no version.
     fn check(&mut self, cx: &mut Context<Self>) {
         let job = jobs::check_for_updates(cx);
         self.running = Some(Job::Check);
         self.finish(
             async move {
                 job.await?;
-                Ok(("Checked for updates".into(), SharedString::default()))
+                Ok((tr!("graphics.toast.checked_title"), SharedString::default()))
             },
             cx,
         );
@@ -425,8 +426,8 @@ impl GraphicsPage {
                 s.library.take_over_mastercomfig(&tf2).map_err(|e| {
                     describe_take_over(&e).into_op(tr!("messages.action.take_over_mastercomfig"))
                 })?;
-                let text = "TF2Tools now looks after mastercomfig.";
-                Ok(("mastercomfig taken over".into(), text.into()))
+                let text = tr!("graphics.toast.taken_over");
+                Ok((tr!("graphics.toast.taken_over_title"), text))
             },
             cx,
         );
@@ -455,12 +456,12 @@ impl GraphicsPage {
                         let restored = s.library.remove_mastercomfig(&tf2).map_err(|e| {
                             describe_remove(&e).into_op(tr!("messages.action.remove_mastercomfig"))
                         })?;
-                        let mut text = "mastercomfig is no longer in TF2.".to_owned();
+                        let mut text = tr!("graphics.toast.removed").to_string();
                         if restored {
                             text.push(' ');
                             text.push_str(&crate::pages::addons::model::movement_off());
                         }
-                        Ok(("mastercomfig removed".into(), text.into()))
+                        Ok((tr!("graphics.toast.removed_title"), text.into()))
                     },
                     cx,
                 );
@@ -483,8 +484,8 @@ impl GraphicsPage {
                 s.library
                     .apply_preset(&tf2, preset)
                     .map_err(|e| describe_apply(&e).into_op(tr!("messages.action.apply_preset")))?;
-                let text = format!("{} applies the next time TF2 starts.", preset_label(preset));
-                Ok(("Preset applied".into(), text.into()))
+                let text = tr!("graphics.toast.preset", preset = preset_label(preset));
+                Ok((tr!("graphics.toast.preset_title"), text))
             },
             cx,
         );
@@ -542,8 +543,8 @@ impl GraphicsPage {
                 };
                 match dropped {
                     Ok(dropped) => Ok(dropped_note(&dropped).map(|text| {
-                        let title = "Some settings went back to the preset";
-                        (ToastKind::Warning, title.into(), text.into())
+                        let title = tr!("graphics.toast.dropped_title");
+                        (ToastKind::Warning, title, text)
                     })),
                     Err(ModulesFailure::Foreign) => {
                         Err(OpError::core(save_failed(), foreign_modules_cfg()))
@@ -890,13 +891,8 @@ impl GraphicsPage {
 impl Render for GraphicsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
-        let warning = missing.then(|| {
-            no_tf2_warning(
-                ids::GRAPHICS_NO_TF2,
-                "Set the TF2 folder in Settings to use mastercomfig.",
-                cx,
-            )
-        });
+        let warning =
+            missing.then(|| no_tf2_warning(ids::GRAPHICS_NO_TF2, tr!("graphics.no_tf2"), cx));
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
@@ -913,7 +909,7 @@ impl Render for GraphicsPage {
             labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::GRAPHICS_SUBTITLE,
-                "Graphics and game settings from mastercomfig",
+                tr!("graphics.subtitle"),
             )
             .into_any_element(),
         );
@@ -1025,13 +1021,11 @@ impl GraphicsPage {
                     .into_any_element(),
             ),
         }
-        let detail = detail(card).map(|text| {
-            labelled(
-                div().text_sm().text_color(muted),
-                ids::GRAPHICS_DETAIL,
-                text,
-            )
-        });
+        let detail = labelled(
+            div().text_sm().text_color(muted),
+            ids::GRAPHICS_DETAIL,
+            detail(card),
+        );
         card_frame(cx)
             .id(ids::GRAPHICS_STATUS)
             .test_support()
@@ -1047,7 +1041,7 @@ impl GraphicsPage {
                                 ids::GRAPHICS_HEADLINE,
                                 headline(card),
                             ))
-                            .children(detail),
+                            .child(detail),
                     )
                     .child(h_flex().flex_wrap().gap_2().children(buttons))
                     .child(labelled(

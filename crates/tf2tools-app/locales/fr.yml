@@ -2982,6 +2982,32 @@ install_parts:
   maps_skipped: "%{name} contient plusieurs cartes. Choisissez celles à installer. Certains fichiers supplémentaires de ce téléchargement ont été ignorés."
 
 graphics:
+  subtitle: "Paramètres graphiques et de jeu de mastercomfig"
+  no_tf2: "Indiquez le dossier de TF2 dans les Paramètres pour utiliser mastercomfig."
+  status:
+    not_installed: "mastercomfig n'est pas installé"
+    install_hint: "Installez-le pour choisir un préréglage graphique."
+    installed: "mastercomfig %{version} est installé"
+    up_to_date: "mastercomfig %{version} est installé et à jour"
+    saves: "Chaque modification est enregistrée aussitôt."
+    outside: "mastercomfig %{version} est installé en dehors de TF2Tools"
+    outside_unknown: "mastercomfig est installé en dehors de TF2Tools"
+    take_over_hint: "Prenez-le en charge pour choisir un préréglage et modifier les paramètres ici."
+  toast:
+    installed_title: "mastercomfig installé"
+    installed: "mastercomfig %{version} est prêt. Choisissez un préréglage ci-dessous."
+    updated_title: "mastercomfig mis à jour"
+    updated: "Version actuelle\u00A0: %{version}."
+    checked_title: "Mises à jour vérifiées"
+    taken_over_title: "mastercomfig pris en charge"
+    taken_over: "TF2Tools gère désormais mastercomfig."
+    removed_title: "mastercomfig retiré"
+    removed: "mastercomfig n'est plus dans TF2."
+    preset_title: "Préréglage appliqué"
+    preset: "Le préréglage «\u00A0%{preset}\u00A0» s'applique au prochain lancement de TF2."
+    dropped_title: "Certains paramètres sont revenus au préréglage"
+    dropped: "Ces paramètres n'existent pas dans cette version de mastercomfig et sont revenus au préréglage\u00A0: %{names}."
+    own_kept: "Votre propre modules.cfg a été conservé, donc les paramètres ci-dessous ne sont pas utilisés. Modifiez-en un pour les utiliser à la place."
   settings_note:
     loading: "Chargement de la liste des paramètres..."
     offline: "La liste des paramètres nécessite une connexion Internet la première fois. Connectez-vous, puis rouvrez cette page."

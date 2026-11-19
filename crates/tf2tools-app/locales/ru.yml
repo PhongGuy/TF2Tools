@@ -2955,6 +2955,32 @@ install_parts:
   maps_skipped: "В %{name} несколько карт. Выберите, какие установить. Часть дополнительных файлов из этой загрузки пропущена."
 
 graphics:
+  subtitle: "Настройки графики и игры из mastercomfig"
+  no_tf2: "Укажите папку TF2 в настройках, чтобы пользоваться mastercomfig."
+  status:
+    not_installed: "mastercomfig не установлен"
+    install_hint: "Установите его, чтобы выбрать графический пресет."
+    installed: "mastercomfig %{version} установлен"
+    up_to_date: "mastercomfig %{version} установлен, обновлений нет"
+    saves: "Каждое изменение сохраняется сразу."
+    outside: "mastercomfig %{version} установлен не через TF2Tools"
+    outside_unknown: "mastercomfig установлен не через TF2Tools"
+    take_over_hint: "Возьмите его под управление, чтобы выбирать пресет и менять настройки здесь."
+  toast:
+    installed_title: "mastercomfig установлен"
+    installed: "mastercomfig %{version} готов. Выберите пресет ниже."
+    updated_title: "mastercomfig обновлён"
+    updated: "Теперь версия %{version}."
+    checked_title: "Обновления проверены"
+    taken_over_title: "mastercomfig под управлением"
+    taken_over: "Теперь mastercomfig управляет TF2Tools."
+    removed_title: "mastercomfig удалён"
+    removed: "mastercomfig больше нет в TF2."
+    preset_title: "Пресет применён"
+    preset: "Пресет «%{preset}» вступит в силу при следующем запуске TF2."
+    dropped_title: "Некоторые настройки вернулись к пресету"
+    dropped: "Этих настроек нет в этой версии mastercomfig, и они вернулись к пресету: %{names}."
+    own_kept: "Ваш собственный modules.cfg сохранён, поэтому настройки ниже не используются. Измените любую из них, чтобы использовать их вместо него."
   settings_note:
     loading: "Загрузка списка настроек..."
     offline: "В первый раз списку настроек нужно подключение к интернету. Подключитесь и откройте эту страницу снова."

@@ -2981,6 +2981,32 @@ install_parts:
   maps_skipped: "%{name} contém vários mapas. Escolha os que quer instalar. Alguns arquivos extras deste download foram ignorados."
 
 graphics:
+  subtitle: "Configurações gráficas e de jogo do mastercomfig"
+  no_tf2: "Defina a pasta do TF2 nas Configurações para usar o mastercomfig."
+  status:
+    not_installed: "O mastercomfig não está instalado"
+    install_hint: "Instale-o para escolher uma predefinição gráfica."
+    installed: "O mastercomfig %{version} está instalado"
+    up_to_date: "O mastercomfig %{version} está instalado e atualizado"
+    saves: "Cada alteração é salva na hora."
+    outside: "O mastercomfig %{version} está instalado fora do TF2Tools"
+    outside_unknown: "O mastercomfig está instalado fora do TF2Tools"
+    take_over_hint: "Assuma o controle para escolher uma predefinição e alterar as configurações aqui."
+  toast:
+    installed_title: "mastercomfig instalado"
+    installed: "O mastercomfig %{version} está pronto. Escolha uma predefinição abaixo."
+    updated_title: "mastercomfig atualizado"
+    updated: "Agora na versão %{version}."
+    checked_title: "Atualizações verificadas"
+    taken_over_title: "Controle do mastercomfig assumido"
+    taken_over: "O TF2Tools agora cuida do mastercomfig."
+    removed_title: "mastercomfig removido"
+    removed: "O mastercomfig não está mais no TF2."
+    preset_title: "Predefinição aplicada"
+    preset: "%{preset} vale a partir da próxima vez que o TF2 iniciar."
+    dropped_title: "Algumas configurações voltaram à predefinição"
+    dropped: "Estas configurações não existem nesta versão do mastercomfig e voltaram à predefinição: %{names}."
+    own_kept: "Seu próprio modules.cfg foi mantido, então as configurações abaixo não estão em uso. Altere uma para usá-las no lugar."
   settings_note:
     loading: "Carregando a lista de configurações..."
     offline: "A lista de configurações precisa de internet na primeira vez. Conecte-se e abra esta página de novo."

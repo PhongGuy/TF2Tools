@@ -9,10 +9,10 @@ use gpui_kit::{
 use tf2tools_core::{
     ApplyModulesError, ApplyPresetError, Choices, ComfigModule, InstallMastercomfigError,
     MastercomfigStatus, MastercomfigStatusError, ModuleCatalog, ModuleCatalogError, ModuleChoice,
-    Preset, RemoveMastercomfigError, TakeOverError, readable_name,
+    Preset, RemoveMastercomfigError, TakeOverError,
 };
 
-use crate::i18n::mastercomfig::choice_label;
+use crate::i18n::mastercomfig::{choice_label, module_label_by_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::{LocalFailure, game_moved, library_open, tf2_write};
@@ -42,7 +42,9 @@ pub(crate) fn foreign_modules_cfg() -> SharedString {
 }
 
 /// Added to the install or update toast when a player's own modules.cfg kept the saved settings out.
-pub const OWN_MODULES_CFG_KEPT: &str = "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.";
+pub fn own_modules_cfg_kept() -> SharedString {
+    tr!("graphics.toast.own_kept")
+}
 
 /// mastercomfig changed after the Graphics page loaded, so the action must be retried.
 fn stale_page() -> SharedString {
@@ -78,31 +80,41 @@ pub fn status_card(status: &MastercomfigStatus, latest: Option<&str>) -> StatusC
     }
 }
 
-/// The card's title line.
-pub fn headline(card: &StatusCard) -> String {
+/// The status row's headline: whether mastercomfig is installed, which version, and by whom.
+pub fn headline(card: &StatusCard) -> SharedString {
     match card {
-        StatusCard::NotInstalled => "mastercomfig isn't installed".to_owned(),
-        StatusCard::Installed { version, .. }
-        | StatusCard::Outside {
+        StatusCard::NotInstalled => tr!("graphics.status.not_installed"),
+        StatusCard::Installed { version, .. } if card_is_current(card) => {
+            tr!("graphics.status.up_to_date", version = version)
+        }
+        StatusCard::Installed { version, .. } => {
+            tr!("graphics.status.installed", version = version)
+        }
+        StatusCard::Outside {
             version: Some(version),
-        } => format!("mastercomfig {version}"),
-        StatusCard::Outside { version: None } => "mastercomfig".to_owned(),
+        } => tr!("graphics.status.outside", version = version),
+        StatusCard::Outside { version: None } => tr!("graphics.status.outside_unknown"),
     }
 }
 
-/// The line under the title; None for a managed install when no release is recorded.
-pub fn detail(card: &StatusCard) -> Option<String> {
+/// The line under the headline, saying what the player can do in this state.
+pub fn detail(card: &StatusCard) -> SharedString {
     match card {
-        StatusCard::NotInstalled => Some("Install it to pick a graphics preset.".to_owned()),
-        StatusCard::Installed { latest: None, .. } => None,
-        StatusCard::Installed {
-            latest: Some(_), ..
-        } => Some(match update_to(card) {
-            Some(tag) => format!("Update to {tag}"),
-            None => "Up to date".to_owned(),
-        }),
-        StatusCard::Outside { .. } => Some("Managed outside TF2Tools".to_owned()),
+        StatusCard::NotInstalled => tr!("graphics.status.install_hint"),
+        StatusCard::Installed { .. } => tr!("graphics.status.saves"),
+        StatusCard::Outside { .. } => tr!("graphics.status.take_over_hint"),
     }
+}
+
+// A managed install is current only when a release is recorded and none is newer.
+fn card_is_current(card: &StatusCard) -> bool {
+    matches!(
+        card,
+        StatusCard::Installed {
+            latest: Some(_),
+            ..
+        }
+    ) && update_to(card).is_none()
 }
 
 /// The recorded release tag when it is newer than a managed install's version. An install
@@ -329,13 +341,13 @@ pub fn catalog_note(err: &ModuleCatalogError) -> SettingsNote {
 }
 
 /// The sentence naming settings an update dropped; None when nothing was dropped.
-pub fn dropped_note(names: &[String]) -> Option<String> {
+pub fn dropped_note(names: &[String]) -> Option<SharedString> {
     if names.is_empty() {
         return None;
     }
-    let names: Vec<String> = names.iter().map(|n| readable_name(n)).collect();
-    Some(format!(
-        "These settings aren't in this mastercomfig version and went back to the preset: {}.",
-        names.join(", ")
-    ))
+    let names: Vec<String> = names
+        .iter()
+        .map(|n| module_label_by_name(n).to_string())
+        .collect();
+    Some(tr!("graphics.toast.dropped", names = names.join(", ")))
 }
