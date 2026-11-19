@@ -12,6 +12,7 @@ use tf2tools_core::{
     Preset, RemoveMastercomfigError, TakeOverError, readable_name,
 };
 
+use crate::i18n::mastercomfig::choice_label;
 use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::{LocalFailure, game_moved, library_open, tf2_write};
@@ -230,9 +231,6 @@ pub fn describe_take_over(err: &TakeOverError) -> LocalFailure {
     LocalFailure::new(message, err.to_string())
 }
 
-/// The Select entry that leaves a module unset, so the game's own value applies.
-pub const GAME_DEFAULT: &str = "Game default";
-
 /// One entry of a settings row's Select.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValueOption {
@@ -271,20 +269,20 @@ impl SelectItem for ValueOption {
     }
 }
 
-/// A row's Select entries: Game default first, then each value in catalog order.
+/// A row's Select entries: Let TF2 decide first, then each value in catalog order.
 pub fn value_options(module: &ComfigModule) -> Vec<ValueOption> {
-    let option = |label: &str, choice: ModuleChoice| ValueOption {
-        id: ids::graphics_value(module.name(), &choice),
-        label: SharedString::from(label.to_owned()),
-        choice,
-    };
-    std::iter::once(option(GAME_DEFAULT, ModuleChoice::NotSet))
+    std::iter::once(ModuleChoice::NotSet)
         .chain(
             module
                 .values()
                 .iter()
-                .map(|v| option(v.label(), ModuleChoice::Value(v.value().to_owned()))),
+                .map(|v| ModuleChoice::Value(v.value().to_owned())),
         )
+        .map(|choice| ValueOption {
+            id: ids::graphics_value(module.name(), &choice),
+            label: choice_label(module, &choice),
+            choice,
+        })
         .collect()
 }
 

@@ -5,8 +5,8 @@ use crate::support;
 use gpui_kit::ElementId;
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::{
-    GAME_DEFAULT, SettingsNote, catalog_note, describe_apply_modules, dropped_note,
-    settings_note_text, shown_choice, value_options,
+    SettingsNote, catalog_note, describe_apply_modules, dropped_note, settings_note_text,
+    shown_choice, value_options,
 };
 use tf2tools_core::{ApplyModulesError, Choices, ModuleCatalogError, ModuleChoice, Preset};
 
@@ -22,9 +22,9 @@ fn name(id: ElementId) -> String {
 }
 
 #[test]
-fn a_row_offers_game_default_then_each_value_in_order() {
+fn a_select_offers_let_tf2_decide_then_each_value_in_order() {
     let catalog = support::module_catalog();
-    let options = value_options(catalog.module("phong").unwrap());
+    let options = value_options(catalog.module("decals").unwrap());
     let shown: Vec<(&str, ModuleChoice)> = options
         .iter()
         .map(|o| (o.label(), o.choice().clone()))
@@ -32,13 +32,14 @@ fn a_row_offers_game_default_then_each_value_in_order() {
     assert_eq!(
         shown,
         [
-            (GAME_DEFAULT, ModuleChoice::NotSet),
+            ("Let TF2 decide", ModuleChoice::NotSet),
             ("Off", value("off")),
-            ("On", value("on")),
-            ("On + Rimlighting", value("rim")),
+            ("Low", value("low")),
+            ("Medium", value("medium")),
+            ("High", value("high")),
+            ("Ultra", value("ultra")),
         ]
     );
-    assert_eq!(GAME_DEFAULT, "Game default");
 }
 
 #[test]
@@ -131,6 +132,11 @@ fn dropped_settings_are_named_in_plain_words() {
 
 #[test]
 fn row_ids_name_the_module_and_value() {
+    assert_eq!(
+        name(ids::graphics_segment("lod", "high")),
+        "graphics-segment:lod=high"
+    );
+    assert_eq!(name(ids::graphics_switch("vsync")), "graphics-switch:vsync");
     assert_eq!(name(ids::graphics_module("lod")), "graphics-module:lod");
     assert_eq!(
         name(ids::graphics_module_reset("lod")),

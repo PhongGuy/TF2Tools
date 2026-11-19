@@ -2987,6 +2987,7 @@ graphics:
   not_set: "Que TF2 decida"
   row:
     preset_value: "%{preset}: %{value}"
+    reset: "Restablecer"
   module:
     lod:
       label: "Calidad de modelos"

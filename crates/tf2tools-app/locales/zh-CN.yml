@@ -2986,6 +2986,7 @@ graphics:
   not_set: "由 TF2 决定"
   row:
     preset_value: "%{preset}：%{value}"
+    reset: "重置"
   module:
     lod:
       label: "模型质量"

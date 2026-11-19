@@ -88,7 +88,7 @@ pub struct GraphicsPage {
     choices: Option<Choices>,
     /// The settings list's catalog, always for the managed install's version.
     catalog: Option<Arc<ModuleCatalog>>,
-    /// One Select per catalog module, built when the catalog arrives.
+    /// One Select per Select row of the catalog, built when the catalog arrives.
     selects: BTreeMap<String, ValueSelect>,
     /// Each Select's pick handler, rebuilt with the Selects.
     select_subscriptions: Vec<Subscription>,
@@ -193,6 +193,13 @@ impl GraphicsPage {
     /// The Select state of `module`'s row.
     pub fn module_select(&self, module: &str) -> Option<ValueSelect> {
         self.selects.get(module).cloned()
+    }
+
+    /// `module`'s row as the list draws it; None without a catalog or for an unknown module.
+    pub fn row(&self, module: &str) -> Option<view::RowView> {
+        let catalog = self.catalog.as_ref()?;
+        let module = catalog.module(module)?;
+        Some(view::row(catalog, &self.shown_against(), module))
     }
 
     fn managed_version(&self) -> Option<&str> {
@@ -587,8 +594,8 @@ impl GraphicsPage {
         .detach();
     }
 
-    // One Select per module of the held catalog, each on its shown value; a pick saves it, and
-    // a cleared Select changes nothing.
+    // One Select per Select row of the held catalog, each on its shown value; a pick saves it,
+    // and a cleared Select changes nothing.
     fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.selects.clear();
         self.select_subscriptions.clear();
@@ -596,7 +603,12 @@ impl GraphicsPage {
             return;
         };
         let choices = self.shown_against();
-        for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+        let select_rows = catalog
+            .categories()
+            .iter()
+            .flat_map(|c| c.modules())
+            .filter(|m| view::control_kind(m) == view::ControlKind::Select);
+        for module in select_rows {
             let shown = shown_choice(&catalog, &choices, module.name());
             let options = value_options(module);
             let select = cx.new(|cx| {

@@ -3,7 +3,7 @@
 use crate::support;
 
 use gpui_kit::TestAppContext;
-use support::graphics::{found, open, server_shell, shown, value, wait_for_list};
+use support::graphics::{found, open, row_value, server_shell, shown, value, wait_for_list};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::{SettingsNote, settings_note_text};
 use tf2tools_app::shell::route::Page;
@@ -32,9 +32,9 @@ fn a_saved_catalog_lists_every_module_with_the_preset_s_value(cx: &mut TestAppCo
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_module_description("lod")).as_deref(),
-        Some("Controls how detailed models are.")
+        Some("How detailed players, weapons and props are up close.")
     );
-    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
+    assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
     assert_eq!(shown(cx, &page, "fpscap"), Some(value("400")));
     assert_eq!(shown(cx, &page, "decals"), Some(value("low")));
     assert!(!support::present(
@@ -60,7 +60,7 @@ fn saved_choices_show_with_a_reset_on_their_rows(cx: &mut TestAppContext) {
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
     assert_eq!(shown(cx, &page, "fpscap"), Some(value("120")));
-    assert_eq!(shown(cx, &page, "lod"), Some(ModuleChoice::NotSet));
+    assert_eq!(row_value(cx, &page, "lod"), Some(ModuleChoice::NotSet));
     assert!(support::present(
         cx,
         s.win,
@@ -132,7 +132,7 @@ fn an_offline_note_asks_again_on_the_next_visit(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
-    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
+    assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
 }
 
 #[gpui_kit::test]
@@ -152,7 +152,7 @@ fn saved_settings_it_cannot_read_still_load_the_page(cx: &mut TestAppContext) {
         Some(MastercomfigStatus::Managed { .. })
     ));
     wait_for_list(cx, &s, &page);
-    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
+    assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
     assert!(
         !support::toast_labels(cx, s.win)
             .iter()

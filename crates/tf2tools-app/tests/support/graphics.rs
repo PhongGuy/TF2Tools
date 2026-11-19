@@ -1,7 +1,8 @@
 //! Driving the Graphics page's settings list.
 
 use gpui_kit::component::select::SelectEvent;
-use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point};
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::pages::graphics::model::ValueOption;
 use tf2tools_app::services::Tf2State;
@@ -67,6 +68,15 @@ pub fn shown(
     })
 }
 
+/// The value `module`'s row shows, whatever its control.
+pub fn row_value(
+    cx: &mut TestAppContext,
+    page: &Entity<GraphicsPage>,
+    module: &str,
+) -> Option<ModuleChoice> {
+    cx.update(|cx| page.read(cx).row(module).map(|r| r.shown))
+}
+
 /// The page's saved choice for `module`.
 pub fn saved(
     cx: &mut TestAppContext,
@@ -111,6 +121,26 @@ pub fn pick(
     })
     .unwrap();
     choose(cx, page, module, Some(choice));
+}
+
+/// Scrolls the Graphics page down a line at a time until `id` is on screen; panics if it never is.
+pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
+    let area = tf2tools_app::ids::page(Page::Graphics);
+    for _ in 0..200 {
+        let seen = cx
+            .update_window(s.win, |_, w, _| {
+                w.try_find(id.clone()).is_some_and(|e| e.visible())
+            })
+            .unwrap();
+        if seen {
+            return;
+        }
+        let down = ScrollDelta::Lines(point(0., -1.));
+        cx.update_window(s.win, |_, w, cx| w.scroll(area.clone(), down, cx))
+            .unwrap();
+        super::settle(cx, s.win);
+    }
+    panic!("{id:?} never showed on the Graphics page");
 }
 
 pub fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {

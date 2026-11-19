@@ -1935,6 +1935,13 @@ pub fn seed_mastercomfig_catalog(env: &Env, tag: &str) {
     std::fs::write(dir.join("preset_modules.json"), MC_PRESET_MODULES).unwrap();
 }
 
+/// Saves the full 9.100.1 catalogue as release `tag`'s, for rows that need every module.
+pub fn seed_full_mastercomfig_catalog(env: &Env, tag: &str) {
+    seed_mastercomfig_catalog(env, tag);
+    let dir = env.data.mastercomfig_dir().join(tag);
+    std::fs::write(dir.join("modules.json"), MC_MODULES_FULL).unwrap();
+}
+
 /// Sets the saved module choices of a managed install, as JSON (`{"fpscap":"120","lod":null}`).
 pub fn seed_mastercomfig_choices(env: &Env, modules: &str) {
     rusqlite::Connection::open(env.data.db_path())

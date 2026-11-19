@@ -1019,7 +1019,33 @@ pub fn graphics_module_reset(name: &str) -> ElementId {
     keyed("graphics-module-reset", name)
 }
 
-/// One entry of a row's Select: "graphics-value:<module>=<value>", empty for Game default.
+/// A settings row: "graphics-row:<module>".
+pub fn graphics_row(module: &str) -> ElementId {
+    keyed("graphics-row", module)
+}
+
+/// An off/on row's Switch: "graphics-switch:<module>".
+pub fn graphics_switch(module: &str) -> ElementId {
+    keyed("graphics-switch", module)
+}
+
+/// The frame of a row's segmented control: "graphics-segments:<module>".
+pub fn graphics_segments(module: &str) -> ElementId {
+    keyed("graphics-segments", module)
+}
+
+/// One segment of a row's segmented control: "graphics-segment:<module>=<value>".
+pub fn graphics_segment(module: &str, value: &str) -> ElementId {
+    keyed("graphics-segment", &format!("{module}={value}"))
+}
+
+/// A changed row's "Preset: value" line, labelled with its text:
+/// "graphics-module-preset:<module>".
+pub fn graphics_module_preset(module: &str) -> ElementId {
+    keyed("graphics-module-preset", module)
+}
+
+/// One entry of a row's Select: "graphics-value:<module>=<value>", empty for Let TF2 decide.
 pub fn graphics_value(module: &str, choice: &ModuleChoice) -> ElementId {
     let value = match choice {
         ModuleChoice::Value(v) => v.as_str(),

@@ -2962,6 +2962,7 @@ graphics:
   not_set: "Пусть решает TF2"
   row:
     preset_value: "%{preset}: %{value}"
+    reset: "Сбросить"
   module:
     lod:
       label: "Качество моделей"
