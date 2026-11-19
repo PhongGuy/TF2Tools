@@ -186,3 +186,15 @@ fn the_hud_maker_meters_use_the_client_names() {
     );
     assert!(text("hud_maker.situation.switch.koth").contains("山丘之王"));
 }
+
+#[test]
+fn the_hud_maker_names_its_parts_in_chinese() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("zh-CN", format!("hud_maker.part_name.{k}"))
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert_ne!(text("health_value"), "Health value");
+    assert_ne!(text("kill_streak_icon"), "Killstreak icon");
+    assert!(text("rune_haste").contains("急速"));
+}
