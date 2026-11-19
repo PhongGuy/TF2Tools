@@ -30,6 +30,8 @@ const THUMB_WIDTH: f32 = 96.;
 const THUMB_HEIGHT: f32 = 54.;
 /// The compare view's widest size; it shrinks with a narrow page.
 const COMPARE_MAX_WIDTH: f32 = 720.;
+/// The wipe line, centred on the clip's left edge.
+const WIPE_LINE_WIDTH: f32 = 2.;
 /// From this wipe on, the player's side is too thin to draw.
 const WIPE_ALL_PRESET: f32 = 0.995;
 
@@ -273,7 +275,8 @@ fn compare(
                     .top_0()
                     .bottom_0()
                     .left(relative(w))
-                    .w(px(2.))
+                    .ml(px(-WIPE_LINE_WIDTH / 2.))
+                    .w(px(WIPE_LINE_WIDTH))
                     .bg(hsla(0., 0., 1., 1.))
             });
             let clip = (w < WIPE_ALL_PRESET).then(|| {

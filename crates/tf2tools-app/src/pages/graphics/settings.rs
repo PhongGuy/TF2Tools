@@ -279,10 +279,14 @@ fn row(
     let toggle = pictures
         .as_ref()
         .map(|_| h_flex().child(picture_panel::toggle(page, name, cx)));
-    let panel = pictures
-        .as_ref()
+    // The open panel compares the crops while zoom is on, the same pictures the page wants;
+    // the thumbnail and strip stay on the full pictures.
+    let panel = page
+        .pictures
+        .as_deref()
         .filter(|_| page.open_row() == Some(name))
-        .map(|p| picture_panel::panel(page, name, p, cx));
+        .and_then(|index| pictures::row_pictures(index, &row, page.zoom()))
+        .map(|p| picture_panel::panel(page, name, &p, cx));
     let tint = Hsla::from(rgb(CHANGED));
     let text = v_flex()
         .flex_1()

@@ -4,10 +4,13 @@ use crate::support;
 
 use gpui_kit::component::slider::{SliderEvent, SliderValue};
 use gpui_kit::{AppContext as _, Bounds, ElementId, Entity, Pixels, TestAppContext, px, size};
-use support::graphics::{picture_page, picture_url, reveal, toggle_pictures, wants};
+use support::graphics::{
+    found, no_network, open, picture_page, picture_url, reveal, toggle_pictures, wait_for_list,
+    wait_for_pictures, wants,
+};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
-use tf2tools_app::remote_images::ImageKey;
+use tf2tools_app::remote_images::{ImageKey, RemoteImages};
 
 fn near(a: Pixels, b: Pixels) -> bool {
     (a - b).abs() <= px(1.)
@@ -179,4 +182,44 @@ fn zoom_swaps_both_pictures_for_their_crops_on_every_row(cx: &mut TestAppContext
     );
     assert!(cx.update(|cx| page.read(cx).zoom()), "zoom is page-wide");
     assert!(wants_compared(cx, &s, &page, "decals", "low.webp"));
+}
+
+/// Whether `module`'s compare picture on `side` has decoded and is drawn.
+fn compare_drawn(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    module: &str,
+    side: &str,
+) -> bool {
+    support::settle(cx, s.win);
+    support::present(cx, s.win, ids::graphics_compare_image(module, side))
+}
+
+#[gpui_kit::test]
+fn the_compare_view_draws_the_pictures_it_asked_for_with_zoom_on_and_off(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    cx.executor().allow_parking();
+    cx.update(|cx| RemoteImages::install(cx, no_network()));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    wait_for_pictures(cx, &s, &page);
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_zoom("lod"));
+    support::click_id(cx, s.win, ids::graphics_zoom("lod"));
+    // texture_filter's full pictures were never asked for, so its compare view only fills
+    // when it draws the crops the page wants.
+    toggle_pictures(cx, &s, "texture_filter");
+    reveal(cx, &s, ids::graphics_compare("texture_filter"));
+    support::wait_real(cx, "the zoomed compare picture", |cx| {
+        compare_drawn(cx, &s, "texture_filter", "preset")
+    });
+    reveal(cx, &s, ids::graphics_zoom("texture_filter"));
+    support::click_id(cx, s.win, ids::graphics_zoom("texture_filter"));
+    assert!(!cx.update(|cx| page.read(cx).zoom()));
+    support::wait_real(cx, "the full compare picture", |cx| {
+        compare_drawn(cx, &s, "texture_filter", "preset")
+    });
 }
