@@ -25,3 +25,19 @@ fn the_graphics_settings_note_reads_in_russian(cx: &mut TestAppContext) {
         )
     );
 }
+
+#[gpui_kit::test]
+fn a_russian_search_finds_the_translated_name_in_any_case(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    let name = support::label_of(cx, s.win, ids::graphics_module("shadows")).unwrap();
+    assert_ne!(name, "Shadows", "the row reads in Russian");
+    graphics::search(cx, &s, &page, &name.to_uppercase());
+    assert!(support::present(cx, s.win, ids::graphics_row("shadows")));
+    assert!(!support::present(cx, s.win, ids::graphics_row("lod")));
+}

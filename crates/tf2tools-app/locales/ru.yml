@@ -2970,6 +2970,13 @@ graphics:
     chip_saved: "%{name}: %{now}"
     undo: "Вернуть «%{name}» к значению «%{was}»"
     reset_all: "Сбросить всё"
+  settings:
+    search: "Поиск настроек"
+    changed_only: "Только изменённые"
+    no_match: "Нет настроек по запросу «%{query}»."
+    nothing_changed: "Ничто не отличается от пресета «%{preset}»."
+    show_all: "Показать все настройки"
+    has_changes: "Есть изменения"
   module:
     lod:
       label: "Качество моделей"

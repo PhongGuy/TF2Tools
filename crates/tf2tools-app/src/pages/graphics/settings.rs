@@ -1,67 +1,229 @@
-//! The Graphics page's settings list: one row per mastercomfig module, grouped by category,
-//! or a note in its place while there is no catalog.
+//! The Graphics page's settings list: the search toolbar, one section per mastercomfig
+//! category with a row per module, the empty state and the category rail; a note in their
+//! place while there is no catalog.
 
-use gpui_kit::component::button::{Button, Toggle};
+use std::collections::BTreeMap;
+
+use gpui_kit::assets::IconName;
+use gpui_kit::component::Icon;
+use gpui_kit::component::button::{Button, ButtonVariants as _, Toggle};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::select::Select;
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Styled as _, TestSupportExt as _, div, px, rgb, transparent_black,
+    ParentElement as _, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    rgb, transparent_black,
 };
-use tf2tools_core::{ModuleCatalog, ModuleChoice};
+use tf2tools_core::ModuleChoice;
 
 use super::GraphicsPage;
-use super::model::{SettingsNote, settings_note_text};
-use super::view::{self, ControlKind, Filter, RowView};
+use super::model::{SettingsNote, preset_label, settings_note_text};
+use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
 use crate::i18n::tr;
 use crate::ids;
+use crate::shell::CONTENT_PADDING;
 use crate::widgets::labelled;
 
-/// The section: the list, or the note while there is no catalog.
-pub(super) fn section(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
-    let body = match &page.catalog {
-        Some(catalog) => list(page, catalog, cx),
-        None => labelled(
-            div().text_sm().text_color(cx.theme().muted_foreground),
-            ids::GRAPHICS_SETTINGS_NOTE,
-            settings_note_text(page.settings_note().unwrap_or(SettingsNote::Loading)),
-        )
-        .into_any_element(),
+/// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
+/// search toolbar (or the note while there is no catalog), one section per category with shown
+/// rows, then the empty state. Records each section's child index in `items` for the rail.
+pub(super) fn push(
+    page: &GraphicsPage,
+    sections: Option<&[SectionView]>,
+    narrow: bool,
+    children: &mut Vec<AnyElement>,
+    items: &mut BTreeMap<String, usize>,
+    cx: &mut Context<GraphicsPage>,
+) {
+    let Some(sections) = sections else {
+        let note = settings_note_text(page.settings_note().unwrap_or(SettingsNote::Loading));
+        children.push(
+            v_flex()
+                .id(ids::GRAPHICS_SETTINGS)
+                .test_support()
+                .child(labelled(
+                    div().text_sm().text_color(cx.theme().muted_foreground),
+                    ids::GRAPHICS_SETTINGS_NOTE,
+                    note,
+                ))
+                .into_any_element(),
+        );
+        return;
     };
-    v_flex()
+    if narrow {
+        children.push(rail(sections, true, cx));
+    }
+    children.push(toolbar(page, cx));
+    for section in sections.iter().filter(|s| !s.rows.is_empty()) {
+        items.insert(section.key.clone(), children.len());
+        children.push(section_view(page, section, cx));
+    }
+    if let Some(empty) = empty(page, sections, cx) {
+        children.push(empty);
+    }
+}
+
+// The search box and the "Changed only" switch over the list.
+fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
+    let muted = cx.theme().muted_foreground;
+    h_flex()
         .id(ids::GRAPHICS_SETTINGS)
         .test_support()
-        .child(body)
+        .gap_4()
+        .child(
+            div()
+                .id(ids::GRAPHICS_SEARCH)
+                .test_support()
+                .flex_1()
+                .min_w_0()
+                .max_w(px(320.))
+                .child(
+                    Input::new(&page.search)
+                        .h_9()
+                        .prefix(Icon::new(IconName::Search).text_color(muted)),
+                ),
+        )
+        .child(
+            Switch::new(ids::GRAPHICS_CHANGED_ONLY)
+                .checked(page.changed_only)
+                .label(tr!("graphics.settings.changed_only"))
+                .on_click(cx.listener(|page, on: &bool, _, cx| page.set_changed_only(*on, cx))),
+        )
         .into_any_element()
 }
 
-// Each category's heading over its rows, in the catalog's order, drawn from the view-model.
-fn list(
+// A category's heading over its shown rows.
+fn section_view(
     page: &GraphicsPage,
-    catalog: &ModuleCatalog,
+    section: &SectionView,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
-    let sections = view::sections(catalog, &page.shown_against(), &Filter::default());
-    let groups: Vec<AnyElement> = sections
-        .into_iter()
-        .map(|section| {
-            let rows: Vec<AnyElement> =
-                section.rows.into_iter().map(|r| row(page, r, cx)).collect();
-            v_flex()
-                .gap_2()
-                .child(labelled(
-                    div().font_weight(FontWeight::SEMIBOLD),
-                    ids::graphics_category(&section.key),
-                    section.label,
-                ))
-                .children(rows)
-                .into_any_element()
-        })
+    let rows: Vec<AnyElement> = section
+        .rows
+        .iter()
+        .map(|r| row(page, r.clone(), cx))
         .collect();
-    v_flex().gap_6().children(groups).into_any_element()
+    v_flex()
+        .id(ids::graphics_section(&section.key))
+        .test_support()
+        .gap_2()
+        .child(labelled(
+            div().font_weight(FontWeight::SEMIBOLD),
+            ids::graphics_category(&section.key),
+            section.label.clone(),
+        ))
+        .children(rows)
+        .into_any_element()
 }
+
+// Why no row shows, with "Show all settings". An empty catalogue with no query has nothing to
+// blame, so it says nothing rather than quote an empty query.
+fn empty(
+    page: &GraphicsPage,
+    sections: &[SectionView],
+    cx: &mut Context<GraphicsPage>,
+) -> Option<AnyElement> {
+    let text = match view::empty_state(sections, &page.filter(cx))? {
+        EmptyState::NoMatch(query) if query.is_empty() => return None,
+        EmptyState::NoMatch(query) => tr!("graphics.settings.no_match", query = query),
+        EmptyState::NothingChanged => tr!(
+            "graphics.settings.nothing_changed",
+            preset = preset_label(page.shown_against().preset())
+        ),
+    };
+    let muted = cx.theme().muted_foreground;
+    Some(
+        v_flex()
+            .items_start()
+            .gap_3()
+            .child(labelled(
+                div().text_sm().text_color(muted),
+                ids::GRAPHICS_EMPTY,
+                text,
+            ))
+            .child(
+                Button::new(ids::GRAPHICS_SHOW_ALL)
+                    .outline()
+                    .small()
+                    .label(tr!("graphics.settings.show_all"))
+                    .on_click(cx.listener(|page, _, window, cx| page.show_all(window, cx))),
+            )
+            .into_any_element(),
+    )
+}
+
+/// The category rail: a column of entries beside the list, or a row of chips above it when
+/// `narrow`. Each entry names its category, dots it while it has changes and counts its
+/// modules; one whose section shows no rows is dimmed and does nothing.
+pub(super) fn rail(
+    sections: &[SectionView],
+    narrow: bool,
+    cx: &mut Context<GraphicsPage>,
+) -> AnyElement {
+    let muted = cx.theme().muted_foreground;
+    let dot = Hsla::from(rgb(CHANGED));
+    let entries = sections.iter().map(|section| {
+        let key = section.key.clone();
+        let mark = section.has_changes.then(|| {
+            div()
+                .id(ids::graphics_rail_dot(&section.key))
+                .aria_label(tr!("graphics.settings.has_changes"))
+                .test_support()
+                .flex_none()
+                .size(px(6.))
+                .rounded_full()
+                .bg(dot)
+        });
+        let button = Button::new(ids::graphics_rail(&section.key))
+            .small()
+            .accessibility_label(section.label.clone())
+            .disabled(section.rows.is_empty())
+            .on_click(cx.listener(move |page, _, _, cx| page.jump(&key, cx)))
+            .child(
+                h_flex()
+                    .when(!narrow, |this| this.w_full())
+                    .gap_2()
+                    .child(div().flex_1().child(section.label.clone()))
+                    .children(mark)
+                    .child(labelled(
+                        div().text_xs().text_color(muted),
+                        ids::graphics_rail_count(&section.key),
+                        section.count.to_string(),
+                    )),
+            );
+        if narrow {
+            button.outline()
+        } else {
+            button.ghost().w_full()
+        }
+    });
+    if narrow {
+        h_flex()
+            .id(ids::GRAPHICS_RAIL)
+            .test_support()
+            .flex_wrap()
+            .gap_2()
+            .children(entries)
+            .into_any_element()
+    } else {
+        v_flex()
+            .id(ids::GRAPHICS_RAIL)
+            .test_support()
+            .flex_none()
+            .w(px(RAIL_WIDTH))
+            .pt(CONTENT_PADDING)
+            .pl(CONTENT_PADDING)
+            .gap_1()
+            .children(entries)
+            .into_any_element()
+    }
+}
+
+/// The wide rail's entry width, enough for the longest category name beside its count.
+const RAIL_WIDTH: f32 = 200.;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 const CHANGED: u32 = 0x1447e6;

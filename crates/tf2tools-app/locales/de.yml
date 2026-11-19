@@ -2995,6 +2995,13 @@ graphics:
     chip_saved: "%{name}: %{now}"
     undo: "%{name} auf %{was} zurücksetzen"
     reset_all: "Alle zurücksetzen"
+  settings:
+    search: "Einstellungen durchsuchen"
+    changed_only: "Nur geänderte"
+    no_match: "Keine Einstellung passt zu „%{query}“."
+    nothing_changed: "Nichts weicht von %{preset} ab."
+    show_all: "Alle Einstellungen zeigen"
+    has_changes: "Hat Änderungen"
   module:
     lod:
       label: "Modellqualität"

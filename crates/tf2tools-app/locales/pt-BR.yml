@@ -2996,6 +2996,13 @@ graphics:
     chip_saved: "%{name}: %{now}"
     undo: "Voltar %{name} para %{was}"
     reset_all: "Redefinir tudo"
+  settings:
+    search: "Buscar configurações"
+    changed_only: "Só as alteradas"
+    no_match: "Nenhuma configuração corresponde a “%{query}”."
+    nothing_changed: "Nada difere de %{preset}."
+    show_all: "Mostrar todas as configurações"
+    has_changes: "Tem alterações"
   module:
     lod:
       label: "Qualidade dos modelos"

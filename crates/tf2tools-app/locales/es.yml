@@ -2995,6 +2995,13 @@ graphics:
     chip_saved: "%{name}: %{now}"
     undo: "Devolver %{name} a %{was}"
     reset_all: "Restablecer todo"
+  settings:
+    search: "Buscar ajustes"
+    changed_only: "Solo los cambiados"
+    no_match: "Ningún ajuste coincide con «%{query}»."
+    nothing_changed: "Nada difiere de %{preset}."
+    show_all: "Mostrar todos los ajustes"
+    has_changes: "Tiene cambios"
   module:
     lod:
       label: "Calidad de modelos"

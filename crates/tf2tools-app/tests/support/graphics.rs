@@ -143,6 +143,21 @@ pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
     panic!("{id:?} never showed on the Graphics page");
 }
 
+/// Types `text` into the settings search as the player would.
+pub fn search(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<GraphicsPage>,
+    text: &str,
+) {
+    let input = cx.update(|cx| page.read(cx).search_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value(text, window, cx))
+    })
+    .unwrap();
+    super::settle(cx, s.win);
+}
+
 pub fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {
     super::wait_real(cx, "the page to settle", |cx| {
         cx.update(|cx| !page.read(cx).is_busy())

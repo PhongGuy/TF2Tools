@@ -87,6 +87,7 @@ fn a_segment_picks_its_value_and_a_second_click_changes_nothing(cx: &mut TestApp
     let (s, page) = full_page(cx, &env, "{}");
     assert!(cx.update(|cx| page.read(cx).module_select("lod")).is_none());
     assert_eq!(checked(cx, &s, "lod", "medium"), Some(true));
+    reveal(cx, &s, ids::graphics_segment("lod", "high"));
     support::click_id(cx, s.win, ids::graphics_segment("lod", "high"));
     support::wait_real(cx, "lod high", |cx| {
         saved(cx, &page, "lod") == Some(value("high"))
@@ -98,6 +99,7 @@ fn a_segment_picks_its_value_and_a_second_click_changes_nothing(cx: &mut TestApp
     );
     assert_eq!(checked(cx, &s, "lod", "high"), Some(true));
     assert_eq!(checked(cx, &s, "lod", "medium"), Some(false));
+    reveal(cx, &s, ids::graphics_segment("lod", "high"));
     support::click_id(cx, s.win, ids::graphics_segment("lod", "high"));
     idle(cx, &page);
     assert_eq!(

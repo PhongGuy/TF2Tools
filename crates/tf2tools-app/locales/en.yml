@@ -2972,6 +2972,13 @@ graphics:
     chip_saved: "%{name}: %{now}"
     undo: "Put %{name} back to %{was}"
     reset_all: "Reset all"
+  settings:
+    search: "Search settings"
+    changed_only: "Changed only"
+    no_match: "No setting matches \"%{query}\"."
+    nothing_changed: "Nothing differs from %{preset}."
+    show_all: "Show all settings"
+    has_changes: "Has changes"
   module:
     lod:
       label: "Model quality"

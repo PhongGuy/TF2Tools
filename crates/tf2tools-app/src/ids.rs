@@ -887,6 +887,16 @@ pub const GRAPHICS_RESET_ALL: &str = "graphics-reset-all";
 pub const GRAPHICS_CHANGES: &str = "graphics-changes";
 /// The dashed strip shown while nothing differs from the preset, labelled with its text.
 pub const GRAPHICS_NO_CHANGES: &str = "graphics-no-changes";
+/// The settings search box.
+pub const GRAPHICS_SEARCH: &str = "graphics-search";
+/// The "Changed only" switch beside the search.
+pub const GRAPHICS_CHANGED_ONLY: &str = "graphics-changed-only";
+/// Shown in place of the rows when none pass the filter, labelled with why.
+pub const GRAPHICS_EMPTY: &str = "graphics-empty";
+/// The empty state's "Show all settings": clears the search and "Changed only".
+pub const GRAPHICS_SHOW_ALL: &str = "graphics-show-all";
+/// The category rail, a column beside the list or a chip row above it when narrow.
+pub const GRAPHICS_RAIL: &str = "graphics-rail";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
@@ -1031,6 +1041,26 @@ pub fn graphics_change(module: &str) -> ElementId {
 /// A change chip's undo button: "graphics-change-undo:<module>".
 pub fn graphics_change_undo(module: &str) -> ElementId {
     keyed("graphics-change-undo", module)
+}
+
+/// A category rail entry, labelled with the category's name: "graphics-rail:<key>".
+pub fn graphics_rail(key: &str) -> ElementId {
+    keyed("graphics-rail", key)
+}
+
+/// A rail entry's module count, labelled with it: "graphics-rail-count:<key>".
+pub fn graphics_rail_count(key: &str) -> ElementId {
+    keyed("graphics-rail-count", key)
+}
+
+/// A rail entry's dot, drawn only while its category has changes: "graphics-rail-dot:<key>".
+pub fn graphics_rail_dot(key: &str) -> ElementId {
+    keyed("graphics-rail-dot", key)
+}
+
+/// A category's section in the settings list: "graphics-section:<key>".
+pub fn graphics_section(key: &str) -> ElementId {
+    keyed("graphics-section", key)
 }
 
 /// A settings row: "graphics-row:<module>".

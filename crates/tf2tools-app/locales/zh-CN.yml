@@ -2994,6 +2994,13 @@ graphics:
     chip_saved: "%{name}：%{now}"
     undo: "将 %{name} 恢复为 %{was}"
     reset_all: "全部重置"
+  settings:
+    search: "搜索设置"
+    changed_only: "仅显示已更改"
+    no_match: "没有与“%{query}”匹配的设置。"
+    nothing_changed: "与 %{preset} 没有任何不同。"
+    show_all: "显示全部设置"
+    has_changes: "有更改"
   module:
     lod:
       label: "模型质量"

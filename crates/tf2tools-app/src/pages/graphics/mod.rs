@@ -10,11 +10,12 @@ use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, AppContext as _, Context, Entity, FontWeight,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, Role,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     TestSupportExt as _, Window, div, px,
@@ -31,6 +32,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
@@ -39,6 +41,7 @@ use model::{
     describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
     preset_label, shown_choice, status_card, update_to, value_options,
 };
+use view::Filter;
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
 const FOOTER: &str = "Changes apply the next time TF2 starts.";
@@ -96,14 +99,31 @@ pub struct GraphicsPage {
     note: Option<SettingsNote>,
     /// The version whose catalog this visit already asked GitHub for.
     asked: Option<String>,
+    /// The settings search; rows filter on its value at render.
+    search: Entity<InputState>,
+    /// "Changed only" is on: the list shows only rows that differ from the preset.
+    changed_only: bool,
+    /// Each shown section's child index in the scroll column, from the last render.
+    section_items: BTreeMap<String, usize>,
     scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
+
+/// Below this page width the category rail becomes a chip row above the settings.
+const NARROW: f32 = 900.;
 
 impl GraphicsPage {
     /// Needs the `Services` and `Tf2Global` globals. Loads the status and release off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
+        let search =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("graphics.settings.search")));
+        // The list filters from the input's value at render, so each edit just redraws.
+        let searched = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        });
         let mut page = Self {
             win: window.window_handle(),
             status: None,
@@ -119,11 +139,52 @@ impl GraphicsPage {
             select_subscriptions: Vec::new(),
             note: None,
             asked: None,
+            search,
+            changed_only: false,
+            section_items: BTreeMap::new(),
             scroll: ScrollHandle::new(),
-            _subscriptions: vec![tf2],
+            _subscriptions: vec![tf2, searched],
         };
         page.reload(cx);
         page
+    }
+
+    /// The settings search box's state.
+    pub fn search_input(&self) -> &Entity<InputState> {
+        &self.search
+    }
+
+    /// Whether "Changed only" is on.
+    pub fn changed_only(&self) -> bool {
+        self.changed_only
+    }
+
+    // What the list shows: the search's value and "Changed only".
+    fn filter(&self, cx: &App) -> Filter {
+        Filter {
+            query: self.search.read(cx).value().to_string(),
+            changed_only: self.changed_only,
+        }
+    }
+
+    fn set_changed_only(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.changed_only = on;
+        cx.notify();
+    }
+
+    // Clears the search and "Changed only", so every row shows again.
+    fn show_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.search
+            .update(cx, |search, cx| search.set_value("", window, cx));
+        self.set_changed_only(false, cx);
+    }
+
+    // Scrolls the category `key`'s section to the top of the page, if it is drawn.
+    fn jump(&mut self, key: &str, cx: &mut Context<Self>) {
+        if let Some(&item) = self.section_items.get(key) {
+            self.scroll.scroll_to_top_of_item(item);
+            cx.notify();
+        }
     }
 
     /// True once a load has ended, failed or not, with or without TF2.
@@ -672,6 +733,48 @@ impl Render for GraphicsPage {
                 cx,
             )
         });
+        // Each section must be a direct child of the scroll column, so the rail can scroll
+        // to it by index; the children are gathered first to learn those indices.
+        let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
+        let filter = self.filter(cx);
+        let sections = self
+            .catalog
+            .as_deref()
+            .filter(|_| self.preset().is_some())
+            .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
+        let mut children: Vec<AnyElement> = Vec::new();
+        children.extend(warning.map(IntoElement::into_any_element));
+        children.push(
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::GRAPHICS_SUBTITLE,
+                "Graphics and game settings from mastercomfig",
+            )
+            .into_any_element(),
+        );
+        children.extend(self.card().map(|card| self.status_card(&card, cx)));
+        let mut items = BTreeMap::new();
+        if let Some(preset) = self.preset() {
+            children.push(self.presets(preset, window, cx));
+            children.push(self.changes_strip(preset, cx));
+            settings::push(
+                self,
+                sections.as_deref(),
+                narrow,
+                &mut children,
+                &mut items,
+                cx,
+            );
+            children.push(
+                labelled(
+                    div().text_sm().text_color(cx.theme().muted_foreground),
+                    ids::GRAPHICS_FOOTER,
+                    FOOTER,
+                )
+                .into_any_element(),
+            );
+        }
+        self.section_items = items;
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -680,27 +783,17 @@ impl Render for GraphicsPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning)
-            .child(labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::GRAPHICS_SUBTITLE,
-                "Graphics and game settings from mastercomfig",
-            ))
-            .children(self.card().map(|card| self.status_card(&card, cx)))
-            .children(
-                self.preset()
-                    .map(|current| self.presets(current, window, cx)),
-            )
-            .children(self.preset().map(|preset| self.changes_strip(preset, cx)))
-            .children(self.preset().map(|_| settings::section(self, cx)))
-            .children(self.preset().map(|_| {
-                labelled(
-                    div().text_sm().text_color(cx.theme().muted_foreground),
-                    ids::GRAPHICS_FOOTER,
-                    FOOTER,
-                )
-            }));
-        scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
+            .children(children);
+        let column = scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content);
+        let rail = sections
+            .as_deref()
+            .filter(|_| !narrow)
+            .map(|sections| settings::rail(sections, false, cx));
+        h_flex()
+            .size_full()
+            .items_start()
+            .children(rail)
+            .child(column.flex_1().min_w_0().h_full())
     }
 }
 

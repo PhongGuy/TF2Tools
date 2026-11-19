@@ -64,6 +64,7 @@ mod gb_map_installs;
 mod global_player;
 mod graphics;
 mod graphics_changes;
+mod graphics_filter;
 mod graphics_model;
 mod graphics_rows;
 mod graphics_settings;
