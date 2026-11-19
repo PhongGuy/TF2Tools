@@ -15,8 +15,8 @@ use std::sync::{Arc, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use tf2tools_core::shoot::{self, SAME_LOOK_RMSE, ShotAction};
-use tf2tools_core::{PictureManifest, Reload, SettingShot, Tf2Install, tf2_running};
+use tf2tools_core::shoot::{self, SAME_LOOK_RMSE, ShotAction, ZoomGeometry};
+use tf2tools_core::{Crop, PictureManifest, Reload, SettingShot, Tf2Install, tf2_running};
 use walkdir::WalkDir;
 
 const USAGE: &str = "usage: shoot_setting_pictures [--only <module>] [--window-at X,Y] [--assets <dir>] [--dry-run]";
@@ -313,6 +313,38 @@ fn convert_args(jpg: &Path, webp: &Path, [width, height]: [u32; 2]) -> Vec<Strin
     ]
 }
 
+/// The `magick` arguments that cut a zoom from the full-size screenshot and double it.
+fn zoom_args(jpg: &Path, zoom: &Path, g: ZoomGeometry) -> Vec<String> {
+    vec![
+        jpg.display().to_string(),
+        "-crop".to_owned(),
+        format!("{}x{}+{}+{}", g.w, g.h, g.x, g.y),
+        "+repage".to_owned(),
+        "-resize".to_owned(),
+        format!("{}x{}!", g.out_w, g.out_h),
+        "-quality".to_owned(),
+        "80".to_owned(),
+        zoom.display().to_string(),
+    ]
+}
+
+/// Runs magick on a screenshot with `args`; a failure names the screenshot and magick's error.
+fn magick(jpg: &Path, args: &[String]) -> Result<(), String> {
+    let out = Command::new("magick")
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("starting magick: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "magick could not convert {}: {}",
+        jpg.display(),
+        String::from_utf8_lossy(&out.stderr).trim()
+    ))
+}
+
 /// What the run prints at the end: every shot's duration and the look-alike pairs.
 struct Report {
     started: Instant,
@@ -377,11 +409,15 @@ impl Shot<'_> {
                     session.launch(self.manifest, map, Some((&self.setting.module, value)))?;
                 }
                 ShotAction::Jpeg(name) => {
-                    let webp = self
-                        .assets
-                        .join(&self.setting.module)
-                        .join(format!("{}.webp", self.value()?));
-                    session.take_picture(name, &webp, self.manifest.size)?;
+                    let value = self.value()?;
+                    let dir = self.assets.join(&self.setting.module);
+                    let webp = dir.join(format!("{value}.webp"));
+                    let zoom = self
+                        .setting
+                        .crop
+                        .map(|crop| (crop, dir.join(format!("{value}.zoom.webp"))));
+                    let zoom = zoom.as_ref().map(|(crop, path)| (*crop, path.as_path()));
+                    session.take_picture(name, &webp, self.manifest.size, zoom)?;
                 }
                 other => return Err(format!("the shooter cannot run {other:?}")),
             }
@@ -490,6 +526,12 @@ fn dry_run(manifest: &PictureManifest, settings: &[&SettingShot]) -> String {
                 &actions,
                 Some((&setting.module, value)),
             );
+            if let Some(c) = setting.crop {
+                out.push_str(&format!(
+                    "// zoom {}/{value}.zoom.webp from crop {}x{}+{}+{} at 2x\n",
+                    setting.module, c.w, c.h, c.x, c.y
+                ));
+            }
         }
         render(
             &mut out,
@@ -1022,8 +1064,15 @@ impl Session {
     }
 
     /// Takes screenshot `name`, waits for the game to finish writing it, converts it to
-    /// `webp` at `size` with magick and removes the screenshot.
-    fn take_picture(&mut self, name: &str, webp: &Path, size: [u32; 2]) -> Result<(), String> {
+    /// `webp` at `size` with magick, cuts the zoom from the same screenshot when the setting
+    /// has a crop, and removes the screenshot.
+    fn take_picture(
+        &mut self,
+        name: &str,
+        webp: &Path,
+        size: [u32; 2],
+        zoom: Option<(Crop, &Path)>,
+    ) -> Result<(), String> {
         let jpg = self.tf.join("screenshots").join(format!("{name}.jpg"));
         if jpg.exists() {
             fs::remove_file(&jpg).map_err(|e| format!("removing {}: {e}", jpg.display()))?;
@@ -1033,17 +1082,12 @@ impl Session {
         if let Some(dir) = webp.parent() {
             fs::create_dir_all(dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
         }
-        let out = Command::new("magick")
-            .args(convert_args(&jpg, webp, size))
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|e| format!("starting magick: {e}"))?;
-        if !out.status.success() {
-            return Err(format!(
-                "magick could not convert {}: {}",
-                jpg.display(),
-                String::from_utf8_lossy(&out.stderr).trim()
-            ));
+        magick(&jpg, &convert_args(&jpg, webp, size))?;
+        if let Some((crop, zoom)) = zoom {
+            let source = image::image_dimensions(&jpg)
+                .map_err(|e| format!("reading the size of {}: {e}", jpg.display()))?;
+            let geometry = shoot::zoom_geometry(crop, size, source);
+            magick(&jpg, &zoom_args(&jpg, zoom, geometry))?;
         }
         fs::remove_file(&jpg).map_err(|e| format!("removing {}: {e}", jpg.display()))
     }
@@ -1261,6 +1305,44 @@ mod tests {
         let m = tf2tools_core::PictureManifest::parse(br#"{"version":1,"mastercomfig":"9.100.1","size":[960,540],"map":"ctf_2fort","base":{},
             "settings":[{"module":"gibs","values":[{"value":"off"},{"value":"high","same_as":"off","reason":"same-in-still"}]}]}"#).unwrap();
         assert_eq!(values_to_shoot(m.setting("gibs").unwrap()), vec!["off"]);
+    }
+
+    #[test]
+    fn magick_cuts_the_zoom_and_doubles_it() {
+        let crop: Crop =
+            serde_json::from_str(r#"{"x": 100, "y": 50, "w": 320, "h": 180}"#).unwrap();
+        let g = shoot::zoom_geometry(crop, [960, 540], (1440, 810));
+        let cmd = zoom_args(
+            std::path::Path::new("/a/x.jpg"),
+            std::path::Path::new("/b/y.zoom.webp"),
+            g,
+        );
+        assert_eq!(
+            cmd,
+            [
+                "/a/x.jpg",
+                "-crop",
+                "480x270+150+75",
+                "+repage",
+                "-resize",
+                "640x360!",
+                "-quality",
+                "80",
+                "/b/y.zoom.webp"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_dry_run_names_a_zoom_for_each_cropped_value() {
+        let m = tf2tools_core::PictureManifest::parse(br#"{"version":1,"mastercomfig":"9.100.1","size":[960,540],"map":"ctf_2fort","base":{},
+            "settings":[{"module":"phong","crop":{"x":10,"y":20,"w":300,"h":200},"values":[{"value":"off"},{"value":"high","same_as":"off"}]}]}"#).unwrap();
+        let out = dry_run(&m, &[m.setting("phong").unwrap()]);
+        assert!(
+            out.contains("// zoom phong/off.zoom.webp from crop 300x200+10+20 at 2x\n"),
+            "{out}"
+        );
+        assert!(!out.contains("high.zoom"), "{out}");
     }
 
     #[test]

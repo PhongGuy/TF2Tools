@@ -2,7 +2,7 @@
 //! arguments, per-value action lists and the modules.cfg that applies the base at launch.
 //! The `shoot_setting_pictures` example runs them.
 
-use super::{PictureManifest, Reload, SettingShot};
+use super::{Crop, PictureManifest, Reload, SettingShot};
 
 /// The RMSE (0-255 scale) at or under which two shots count as the same look.
 pub const SAME_LOOK_RMSE: f64 = 0.5;
@@ -218,4 +218,41 @@ pub fn rmse(a: &[u8], b: &[u8]) -> Option<f64> {
         })
         .sum();
     Some((sum / a.len() as f64).sqrt())
+}
+
+/// Where to cut a zoom from a screenshot and how large to make it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ZoomGeometry {
+    /// The left edge in the screenshot.
+    pub x: u32,
+    /// The top edge in the screenshot.
+    pub y: u32,
+    /// The width in the screenshot.
+    pub w: u32,
+    /// The height in the screenshot.
+    pub h: u32,
+    /// The zoom's width: twice the crop's.
+    pub out_w: u32,
+    /// The zoom's height: twice the crop's.
+    pub out_h: u32,
+}
+
+/// Scales `crop` from picture coordinates (`size`) to a `source` frame of another size, so the
+/// zoom is cut from the full-resolution screenshot rather than the downscaled picture.
+pub fn zoom_geometry(crop: Crop, size: [u32; 2], source: (u32, u32)) -> ZoomGeometry {
+    let scale = |v: u32, from: u32, to: u32| -> u32 {
+        let from = u64::from(from.max(1));
+        let scaled = (u64::from(v) * u64::from(to) + from / 2) / from;
+        u32::try_from(scaled).unwrap_or(u32::MAX)
+    };
+    let [width, height] = size;
+    ZoomGeometry {
+        x: scale(crop.x, width, source.0),
+        y: scale(crop.y, height, source.1),
+        w: scale(crop.w, width, source.0),
+        h: scale(crop.h, height, source.1),
+        out_w: crop.w.saturating_mul(2),
+        out_h: crop.h.saturating_mul(2),
+    }
 }

@@ -3,7 +3,7 @@
 use tf2tools_core::PictureManifest;
 use tf2tools_core::shoot::{
     ShotAction, join_commands, kick_seen, launch_args, marker_seen, modules_cfg, reset_actions,
-    rmse, setting_actions, shot_name, start_cfg, step_cfg, value_actions,
+    rmse, setting_actions, shot_name, start_cfg, step_cfg, value_actions, zoom_geometry,
 };
 
 const MANIFEST: &str = r#"{
@@ -235,4 +235,15 @@ fn rmse_is_zero_for_equal_pixels_and_none_for_different_sizes() {
     assert_eq!(rmse(&[0, 0, 0, 0], &[2, 2, 2, 2]), Some(2.0));
     assert_eq!(rmse(&[0, 0, 0], &[0, 0]), None);
     assert_eq!(rmse(&[], &[]), None);
+}
+
+#[test]
+fn the_zoom_is_cut_from_the_full_size_frame_at_twice_the_crop() {
+    let crop: tf2tools_core::Crop =
+        serde_json::from_str(r#"{"x": 100, "y": 50, "w": 320, "h": 180}"#).unwrap();
+    let g = zoom_geometry(crop, [960, 540], (1440, 810));
+    assert_eq!(
+        (g.x, g.y, g.w, g.h, g.out_w, g.out_h),
+        (150, 75, 480, 270, 640, 360)
+    );
 }

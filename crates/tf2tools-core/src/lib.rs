@@ -128,8 +128,8 @@ pub use paths::{DataDir, LibraryKind};
 pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
 pub use setting_pictures::shoot;
 pub use setting_pictures::{
-    PictureManifest, REASON_KEYS, Reload, SettingPicture, SettingPictures, SettingShot, ShotStep,
-    ValueShot,
+    Crop, PictureManifest, REASON_KEYS, Reload, SettingPicture, SettingPictures, SettingShot,
+    ShotStep, ValueShot,
 };
 pub use settings::{Settings, Volume};
 pub use store::{

@@ -15,7 +15,8 @@ const MANIFEST: &str = r#"{
   "base": { "shadows": "high", "gibs": "low" },
   "settings": [
     { "module": "shadows", "setpos": [-1888.0, -1280.0, 321.0], "setang": [0.0, -30.0, 0.0],
-      "setup": ["thirdperson"], "values": [{ "value": "off" }, { "value": "low" }, { "value": "high" }] },
+      "setup": ["thirdperson"], "crop": {"x": 0, "y": 0, "w": 320, "h": 180},
+      "note": "drawn black by TF2", "values": [{ "value": "off" }, { "value": "low" }, { "value": "high" }] },
     { "module": "gibs", "reload": "map", "pause": false, "steps": [{ "run": "kill", "wait_ms": 400 }],
       "values": [{ "value": "off" }, { "value": "low" }, { "value": "high", "same_as": "low", "reason": "same-in-still" }] },
     { "module": "ragdolls", "values": [{ "value": "medium", "same_as": "high" }, { "value": "high", "same_as": "off" }, { "value": "off" }] },
@@ -169,4 +170,62 @@ fn file_for_names_the_module_folder_and_value() {
         tmp.path().join("3dsky").join("on.webp")
     );
     assert_eq!(pics.manifest().map, "ctf_2fort");
+}
+
+#[test]
+fn a_cropped_setting_points_at_the_zoom_beside_the_picture() {
+    let tmp = folder(&["shadows/off.zoom.webp"]);
+    let pics = open(tmp.path());
+    assert_eq!(
+        pics.zoom_for("shadows", "off"),
+        Some(tmp.path().join("shadows").join("off.zoom.webp"))
+    );
+    assert_eq!(
+        pics.zoom_file_for("shadows", "low"),
+        tmp.path().join("shadows").join("low.zoom.webp")
+    );
+    assert_eq!(pics.zoom_for("shadows", "low"), None);
+    assert_eq!(pics.zoom_for("shadows", "nope"), None);
+    assert_eq!(
+        pics.manifest().setting("shadows").unwrap().note.as_deref(),
+        Some("drawn black by TF2")
+    );
+}
+
+#[test]
+fn a_setting_without_a_crop_has_no_zoom() {
+    let tmp = folder(&["gibs/low.zoom.webp"]);
+    let pics = open(tmp.path());
+    assert_eq!(pics.zoom_for("gibs", "low"), None);
+    assert_eq!(pics.manifest().setting("gibs").unwrap().note, None);
+}
+
+#[test]
+fn a_crop_outside_the_picture_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let bad = MANIFEST.replace(
+        r#""x": 0, "y": 0, "w": 320"#,
+        r#""x": 700, "y": 0, "w": 320"#,
+    );
+    fs::write(tmp.path().join("manifest.json"), bad).unwrap();
+    let err = SettingPictures::open(tmp.path()).err().unwrap();
+    assert!(
+        matches!(err, SettingPicturesError::Format { .. }),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn an_empty_crop_is_refused() {
+    let bad = MANIFEST.replace(r#""h": 180"#, r#""h": 0"#);
+    let err = PictureManifest::parse(bad.as_bytes()).unwrap_err();
+    assert!(
+        matches!(err, SettingPicturesError::Format { .. }),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn needs_motion_is_a_reason_key() {
+    assert!(tf2tools_core::REASON_KEYS.contains(&"needs-motion"));
 }

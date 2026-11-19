@@ -12,11 +12,12 @@ use serde::Deserialize;
 use crate::error::SettingPicturesError;
 
 /// The reasons a setting may have no picture, as keys the app turns into text.
-pub const REASON_KEYS: [&str; 4] = [
+pub const REASON_KEYS: [&str; 5] = [
     "performance-only",
     "same-in-still",
     "needs-item",
     "not-on-local-server",
+    "needs-motion",
 ];
 
 /// The reason a `same_as` value carries when the manifest names none.
@@ -76,8 +77,29 @@ pub struct SettingShot {
     /// Why this setting has no pictures, as one of [`REASON_KEYS`].
     #[serde(default)]
     pub no_picture: Option<String>,
+    /// The spot that changes, shown again at twice its size beside the full picture.
+    #[serde(default)]
+    pub crop: Option<Crop>,
+    /// A line for the Graphics page where the look is surprising.
+    #[serde(default)]
+    pub note: Option<String>,
     /// The values, in shooting order.
     pub values: Vec<ValueShot>,
+}
+
+/// A rectangle in picture coordinates, that is within the manifest `size`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct Crop {
+    /// The left edge.
+    pub x: u32,
+    /// The top edge.
+    pub y: u32,
+    /// The width.
+    pub w: u32,
+    /// The height.
+    pub h: u32,
 }
 
 /// One console command and how long to wait after it.
@@ -124,10 +146,28 @@ pub struct ValueShot {
 
 impl PictureManifest {
     /// Reads a manifest from its JSON bytes; anything malformed is `Format`.
+    /// A crop that is empty or reaches past the picture is `Format` too.
     pub fn parse(bytes: &[u8]) -> Result<Self, SettingPicturesError> {
-        serde_json::from_slice(bytes).map_err(|e| SettingPicturesError::Format {
-            reason: e.to_string(),
-        })
+        let manifest: Self =
+            serde_json::from_slice(bytes).map_err(|e| SettingPicturesError::Format {
+                reason: e.to_string(),
+            })?;
+        let [width, height] = manifest.size;
+        for setting in &manifest.settings {
+            let Some(c) = setting.crop else { continue };
+            // Widened sums so a huge edge cannot wrap around and pass.
+            let inside = u64::from(c.x) + u64::from(c.w) <= u64::from(width)
+                && u64::from(c.y) + u64::from(c.h) <= u64::from(height);
+            if c.w == 0 || c.h == 0 || !inside {
+                return Err(SettingPicturesError::Format {
+                    reason: format!(
+                        "the crop of {} must be non-empty and inside {width}x{height}",
+                        setting.module
+                    ),
+                });
+            }
+        }
+        Ok(manifest)
     }
 
     /// The shooting entry for a module, if the manifest has one.
@@ -193,6 +233,23 @@ impl SettingPictures {
     /// Where a value's picture lives, whether or not the file exists.
     pub fn file_for(&self, module: &str, value: &str) -> PathBuf {
         self.dir.join(module).join(format!("{value}.webp"))
+    }
+
+    /// Where a value's zoomed crop lives, whether or not the file exists.
+    pub fn zoom_file_for(&self, module: &str, value: &str) -> PathBuf {
+        self.dir.join(module).join(format!("{value}.zoom.webp"))
+    }
+
+    /// The zoomed crop to show beside a value's picture, when the setting has a crop and the
+    /// file exists. A shared look uses the other value's zoom, as the picture does.
+    pub fn zoom_for(&self, module: &str, value: &str) -> Option<PathBuf> {
+        let setting = self.manifest.setting(module)?;
+        if setting.crop.is_none() || setting.no_picture.is_some() {
+            return None;
+        }
+        let shot = setting.values.iter().find(|v| v.value == value)?;
+        let target = shot.same_as.as_deref().unwrap_or(value);
+        Some(self.zoom_file_for(module, target)).filter(|path| path.is_file())
     }
 
     /// The stand-in picture for values that have none yet.
