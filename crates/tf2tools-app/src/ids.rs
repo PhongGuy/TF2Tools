@@ -871,7 +871,7 @@ pub const GRAPHICS_PRESET_LINE: &str = "graphics-preset-line";
 pub const GRAPHICS_PRESET_SCALE: &str = "graphics-preset-scale";
 /// The status row's headline, labelled with its text.
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
-/// The line under the status row's headline, labelled with its text; absent when it has none.
+/// The line under the status row's headline, labelled with its text; always drawn.
 pub const GRAPHICS_DETAIL: &str = "graphics-detail";
 /// The status row's credit to the mastercomfig team, present only while it is not installed.
 pub const GRAPHICS_CREDIT: &str = "graphics-credit";

@@ -46,6 +46,8 @@ fn a_switch_row_flips_between_on_and_off(cx: &mut TestAppContext) {
         cx.update(|cx| page.read(cx).module_select("vsync"))
             .is_none()
     );
+    // The first change grows the changes strip above the list, pushing the row down, so each
+    // later click reveals its row again.
     reveal(cx, &s, ids::graphics_switch("vsync"));
     support::click_id(cx, s.win, ids::graphics_switch("vsync"));
     support::wait_real(cx, "vsync on", |cx| {
@@ -64,8 +66,7 @@ fn a_switch_row_flips_between_on_and_off(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::graphics_module_preset("vsync")).as_deref(),
         Some("Medium: Off")
     );
-    // The first change grows the changes strip above the list, pushing the row down. Medium
-    // sets vsync off, so flipping back to off clears the saved choice.
+    // Medium sets vsync off, so flipping back to off clears the saved choice.
     reveal(cx, &s, ids::graphics_switch("vsync"));
     support::click_id(cx, s.win, ids::graphics_switch("vsync"));
     support::wait_real(cx, "vsync off", |cx| saved(cx, &page, "vsync").is_none());

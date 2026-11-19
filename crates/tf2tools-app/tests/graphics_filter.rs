@@ -99,7 +99,7 @@ fn a_narrow_page_puts_the_rail_above_the_settings(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn every_plan_a_id_is_on_a_seeded_page(cx: &mut TestAppContext) {
+fn every_settings_list_control_has_a_stable_id(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, page) = full_page(cx, &env, r#"{"fpscap":"120","lod":null}"#);
     let mut drawn: Vec<ElementId> = vec![

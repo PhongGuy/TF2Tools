@@ -3036,7 +3036,7 @@ graphics:
     caption: "Cliquez sur une image pour utiliser ce réglage."
   changes:
     title: { one: "%{count} modification par rapport à %{preset}", other: "%{count} modifications par rapport à %{preset}" }
-    as_is: "%{preset} est utilisé tel quel. Modifiez un réglage ci-dessous et il apparaîtra ici."
+    as_is: "Le préréglage %{preset} est utilisé tel quel. Modifiez un réglage ci-dessous et il apparaîtra ici."
     chip: "%{name}\u00A0: %{was} → %{now}"
     chip_saved: "%{name}\u00A0: %{now}"
     undo: "Remettre %{name} sur %{was}"

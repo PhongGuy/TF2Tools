@@ -1,4 +1,4 @@
-//! Every element plans B and C add carries its id on a seeded page.
+//! Every status row, preset and picture control carries its stable id on a seeded page.
 
 use crate::support;
 
@@ -9,7 +9,7 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_core::Preset;
 
 #[gpui_kit::test]
-fn every_plan_b_and_c_id_is_on_a_seeded_page(cx: &mut TestAppContext) {
+fn every_status_preset_and_picture_control_has_a_stable_id(cx: &mut TestAppContext) {
     let env = support::env();
     cx.update(|cx| Tf2Probe::install(cx, || true));
     let (s, page) = picture_page(cx, &env, "medium", r#"{"lod":"high"}"#);
