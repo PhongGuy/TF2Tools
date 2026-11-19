@@ -269,10 +269,10 @@ fn row(
         ControlKind::Segmented => segments(page, &row, cx),
         ControlKind::Select => select(page, &row),
     };
-    let pictures = page.pictures.as_deref().and_then(|index| {
-        let label = page.preset().map(preset_label).unwrap_or_default();
-        pictures::row_pictures(index, &row, &label, false)
-    });
+    let pictures = page
+        .pictures
+        .as_deref()
+        .and_then(|index| pictures::row_pictures(index, &row, false));
     let thumb = pictures
         .as_ref()
         .map(|p| picture_panel::thumbnail(page, name, &row.label, p, cx));

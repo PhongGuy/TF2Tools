@@ -2998,6 +2998,7 @@ graphics:
     zoom: "Ampliar"
     full: "Imagem inteira"
     wipe: "Deslize entre a imagem da predefinição e a sua"
+    caption: "Clique em uma imagem para usar essa configuração."
   changes:
     title: { one: "%{count} alteração em relação a %{preset}", other: "%{count} alterações em relação a %{preset}" }
     as_is: "Usando %{preset} sem alterações. Mude qualquer configuração abaixo e ela aparece aqui."

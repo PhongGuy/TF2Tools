@@ -2974,6 +2974,7 @@ graphics:
     zoom: "Zoom"
     full: "Full picture"
     wipe: "Slide between the preset's picture and yours"
+    caption: "Click a picture to use that setting."
   changes:
     title: { one: "%{count} change from %{preset}", other: "%{count} changes from %{preset}" }
     as_is: "Using %{preset} as is. Change any setting below and it shows up here."

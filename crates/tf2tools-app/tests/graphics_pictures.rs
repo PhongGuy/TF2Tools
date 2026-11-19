@@ -4,7 +4,6 @@ use crate::support;
 
 use std::path::PathBuf;
 
-use tf2tools_app::pages::graphics::model::preset_label;
 use tf2tools_app::pages::graphics::pictures::{Compare, PictureIndex, RowPictures, row_pictures};
 use tf2tools_app::pages::graphics::view::row;
 use tf2tools_app::remote_images::local_image_url;
@@ -59,12 +58,7 @@ fn pictures_of(
         choices.set(&catalog, name, choice.clone());
     }
     let row = row(&catalog, &choices, catalog.module(module).unwrap());
-    row_pictures(
-        &PictureIndex::open(&bundled()),
-        &row,
-        &preset_label(preset),
-        zoom,
-    )
+    row_pictures(&PictureIndex::open(&bundled()), &row, zoom)
 }
 
 #[test]

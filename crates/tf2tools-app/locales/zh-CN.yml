@@ -2996,6 +2996,7 @@ graphics:
     zoom: "放大"
     full: "完整图片"
     wipe: "滑动以对比预设的图片和你的图片"
+    caption: "点击图片即可使用该设置。"
   changes:
     title: { other: "相对 %{preset} 有 %{count} 处更改" }
     as_is: "正在原样使用 %{preset}。更改下方任一设置后，它会显示在这里。"

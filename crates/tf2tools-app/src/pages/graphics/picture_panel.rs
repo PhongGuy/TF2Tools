@@ -1,26 +1,29 @@
 //! What a settings row draws of its pictures: the thumbnail of its current value, the
 //! Show/Hide pictures button and, while the row is open, its pictures panel: the preset's
-//! picture and yours behind a wipe, and the zoom toggle.
+//! picture and yours behind a wipe, the zoom toggle, and the strip that picks a value by
+//! its picture.
 
 use std::path::Path;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::Slider;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, hsla, px,
-    relative,
+    relative, transparent_black,
 };
 
 use super::GraphicsPage;
+use super::model::preset_label;
 use super::pictures::{Compare, RowPictures};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::huds::hud_picture;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
-use crate::widgets::Named as _;
+use crate::theme::selected_segment;
+use crate::widgets::{Named as _, labelled};
 
 /// The thumbnail's size, the pictures' 16:9.
 const THUMB_WIDTH: f32 = 96.;
@@ -103,8 +106,8 @@ pub(super) fn toggle(
         .into_any_element()
 }
 
-/// The open row's pictures panel: the zoom toggle when the setting has crops, then the
-/// compare view; the strip follows it.
+/// The open row's pictures panel: the zoom toggle when the setting has crops, the compare
+/// view, then the strip of value pictures and its caption.
 pub(super) fn panel(
     page: &GraphicsPage,
     module: &str,
@@ -132,6 +135,80 @@ pub(super) fn panel(
         .gap_2()
         .children(zoom)
         .children(compare(page, module, &pictures.compare, cx))
+        .when(!pictures.strip.is_empty(), |panel| {
+            panel
+                .child(strip(page, module, pictures, cx))
+                .child(labelled(
+                    div().text_xs().text_color(cx.theme().muted_foreground),
+                    ids::graphics_strip_caption(module),
+                    tr!("graphics.pictures.caption"),
+                ))
+        })
+        .into_any_element()
+}
+
+// One button per value with a picture, in catalogue order: its picture over its word, the
+// chosen one ringed like a selected segment and the preset's carrying the preset's name.
+fn strip(
+    page: &GraphicsPage,
+    module: &str,
+    pictures: &RowPictures,
+    cx: &mut Context<GraphicsPage>,
+) -> AnyElement {
+    let preset = preset_label(page.shown_against().preset());
+    let (ring, _) = selected_segment(cx.theme());
+    let buttons = pictures.strip.iter().map(|entry| {
+        let key = page
+            .pictures
+            .as_deref()
+            .map(|index| ImageKey::card(&index.url(&entry.picture)));
+        let image = picture(
+            ids::graphics_strip_area(module, &entry.value),
+            ids::graphics_strip_image(module, &entry.value),
+            key.as_ref(),
+            cx,
+        );
+        let tag = entry.preset.then(|| {
+            div()
+                .id(ids::graphics_strip_tag(module))
+                .aria_label(preset.clone())
+                .test_support()
+                .px_1p5()
+                .rounded_md()
+                .bg(cx.theme().secondary)
+                .text_xs()
+                .child(preset.clone())
+        });
+        let (target, value) = (module.to_owned(), entry.value.clone());
+        Button::new(ids::graphics_strip_picture(module, &entry.value))
+            .ghost()
+            .p_1()
+            .h_auto()
+            .border_2()
+            .border_color(if entry.chosen {
+                ring
+            } else {
+                transparent_black()
+            })
+            .accessibility_label(entry.label.clone())
+            .disabled(page.busy)
+            .on_click(cx.listener(move |page, _, _, cx| page.pick_value(&target, &value, cx)))
+            .child(
+                v_flex()
+                    .w(px(THUMB_WIDTH))
+                    .items_center()
+                    .gap_1()
+                    .child(image)
+                    .child(div().text_xs().child(entry.label.clone()))
+                    .children(tag),
+            )
+    });
+    h_flex()
+        .id(ids::graphics_strip(module))
+        .test_support()
+        .flex_wrap()
+        .gap_2()
+        .children(buttons)
         .into_any_element()
 }
 

@@ -2999,6 +2999,7 @@ graphics:
     zoom: "Zoom"
     full: "Image entière"
     wipe: "Glisser entre l'image du préréglage et la vôtre"
+    caption: "Cliquez sur une image pour utiliser ce réglage."
   changes:
     title: { one: "%{count} modification par rapport à %{preset}", other: "%{count} modifications par rapport à %{preset}" }
     as_is: "%{preset} est utilisé tel quel. Modifiez un réglage ci-dessous et il apparaîtra ici."

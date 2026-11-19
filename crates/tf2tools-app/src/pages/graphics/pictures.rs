@@ -137,14 +137,8 @@ pub struct RowPictures {
 }
 
 /// None when no value of the row's module has a picture. Thumb and strip use full pictures;
-/// `zoom` swaps the compare pictures for crops where the value has one. `preset` is the
-/// preset's label for the strip tag; the tag's words are drawn by the panel, so it is unused here.
-pub fn row_pictures(
-    index: &PictureIndex,
-    row: &RowView,
-    _preset: &SharedString,
-    zoom: bool,
-) -> Option<RowPictures> {
+/// `zoom` swaps the compare pictures for crops where the value has one.
+pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<RowPictures> {
     if !index.has_pictures(&row.module) {
         return None;
     }

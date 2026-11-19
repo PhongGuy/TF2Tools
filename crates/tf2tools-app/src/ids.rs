@@ -1133,6 +1133,36 @@ pub fn graphics_zoom(module: &str) -> ElementId {
     keyed("graphics-zoom", module)
 }
 
+/// The open row's strip of value pictures: "graphics-strip:<module>".
+pub fn graphics_strip(module: &str) -> ElementId {
+    keyed("graphics-strip", module)
+}
+
+/// One value's picture Button in the strip: "graphics-strip-picture:<module>=<value>".
+pub fn graphics_strip_picture(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-picture", &format!("{module}={value}"))
+}
+
+/// The picture area inside a strip picture: "graphics-strip-area:<module>=<value>".
+pub fn graphics_strip_area(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-area", &format!("{module}={value}"))
+}
+
+/// A strip picture's decoded image: "graphics-strip-image:<module>=<value>".
+pub fn graphics_strip_image(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-image", &format!("{module}={value}"))
+}
+
+/// The preset's tag inside its value's strip picture: "graphics-strip-tag:<module>".
+pub fn graphics_strip_tag(module: &str) -> ElementId {
+    keyed("graphics-strip-tag", module)
+}
+
+/// The caption under the strip: "graphics-strip-caption:<module>".
+pub fn graphics_strip_caption(module: &str) -> ElementId {
+    keyed("graphics-strip-caption", module)
+}
+
 /// An off/on row's Switch: "graphics-switch:<module>".
 pub fn graphics_switch(module: &str) -> ElementId {
     keyed("graphics-switch", module)
