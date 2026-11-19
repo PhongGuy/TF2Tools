@@ -63,6 +63,8 @@ fn a_switch_row_flips_between_on_and_off(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::graphics_module_preset("vsync")).as_deref(),
         Some("Medium: Let TF2 decide")
     );
+    // The first change grows the changes strip above the list, pushing the row down.
+    reveal(cx, &s, ids::graphics_switch("vsync"));
     support::click_id(cx, s.win, ids::graphics_switch("vsync"));
     support::wait_real(cx, "vsync off", |cx| {
         saved(cx, &page, "vsync") == Some(value("off"))

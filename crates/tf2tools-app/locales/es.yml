@@ -2988,6 +2988,13 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Restablecer"
+  changes:
+    title: { one: "%{count} cambio respecto a %{preset}", other: "%{count} cambios respecto a %{preset}" }
+    as_is: "Usando %{preset} tal cual. Cambia cualquier ajuste de abajo y aparecerá aquí."
+    chip: "%{name}: %{was} → %{now}"
+    chip_saved: "%{name}: %{now}"
+    undo: "Devolver %{name} a %{was}"
+    reset_all: "Restablecer todo"
   module:
     lod:
       label: "Calidad de modelos"

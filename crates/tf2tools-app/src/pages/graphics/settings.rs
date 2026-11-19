@@ -19,25 +19,8 @@ use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
 
-/// The section: its heading with Reset all, then the list or the note.
+/// The section: the list, or the note while there is no catalog.
 pub(super) fn section(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
-    let nothing_saved = page.choices.as_ref().is_none_or(|c| c.modules().is_empty());
-    let header = h_flex()
-        .justify_between()
-        .gap_4()
-        .child(
-            div()
-                .text_lg()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child("Settings"),
-        )
-        .child(
-            Button::new(ids::GRAPHICS_RESET_ALL)
-                .outline()
-                .label("Reset all to preset")
-                .disabled(nothing_saved || page.busy)
-                .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx))),
-        );
     let body = match &page.catalog {
         Some(catalog) => list(page, catalog, cx),
         None => labelled(
@@ -50,8 +33,6 @@ pub(super) fn section(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> An
     v_flex()
         .id(ids::GRAPHICS_SETTINGS)
         .test_support()
-        .gap_3()
-        .child(header)
         .child(body)
         .into_any_element()
 }

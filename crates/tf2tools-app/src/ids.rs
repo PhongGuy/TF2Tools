@@ -881,8 +881,12 @@ pub const GRAPHICS_FOOTER: &str = "graphics-footer";
 pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
 /// The note shown in place of the settings list, labelled with its text.
 pub const GRAPHICS_SETTINGS_NOTE: &str = "graphics-settings-note";
-/// "Reset all": drops every setting back to the preset.
+/// The changes strip's "Reset all": drops every setting back to the preset.
 pub const GRAPHICS_RESET_ALL: &str = "graphics-reset-all";
+/// The changes strip while settings differ from the preset, labelled with its title.
+pub const GRAPHICS_CHANGES: &str = "graphics-changes";
+/// The dashed strip shown while nothing differs from the preset, labelled with its text.
+pub const GRAPHICS_NO_CHANGES: &str = "graphics-no-changes";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
@@ -1017,6 +1021,16 @@ pub fn graphics_module_select(name: &str) -> ElementId {
 /// A settings row's Reset: "graphics-module-reset:<name>".
 pub fn graphics_module_reset(name: &str) -> ElementId {
     keyed("graphics-module-reset", name)
+}
+
+/// A chip in the changes strip, labelled with its sentence: "graphics-change:<module>".
+pub fn graphics_change(module: &str) -> ElementId {
+    keyed("graphics-change", module)
+}
+
+/// A change chip's undo button: "graphics-change-undo:<module>".
+pub fn graphics_change_undo(module: &str) -> ElementId {
+    keyed("graphics-change-undo", module)
 }
 
 /// A settings row: "graphics-row:<module>".

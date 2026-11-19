@@ -42,7 +42,7 @@ fn a_saved_catalog_lists_every_module_with_the_preset_s_value(cx: &mut TestAppCo
         s.win,
         ids::graphics_module_reset("lod")
     ));
-    assert!(support::disabled_of(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    assert!(!support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
     assert!(!support::present(cx, s.win, ids::GRAPHICS_SETTINGS_NOTE));
     assert_eq!(
         support::label_of(cx, s.win, ids::GRAPHICS_FOOTER).as_deref(),
@@ -76,7 +76,7 @@ fn saved_choices_show_with_a_reset_on_their_rows(cx: &mut TestAppContext) {
         s.win,
         ids::graphics_module_reset("decals")
     ));
-    assert!(!support::disabled_of(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    assert!(support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
 }
 
 #[gpui_kit::test]

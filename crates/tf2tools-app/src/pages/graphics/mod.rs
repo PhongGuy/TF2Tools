@@ -11,7 +11,7 @@ use std::sync::Arc;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::select::{SelectEvent, SelectState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, AppContext as _, Context, Entity, FontWeight,
@@ -21,7 +21,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
-use crate::i18n::tr;
+use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::pages::common::{card_frame, no_tf2_warning};
@@ -31,8 +31,8 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
 use model::{
     OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
@@ -691,6 +691,7 @@ impl Render for GraphicsPage {
                 self.preset()
                     .map(|current| self.presets(current, window, cx)),
             )
+            .children(self.preset().map(|preset| self.changes_strip(preset, cx)))
             .children(self.preset().map(|_| settings::section(self, cx)))
             .children(self.preset().map(|_| {
                 labelled(
@@ -870,6 +871,115 @@ impl GraphicsPage {
                     .child("Preset"),
             )
             .child(h_flex().flex_wrap().gap_4().children(cards))
+            .into_any_element()
+    }
+
+    // The player's changes from `preset` as chips with an undo each, and Reset all; a dashed
+    // "as is" strip when there are none. Offline the chips only name the saved values, since
+    // undoing needs the catalogue.
+    fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let preset = preset_label(preset);
+        let catalog = self.catalog.as_deref();
+        let list = view::changes(catalog, &self.shown_against());
+        if list.is_empty() {
+            return labelled(
+                div()
+                    .text_sm()
+                    .text_color(muted)
+                    .p_3()
+                    .border_1()
+                    .border_dashed()
+                    .border_color(border)
+                    .rounded(radius),
+                ids::GRAPHICS_NO_CHANGES,
+                tr!("graphics.changes.as_is", preset = preset),
+            )
+            .into_any_element();
+        }
+        let n = u64::try_from(list.len()).unwrap_or(u64::MAX);
+        let title = counted_plural(
+            "graphics.changes.title",
+            n,
+            &n.to_string(),
+            &[("preset", &preset)],
+        );
+        let editable = catalog.is_some();
+        let chips: Vec<AnyElement> = list
+            .into_iter()
+            .map(|change| {
+                let sentence = match &change.was {
+                    Some(was) => tr!(
+                        "graphics.changes.chip",
+                        name = change.label,
+                        was = was,
+                        now = change.now
+                    ),
+                    None => tr!(
+                        "graphics.changes.chip_saved",
+                        name = change.label,
+                        now = change.now
+                    ),
+                };
+                let undo = change.was.clone().filter(|_| editable).map(|was| {
+                    let module = change.module.clone();
+                    Button::new(ids::graphics_change_undo(&change.module))
+                        .ghost()
+                        .xsmall()
+                        .icon(IconName::X)
+                        .named(tr!("graphics.changes.undo", name = change.label, was = was))
+                        .disabled(self.busy)
+                        .on_click(cx.listener(move |page, _, _, cx| page.reset_module(&module, cx)))
+                });
+                h_flex()
+                    .id(ids::graphics_change(&change.module))
+                    .aria_label(sentence)
+                    .test_support()
+                    .gap_1()
+                    .pl_2()
+                    .pr_1()
+                    .py_0p5()
+                    .text_sm()
+                    .border_1()
+                    .border_color(border)
+                    .rounded(radius)
+                    .child(change.label)
+                    .children(
+                        change
+                            .was
+                            .map(|was| div().text_color(muted).child(format!("{was} →"))),
+                    )
+                    .child(div().font_weight(FontWeight::MEDIUM).child(change.now))
+                    .children(undo)
+                    .into_any_element()
+            })
+            .collect();
+        let reset_all = editable.then(|| {
+            Button::new(ids::GRAPHICS_RESET_ALL)
+                .outline()
+                .small()
+                .label(tr!("graphics.changes.reset_all"))
+                .disabled(self.busy)
+                .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
+        });
+        v_flex()
+            .id(ids::GRAPHICS_CHANGES)
+            .aria_label(title.clone())
+            .test_support()
+            .gap_3()
+            .p_3()
+            .border_1()
+            .border_color(border)
+            .rounded(radius)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_4()
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
+                    .children(reset_all),
+            )
+            .child(h_flex().flex_wrap().gap_2().children(chips))
             .into_any_element()
     }
 }

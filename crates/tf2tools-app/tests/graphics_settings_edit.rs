@@ -118,7 +118,7 @@ fn reset_and_reset_all_go_back_to_the_preset(cx: &mut TestAppContext) {
     idle(cx, &page);
     assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
     assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
-    assert!(support::disabled_of(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    assert!(!support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
 }
 
 #[gpui_kit::test]
