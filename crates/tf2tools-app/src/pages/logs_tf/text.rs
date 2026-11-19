@@ -8,7 +8,7 @@ use tf2tools_core::{
     SteamId, Team, TfClass,
 };
 
-use crate::i18n::{Phrase, counted_plural, format, names, tr};
+use crate::i18n::{Phrase, counted_plural, format, labelled, names, tr};
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
@@ -492,10 +492,9 @@ pub fn healing_text(heal: u32, per_min: f64) -> String {
 
 /// One medigun's charges and their share of all `total`: "Medigun: 12 (100%)".
 pub fn charge_text(medigun: &Medigun, n: u32, total: u32) -> String {
-    format!(
-        "{}: {n} ({})",
+    labelled(
         medigun_name(medigun),
-        floored_share_text(n, total)
+        format!("{n} ({})", floored_share_text(n, total)),
     )
 }
 

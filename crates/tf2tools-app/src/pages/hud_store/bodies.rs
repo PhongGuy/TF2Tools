@@ -10,9 +10,9 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreItem, StoreItemId};
 
-use super::curated::CuratedHud;
+use super::curated::{CuratedHud, Os};
 use crate::counts::count_stat;
-use crate::i18n::{format, tr};
+use crate::i18n::{format, labelled, separated, tr};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::common::badge_of;
@@ -30,11 +30,6 @@ pub fn curated_body() -> DetailBody {
             .iter()
             .map(|(key, url)| (key.clone(), social_label(key), url.clone()))
             .collect();
-        let traits = [
-            (tr!("hud_store.detail.os"), &hud.os),
-            (tr!("hud_store.detail.gamemodes"), &hud.gamemodes),
-            (tr!("hud_store.detail.resolutions"), &hud.resolutions),
-        ];
         v_flex()
             .gap_3()
             .children(
@@ -43,14 +38,7 @@ pub fn curated_body() -> DetailBody {
                     .map(|d| text_row(cx, tr!("hud_store.detail.released", date = d))),
             )
             .children(tag_row("flags", &hud.flags, false, cx))
-            .children(
-                traits
-                    .into_iter()
-                    .filter(|(_, values)| !values.is_empty())
-                    .map(|(name, values)| {
-                        text_row(cx, format!("{name}: {}", crate::i18n::separated(values)))
-                    }),
-            )
+            .children(trait_rows(&hud).into_iter().map(|row| text_row(cx, row)))
             .children(tag_row("tags", &hud.tags, true, cx))
             .children((!socials.is_empty()).then(|| link_row(socials)))
             .into_any_element()
@@ -59,6 +47,27 @@ pub fn curated_body() -> DetailBody {
         let repo = CuratedHud::from_item(item)?.repo?;
         Some(link_button("repo", tr!("hud_store.detail.repository"), repo).into_any_element())
     })
+}
+
+/// A curated HUD's OS, gamemode and resolution lines, each "Label: a, b" in the current
+/// language; a trait the HUD leaves empty has no line. Systems read as their proper names.
+pub fn trait_rows(hud: &CuratedHud) -> Vec<String> {
+    let os: Vec<&str> = hud
+        .os
+        .iter()
+        .map(|raw| Os::from_key(raw).map_or(raw.as_str(), |os| os.name()))
+        .collect();
+    let gamemodes: Vec<&str> = hud.gamemodes.iter().map(String::as_str).collect();
+    let resolutions: Vec<&str> = hud.resolutions.iter().map(String::as_str).collect();
+    [
+        (tr!("hud_store.detail.os"), os),
+        (tr!("hud_store.detail.gamemodes"), gamemodes),
+        (tr!("hud_store.detail.resolutions"), resolutions),
+    ]
+    .into_iter()
+    .filter(|(_, values)| !values.is_empty())
+    .map(|(name, values)| labelled(name, separated(&values)))
+    .collect()
 }
 
 /// A GameBanana HUD: added date, likes and views, tags, and its GameBanana button beside the name.

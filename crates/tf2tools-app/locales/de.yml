@@ -220,6 +220,7 @@ common:
     title: "TF2 nicht gefunden"
     open_settings: "Einstellungen öffnen"
     needs_tf2: "Lege zuerst den TF2-Ordner in den Einstellungen fest"
+  label_value: "%{label}: %{value}"
   list:
     separator: ", "
     last: "%{rest} und %{last}"

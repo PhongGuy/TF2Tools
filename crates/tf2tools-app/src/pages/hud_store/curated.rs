@@ -46,6 +46,20 @@ impl Os {
             Os::Linux => "Linux",
         }
     }
+
+    /// The OS hud-db means by a `traits.os` value, or None for one it does not list.
+    pub fn from_key(key: &str) -> Option<Os> {
+        Os::ALL.into_iter().find(|os| os.key() == key)
+    }
+
+    /// The system's proper name, the same in every language; the filter keeps v5's short label.
+    pub fn name(self) -> &'static str {
+        match self {
+            Os::Windows => "Windows",
+            Os::Mac => "macOS",
+            Os::Linux => "Linux",
+        }
+    }
 }
 
 /// A multi-value attribute the store filters on.

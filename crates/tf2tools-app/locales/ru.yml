@@ -195,6 +195,7 @@ common:
     title: "TF2 не найдена"
     open_settings: "Открыть настройки"
     needs_tf2: "Сначала укажите папку TF2 в настройках"
+  label_value: "%{label}: %{value}"
   list:
     separator: ", "
     last: "%{rest} и %{last}"

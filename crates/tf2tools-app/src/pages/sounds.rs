@@ -728,7 +728,7 @@ fn conflict_box(installed: &InstalledSounds, cx: &App) -> Option<AnyElement> {
         .collect();
     let label = lines
         .iter()
-        .map(|(folder, message)| format!("{folder}: {message}"))
+        .map(|(folder, message)| crate::i18n::labelled(folder, message))
         .collect::<Vec<_>>()
         .join(" ");
     let muted = cx.theme().muted_foreground;

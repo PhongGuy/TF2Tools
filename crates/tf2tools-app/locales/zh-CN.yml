@@ -219,6 +219,7 @@ common:
     title: "未找到 TF2"
     open_settings: "打开设置"
     needs_tf2: "请先在设置中指定 TF2 文件夹"
+  label_value: "%{label}：%{value}"
   list:
     separator: "、"
     last: "%{rest}和%{last}"
