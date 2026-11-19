@@ -321,7 +321,7 @@ fn the_start_card_zoom_and_shortcuts_read_in_russian(cx: &mut TestAppContext) {
         .collect();
     for want in [
         "Стрелки: Сдвинуть выбранные части",
-        "Escape: Снять выделение",
+        "Esc: Снять выделение",
         "Ctrl+Z: Отменить",
         "Тянуть по пустому месту: Выделить все части в рамке",
     ] {

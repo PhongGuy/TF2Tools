@@ -653,6 +653,16 @@ fn log_space_reads_in_kilobytes_or_megabytes() {
     );
 }
 
+// With no full log kept, the line says so instead of counting zero logs and their empty table.
+#[test]
+fn an_empty_logs_cache_says_nothing_is_cached() {
+    use tf2tools_app::pages::settings::usage_text;
+    assert_eq!(
+        usage_text(40_960, 0, 4_096),
+        "No full logs are cached yet. The logs cache uses about 40.0 KB."
+    );
+}
+
 /// Waits until the library and trim jobs both rest, then returns the library job's passes.
 fn jobs_idle(cx: &mut TestAppContext) -> u64 {
     use tf2tools_app::library_pack::LibraryPack;
@@ -782,8 +792,7 @@ fn the_logs_tf_card_keeps_full_logs_for_the_chosen_days_and_saves_at_once(cx: &m
     scroll_settings_to(cx, &s, ids::SETTINGS_LOG_SPACE.into());
     let usage = support::label_of(cx, s.win, ids::SETTINGS_LOG_SPACE).unwrap_or_default();
     assert!(
-        usage.starts_with("The logs cache uses about ")
-            && usage.contains("; 0 full logs use about "),
+        usage.starts_with("No full logs are cached yet. The logs cache uses about "),
         "{usage}"
     );
     support::click_id(cx, s.win, ids::SETTINGS_LOG_KEEP);

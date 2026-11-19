@@ -36,7 +36,7 @@ use tf2tools_core::{
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::crosshair_sync::CrosshairSync;
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::keymap::{
     FitGrid, MAKER_CONTEXT, RedoDrawing, UndoDrawing, UseCircle, UseEraser, UseFill, UseLine,
@@ -844,7 +844,7 @@ impl CrosshairMakerPage {
         let hint = colour_hint(colour);
         let opacity = tr!(
             "crosshair_maker.opacity_value",
-            percent = percent_of_alpha(self.editor.alpha())
+            percent = format::percent(percent_of_alpha(self.editor.alpha()))
         );
         let background = self
             .background

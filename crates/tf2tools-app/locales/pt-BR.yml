@@ -41,7 +41,7 @@ settings:
   audio:
     title: "Áudio"
     description: "Volume da prévia de hitsounds e killsounds"
-    volume: "Volume: %{percent}%"
+    volume: "Volume: %{percent}"
   cache:
     duration: "Duração do cache: %{duration}"
     hint: "As lojas sincronizam de novo sozinhas quando o cache expira. Padrão: 7 dias (168 horas)."
@@ -74,6 +74,7 @@ settings:
       frees: "%{option}, libera cerca de %{size}"
     cost: "Cada log completo ocupa cerca de 10\u00A0KB. O espaço cresce com a quantidade de logs dos jogadores que você acompanha, então “Para sempre” pode ocupar muito espaço."
     usage: "O cache de logs usa cerca de %{cache}; %{logs} cerca de %{full}."
+    usage_empty: "Nenhum log completo em cache ainda. O cache de logs usa cerca de %{cache}."
     full_logs: { one: "%{count} log completo usa", other: "%{count} logs completos usam" }
     measuring: "Medindo..."
     unmeasured: "Não foi possível medir o tamanho do cache de logs."
@@ -120,7 +121,7 @@ updater:
     checking: "Verificando atualizações..."
     available: "v%{version} disponível"
     available_page: "v%{version} disponível. Baixe pela página de versões."
-    downloading: "Baixando... %{percent}%"
+    downloading: "Baixando... %{percent}"
     ready: "Atualização pronta — reinicie para aplicar"
     installing: "Instalando atualização..."
     unavailable: "As atualizações automáticas não estão disponíveis nesta versão. Baixe as novas versões pela página de versões."
@@ -226,6 +227,7 @@ common:
   number:
     decimal: ","
     group: "."
+    percent: "%{number}%"
   count:
     thousand: "%{number}\u00A0mil"
     million: "%{number}\u00A0mi"
@@ -1294,7 +1296,7 @@ hud_maker:
       shift_arrows: "Shift + setas"
       ctrl_drag: "Ctrl + arrastar"
       hide: "H ou Delete"
-      escape: "Escape"
+      escape: "Esc"
       alt_click: "Alt + clique"
       shift_click: "Shift + clique"
       box: "Arrastar em área vazia"
@@ -2420,7 +2422,7 @@ crosshair_maker:
   paint_colour: "Cor da tinta"
   any_colour: "Qualquer cor"
   opacity: "Opacidade"
-  opacity_value: "Opacidade: %{percent}%"
+  opacity_value: "Opacidade: %{percent}"
   opacity_tip: "Tinta transparente. Pintar sobre um pixel o substitui; as cores nunca se misturam."
   outline: "Contorno"
   outline_colour: "Cor do contorno"

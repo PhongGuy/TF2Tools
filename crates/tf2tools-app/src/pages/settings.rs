@@ -175,8 +175,15 @@ pub fn keep_text(keep: KeepFullLogs, frees: u64) -> SharedString {
     )
 }
 
-/// The line saying what the whole logs cache takes and what its full logs take.
+/// The line saying what the whole logs cache takes and what its full logs take. With no full
+/// log kept it says so, rather than counting zero logs and sizing their empty table.
 pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedString {
+    if full_logs == 0 {
+        return tr!(
+            "settings.logs_tf.usage_empty",
+            cache = size_text(cache_bytes)
+        );
+    }
     tr!(
         "settings.logs_tf.usage",
         cache = size_text(cache_bytes),
@@ -1448,7 +1455,7 @@ impl Render for SettingsPage {
             .text_sm()
             .child(labelled(
                 ids::SETTINGS_VOLUME_LABEL,
-                tr!("settings.audio.volume", percent = volume),
+                tr!("settings.audio.volume", percent = format::percent(volume)),
             ))
             .child(
                 div()

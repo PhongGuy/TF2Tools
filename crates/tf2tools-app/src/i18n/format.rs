@@ -36,6 +36,11 @@ pub fn compact_count(n: i64) -> String {
     }
 }
 
+/// A whole percentage in the language's pattern: "100%" in English, "100 %" (no-break space) in French.
+pub fn percent(n: impl std::fmt::Display) -> SharedString {
+    tr!("common.number.percent", number = n)
+}
+
 /// A byte count in the largest 1024 unit that keeps it under 1024: "512 B", "1.5 KB".
 pub fn bytes(n: u64) -> SharedString {
     let (digits, unit) = scale_bytes(n);

@@ -141,7 +141,7 @@ fn the_question_mark_opens_the_shortcuts(cx: &mut TestAppContext) {
     for want in [
         "Arrow keys: Move the selected parts",
         "H or Delete: Hide the selected parts",
-        "Escape: Clear the selection",
+        "Esc: Clear the selection",
         "Ctrl+Z: Undo",
         "Space + drag: Move around the canvas",
         "Ctrl + drag: Move or resize without snapping",

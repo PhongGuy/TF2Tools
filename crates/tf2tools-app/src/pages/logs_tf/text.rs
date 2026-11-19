@@ -423,7 +423,7 @@ fn local_time(unix: i64) -> Option<chrono::NaiveDateTime> {
 
 /// `part` as a whole percent of `whole`, rounded to nearest: "47%"; a whole of 0 reads "0%".
 pub fn share_text(part: u32, whole: u32) -> String {
-    format!("{}%", percent(part, whole))
+    format::percent(percent(part, whole)).to_string()
 }
 
 /// `part` as a whole percent of `whole` cut down, as logs.tf shows heal and charge shares:
@@ -432,7 +432,7 @@ pub fn floored_share_text(part: u32, whole: u32) -> String {
     let share = (u64::from(part) * 100)
         .checked_div(u64::from(whole))
         .unwrap_or(0);
-    format!("{share}%")
+    format::percent(share).to_string()
 }
 
 /// Hits as a whole percent of shots: "43%"; with no shots there is no accuracy, "-".
@@ -440,7 +440,7 @@ pub fn accuracy_text(hits: u32, shots: u32) -> String {
     if shots == 0 {
         return "-".to_owned();
     }
-    format!("{}%", percent(hits, shots))
+    format::percent(percent(hits, shots)).to_string()
 }
 
 // Integer half-up rounding, so 4.5% reads "5%".
