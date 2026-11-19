@@ -2980,7 +2980,7 @@ graphics:
     updated: "Теперь версия %{version}."
     checked_title: "Обновления проверены"
     taken_over_title: "mastercomfig под управлением"
-    taken_over: "Теперь mastercomfig управляет TF2Tools."
+    taken_over: "Теперь TF2Tools управляет mastercomfig."
     removed_title: "mastercomfig удалён"
     removed: "mastercomfig больше нет в TF2."
     preset_title: "Пресет применён"

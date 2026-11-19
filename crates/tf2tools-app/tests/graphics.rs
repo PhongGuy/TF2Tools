@@ -396,7 +396,6 @@ fn check_for_updates_records_a_newer_release(cx: &mut TestAppContext) {
         Some("mastercomfig 9.100.1 is installed")
     );
     assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
-    assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
 }
 
 #[gpui_kit::test]
