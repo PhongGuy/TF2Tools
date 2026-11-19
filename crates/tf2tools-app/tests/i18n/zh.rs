@@ -283,3 +283,32 @@ fn chinese_takes_full_width_punctuation() {
         .collect();
     assert!(slips.is_empty(), "zh-CN punctuation: {slips:#?}");
 }
+
+// Each language owns the order and joiner of the Crosshair Maker's position line; Chinese puts
+// the direction first and joins with a full-width comma.
+#[test]
+fn the_crosshair_position_reads_in_each_languages_order() {
+    use tf2tools_app::pages::crosshair_maker::model::{CanvasSize, position_text};
+    let cases = [
+        ("en", "3 right, 3 up", "1 left, 32 down"),
+        ("ru", "3 вправо, 3 вверх", "1 влево, 32 вниз"),
+        ("pt-BR", "3 à direita, 3 acima", "1 à esquerda, 32 abaixo"),
+        (
+            "es",
+            "3 a la derecha, 3 arriba",
+            "1 a la izquierda, 32 abajo",
+        ),
+        ("de", "3 rechts, 3 oben", "1 links, 32 unten"),
+        ("fr", "3 à droite, 3 en haut", "1 à gauche, 32 en bas"),
+        ("zh-CN", "向右 3 格，向上 3 格", "向左 1 格，向下 32 格"),
+    ];
+    for (code, up_right, down_left) in cases {
+        let _guard = LocaleGuard::switch(code);
+        assert_eq!(position_text(CanvasSize::Large, 34, 29), up_right, "{code}");
+        assert_eq!(
+            position_text(CanvasSize::Large, 31, 63),
+            down_left,
+            "{code}"
+        );
+    }
+}

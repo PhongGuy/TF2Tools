@@ -2447,10 +2447,11 @@ crosshair_maker:
     grey: "Grey"
     dark_grey: "Dark grey"
   position:
-    right: "right"
-    left: "left"
-    down: "down"
-    up: "up"
+    right: "%{n} right"
+    left: "%{n} left"
+    down: "%{n} down"
+    up: "%{n} up"
+    joined: "%{across}, %{down}"
   starter:
     title: "Starter shapes"
     about: "Pick a shape and set it up. Use starts a new drawing you can keep editing."

@@ -2472,10 +2472,11 @@ crosshair_maker:
     grey: "Gris"
     dark_grey: "Gris foncé"
   position:
-    right: "à droite"
-    left: "à gauche"
-    down: "en bas"
-    up: "en haut"
+    right: "%{n} à droite"
+    left: "%{n} à gauche"
+    down: "%{n} en bas"
+    up: "%{n} en haut"
+    joined: "%{across}, %{down}"
   starter:
     title: "Formes de départ"
     about: "Choisissez une forme et réglez-la. Utiliser démarre un nouveau dessin que vous pourrez continuer à modifier."

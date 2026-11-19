@@ -2471,10 +2471,11 @@ crosshair_maker:
     grey: "Cinza"
     dark_grey: "Cinza-escuro"
   position:
-    right: "à direita"
-    left: "à esquerda"
-    down: "abaixo"
-    up: "acima"
+    right: "%{n} à direita"
+    left: "%{n} à esquerda"
+    down: "%{n} abaixo"
+    up: "%{n} acima"
+    joined: "%{across}, %{down}"
   starter:
     title: "Formas prontas"
     about: "Escolha uma forma e ajuste-a. Usar começa um novo desenho que você pode continuar editando."

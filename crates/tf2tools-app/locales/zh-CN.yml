@@ -460,7 +460,7 @@ logs_tf:
     deaths_min: "死亡/分"
     dmg_min: "伤害/分"
     heals_min: "治疗/分"
-    ubers_10min: "Uber/10 分钟"
+    ubers_10min: "Uber/10 分"
   sort:
     descending: "从高到低"
     ascending: "从低到高"
@@ -506,7 +506,7 @@ logs_tf:
     deaths: "死亡"
     healing: "治疗量"
     avg_build: "平均充能时间"
-    avg_before_use: "平均使用前等待"
+    avg_before_use: "使用前平均等待"
     near_full_deaths: "接近满充能时死亡"
     avg_uber: "平均 Uber 时长"
     deaths_after: "充能后死亡"
@@ -2469,10 +2469,11 @@ crosshair_maker:
     grey: "灰色"
     dark_grey: "深灰色"
   position:
-    right: "格向右"
-    left: "格向左"
-    down: "格向下"
-    up: "格向上"
+    right: "向右 %{n} 格"
+    left: "向左 %{n} 格"
+    down: "向下 %{n} 格"
+    up: "向上 %{n} 格"
+    joined: "%{across}，%{down}"
   starter:
     title: "起始图形"
     about: "选择一个图形并调整参数。“使用”会以它新建一个可继续编辑的绘图。"

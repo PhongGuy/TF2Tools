@@ -2470,10 +2470,11 @@ crosshair_maker:
     grey: "Grau"
     dark_grey: "Dunkelgrau"
   position:
-    right: "rechts"
-    left: "links"
-    down: "unten"
-    up: "oben"
+    right: "%{n} rechts"
+    left: "%{n} links"
+    down: "%{n} unten"
+    up: "%{n} oben"
+    joined: "%{across}, %{down}"
   starter:
     title: "Formvorlagen"
     about: "Wähle eine Form und stell sie ein. Verwenden startet eine neue Zeichnung, die du weiter bearbeiten kannst."

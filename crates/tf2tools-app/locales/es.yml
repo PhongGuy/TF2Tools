@@ -2470,10 +2470,11 @@ crosshair_maker:
     grey: "Gris"
     dark_grey: "Gris oscuro"
   position:
-    right: "a la derecha"
-    left: "a la izquierda"
-    down: "abajo"
-    up: "arriba"
+    right: "%{n} a la derecha"
+    left: "%{n} a la izquierda"
+    down: "%{n} abajo"
+    up: "%{n} arriba"
+    joined: "%{across}, %{down}"
   starter:
     title: "Formas iniciales"
     about: "Elige una forma y ajústala. Usar empieza un dibujo nuevo que puedes seguir editando."
