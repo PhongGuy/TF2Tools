@@ -216,8 +216,8 @@ impl Shell {
         }
     }
 
-    // Asks off the UI thread whether TF2 runs and redraws when the answer changed. Only a found
-    // TF2 is asked about, as the Play button shows only then.
+    // Asks off the UI thread whether TF2 runs, hands every answer to a live Graphics page for its
+    // banner and redraws when the answer changed. Only a found TF2 is asked about.
     fn recheck_running(cx: &mut Context<Self>) {
         if tf2_state(cx).read(cx).install().is_none() {
             return;
@@ -226,6 +226,9 @@ impl Shell {
         cx.spawn(async move |shell, cx| {
             let running = cx.background_spawn(async move { probe() }).await;
             shell.update(cx, |shell, cx| {
+                if let Some(graphics) = &shell.graphics {
+                    graphics.update(cx, |page, cx| page.set_tf2_running(running, cx));
+                }
                 if shell.tf2_running != running {
                     shell.tf2_running = running;
                     cx.notify();
@@ -639,11 +642,19 @@ impl Render for Shell {
                 })
                 .clone()
                 .into_any_element(),
-            Page::Graphics => self
-                .graphics
-                .get_or_insert_with(|| cx.new(|cx| GraphicsPage::new(window, cx)))
-                .clone()
-                .into_any_element(),
+            Page::Graphics => {
+                let running = self.tf2_running;
+                self.graphics
+                    .get_or_insert_with(|| {
+                        cx.new(|cx| {
+                            let mut page = GraphicsPage::new(window, cx);
+                            page.set_tf2_running(running, cx);
+                            page
+                        })
+                    })
+                    .clone()
+                    .into_any_element()
+            }
             // The editor's empty pickers ask for a store by event.
             Page::Profiles => {
                 let pending = self.pending_profile.take();

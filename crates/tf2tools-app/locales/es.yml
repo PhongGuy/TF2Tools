@@ -2982,6 +2982,7 @@ install_parts:
 graphics:
   subtitle: "Ajustes gráficos y de juego de mastercomfig"
   no_tf2: "Elige la carpeta de TF2 en Ajustes para usar mastercomfig."
+  running: "TF2 está abierto. Tus cambios se aplican la próxima vez que se inicie."
   status:
     not_installed: "mastercomfig no está instalado"
     install_hint: "Instálalo para elegir un preajuste gráfico."

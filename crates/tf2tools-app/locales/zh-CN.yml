@@ -2981,6 +2981,7 @@ install_parts:
 graphics:
   subtitle: "来自 mastercomfig 的图形与游戏设置"
   no_tf2: "请在设置中指定 TF2 文件夹以使用 mastercomfig。"
+  running: "TF2 正在运行。你的更改将在下次启动时生效。"
   status:
     not_installed: "未安装 mastercomfig"
     install_hint: "安装后即可选择图形预设。"

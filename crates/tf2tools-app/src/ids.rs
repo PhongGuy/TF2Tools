@@ -859,6 +859,8 @@ pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
 /// The mastercomfig status card.
 pub const GRAPHICS_STATUS: &str = "graphics-status";
+/// The banner under the status row while TF2 runs, labelled with its text.
+pub const GRAPHICS_RUNNING: &str = "graphics-running";
 /// The status card's title line, labelled with its text.
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
 /// The line under the status card's title, labelled with its text; absent when it has none.

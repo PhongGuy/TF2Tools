@@ -2957,6 +2957,7 @@ install_parts:
 graphics:
   subtitle: "Настройки графики и игры из mastercomfig"
   no_tf2: "Укажите папку TF2 в настройках, чтобы пользоваться mastercomfig."
+  running: "TF2 запущена. Изменения вступят в силу при её следующем запуске."
   status:
     not_installed: "mastercomfig не установлен"
     install_hint: "Установите его, чтобы выбрать графический пресет."

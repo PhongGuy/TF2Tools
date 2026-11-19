@@ -70,6 +70,7 @@ mod graphics_images;
 mod graphics_model;
 mod graphics_pictures;
 mod graphics_rows;
+mod graphics_running;
 mod graphics_settings;
 mod graphics_settings_edit;
 mod graphics_settings_files;

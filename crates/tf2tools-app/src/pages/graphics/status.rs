@@ -4,8 +4,8 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, div,
+    AnyElement, App, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Styled as _, TestSupportExt as _, div, rgb,
 };
 
 use super::model::{StatusCard, detail, headline, update_to};
@@ -13,7 +13,7 @@ use super::{GraphicsPage, Job};
 use crate::i18n::tr;
 use crate::ids;
 use crate::links::MASTERCOMFIG_DOCS_URL;
-use crate::pages::common::card_frame;
+use crate::pages::common::{ORANGE_500, card_frame};
 use crate::widgets::labelled;
 
 impl GraphicsPage {
@@ -131,4 +131,24 @@ impl GraphicsPage {
             )
             .into_any_element()
     }
+}
+
+// The amber line under the status row while TF2 runs. It only warns: edits stay enabled and
+// take effect when TF2 next reads its config.
+pub(super) fn running_banner(cx: &App) -> AnyElement {
+    let orange: Hsla = rgb(ORANGE_500).into();
+    labelled(
+        div()
+            .px_4()
+            .py_2()
+            .rounded(cx.theme().radius_lg)
+            .border_1()
+            .border_color(orange.opacity(0.5))
+            .bg(orange.opacity(0.1))
+            .text_sm()
+            .text_color(orange),
+        ids::GRAPHICS_RUNNING,
+        tr!("graphics.running"),
+    )
+    .into_any_element()
 }

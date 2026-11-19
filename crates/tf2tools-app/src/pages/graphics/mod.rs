@@ -123,6 +123,8 @@ pub struct GraphicsPage {
     wipe: Entity<SliderState>,
     /// Whether the compare view shows the crops; one switch for the whole page.
     zoom: bool,
+    /// The shell's remembered answer to whether TF2 runs; drawing never probes processes.
+    tf2_running: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -184,11 +186,25 @@ impl GraphicsPage {
             open_row: None,
             wipe,
             zoom: false,
+            tf2_running: false,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
         page.load_pictures(cx);
         page
+    }
+
+    /// Takes the shell's answer to whether TF2 runs; redraws only when it changed.
+    pub fn set_tf2_running(&mut self, running: bool, cx: &mut Context<Self>) {
+        if self.tf2_running != running {
+            self.tf2_running = running;
+            cx.notify();
+        }
+    }
+
+    /// Whether TF2 ran when the shell last asked; the running banner shows while it did.
+    pub fn tf2_running(&self) -> bool {
+        self.tf2_running
     }
 
     /// The bundled setting pictures once read; an empty index when the folder cannot be read.
@@ -911,7 +927,12 @@ impl Render for GraphicsPage {
             )
             .into_any_element(),
         );
-        children.extend(self.card().map(|card| self.status_row(&card, cx)));
+        if let Some(card) = self.card() {
+            children.push(self.status_row(&card, cx));
+            if self.tf2_running {
+                children.push(status::running_banner(cx));
+            }
+        }
         let mut items = BTreeMap::new();
         if let Some(preset) = self.preset() {
             children.push(self.presets(preset, window, cx));
