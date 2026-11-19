@@ -298,6 +298,9 @@ fn startup_fonts_cover_the_weights_the_first_frame_draws(cx: &mut TestAppContext
         );
         assert!(fonts.iter().all(|f| f.family == family));
         assert!(fonts.iter().all(|f| f.style == gpui_kit::FontStyle::Normal));
+        let listed = tf2tools_app::theme::ui_font(family.clone()).fallbacks;
+        assert!(listed.is_some());
+        assert!(fonts.iter().all(|f| f.fallbacks == listed));
     });
 }
 

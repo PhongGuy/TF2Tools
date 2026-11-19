@@ -24,11 +24,13 @@ pub enum AppRoot {
 
 impl Render for AppRoot {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        match self {
+        let page = match self {
             Self::Loading => loading(cx).into_any_element(),
             Self::Ready(shell) => shell.clone().into_any_element(),
             Self::Failed { error } => error_view::render(error, cx).into_any_element(),
-        }
+        };
+        // Every text below inherits the UI font with its Chinese fallbacks.
+        crate::theme::with_ui_font(div().size_full(), cx).child(page)
     }
 }
 

@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use gpui_kit::component::{Theme, TitleBar};
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Font, FontWeight, TitlebarOptions, Window,
-    WindowBounds, WindowDecorations, WindowOptions, font, px, size,
+    WindowBounds, WindowDecorations, WindowOptions, px, size,
 };
 use tf2tools_core::{DataDir, Endpoints, FontHost, Recovery, Tf2Install};
 
@@ -252,7 +252,7 @@ pub fn startup_fonts(cx: &App) -> Vec<Font> {
     .into_iter()
     .map(|weight| Font {
         weight,
-        ..font(family.clone())
+        ..crate::theme::ui_font(family.clone())
     })
     .collect()
 }

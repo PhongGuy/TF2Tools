@@ -28,7 +28,8 @@ struct Tip {
 
 impl Render for Tip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = div()
+        // The tooltip draws outside the app root, so it sets the UI font's fallbacks itself.
+        let content = crate::theme::with_ui_font(div(), cx)
             .id(self.id)
             .aria_label(self.text.clone())
             .test_support()
