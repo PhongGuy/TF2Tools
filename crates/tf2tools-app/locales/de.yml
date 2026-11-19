@@ -2994,6 +2994,9 @@ graphics:
     thumb: "Bilder von %{name}"
     yours: "Deins: %{value}"
     same: "%{value}, wie %{preset}"
+    zoom: "Zoom"
+    full: "Ganzes Bild"
+    wipe: "Zwischen dem Bild der Voreinstellung und deinem schieben"
   changes:
     title: { one: "%{count} Änderung gegenüber %{preset}", other: "%{count} Änderungen gegenüber %{preset}" }
     as_is: "%{preset} wird unverändert genutzt. Ändere unten eine Einstellung, dann erscheint sie hier."

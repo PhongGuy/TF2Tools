@@ -1093,6 +1093,46 @@ pub fn graphics_pictures(module: &str) -> ElementId {
     keyed("graphics-pictures", module)
 }
 
+/// The open row's compare view: "graphics-compare:<module>".
+pub fn graphics_compare(module: &str) -> ElementId {
+    keyed("graphics-compare", module)
+}
+
+/// The overlay from the wipe line to the compare view's right edge: "graphics-compare-clip:<module>".
+pub fn graphics_compare_clip(module: &str) -> ElementId {
+    keyed("graphics-compare-clip", module)
+}
+
+/// The player's picture inside the overlay: "graphics-compare-yours:<module>".
+pub fn graphics_compare_yours(module: &str) -> ElementId {
+    keyed("graphics-compare-yours", module)
+}
+
+/// A compare picture's area, `side` being preset or yours: "graphics-compare-area:<module>=<side>".
+pub fn graphics_compare_area(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-area", &format!("{module}={side}"))
+}
+
+/// A compare picture's image, drawn only once decoded: "graphics-compare-image:<module>=<side>".
+pub fn graphics_compare_image(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-image", &format!("{module}={side}"))
+}
+
+/// The wipe Slider's wrapper: "graphics-compare-slider:<module>".
+pub fn graphics_compare_slider(module: &str) -> ElementId {
+    keyed("graphics-compare-slider", module)
+}
+
+/// A compare pill, `side` being preset, yours or same: "graphics-compare-pill:<module>=<side>".
+pub fn graphics_compare_pill(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-pill", &format!("{module}={side}"))
+}
+
+/// The open row's Zoom / Full picture Button: "graphics-zoom:<module>".
+pub fn graphics_zoom(module: &str) -> ElementId {
+    keyed("graphics-zoom", module)
+}
+
 /// An off/on row's Switch: "graphics-switch:<module>".
 pub fn graphics_switch(module: &str) -> ElementId {
     keyed("graphics-switch", module)

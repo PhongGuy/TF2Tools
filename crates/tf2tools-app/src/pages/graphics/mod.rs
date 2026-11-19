@@ -14,6 +14,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -118,6 +119,10 @@ pub struct GraphicsPage {
     image_viewer: String,
     /// The module whose pictures are open; at most one row's at a time.
     open_row: Option<String>,
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    wipe: Entity<SliderState>,
+    /// Whether the compare view shows the crops; one switch for the whole page.
+    zoom: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -136,7 +141,15 @@ impl GraphicsPage {
                 cx.notify();
             }
         });
-        let mut subscriptions = vec![tf2, searched];
+        let wipe = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max(100.)
+                .step(1.)
+                .default_value(50.)
+        });
+        let wiped = cx.subscribe(&wipe, |_, _, _: &SliderEvent, cx| cx.notify());
+        let mut subscriptions = vec![tf2, searched, wiped];
         // Pictures redraw the page as they land, and the page's wants go with it.
         let image_viewer = format!("graphics:{}", cx.entity_id());
         if let Some(images) = RemoteImages::global(cx) {
@@ -169,6 +182,8 @@ impl GraphicsPage {
             wanted: Vec::new(),
             image_viewer,
             open_row: None,
+            wipe,
+            zoom: false,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -209,13 +224,36 @@ impl GraphicsPage {
         self.open_row.as_deref()
     }
 
+    /// The compare view's wipe slider.
+    pub fn wipe_state(&self) -> &Entity<SliderState> {
+        &self.wipe
+    }
+
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    pub fn wipe(&self, cx: &App) -> f32 {
+        self.wipe.read(cx).value().start()
+    }
+
+    /// Whether the compare view shows the zoomed crops.
+    pub fn zoom(&self) -> bool {
+        self.zoom
+    }
+
     // Opens `module`'s pictures, closing any other row's, or closes them when already open.
-    fn toggle_pictures(&mut self, module: &str, _window: &mut Window, cx: &mut Context<Self>) {
+    // A freshly opened row starts with the wipe in the middle.
+    fn toggle_pictures(&mut self, module: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.open_row = if self.open_row.as_deref() == Some(module) {
             None
         } else {
+            self.wipe
+                .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
             Some(module.to_owned())
         };
+        cx.notify();
+    }
+
+    fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
+        self.zoom = !self.zoom;
         cx.notify();
     }
 
@@ -763,7 +801,8 @@ impl GraphicsPage {
         .detach();
     }
 
-    // The current thumbnail of every row with pictures; all are wanted, not just the visible.
+    // The open row's compare pictures first, as the newest wants, then the current thumbnail
+    // of every row with pictures; all thumbnails are wanted, not just the visible.
     fn image_keys(&self) -> Vec<ImageKey> {
         let (Some(index), Some(catalog), Some(preset)) = (
             self.pictures.as_deref(),
@@ -773,8 +812,14 @@ impl GraphicsPage {
             return Vec::new();
         };
         let label = model::preset_label(preset);
+        let open = self
+            .open_row
+            .as_deref()
+            .and_then(|module| self.row(module))
+            .and_then(|row| pictures::row_pictures(index, &row, &label, self.zoom));
+        let compared = open.map(|p| p.compare.pictures()).unwrap_or_default();
         let choices = self.shown_against();
-        catalog
+        let thumbs = catalog
             .categories()
             .iter()
             .flat_map(|category| category.modules())
@@ -783,7 +828,11 @@ impl GraphicsPage {
                 let row = view::row(catalog, &choices, module);
                 pictures::row_pictures(index, &row, &label, false)?.thumb
             })
-            .map(|thumb| ImageKey::card(&index.url(&thumb)))
+            .map(|thumb| ImageKey::card(&index.url(&thumb)));
+        compared
+            .into_iter()
+            .map(|picture| ImageKey::carousel(&index.url(&picture)))
+            .chain(thumbs)
             .collect()
     }
 

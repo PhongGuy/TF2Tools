@@ -104,6 +104,19 @@ pub enum Compare {
     },
 }
 
+impl Compare {
+    /// The pictures drawn, preset's side first.
+    pub fn pictures(&self) -> Vec<PathBuf> {
+        match self {
+            Compare::None => Vec::new(),
+            Compare::Same { picture, .. } | Compare::Single { picture, .. } => {
+                vec![picture.clone()]
+            }
+            Compare::Wipe { preset, yours, .. } => vec![preset.clone(), yours.clone()],
+        }
+    }
+}
+
 /// One value in the strip that picks a value by picture.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StripPicture {

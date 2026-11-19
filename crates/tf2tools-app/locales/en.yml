@@ -2971,6 +2971,9 @@ graphics:
     thumb: "Pictures of %{name}"
     yours: "Yours: %{value}"
     same: "%{value}, as %{preset}"
+    zoom: "Zoom"
+    full: "Full picture"
+    wipe: "Slide between the preset's picture and yours"
   changes:
     title: { one: "%{count} change from %{preset}", other: "%{count} changes from %{preset}" }
     as_is: "Using %{preset} as is. Change any setting below and it shows up here."

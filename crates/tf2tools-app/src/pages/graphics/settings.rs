@@ -282,7 +282,7 @@ fn row(
     let panel = pictures
         .as_ref()
         .filter(|_| page.open_row() == Some(name))
-        .map(|p| picture_panel::panel(name, p));
+        .map(|p| picture_panel::panel(page, name, p, cx));
     let tint = Hsla::from(rgb(CHANGED));
     let text = v_flex()
         .flex_1()

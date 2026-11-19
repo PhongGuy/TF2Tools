@@ -2993,6 +2993,9 @@ graphics:
     thumb: "%{name} 的图片"
     yours: "你的：%{value}"
     same: "%{value}，与 %{preset} 相同"
+    zoom: "放大"
+    full: "完整图片"
+    wipe: "滑动以对比预设的图片和你的图片"
   changes:
     title: { other: "相对 %{preset} 有 %{count} 处更改" }
     as_is: "正在原样使用 %{preset}。更改下方任一设置后，它会显示在这里。"

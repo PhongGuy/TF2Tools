@@ -2994,6 +2994,9 @@ graphics:
     thumb: "Imágenes de %{name}"
     yours: "Tuyo: %{value}"
     same: "%{value}, igual que %{preset}"
+    zoom: "Ampliar"
+    full: "Imagen completa"
+    wipe: "Desliza entre la imagen del preajuste y la tuya"
   changes:
     title: { one: "%{count} cambio respecto a %{preset}", other: "%{count} cambios respecto a %{preset}" }
     as_is: "Usando %{preset} tal cual. Cambia cualquier ajuste de abajo y aparecerá aquí."
