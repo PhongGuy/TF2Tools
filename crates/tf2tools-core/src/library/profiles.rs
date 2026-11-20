@@ -8,7 +8,7 @@ use std::fmt;
 
 use rusqlite::{Connection, OptionalExtension, Row};
 
-use super::addons::display_info;
+use super::addons::{display_info, is_override};
 use super::crosshairs::{SOURCE_BUILTIN, SOURCE_LIBRARY, is_weapon_script};
 use super::profile_setup::CurrentSetup;
 use super::profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
@@ -618,8 +618,9 @@ pub(super) fn assigned_crosshairs(
     Ok(out)
 }
 
-/// The draft's add-on names, once each and sorted. A `Pick` must be in the library; a
-/// `Keep` only has to be a valid add-on name.
+/// The draft's add-on names, once each and sorted. A `Pick` must be in the library and not a
+/// mastercomfig override, which the add-on step would copy over; a `Keep` only has to be a
+/// valid add-on name.
 fn resolve_addons(
     conn: &Connection,
     items: &[DraftItem<AddonName>],
@@ -628,13 +629,14 @@ fn resolve_addons(
     for item in items {
         let name = match item {
             DraftItem::Pick(name) => {
-                let known: bool = conn
-                    .query_row(
-                        "SELECT EXISTS (SELECT 1 FROM library_addons WHERE asset_name = ?1)",
-                        [name.as_str()],
-                        |r| r.get(0),
-                    )
-                    .map_err(profile_db)?;
+                let known: bool = !is_override(name)
+                    && conn
+                        .query_row(
+                            "SELECT EXISTS (SELECT 1 FROM library_addons WHERE asset_name = ?1)",
+                            [name.as_str()],
+                            |r| r.get(0),
+                        )
+                        .map_err(profile_db)?;
                 if !known {
                     return Err(ProfileError::ItemNotFound {
                         what: format!("addon {}", name.as_str()),
@@ -1471,7 +1473,7 @@ impl Library {
 
     /// Resolves every library reference of the profile (folder on disk, then provenance,
     /// rewriting the folder on a provenance match) and returns those that do not resolve,
-    /// in slot order: HUD, hitsound, killsound, then crosshairs by weapon script.
+    /// in slot order: HUD, hitsound, killsound, crosshairs by weapon script, then add-ons.
     /// Builtin crosshairs are not checked here. An unknown id is `NotFound`.
     pub fn missing_items(&self, id: &ProfileId) -> Result<Vec<MissingItem>, ProfileError> {
         self.db

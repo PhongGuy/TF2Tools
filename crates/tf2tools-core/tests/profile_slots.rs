@@ -209,6 +209,29 @@ fn an_addon_the_library_lacks_is_refused_before_writing() {
 }
 
 #[test]
+fn an_override_vpk_is_refused_as_an_addon_even_with_a_library_row() {
+    // A stray row must not let the add-on step copy over mastercomfig's override.
+    let env = library_env();
+    const OVERRIDE: &str = "mastercomfig-addon-override-1.vpk";
+    sql(&env.dir)
+        .execute(
+            "INSERT INTO library_addons (asset_name, display_name, installed_tag, created_at, updated_at)
+             VALUES (?1, 'x', '9.100.1', 'x', 'x')",
+            [OVERRIDE],
+        )
+        .unwrap();
+    let name = AddonName::new(OVERRIDE).unwrap();
+    let draft =
+        ProfileDraft::new("X").with_addons(SlotMode::Set((vec![DraftItem::Pick(name)], false)));
+    let err = env.lib.create_profile(&draft).unwrap_err();
+    assert!(
+        matches!(&err, ProfileError::ItemNotFound { what } if *what == format!("addon {OVERRIDE}")),
+        "{err:?}"
+    );
+    assert_eq!(count(&env.dir, "profiles"), 0);
+}
+
+#[test]
 fn a_kept_addon_survives_its_library_copy_being_deleted() {
     let env = library_env();
     let flat = addon(&env, FLAT);
