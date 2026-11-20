@@ -1425,8 +1425,9 @@ impl Library {
 
     /// Rewrites a profile from a draft: a `Keep` of the folder a slot holds leaves its columns
     /// as saved, and a Set crosshair list replaces the old builtin and library rows; a row of
-    /// another source stays unless the list sets its weapon. An edit of the active profile that changes what the game would
-    /// get ends its active state; a rename does not, and no game file is touched either way.
+    /// another source stays unless the list sets its weapon. An edit of the active profile
+    /// that changes what the game would get ends its active state; a rename does not, and no
+    /// game file is touched either way.
     /// Fails like `create_profile`, or with `NotFound`.
     pub fn update_profile(
         &self,
@@ -1478,7 +1479,7 @@ impl Library {
     /// alone, best effort. Missing items fail with `Missing` before any file is touched unless
     /// `skip_missing`, which leaves what is installed for those slots alone; unless the HUD is
     /// skipped or left, a HUD the library cannot put back then fails with `ExternalHuds` the
-    /// same way. Graphics then Add-ons run last; see `ApplySkipReason` and `pending_modules`.
+    /// same way. Graphics runs next, then Add-ons last; see `ApplySkipReason` and `pending_modules`.
     /// The profile becomes active only when nothing was skipped, no step failed and no module
     /// choices are pending, so Active means the game matches it.
     pub fn apply_profile(
@@ -1551,18 +1552,20 @@ impl Library {
         // None slot still uninstalls, since the profile asks for nothing there.
         let mut hud_blocked_name = None;
         if run_hud {
+            // Leave runs nothing here as well, so no change to `run_hud` can uninstall for it.
             let hud = match &resolved.hud {
-                SlotMode::Set(hud) => {
+                SlotMode::Set(hud) => Some(
                     self.install_hud_discarding_locked(hud, tf2, discard)
                         .map(|done| {
                             hud_blocked_name = done.blocked_name().map(str::to_owned);
-                        })
-                }
-                SlotMode::None | SlotMode::Leave => {
-                    self.uninstall_hud_discarding_locked(tf2, discard)
-                }
+                        }),
+                ),
+                SlotMode::None => Some(self.uninstall_hud_discarding_locked(tf2, discard)),
+                SlotMode::Leave => None,
             };
-            record(ApplyStep::Hud, hud.map_err(|e| e.to_string()));
+            if let Some(hud) = hud {
+                record(ApplyStep::Hud, hud.map_err(|e| e.to_string()));
+            }
         }
         drop(hud_guards);
         for (step, kind, missing, sound) in [

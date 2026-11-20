@@ -1,4 +1,4 @@
-//! The profile apply steps past crosshairs: Graphics, then Add-ons. Each step returns
+//! The profile apply steps that follow crosshairs, Graphics and Add-ons. Each step returns
 //! what the report records, so `apply_profile_discarding` only collects it.
 
 use super::profile_slots::{ProfileAddons, ProfileGraphics, SlotMode};
@@ -119,10 +119,12 @@ impl Library {
                 .iter()
                 .any(|m| matches!(m.kind(), MissingKind::Addon { name: n } if n == name))
         };
-        let custom = tf2.custom_dir();
+        // Installed is read from `listed`, the same fact the turn-offs above went by.
+        let installed =
+            |name: &AddonName| listed.iter().any(|a| a.name() == name && a.is_installed());
         let turn_ons: Vec<&AddonName> = wanted
             .iter()
-            .filter(|name| !is_missing(name) && !custom.join(name.as_str()).is_file())
+            .filter(|name| !is_missing(name) && !installed(name))
             .collect();
         if turn_ons.is_empty() {
             return step;
