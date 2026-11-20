@@ -133,7 +133,7 @@ pub(super) fn toggle(
 }
 
 /// The open row's pictures panel, the card's full width on the page's darker fill: the
-/// compare view with the zoom toggle on its corner when the setting has crops, then the
+/// compare view with the wipe slider and the zoom toggle along its bottom edge, then the
 /// strip of value pictures and its caption.
 pub(super) fn panel(
     page: &GraphicsPage,
@@ -149,9 +149,7 @@ pub(super) fn panel(
         };
         Button::new(ids::graphics_zoom(module))
             .ghost()
-            .absolute()
-            .right(px(10.))
-            .bottom(px(10.))
+            .flex_none()
             .h(px(26.))
             .px(px(10.))
             .rounded_full()
@@ -283,7 +281,7 @@ fn strip(
 
 // The compare view. The preset's picture fills the box; on a wipe, an overlay from the wipe
 // line to the right edge shows the matching right part of yours, which keeps the box's full
-// width so both pictures line up.
+// width so both pictures line up. The slider sits on the picture, so a pick never resizes it.
 fn compare(
     page: &GraphicsPage,
     module: &str,
@@ -307,13 +305,24 @@ fn compare(
         .id(ids::graphics_compare(module))
         .test_support()
         .relative()
-        .mt_3()
-        .w_full()
+        .flex_1()
         .max_w(px(COMPARE_MAX_WIDTH))
         .aspect_ratio(16. / 9.)
         .rounded(px(COMPARE_RADIUS))
         .overflow_hidden();
     let full = |child: AnyElement| div().absolute().inset_0().size_full().child(child);
+    // The bottom edge's bar: the slider when there is one, then Zoom in the corner.
+    let bar = |slider: Option<AnyElement>, zoom: Option<Button>| {
+        h_flex()
+            .absolute()
+            .left(px(10.))
+            .right(px(10.))
+            .bottom(px(10.))
+            .gap_2()
+            .justify_end()
+            .children(slider)
+            .children(zoom)
+    };
     let view = match compare {
         Compare::None => return None,
         Compare::Same {
@@ -322,7 +331,7 @@ fn compare(
         } => frame
             .child(full(side("preset", picture, cx)))
             .child(pill(module, "same", text, false))
-            .children(zoom),
+            .child(bar(None, zoom)),
         Compare::Single {
             picture,
             pill: text,
@@ -332,7 +341,7 @@ fn compare(
             frame
                 .child(full(side(name, picture, cx)))
                 .child(pill(module, name, text, *yours))
-                .children(zoom)
+                .child(bar(None, zoom))
         }
         Compare::Wipe {
             preset,
@@ -379,30 +388,30 @@ fn compare(
                 .id(ids::graphics_compare_slider(module))
                 .aria_label(tr!("graphics.pictures.wipe"))
                 .test_support()
-                .w_full()
-                .max_w(px(COMPARE_MAX_WIDTH))
+                .flex_1()
+                .flex()
+                .items_center()
+                .h(px(26.))
+                .px_3()
+                .rounded_full()
+                .bg(hsla(0., 0., 0., 0.6))
                 .child(
                     Slider::new(page.wipe_state())
                         .accessibility_label(tr!("graphics.pictures.wipe")),
-                );
-            let view = frame
+                )
+                .into_any_element();
+            frame
                 .child(full(side("preset", preset, cx)))
                 .children(clip)
                 .children(line)
                 .child(pill(module, "preset", preset_pill, false))
                 .child(pill(module, "yours", yours_pill, true))
-                .children(zoom);
-            return Some(
-                v_flex()
-                    .w_full()
-                    .gap_3()
-                    .child(view)
-                    .child(slider)
-                    .into_any_element(),
-            );
+                .child(bar(Some(slider), zoom))
         }
     };
-    Some(view.into_any_element())
+    // In a row the frame's width settles on the main axis before its 16:9 height follows,
+    // so a frame capped below the panel's width takes no height for the width it lost.
+    Some(h_flex().w_full().mt_3().child(view).into_any_element())
 }
 
 // A label over a compare picture's top corner: left for the preset's side, right for yours.
