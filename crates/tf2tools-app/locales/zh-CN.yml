@@ -738,15 +738,15 @@ profiles:
     missing: "部分物品缺失"
     applied_line: "已应用 %{name}。TF2 下次启动时生效。"
     apply_failed: "无法应用 %{name}"
-    kept_only: "以下项目保留了原有内容：%{list}（库中缺失）"
-    skipped: "%{part}保持不变：%{reason}"
+    kept_only: "以下项目保留了原有内容：%{list}（库中缺失）。"
+    skipped: "%{part}保持不变：%{reason}。"
   skip:
     graphics_not_installed: "未安装 mastercomfig，请先在图形页面安装"
     not_managed: "你的 mastercomfig 不是由 TF2Tools 安装的，请先在图形页面接管"
     addons_need_base: "插件需要 mastercomfig，但它尚未安装"
   modules:
-    no_catalog: "请打开一次图形页面，让 TF2Tools 读取你的 mastercomfig 设置"
-    foreign: "你的 modules.cfg 不是由 TF2Tools 写入的；请打开图形页面替换它"
+    no_catalog: "请打开一次图形页面，让 TF2Tools 读取你的 mastercomfig 设置。"
+    foreign: "你的 modules.cfg 不是由 TF2Tools 写入的；请打开图形页面替换它。"
   activity:
     saved_current: "已将当前设置保存为配置文件：%{name}"
     deleted: "已删除配置文件：%{name}"

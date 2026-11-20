@@ -424,3 +424,34 @@ fn code_built_label_value_lines_take_the_language_colon() {
         );
     }
 }
+
+#[test]
+fn profile_toasts_end_each_sentence_with_a_chinese_full_stop() {
+    use tf2tools_app::pages::profiles::model::{
+        ApplyOutcome, modules_foreign, modules_no_catalog, outcome_toast,
+    };
+    use tf2tools_core::{ApplySkipReason, ApplyStep};
+    let _guard = LocaleGuard::switch("zh-CN");
+    let warned = ApplyOutcome {
+        kept: vec!["x".into()],
+        skipped_steps: vec![
+            (ApplyStep::Graphics, ApplySkipReason::MastercomfigNotManaged),
+            (ApplyStep::Addons, ApplySkipReason::MastercomfigNotInstalled),
+        ],
+        ..ApplyOutcome::default()
+    };
+    let (_, _, warning) = outcome_toast(&warned);
+    for reason in [modules_no_catalog(), modules_foreign()] {
+        let failed = ApplyOutcome {
+            failed: vec![(ApplyStep::Graphics, reason.to_string())],
+            ..ApplyOutcome::default()
+        };
+        let (_, _, error) = outcome_toast(&failed);
+        let plain = error.replace("modules.cfg", "");
+        assert!(!plain.contains('.') && error.ends_with('。'), "{error}");
+    }
+    assert!(
+        !warning.contains('.') && warning.ends_with('。'),
+        "{warning}"
+    );
+}

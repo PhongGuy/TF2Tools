@@ -714,7 +714,7 @@ profiles:
     missing: "Некоторые элементы отсутствуют"
     applied_line: "%{name} применён. TF2 подхватит его при следующем запуске."
     apply_failed: "Не удалось применить %{name}"
-    kept_only: "Без изменений: %{list} (нет в библиотеке)"
+    kept_only: "Оставлено то, что было: %{list} (нет в библиотеке)"
     skipped: "%{part}: оставлено как было, %{reason}"
   skip:
     graphics_not_installed: "mastercomfig не установлен, сначала установите его на странице «Графика»"

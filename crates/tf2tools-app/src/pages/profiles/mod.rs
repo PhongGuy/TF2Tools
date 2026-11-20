@@ -825,6 +825,8 @@ fn summary_row(
         .into_any_element()
 }
 
+// Reads the profile, carries out `plan` and applies it; a missing item or an unnamed HUD in the
+// way touches nothing, so it becomes a value. `finish_apply` writes the activity row.
 fn apply_job(
     s: &Services,
     id: &ProfileId,
