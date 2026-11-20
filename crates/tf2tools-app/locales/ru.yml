@@ -973,6 +973,7 @@ sounds:
   button:
     play: "Воспроизвести"
     stop: "Остановить"
+    cancel_preview: "Отмена"
     uninstall: "Убрать"
     removing: "Удаление..."
     delete: "Удалить из библиотеки"

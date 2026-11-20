@@ -998,6 +998,7 @@ sounds:
   button:
     play: "Abspielen"
     stop: "Stoppen"
+    cancel_preview: "Abbrechen"
     uninstall: "Deinstallieren"
     removing: "Wird entfernt..."
     delete: "Aus Bibliothek löschen"

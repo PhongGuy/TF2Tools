@@ -7,6 +7,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::base::{POPUP_PRIORITY, Root, RootPlugin};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, Global,
@@ -32,6 +33,13 @@ pub struct NowPlaying {
     pub subtitle: SharedString,
 }
 
+/// Where the held sound is: its bytes still on the way, or playing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayState {
+    Loading,
+    Playing,
+}
+
 /// Plays one sound at a time. Each play or stop bumps `generation`, so a load or an end
 /// that belongs to an older play changes nothing.
 pub struct Player {
@@ -39,6 +47,8 @@ pub struct Player {
     win: AnyWindowHandle,
     generation: u64,
     now: Option<NowPlaying>,
+    // The phase of `now`; meaningless while `now` is empty.
+    phase: PlayState,
     volume: Entity<SliderState>,
     shared: Entity<SharedVolume>,
     ready: bool,
@@ -73,6 +83,7 @@ impl Player {
             win: window.window_handle(),
             generation: 0,
             now: None,
+            phase: PlayState::Loading,
             volume,
             shared,
             ready: false,
@@ -90,14 +101,22 @@ impl Player {
         self.now.as_ref()
     }
 
+    /// Whether `key` is loading or playing; `None` when the player holds another sound or none.
+    pub fn state_of(&self, key: &str) -> Option<PlayState> {
+        self.now
+            .as_ref()
+            .filter(|now| now.key.as_ref() == key)
+            .map(|_| self.phase)
+    }
+
     /// The 0..100 volume slider, tied to the app's one volume; letting go saves it.
     pub fn volume(&self) -> &Entity<SliderState> {
         &self.volume
     }
 
-    /// Stops if `now.key` is playing; else stops the old sound, shows `now`, reads the bytes with
-    /// `load` in `run_blocking` and plays them. A newer toggle or `stop` drops a slower load.
-    /// A failed load or play clears the player and toasts its error. Returns the load-and-play
+    /// Stops if `now.key` is held; else stops the old sound, shows `now` as loading, reads the
+    /// bytes with `load` in `run_blocking` and plays them. A newer toggle or `stop` drops a slower
+    /// load. A failed load or play clears the player and toasts its error. Returns the load-and-play
     /// task (a ready one for a stop); the caller detaches it, and dropping it cancels the play.
     pub fn toggle(
         &mut self,
@@ -128,6 +147,7 @@ impl Player {
         let generation = self.generation;
         self.audio.stop();
         self.now = Some(now);
+        self.phase = PlayState::Loading;
         cx.notify();
         let loading = start(cx);
         let win = self.win;
@@ -137,7 +157,11 @@ impl Player {
             // the update so the entity is not leased while the sound plays.
             let started = player.update(cx, |player, cx| {
                 (player.generation == generation).then(|| {
-                    loaded.map(|wav| player.audio.play(wav, player.shared.read(cx).gain()))
+                    loaded.map(|wav| {
+                        player.phase = PlayState::Playing;
+                        cx.notify();
+                        player.audio.play(wav, player.shared.read(cx).gain())
+                    })
                 })
             });
             let failed = match started {
@@ -291,43 +315,52 @@ impl Render for Player {
         } else {
             IconName::Volume2
         };
+        // While the bytes load, the button shows a spinner in the icon's place and still cancels.
+        let button = match self.phase {
+            PlayState::Loading => Button::new(ids::SOUND_PLAYER_CANCEL)
+                .w(px(32.))
+                .h(px(32.))
+                .p_0()
+                .child(
+                    div()
+                        .id(ids::SOUND_PLAYER_SPINNER)
+                        .test_support()
+                        .child(Spinner::new().with_size(Size::Size(px(24.)))),
+                )
+                .named(tr!("sounds.button.cancel_preview")),
+            PlayState::Playing => Button::new(ids::SOUND_PLAYER_STOP)
+                .icon(IconName::Square)
+                .named(tr!("widgets.player.stop")),
+        }
+        .ghost()
+        .size(px(32.))
+        .on_click(cx.listener(|player, _, _, cx| player.stop(cx)));
         let playing = self.now.clone().map(|now| {
-            h_flex()
-                .gap_2()
-                .mb_2()
-                .child(
-                    Button::new(ids::SOUND_PLAYER_STOP)
-                        .ghost()
-                        .icon(IconName::Square)
-                        .size(px(32.))
-                        .named(tr!("widgets.player.stop"))
-                        .on_click(cx.listener(|player, _, _, cx| player.stop(cx))),
-                )
-                .child(
-                    // Tailwind's text-sm and text-xs lines (20 and 16 px);
-                    // gpui's defaults run taller.
-                    v_flex()
-                        .flex_1()
-                        .min_w_0()
-                        .child(labelled(
-                            div()
-                                .text_sm()
-                                .line_height(px(20.))
-                                .font_weight(FontWeight::MEDIUM)
-                                .truncate(),
-                            ids::SOUND_PLAYER_NAME,
-                            now.name,
-                        ))
-                        .child(labelled(
-                            div()
-                                .text_xs()
-                                .line_height(px(16.))
-                                .text_color(muted)
-                                .truncate(),
-                            ids::SOUND_PLAYER_SUBTITLE,
-                            now.subtitle,
-                        )),
-                )
+            h_flex().gap_2().mb_2().child(button).child(
+                // Tailwind's text-sm and text-xs lines (20 and 16 px);
+                // gpui's defaults run taller.
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .child(labelled(
+                        div()
+                            .text_sm()
+                            .line_height(px(20.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .truncate(),
+                        ids::SOUND_PLAYER_NAME,
+                        now.name,
+                    ))
+                    .child(labelled(
+                        div()
+                            .text_xs()
+                            .line_height(px(16.))
+                            .text_color(muted)
+                            .truncate(),
+                        ids::SOUND_PLAYER_SUBTITLE,
+                        now.subtitle,
+                    )),
+            )
         });
         // The player floats over the page and any open dialog, and swallows its own clicks so
         // a press on it never reaches the card or backdrop beneath.

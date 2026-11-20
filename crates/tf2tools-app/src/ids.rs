@@ -646,6 +646,10 @@ pub const HUDS_LIBRARY: &str = "huds-library";
 pub const SOUND_PLAYER: &str = "sound-player";
 /// The player's stop button; present only while a sound plays.
 pub const SOUND_PLAYER_STOP: &str = "sound-player-stop";
+/// The player's cancel button; present only while a sound's bytes load.
+pub const SOUND_PLAYER_CANCEL: &str = "sound-player-cancel";
+/// The spinner inside the player's cancel button.
+pub const SOUND_PLAYER_SPINNER: &str = "sound-player-spinner";
 /// Labelled with the playing sound's name.
 pub const SOUND_PLAYER_NAME: &str = "sound-player-name";
 /// Labelled with the playing sound's subtitle.
