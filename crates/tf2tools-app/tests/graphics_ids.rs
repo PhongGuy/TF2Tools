@@ -40,6 +40,7 @@ fn every_status_preset_and_picture_control_has_a_stable_id(cx: &mut TestAppConte
         ids::graphics_compare("lod"),
         ids::graphics_compare_clip("lod"),
         ids::graphics_compare_yours("lod"),
+        ids::graphics_compare_line("lod"),
         ids::graphics_compare_slider("lod"),
         ids::graphics_compare_pill("lod", "preset"),
         ids::graphics_compare_pill("lod", "yours"),

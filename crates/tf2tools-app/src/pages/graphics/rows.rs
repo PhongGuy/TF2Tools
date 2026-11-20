@@ -8,7 +8,7 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, div, px, rgb,
+    Styled as _, TestSupportExt as _, div, px, relative, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
@@ -45,22 +45,27 @@ impl GraphicsChoicesEditor {
                 text,
             )
         });
-        // The docs link reads as part of the description: its size and muted colour, underlined.
-        let learn_more = h_flex().child(
-            Button::new(scope.id(ids::graphics_learn_more(name)))
-                .link()
-                .xsmall()
-                .text_color(muted)
-                .label(tr!("graphics.row.learn_more"))
-                .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
-        );
+        // Set solid, so the Learn more link alone gives the line its height.
         let preset = row.changed.then(|| {
             labelled(
-                div().text_xs().text_color(muted),
+                div().text_xs().line_height(relative(1.)).text_color(muted),
                 scope.id(ids::graphics_module_preset(name)),
                 row.preset_text.clone(),
             )
         });
+        // The docs link reads as part of the description: its size and muted colour, underlined.
+        // The preset's value shares its line, so a pick never adds a line to the text.
+        let learn_more = h_flex()
+            .gap_3()
+            .child(
+                Button::new(scope.id(ids::graphics_learn_more(name)))
+                    .link()
+                    .xsmall()
+                    .text_color(muted)
+                    .label(tr!("graphics.row.learn_more"))
+                    .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
+            )
+            .children(preset);
         let reset =
             row.changed.then(|| {
                 let module = name.to_owned();
@@ -108,7 +113,6 @@ impl GraphicsChoicesEditor {
             ))
             .children(description)
             .child(learn_more)
-            .children(preset)
             .children(toggle);
         let controls = h_flex().flex_none().gap_2().children(reset).child(control);
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)

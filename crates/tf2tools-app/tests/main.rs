@@ -83,6 +83,7 @@ mod graphics_settings_edit;
 mod graphics_settings_files;
 mod graphics_settings_model;
 mod graphics_status;
+mod graphics_steady;
 mod graphics_strip;
 mod graphics_thumbs;
 mod graphics_view;
