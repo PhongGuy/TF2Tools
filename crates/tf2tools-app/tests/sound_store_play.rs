@@ -434,3 +434,51 @@ fn the_detail_preview_button_spins_while_the_preview_loads(cx: &mut TestAppConte
         Some("Stop Preview")
     );
 }
+
+// The spinner stands in for the 16 px icon: drawn inside the button, never larger than the icon.
+#[gpui_kit::test]
+fn the_card_spinner_fits_inside_its_button(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    let button = support::bounds_of(cx, win, ids::store_play(S, &gb(1))).unwrap();
+    let spinner = support::bounds_of(cx, win, ids::store_play_spinner(S, &gb(1))).unwrap();
+    assert!(
+        button.contains(&spinner.origin) && button.contains(&spinner.bottom_right()),
+        "{spinner:?} inside {button:?}"
+    );
+    assert!(
+        spinner.size.width <= gpui_kit::px(16.) && spinner.size.height <= gpui_kit::px(16.),
+        "{:?}",
+        spinner.size
+    );
+}
+
+// Loading reads "Stop Preview" beside the spinner, so the button keeps its width when it plays.
+#[gpui_kit::test]
+fn the_detail_preview_button_keeps_its_width_from_loading_to_playing(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_card(S, &gb(1)));
+    support::wait_real(cx, "the detail's preview button", |cx| {
+        support::present(cx, win, ids::STORE_PREVIEW)
+    });
+    support::click_id(cx, win, ids::STORE_PREVIEW);
+    assert!(support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
+    let loading = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    let playing = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
+    assert_eq!(loading.size.width, playing.size.width);
+}

@@ -317,14 +317,15 @@ impl Render for Player {
         };
         // While the bytes load, the button shows a spinner in the icon's place and still cancels.
         let button = match self.phase {
+            // A button with children pads like a labelled one, so `p_0` keeps the spinner centred
+            // at the icon's 16 px.
             PlayState::Loading => Button::new(ids::SOUND_PLAYER_CANCEL)
-                .w(px(32.))
-                .h(px(32.))
+                .p_0()
                 .child(
                     div()
                         .id(ids::SOUND_PLAYER_SPINNER)
                         .test_support()
-                        .child(Spinner::new().with_size(Size::Size(px(24.)))),
+                        .child(Spinner::new()),
                 )
                 .named(tr!("sounds.button.cancel_preview")),
             PlayState::Playing => Button::new(ids::SOUND_PLAYER_STOP)

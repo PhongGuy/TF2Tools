@@ -70,8 +70,9 @@ pub fn sound_body(player: WeakEntity<Player>) -> DetailBody {
     })
 }
 
-// Toggles the page's player on this sound's preview; it reads "Stop" while that preview plays,
-// and shows a spinner reading "Cancel" while its bytes download.
+// Toggles the page's player on this sound's preview; it reads "Stop" while that preview plays.
+// While its bytes download a spinner replaces the icon beside the same "Stop Preview" text, so
+// the button keeps its width, and a screen reader hears "Cancel".
 fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Option<Button> {
     let StoreItemId::GameBanana(id) = *item.id() else {
         return None;
@@ -95,18 +96,15 @@ fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Op
         Some(PlayState::Playing) => button
             .icon(IconName::Square)
             .label(tr!("sound_store.preview.stop")),
-        Some(PlayState::Loading) => {
-            let cancel = tr!("sounds.button.cancel_preview");
-            button
-                .child(
-                    div()
-                        .id(ids::STORE_PREVIEW_SPINNER)
-                        .test_support()
-                        .child(Spinner::new()),
-                )
-                .child(cancel.clone())
-                .accessibility_label(cancel)
-        }
+        Some(PlayState::Loading) => button
+            .child(
+                div()
+                    .id(ids::STORE_PREVIEW_SPINNER)
+                    .test_support()
+                    .child(Spinner::new()),
+            )
+            .child(tr!("sound_store.preview.stop"))
+            .accessibility_label(tr!("sounds.button.cancel_preview")),
     };
     let button = button.on_click(move |_, _, cx| {
         if let Some(player) = player.upgrade() {

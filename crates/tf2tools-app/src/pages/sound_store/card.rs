@@ -4,7 +4,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, Window, div, px,
@@ -225,18 +225,18 @@ fn play_button(card: &StoreCard, state: CardState, player: &WeakEntity<Player>) 
     }
     let (player, name, author) = (player.clone(), card.name.clone(), card.author.clone());
     // The icon-only button names its action, so a screen reader and a test hear Play, Stop or
-    // Cancel. While the preview downloads a spinner takes the icon's place (a 36 px button draws
-    // a 27 px icon) and the button keeps its size and its click, which cancels.
+    // Cancel. While the preview downloads a 16 px spinner takes the icon's place; a button with
+    // children pads like a labelled one, so `p_0` keeps it centred. The click still cancels.
     let button = Button::new(ids::store_play(StoreKind::Sounds, &card.id));
     let (button, action) = match state.playing {
         None => (button.icon(IconName::Play), tr!("sounds.button.play")),
         Some(PlayState::Playing) => (button.icon(IconName::Square), tr!("sounds.button.stop")),
         Some(PlayState::Loading) => (
-            button.w(px(36.)).h(px(36.)).child(
+            button.p_0().child(
                 div()
                     .id(ids::store_play_spinner(StoreKind::Sounds, &card.id))
                     .test_support()
-                    .child(Spinner::new().with_size(Size::Size(px(27.)))),
+                    .child(Spinner::new()),
             ),
             tr!("sounds.button.cancel_preview"),
         ),

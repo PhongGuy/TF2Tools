@@ -161,3 +161,22 @@ fn the_loading_button_sits_where_stop_does(cx: &mut TestAppContext) {
     let stop = support::bounds_of(cx, h.win, ids::SOUND_PLAYER_STOP).expect("the stop button");
     assert_eq!(cancel, stop);
 }
+
+// The spinner stands in for the 16 px icon: drawn inside the button, never larger than the icon.
+#[gpui_kit::test]
+fn the_player_spinner_fits_inside_its_button(cx: &mut TestAppContext) {
+    let h = host(cx, 50);
+    let _gate = toggle_gated(cx, &h, "Ding");
+    support::settle(cx, h.win);
+    let button = support::bounds_of(cx, h.win, ids::SOUND_PLAYER_CANCEL).unwrap();
+    let spinner = support::bounds_of(cx, h.win, ids::SOUND_PLAYER_SPINNER).unwrap();
+    assert!(
+        button.contains(&spinner.origin) && button.contains(&spinner.bottom_right()),
+        "{spinner:?} inside {button:?}"
+    );
+    assert!(
+        spinner.size.width <= gpui_kit::px(16.) && spinner.size.height <= gpui_kit::px(16.),
+        "{:?}",
+        spinner.size
+    );
+}
