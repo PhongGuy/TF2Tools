@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 22;
+pub(crate) const SCHEMA_VERSION: u32 = 24;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -149,6 +149,31 @@ const STEPS: &[Step] = &[
     Step {
         version: 22,
         sql: "",
+        add_columns: &[],
+    },
+    // v6 step 23: a profile's five slot modes, its Graphics choices and its add-on list.
+    Step {
+        version: 23,
+        sql: STEP_23_SQL,
+        add_columns: &[
+            ("profiles", "hud_mode", "TEXT NOT NULL DEFAULT 'leave'"),
+            ("profiles", "sounds_mode", "TEXT NOT NULL DEFAULT 'leave'"),
+            (
+                "profiles",
+                "crosshairs_mode",
+                "TEXT NOT NULL DEFAULT 'leave'",
+            ),
+            ("profiles", "graphics_mode", "TEXT NOT NULL DEFAULT 'leave'"),
+            ("profiles", "addons_mode", "TEXT NOT NULL DEFAULT 'leave'"),
+            ("profiles", "graphics_preset", "TEXT"),
+            ("profiles", "graphics_modules", "TEXT"),
+            ("profiles", "addons_only", "INTEGER NOT NULL DEFAULT 0"),
+        ],
+    },
+    // v6 step 24: old rows apply as before; a separate step, since step 23's columns land after its SQL.
+    Step {
+        version: 24,
+        sql: STEP_24_SQL,
         add_columns: &[],
     },
 ];
@@ -602,4 +627,27 @@ const STEP_20_SQL: &str = "
         ON store_gb_maps(gamemode_id, download_rank, gb_id DESC);
     CREATE INDEX IF NOT EXISTS idx_store_gb_maps_mode_date
         ON store_gb_maps(gamemode_id, date_added DESC, gb_id DESC);
+";
+
+/// v6 step 23: the add-ons a profile turns on, by asset name.
+const STEP_23_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS profile_addons (
+        profile_id TEXT NOT NULL,
+        addon_name TEXT NOT NULL,
+        PRIMARY KEY (profile_id, addon_name),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    );
+";
+
+/// v6 step 24: a slot that stores something is Set, else None; Graphics and Add-ons stay Leave.
+/// A folder counts when it is neither NULL nor empty, and a crosshair row only with a source v6 reads.
+const STEP_24_SQL: &str = "
+    UPDATE profiles SET
+        hud_mode = CASE WHEN IFNULL(hud_folder_name, '') != '' THEN 'set' ELSE 'none' END,
+        sounds_mode = CASE WHEN IFNULL(hitsound_folder_name, '') != ''
+                             OR IFNULL(killsound_folder_name, '') != '' THEN 'set' ELSE 'none' END,
+        crosshairs_mode = CASE WHEN EXISTS (
+            SELECT 1 FROM profile_crosshair_assignments a
+            WHERE a.profile_id = profiles.id AND a.crosshair_source IN ('builtin', 'library')
+        ) THEN 'set' ELSE 'none' END;
 ";

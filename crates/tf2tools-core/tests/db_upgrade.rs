@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v22_without_loss() {
+fn v5_database_upgrades_to_v24_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,14 +34,37 @@ fn v5_database_upgrades_to_v22_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
     assert_eq!(common::schema_shape(&after), common::current_shape());
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 22);
+    assert_eq!(version, 24);
+    let modes: (String, String, String, String, String) = after
+        .query_row(
+            "SELECT hud_mode, sounds_mode, crosshairs_mode, graphics_mode, addons_mode
+             FROM profiles WHERE id = 'p1'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        modes,
+        (
+            "set".into(),
+            "none".into(),
+            "set".into(),
+            "leave".into(),
+            "leave".into()
+        )
+    );
+    for column in PROFILE_SLOT_COLUMNS {
+        after
+            .execute_batch(&format!("ALTER TABLE profiles DROP COLUMN {column}"))
+            .unwrap();
+    }
     // The v5 rows must survive unchanged; the new HUD column is the only addition.
     after
         .execute_batch("ALTER TABLE library_huds DROP COLUMN gb_file_date")
@@ -61,6 +84,7 @@ fn v5_database_upgrades_to_v22_without_loss() {
         "gb_hud_checks",
         "store_gb_maps",
         "store_gb_map_categories",
+        "profile_addons",
     ] {
         assert_eq!(
             rows.remove(table).map(|r| r.len()),
@@ -92,12 +116,12 @@ fn v5_database_upgrades_to_v22_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v22");
-    assert_eq!(db.schema_version(), 22);
+    let db = Database::open(&dir).expect("reopen at v24");
+    assert_eq!(db.schema_version(), 24);
 }
 
 #[test]
-fn v1_database_upgrades_to_v22() {
+fn v1_database_upgrades_to_v24() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -113,7 +137,7 @@ fn v1_database_upgrades_to_v22() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -141,7 +165,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 23;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 25;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -151,7 +175,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 23, supported: 22 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 25, supported: 24 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -258,7 +282,7 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v10 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let keys: Vec<String> = conn
@@ -293,7 +317,7 @@ fn v11_database_gains_the_map_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v11 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     assert_eq!(common::count(&dir, "store_maps"), 0);
     assert_eq!(common::count(&dir, "downloaded_maps"), 0);
@@ -334,7 +358,7 @@ fn v12_database_gains_the_mastercomfig_tables_and_drops_override_addons() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v12 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     assert_eq!(
         asset_names(&dir, "library_addons"),
@@ -393,7 +417,7 @@ fn v14_database_gains_the_logstf_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v14 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     for table in [
         "logstf_players",
@@ -421,7 +445,7 @@ fn v15_database_gains_weapon_rows_and_the_counted_marker() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v15 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     assert_eq!(common::count(&dir, "logstf_weapon_rows"), 0);
     let conn = common::sql(&dir);
@@ -457,7 +481,7 @@ fn v16_database_gains_gb_hud_checks_seeded_once_per_item() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v16 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     let conn = common::sql(&dir);
     let rows: Vec<(i64, Option<i64>, Option<i64>, i64)> = conn
@@ -498,7 +522,7 @@ fn v17_database_keeps_its_class_rows_with_no_damage_taken() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v17 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     let conn = common::sql(&dir);
     let row: (i64, Option<i64>) = conn
@@ -539,7 +563,7 @@ fn v18_database_gains_the_nickname_column_and_keeps_its_players() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v18 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     let players = tf2tools_core::LogsCache::new(db).players().unwrap();
     assert_eq!(players.len(), 1);
     assert_eq!(players[0].name(), "Arie");
@@ -559,7 +583,7 @@ fn v19_database_gains_the_gamebanana_map_tables() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v19 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     assert_eq!(common::count(&dir, "store_gb_maps"), 0);
     assert_eq!(common::count(&dir, "store_gb_map_categories"), 0);
@@ -585,7 +609,7 @@ fn v20_database_gains_opened_at_and_keeps_its_logs() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v20 database");
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     drop(db);
     let conn = common::sql(&dir);
     let row: (i64, Option<i64>, i64, i64, i64) = conn
@@ -599,4 +623,135 @@ fn v20_database_gains_opened_at_and_keeps_its_logs() {
     assert_eq!(row, (2, None, 0, 1, 1));
     assert_eq!(common::count(&dir, "logstf_class_rows"), 1);
     assert_eq!(common::schema_shape(&conn), common::current_shape());
+}
+
+/// The eight profile columns migration 23 adds, for dropping back to an older shape.
+const PROFILE_SLOT_COLUMNS: [&str; 8] = [
+    "hud_mode",
+    "sounds_mode",
+    "crosshairs_mode",
+    "graphics_mode",
+    "addons_mode",
+    "graphics_preset",
+    "graphics_modules",
+    "addons_only",
+];
+
+#[test]
+fn v22_database_backfills_profile_modes_from_what_each_row_stores() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    conn.execute_batch("DROP TABLE profile_addons;").unwrap();
+    for column in PROFILE_SLOT_COLUMNS {
+        conn.execute_batch(&format!("ALTER TABLE profiles DROP COLUMN {column}"))
+            .unwrap();
+    }
+    conn.execute_batch(
+        "INSERT INTO profiles (id, name, hud_folder_name, hitsound_folder_name,
+             killsound_folder_name, created_at, updated_at) VALUES
+             ('hud', 'Hud', 'rayshud', NULL, NULL, 't', 't'),
+             ('blank', 'Blank', '', '', '', 't', 't'),
+             ('kill', 'Kill', NULL, NULL, 'bell', 't', 't'),
+             ('hit', 'Hit', NULL, 'ding', '', 't', 't'),
+             ('builtin', 'Builtin', NULL, NULL, NULL, 't', 't'),
+             ('library', 'Library', NULL, NULL, NULL, 't', 't'),
+             ('foreign', 'Foreign', NULL, NULL, NULL, 't', 't'),
+             ('bare', 'Bare', NULL, NULL, NULL, 't', 't');
+         INSERT INTO profile_crosshair_assignments
+             (profile_id, weapon_script, crosshair_source, crosshair_ref) VALUES
+             ('builtin', 'tf_weapon_scattergun', 'builtin', 'cpma_9'),
+             ('library', 'tf_weapon_scattergun', 'library', 'dot'),
+             ('foreign', 'tf_weapon_scattergun', 'gamebanana', 'x');
+         PRAGMA user_version = 22;",
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = Database::open(&dir).expect("open v22 database");
+    assert_eq!(db.schema_version(), 24);
+    drop(db);
+    let conn = common::sql(&dir);
+    type Row = (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        i64,
+    );
+    let rows: Vec<Row> = conn
+        .prepare(
+            "SELECT id, hud_mode, sounds_mode, crosshairs_mode, graphics_mode, addons_mode,
+                 graphics_preset, addons_only FROM profiles ORDER BY id",
+        )
+        .unwrap()
+        .query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+                r.get(6)?,
+                r.get(7)?,
+            ))
+        })
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    let row = |id: &str, hud: &str, sounds: &str, crosshairs: &str| -> Row {
+        (
+            id.into(),
+            hud.into(),
+            sounds.into(),
+            crosshairs.into(),
+            "leave".into(),
+            "leave".into(),
+            None,
+            0,
+        )
+    };
+    assert_eq!(
+        rows,
+        [
+            row("bare", "none", "none", "none"),
+            row("blank", "none", "none", "none"),
+            row("builtin", "none", "none", "set"),
+            row("foreign", "none", "none", "none"),
+            row("hit", "none", "set", "none"),
+            row("hud", "set", "none", "none"),
+            row("kill", "none", "set", "none"),
+            row("library", "none", "none", "set"),
+        ]
+    );
+    assert_eq!(common::schema_shape(&conn), common::current_shape());
+}
+
+#[test]
+fn a_new_profile_row_leaves_every_slot_and_its_addon_rows_cascade() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = common::sql(&dir);
+    conn.execute_batch(
+        "PRAGMA foreign_keys = ON;
+         INSERT INTO profiles (id, name, created_at, updated_at) VALUES ('p', 'P', 't', 't');
+         INSERT INTO profile_addons (profile_id, addon_name)
+             VALUES ('p', 'mastercomfig-addon-flat-mouse.vpk');",
+    )
+    .unwrap();
+    let defaults: (String, String, i64) = conn
+        .query_row(
+            "SELECT hud_mode, addons_mode, addons_only FROM profiles WHERE id = 'p'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(defaults, ("leave".to_owned(), "leave".to_owned(), 0));
+    conn.execute("DELETE FROM profiles WHERE id = 'p'", [])
+        .unwrap();
+    assert_eq!(common::count(&dir, "profile_addons"), 0);
 }

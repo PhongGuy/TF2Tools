@@ -267,11 +267,29 @@ const M20_TABLES: &str = "
         ON store_gb_maps(gamemode_id, date_added DESC, gb_id DESC);
 ";
 
+/// The add-on table and profile slot columns migration 23 adds, as the schema should hold them.
+const M23_PROFILE_SLOTS: &str = "
+    CREATE TABLE profile_addons (
+        profile_id TEXT NOT NULL,
+        addon_name TEXT NOT NULL,
+        PRIMARY KEY (profile_id, addon_name),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    );
+    ALTER TABLE profiles ADD COLUMN hud_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN sounds_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN crosshairs_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN graphics_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN addons_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN graphics_preset TEXT;
+    ALTER TABLE profiles ADD COLUMN graphics_modules TEXT;
+    ALTER TABLE profiles ADD COLUMN addons_only INTEGER NOT NULL DEFAULT 0;
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
 /// tables, migration 16's weapon rows, migration 17's HUD checks, migration 18's damage taken, migration 19's
-/// nicknames and migration 20's GameBanana maps:
-/// the schema v6 opens to.
+/// nicknames, migration 20's GameBanana maps, migration 21's log opened time and migration 23's
+/// profile slots: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
@@ -284,6 +302,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M19_COLUMNS).unwrap();
     conn.execute_batch(M20_TABLES).unwrap();
     conn.execute_batch(M21_COLUMNS).unwrap();
+    conn.execute_batch(M23_PROFILE_SLOTS).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape

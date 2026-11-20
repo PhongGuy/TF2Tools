@@ -162,7 +162,7 @@ async fn run_blocking_returns_the_value(cx: &mut TestAppContext) {
     let env = support::env();
     support::install_services(cx, support::services(&env, support::no_steam()));
     let task = cx.update(|cx| run_blocking(cx, |s| Ok(s.db.schema_version())));
-    assert_eq!(task.await, Ok(22));
+    assert_eq!(task.await, Ok(24));
 }
 
 #[gpui_kit::test]
