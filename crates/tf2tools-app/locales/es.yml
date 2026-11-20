@@ -3022,6 +3022,7 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Restablecer"
+    learn_more: "Más información"
   pictures:
     show: "Mostrar imágenes"
     hide: "Ocultar imágenes"

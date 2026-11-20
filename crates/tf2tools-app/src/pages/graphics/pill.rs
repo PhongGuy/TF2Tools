@@ -13,6 +13,11 @@ pub(crate) fn track(cx: &App) -> Div {
         .bg(cx.theme().secondary)
 }
 
+/// The tighter track a settings row's choices sit in: 3 px inset with 2 px between segments.
+pub(crate) fn row_track(cx: &App) -> Div {
+    track(cx).p(px(3.)).gap(px(2.))
+}
+
 /// Styles one segment: background fill, foreground text and a small shadow when checked;
 /// transparent with muted text otherwise.
 pub(crate) fn segment_look<E: Styled>(el: E, checked: bool, cx: &App) -> E {

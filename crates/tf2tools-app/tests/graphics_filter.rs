@@ -177,6 +177,7 @@ fn every_settings_list_control_has_a_stable_id(cx: &mut TestAppContext) {
         ids::graphics_segment("lod", "low"),
         ids::graphics_module("lod"),
         ids::graphics_module_description("lod"),
+        ids::graphics_learn_more("lod"),
         ids::graphics_module_select("decals"),
         ids::graphics_module_preset("fpscap"),
         ids::graphics_module_reset("fpscap"),

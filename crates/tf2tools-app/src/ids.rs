@@ -1098,6 +1098,11 @@ pub fn graphics_pictures_toggle(module: &str) -> ElementId {
     keyed("graphics-pictures-toggle", module)
 }
 
+/// A row's "Learn more" link to the mastercomfig docs: "graphics-learn-more:<module>".
+pub fn graphics_learn_more(module: &str) -> ElementId {
+    keyed("graphics-learn-more", module)
+}
+
 /// A row's open pictures panel: "graphics-pictures:<module>".
 pub fn graphics_pictures(module: &str) -> ElementId {
     keyed("graphics-pictures", module)

@@ -287,9 +287,9 @@ fn a_selected_segment_stands_out_from_the_page(cx: &mut TestAppContext) {
     });
 }
 
-// The Graphics rows' segments take their checked look from `selected_segment`.
+// The Graphics rows' segments take their checked look from the pill the preset shares.
 #[test]
-fn graphics_segments_use_the_selected_segment_look() {
+fn graphics_segments_use_the_shared_pill_look() {
     let source = include_str!("../src/pages/graphics/settings.rs");
-    assert!(source.contains("selected_segment("));
+    assert!(source.contains("pill::segment_look(") && source.contains("pill::row_track("));
 }

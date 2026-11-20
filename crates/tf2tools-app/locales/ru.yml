@@ -2997,6 +2997,7 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Сбросить"
+    learn_more: "Подробнее"
   pictures:
     show: "Показать изображения"
     hide: "Скрыть изображения"

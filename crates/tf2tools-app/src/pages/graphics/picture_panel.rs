@@ -101,8 +101,8 @@ pub(super) fn toggle(
     };
     let target = module.to_owned();
     Button::new(ids::graphics_pictures_toggle(module))
-        .outline()
-        .xsmall()
+        .ghost()
+        .small()
         .label(label)
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
         .into_any_element()

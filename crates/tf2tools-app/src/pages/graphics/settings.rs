@@ -15,16 +15,17 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
     ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
-    div, px, rgb, transparent_black,
+    div, px, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
 use super::model::{SettingsNote, preset_label, settings_note_text};
 use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
-use super::{GraphicsPage, picture_panel, pictures};
+use super::{GraphicsPage, picture_panel, pictures, pill};
 use crate::i18n::tr;
 use crate::ids;
-use crate::theme::selected_segment;
+use crate::links::MASTERCOMFIG_DOCS_URL;
+use crate::pages::common::card_frame;
 use crate::widgets::labelled;
 
 /// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
@@ -118,7 +119,7 @@ fn toolbar(
         .into_any_element()
 }
 
-// A category's heading over its shown rows.
+// A category's card: a muted header bar over its shown rows, which run edge to edge.
 fn section_view(
     page: &GraphicsPage,
     section: &SectionView,
@@ -129,15 +130,30 @@ fn section_view(
     let rows: Vec<AnyElement> = section
         .rows
         .iter()
-        .map(|r| row(page, r.clone(), narrow, cx))
+        .enumerate()
+        .map(|(i, r)| row(page, r.clone(), i == 0, narrow, cx))
         .collect();
-    v_flex()
+    let theme = cx.theme();
+    let (border, muted) = (theme.border, theme.muted_foreground);
+    card_frame(cx)
         .id(ids::graphics_section(&section.key))
         .test_support()
         .ml(indent)
-        .gap_2()
+        .flex_none()
+        .flex()
+        .flex_col()
+        // Clipping drops a flex item's content height as its floor, so the card keeps it
+        // explicitly rather than shrink to fit the scroll column.
+        .overflow_hidden()
         .child(labelled(
-            div().font_weight(FontWeight::SEMIBOLD),
+            div()
+                .px_4()
+                .py_3()
+                .text_size(px(13.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(muted)
+                .border_b_1()
+                .border_color(border),
             ids::graphics_category(&section.key),
             section.label.clone(),
         ))
@@ -257,12 +273,14 @@ const RAIL_GUTTER: f32 = 24.;
 /// The left bar and tint that mark a row the player changed from the preset.
 const CHANGED: u32 = 0x1447e6;
 
-// The title and description, plus the preset's value when changed, on the left; Reset when
-// changed and the row's control on the right. A module with pictures adds its thumbnail
-// before the text and Show pictures under it, and the open row's panel goes below the line.
+// The title, description and Learn more, plus the preset's value when changed, on the left;
+// Reset when changed and the row's control on the right. A module with pictures adds its
+// thumbnail before the text and Show pictures under it, and the open row's panel goes below
+// the line. Every row but the card's `first` rules itself off from the one above.
 fn row(
     page: &GraphicsPage,
     row: RowView,
+    first: bool,
     narrow: bool,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
@@ -275,6 +293,13 @@ fn row(
             text,
         )
     });
+    let learn_more = h_flex().child(
+        Button::new(ids::graphics_learn_more(name))
+            .link()
+            .small()
+            .label(tr!("graphics.row.learn_more"))
+            .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
+    );
     let preset = row.changed.then(|| {
         labelled(
             div().text_xs().text_color(muted),
@@ -303,9 +328,12 @@ fn row(
     let thumb = pictures
         .as_ref()
         .map(|p| picture_panel::thumbnail(page, name, &row.label, p, cx));
-    let toggle = pictures
-        .as_ref()
-        .map(|_| h_flex().child(picture_panel::toggle(page, name, cx)));
+    let toggle = pictures.as_ref().map(|_| {
+        h_flex()
+            .ml(px(-8.))
+            .child(picture_panel::toggle(page, name, cx))
+    });
+    let border = cx.theme().border;
     // The open panel compares the crops while zoom is on, the same pictures the page wants;
     // the thumbnail and strip stay on the full pictures.
     let panel = page
@@ -325,6 +353,7 @@ fn row(
             row.label.clone(),
         ))
         .children(description)
+        .child(learn_more)
         .children(preset)
         .children(toggle);
     let controls = h_flex().flex_none().gap_2().children(reset).child(control);
@@ -353,15 +382,26 @@ fn row(
             )
             .child(controls)
     };
+    // A changed row is tinted with a 3 px accent bar down its left edge, drawn as an overlay
+    // so the row's single border colour stays free for the rule above it.
+    let bar = row.changed.then(|| {
+        div()
+            .absolute()
+            .left_0()
+            .top_0()
+            .bottom_0()
+            .w(px(3.))
+            .bg(tint)
+    });
     v_flex()
         .id(ids::graphics_row(name))
         .test_support()
-        .pl_3()
-        .border_l(px(3.))
-        .border_color(transparent_black())
-        .when(row.changed, |this| {
-            this.border_color(tint).bg(tint.opacity(0.06))
-        })
+        .relative()
+        .px_4()
+        .py_3()
+        .when(!first, |this| this.border_t_1().border_color(border))
+        .when(row.changed, |this| this.bg(tint.opacity(0.07)))
+        .children(bar)
         .gap_3()
         .child(line)
         .children(panel)
@@ -387,13 +427,10 @@ fn switch(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) ->
         .into_any_element()
 }
 
-// One standalone Toggle per value in a single frame, so each is a tab stop that Enter and
+// One standalone Toggle per value in a single dark pill, so each is a tab stop that Enter and
 // Space click. A click on the checked segment reports false and changes nothing.
 fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) -> AnyElement {
-    let border = cx.theme().border;
-    let muted = cx.theme().muted_foreground;
-    let (fill, on_fill) = selected_segment(cx.theme());
-    let toggles = row.options.iter().enumerate().filter_map(|(i, option)| {
+    let toggles = row.options.iter().filter_map(|option| {
         // Segments offer only values; anything else has no segment to draw.
         let ModuleChoice::Value(value) = &option.choice else {
             return None;
@@ -408,11 +445,9 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
             .tooltip(option.label.clone())
             .checked(checked)
             .disabled(page.busy)
-            .rounded_none()
-            .px_3()
-            .text_color(muted)
-            .when(checked, |t| t.bg(fill).text_color(on_fill))
-            .when(i > 0, |t| t.border_l_1().border_color(border))
+            .h(px(26.))
+            .px(px(10.))
+            .text_size(px(13.))
             .on_click(move |&next, _, cx| {
                 if !next {
                     return;
@@ -422,15 +457,11 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
                     page.change(|c, catalog| c.set(catalog, &module, choice), cx)
                 });
             });
-        Some(toggle)
+        Some(pill::segment_look(toggle, checked, cx))
     });
-    h_flex()
+    pill::row_track(cx)
         .id(ids::graphics_segments(&row.module))
         .test_support()
-        .border_1()
-        .border_color(border)
-        .rounded(cx.theme().radius)
-        .overflow_hidden()
         .children(toggles)
         .into_any_element()
 }

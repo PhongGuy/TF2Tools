@@ -2999,6 +2999,7 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Reset"
+    learn_more: "Learn more"
   pictures:
     show: "Show pictures"
     hide: "Hide pictures"

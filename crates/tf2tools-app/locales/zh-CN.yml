@@ -3021,6 +3021,7 @@ graphics:
   row:
     preset_value: "%{preset}：%{value}"
     reset: "重置"
+    learn_more: "了解更多"
   pictures:
     show: "显示图片"
     hide: "隐藏图片"
