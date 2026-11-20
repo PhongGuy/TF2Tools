@@ -9,7 +9,7 @@ use common::{
     LibraryEnv, builtin_catalog, gb, library_env, set_setting, setting, tree, write_file, zip_bytes,
 };
 use tf2tools_core::{
-    ApplyStep, DraftSlot, HudEntry, HudStatus, LibraryKind, ProfileDraft, Provenance,
+    ApplyStep, DraftItem, HudEntry, HudStatus, LibraryKind, ProfileDraft, Provenance, SlotMode,
 };
 
 const HASH: &str = "4f00092c3b5e8a1d2f6e7a8b9c0d1e2f3a4b5c6d";
@@ -484,7 +484,7 @@ fn save_current_keeps_a_hud_installed_under_its_expected_folder() {
     let hud = referencing_hud(&env);
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     let p = env.lib.save_current_profile("Now", &env.tf2).unwrap();
-    assert_eq!(p.hud().unwrap().folder_name(), hud.folder_name());
+    assert_eq!(p.hud().as_set().unwrap().folder_name(), hud.folder_name());
 }
 
 #[test]
@@ -575,7 +575,7 @@ fn a_failed_copy_leaves_no_hud_recorded_as_installed() {
 }
 
 fn profile_with(env: &LibraryEnv, hud: &HudEntry) -> tf2tools_core::Profile {
-    let draft = ProfileDraft::new("P").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft = ProfileDraft::new("P").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     env.lib.create_profile(&draft).unwrap()
 }
 

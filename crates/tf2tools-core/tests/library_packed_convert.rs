@@ -10,7 +10,7 @@ use common::packed::{
     convert, hud_dir, library_files, loose_files, loose_hud, packed_files, zip_path,
 };
 use common::{builtin_catalog, library_env, write_file, zip_bytes};
-use tf2tools_core::{DraftSlot, ProfileDraft, Provenance};
+use tf2tools_core::{DraftItem, ProfileDraft, Provenance, SlotMode};
 
 const FILES: &[(&str, &[u8])] = &[
     (
@@ -177,7 +177,7 @@ fn entry_points_finish_while_a_conversion_waits() {
     let env = library_env();
     let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
     let other = loose_hud(&env, "flawhud", FILES, Provenance::Local);
-    let draft = ProfileDraft::new("P").with_hud(DraftSlot::Item(other.id().clone()));
+    let draft = ProfileDraft::new("P").with_hud(SlotMode::Set(DraftItem::Pick(other.id().clone())));
     let profile = env.lib.create_profile(&draft).unwrap();
     let archive = write_file(
         &env.tmp.path().join("in/budhud.zip"),

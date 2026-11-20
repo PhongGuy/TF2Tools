@@ -83,9 +83,16 @@ fn profile_types_are_send_sync_debug() {
 
 #[test]
 fn draft_types_are_send_sync_debug() {
-    use tf2tools_core::{DraftCrosshair, DraftSlot, HudId, ProfileDraft};
+    use tf2tools_core::{
+        AddonName, DraftCrosshair, DraftItem, HudId, ProfileAddons, ProfileDraft, ProfileGraphics,
+        ProfileSounds, SlotMode,
+    };
     assert_send_sync::<ProfileDraft>();
-    assert_send_sync::<DraftSlot<HudId>>();
+    assert_send_sync::<SlotMode<DraftItem<HudId>>>();
+    assert_send_sync::<DraftItem<AddonName>>();
+    assert_send_sync::<ProfileSounds>();
+    assert_send_sync::<ProfileGraphics>();
+    assert_send_sync::<ProfileAddons>();
     assert_send_sync::<DraftCrosshair>();
 }
 

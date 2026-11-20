@@ -5,7 +5,7 @@ use crate::common;
 use common::hud_copy::snapshot;
 use common::packed::{convert, hud_dir, loose_hud, zip_path};
 use common::{builtin_catalog, library_env, set_setting, setting, tree, write_file};
-use tf2tools_core::{DraftSlot, InstallError, ProfileDraft, Provenance, Reinstall};
+use tf2tools_core::{DraftItem, InstallError, ProfileDraft, Provenance, Reinstall, SlotMode};
 
 const FILES: &[(&str, &[u8])] = &[
     ("resource/clientscheme.res", b"\"Scheme\" {}"),
@@ -157,7 +157,7 @@ fn a_profile_installs_its_packed_hud() {
     let env = library_env();
     let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
     convert(&env);
-    let draft = ProfileDraft::new("P").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft = ProfileDraft::new("P").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let profile = env.lib.create_profile(&draft).unwrap();
     env.lib
         .apply_profile(profile.id(), &env.tf2, &builtin_catalog(), false)

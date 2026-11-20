@@ -11,8 +11,8 @@ use common::{
     LibraryEnv, builtin_catalog, import_hud_as, library_env, set_setting, setting, tree, write_file,
 };
 use tf2tools_core::{
-    ApplyProfileError, ApplyStep, DraftSlot, ExternalHud, HudEntry, HudId, HudStatus, InstallError,
-    LibraryKind, Profile, ProfileDraft, Provenance, Reinstall, ReinstallError,
+    ApplyProfileError, ApplyStep, DraftItem, ExternalHud, HudEntry, HudId, HudStatus, InstallError,
+    LibraryKind, Profile, ProfileDraft, Provenance, Reinstall, ReinstallError, SlotMode,
 };
 // Only the Unix permission and link tests check why keeping a HUD failed.
 #[cfg(unix)]
@@ -49,7 +49,7 @@ fn library_folders(env: &LibraryEnv) -> Vec<String> {
     huds.iter().map(|h| h.folder_name().to_owned()).collect()
 }
 
-fn hud_profile(env: &LibraryEnv, slot: DraftSlot<HudId>) -> Profile {
+fn hud_profile(env: &LibraryEnv, slot: SlotMode<DraftItem<HudId>>) -> Profile {
     let draft = ProfileDraft::new("Comp").with_hud(slot);
     env.lib.create_profile(&draft).unwrap()
 }
@@ -605,7 +605,7 @@ fn library_huds_are_replaced_without_being_asked() {
 fn a_profile_with_a_hud_refuses_before_any_step_runs() {
     let env = library_env();
     let next = hud(&env, "budhud");
-    let profile = hud_profile(&env, DraftSlot::Item(next.id().clone()));
+    let profile = hud_profile(&env, SlotMode::Set(DraftItem::Pick(next.id().clone())));
     place(&env, "manual");
     set_setting(&env.dir, "active_profile_id", "p1");
     let custom = env.tf2.custom_dir();
@@ -630,7 +630,7 @@ fn a_profile_with_a_hud_refuses_before_any_step_runs() {
 #[test]
 fn a_profile_without_a_hud_refuses_too() {
     let env = library_env();
-    let profile = hud_profile(&env, DraftSlot::Empty);
+    let profile = hud_profile(&env, SlotMode::None);
     place(&env, "manual");
     let err = env
         .lib
@@ -644,7 +644,7 @@ fn a_profile_without_a_hud_refuses_too() {
 fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking() {
     let env = library_env();
     let gone = hud(&env, "budhud");
-    let profile = hud_profile(&env, DraftSlot::Item(gone.id().clone()));
+    let profile = hud_profile(&env, SlotMode::Set(DraftItem::Pick(gone.id().clone())));
     env.lib.delete_hud(gone.id()).unwrap();
     place(&env, "manual");
     // The skipped HUD step removes nothing, so there is no HUD to ask about.
@@ -661,7 +661,7 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking() 
 fn a_profile_goes_through_once_the_huds_are_named() {
     let env = library_env();
     let next = hud(&env, "budhud");
-    let profile = hud_profile(&env, DraftSlot::Item(next.id().clone()));
+    let profile = hud_profile(&env, SlotMode::Set(DraftItem::Pick(next.id().clone())));
     place(&env, "manual");
     let found = env.lib.external_huds(&env.tf2).unwrap();
     let report = env

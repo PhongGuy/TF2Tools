@@ -67,8 +67,8 @@ pub use live_link::{Recovery, Reinstall};
 pub use made_huds::{HudAssets, MadeHud, MakeTarget, SavedHud, pictures_fit};
 pub use mastercomfig::{MastercomfigStatus, Preset};
 pub(crate) use mastercomfig::{
-    back_up, modules_cfg_path, read_choices, record_install, save_modules, write_modules_cfg,
-    write_setup_hook, written_by_us,
+    back_up, modules_cfg_path, modules_json, parse_modules, read_choices, record_install,
+    save_modules, write_modules_cfg, write_setup_hook, written_by_us,
 };
 pub use mastercomfig_modules::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
@@ -78,8 +78,9 @@ pub(crate) use movement::NULL_MOVEMENT;
 pub(crate) use movement::movement_keys;
 pub use movement::{MoveDirection, MovementKeys};
 pub(crate) use packed::{HUD_ZIP, ItemSource, read_packed_entry};
+pub use profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
 pub use profiles::{
-    ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
+    ApplyProfileReport, ApplyStep, DraftCrosshair, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
 };
 pub use sounds::{
@@ -256,6 +257,7 @@ macro_rules! text_id {
 }
 
 // Declared below `text_id!`, which a module can only use after the macro's definition.
+mod profile_slots;
 mod profiles;
 
 text_id!(

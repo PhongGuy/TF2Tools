@@ -302,21 +302,24 @@ pub(crate) fn read_choices(db: &Database) -> rusqlite::Result<Option<Choices>> {
         .optional()
     })?;
     Ok(row.map(|(preset, modules)| {
-        let saved: BTreeMap<String, Option<String>> =
-            serde_json::from_str(&modules).unwrap_or_default();
-        let modules = saved
-            .into_iter()
-            .map(|(name, v)| (name, v.map_or(ModuleChoice::NotSet, ModuleChoice::Value)))
-            .collect();
         Choices::from_saved(
             Preset::from_name(&preset).unwrap_or(Preset::Medium),
-            modules,
+            parse_modules(&modules),
         )
     }))
 }
 
-/// Saves `choices`' modules as `{"name":"value"|null}`, leaving the saved preset alone.
-pub(crate) fn save_modules(db: &Database, choices: &Choices) -> rusqlite::Result<()> {
+/// Module choices from their saved `{"name":"value"|null}` JSON; unreadable JSON is none.
+pub(crate) fn parse_modules(json: &str) -> BTreeMap<String, ModuleChoice> {
+    let saved: BTreeMap<String, Option<String>> = serde_json::from_str(json).unwrap_or_default();
+    saved
+        .into_iter()
+        .map(|(name, v)| (name, v.map_or(ModuleChoice::NotSet, ModuleChoice::Value)))
+        .collect()
+}
+
+/// `choices`' modules as `{"name":"value"|null}` JSON, sorted by module name.
+pub(crate) fn modules_json(choices: &Choices) -> String {
     let saved: BTreeMap<&str, Option<&str>> = choices
         .modules()
         .iter()
@@ -328,8 +331,13 @@ pub(crate) fn save_modules(db: &Database, choices: &Choices) -> rusqlite::Result
             (name.as_str(), value)
         })
         .collect();
-    let json = serde_json::to_string(&saved)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+    // A map of strings always serialises; the fallback only keeps this infallible.
+    serde_json::to_string(&saved).unwrap_or_else(|_| "{}".to_owned())
+}
+
+/// Saves `choices`' modules as `{"name":"value"|null}`, leaving the saved preset alone.
+pub(crate) fn save_modules(db: &Database, choices: &Choices) -> rusqlite::Result<()> {
+    let json = modules_json(choices);
     db.write(|conn| {
         conn.execute(
             "UPDATE mastercomfig_state SET modules = ?1 WHERE id = 1",

@@ -254,6 +254,7 @@ mod profile_apply;
 mod profile_edit;
 mod profile_resolve;
 mod profile_save_current;
+mod profile_slots;
 mod profiles;
 mod public_types;
 mod readme;
