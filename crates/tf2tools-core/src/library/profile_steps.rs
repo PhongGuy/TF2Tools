@@ -1,8 +1,9 @@
-//! The profile apply steps past crosshairs: Graphics now, Add-ons next. Each step returns
+//! The profile apply steps past crosshairs: Graphics, then Add-ons. Each step returns
 //! what the report records, so `apply_profile_discarding` only collects it.
 
-use super::profile_slots::{ProfileGraphics, SlotMode};
-use super::{Choices, Library, MastercomfigStatus};
+use super::profile_slots::{ProfileAddons, ProfileGraphics, SlotMode};
+use super::profiles::{MissingItem, MissingKind};
+use super::{AddonName, Choices, Library, MastercomfigStatus, MovementKeys};
 use crate::tf2::Tf2Install;
 
 /// Why a profile step did not run although its slot asked for a change.
@@ -63,6 +64,83 @@ impl Library {
                 step.binds_restored = matches!(result, Ok(true));
                 step.outcome = Some(result.map(|_| ()).map_err(|e| e.to_string()));
             }
+        }
+        step
+    }
+}
+
+/// What the Add-ons step did. `ran` is false for Leave; `failures` holds each toggle's error.
+#[derive(Debug, Default)]
+pub(super) struct AddonsStep {
+    pub(super) ran: bool,
+    pub(super) failures: Vec<String>,
+    pub(super) skip: Option<ApplySkipReason>,
+    pub(super) movement: Option<MovementKeys>,
+}
+
+impl Library {
+    /// None turns off every installed library add-on; Set turns on the ticked ones that are
+    /// present and not yet installed and, with Only these, turns off the rest. Turn-offs
+    /// always run; turn-ons need mastercomfig as the Graphics step left it.
+    pub(super) fn apply_profile_addons(
+        &self,
+        slot: &SlotMode<ProfileAddons>,
+        missing: &[MissingItem],
+        tf2: &Tf2Install,
+    ) -> AddonsStep {
+        let mut step = AddonsStep::default();
+        let (wanted, only_these): (&[AddonName], bool) = match slot {
+            SlotMode::Leave => return step,
+            SlotMode::None => (&[], true),
+            SlotMode::Set(addons) => (&addons.on, addons.only_these),
+        };
+        step.ran = true;
+        // `list_addons` leaves out override VPKs, so only real add-ons are turned off.
+        let listed = match self.list_addons(Some(tf2)) {
+            Ok(listed) => listed,
+            Err(e) => {
+                step.failures.push(e.to_string());
+                return step;
+            }
+        };
+        if only_these {
+            for addon in listed
+                .iter()
+                .filter(|a| a.is_installed() && !wanted.contains(a.name()))
+            {
+                if let Err(e) = self.uninstall_addon(addon.name(), tf2) {
+                    step.failures.push(e.to_string());
+                }
+            }
+        }
+
+        let is_missing = |name: &AddonName| {
+            missing
+                .iter()
+                .any(|m| matches!(m.kind(), MissingKind::Addon { name: n } if n == name))
+        };
+        let custom = tf2.custom_dir();
+        let turn_ons: Vec<&AddonName> = wanted
+            .iter()
+            .filter(|name| !is_missing(name) && !custom.join(name.as_str()).is_file())
+            .collect();
+        if turn_ons.is_empty() {
+            return step;
+        }
+        match self.mastercomfig_status(tf2) {
+            Ok(MastercomfigStatus::NotInstalled) => {
+                step.skip = Some(ApplySkipReason::MastercomfigNotInstalled);
+            }
+            Ok(_) => {
+                for name in turn_ons {
+                    match self.install_addon(name, tf2) {
+                        Ok(Some(keys)) => step.movement = Some(keys),
+                        Ok(None) => {}
+                        Err(e) => step.failures.push(e.to_string()),
+                    }
+                }
+            }
+            Err(e) => step.failures.push(e.to_string()),
         }
         step
     }

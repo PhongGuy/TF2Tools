@@ -250,6 +250,7 @@ mod old_v4;
 mod panic_mark;
 mod payloads;
 mod png;
+mod profile_addons_apply;
 mod profile_apply;
 mod profile_apply_modes;
 mod profile_current_setup;

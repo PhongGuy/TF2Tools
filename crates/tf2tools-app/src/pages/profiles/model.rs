@@ -108,7 +108,7 @@ pub fn taken_message(name: &str) -> String {
     crate::i18n::tr!("messages.profiles.name_taken", name = name).into()
 }
 
-/// "HUD", "Hitsound", "Killsound", "Crosshairs", "Graphics".
+/// "HUD", "Hitsound", "Killsound", "Crosshairs", "Graphics", "Add-ons".
 pub fn step_label(step: ApplyStep) -> SharedString {
     match step {
         ApplyStep::Hud => "HUD".into(),
@@ -116,6 +116,7 @@ pub fn step_label(step: ApplyStep) -> SharedString {
         ApplyStep::Killsound => names::sound_kind_name(SoundKind::Killsound),
         ApplyStep::Crosshairs => tr!("profiles.part.crosshairs"),
         ApplyStep::Graphics => tr!("nav.graphics"),
+        ApplyStep::Addons => tr!("nav.addons"),
         _ => tr!("profiles.part.item"),
     }
 }
@@ -127,7 +128,7 @@ pub fn kind_label(kind: &MissingKind) -> SharedString {
         MissingKind::Hitsound => tr!("profiles.missing.kind.hitsound"),
         MissingKind::Killsound => tr!("profiles.missing.kind.killsound"),
         MissingKind::Crosshair { .. } => tr!("profiles.missing.kind.crosshair"),
-        _ => tr!("profiles.missing.kind.item"),
+        MissingKind::Addon { .. } | _ => tr!("profiles.missing.kind.item"),
     }
 }
 
@@ -275,7 +276,7 @@ pub fn redownload_target(
                 MissingKind::Hud => StoreKind::GameBananaHuds,
                 MissingKind::Hitsound | MissingKind::Killsound => StoreKind::Sounds,
                 MissingKind::Crosshair { .. } => StoreKind::Crosshairs,
-                _ => return None,
+                MissingKind::Addon { .. } | _ => return None,
             };
             Some((store, StoreItemId::GameBanana(*gb_id)))
         }

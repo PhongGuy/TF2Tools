@@ -8,14 +8,15 @@ use std::fmt;
 
 use rusqlite::{Connection, OptionalExtension, Row};
 
+use super::addons::display_info;
 use super::crosshairs::{SOURCE_BUILTIN, SOURCE_LIBRARY, is_weapon_script};
 use super::profile_setup::CurrentSetup;
 use super::profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
 use super::profile_steps::ApplySkipReason;
 use super::{
-    AddonName, Assignment, Choices, CrosshairRef, ExternalHud, GbId, HudId, Library, Preset,
-    Provenance, SoundId, SoundKind, game_custom_dir, modules_json, new_id, now, parse_modules,
-    profile_db, read_setting, save_setting,
+    AddonName, Assignment, Choices, CrosshairRef, ExternalHud, GbId, HudId, Library, MovementKeys,
+    Preset, Provenance, SoundId, SoundKind, game_custom_dir, modules_json, new_id, now,
+    parse_modules, profile_db, read_setting, save_setting,
 };
 use crate::crosshair_catalog::BuiltinCrosshairs;
 use crate::error::{ApplyProfileError, LibraryError, ProfileError};
@@ -952,6 +953,11 @@ pub enum MissingKind {
         /// The weapon script the crosshair is assigned to.
         weapon_script: String,
     },
+    /// One ticked add-on of the Add-ons slot.
+    Addon {
+        /// The add-on's asset name.
+        name: AddonName,
+    },
 }
 
 /// A profile reference that resolves to nothing in the library.
@@ -1237,6 +1243,29 @@ pub(super) fn resolve_profile(
         }
         crosshairs.push(crosshair);
     }
+    // A ticked add-on needs its library row and its VPK in the library.
+    if let SlotMode::Set(addons) = &profile.addons {
+        for name in &addons.on {
+            let recorded: bool = tx
+                .query_row(
+                    "SELECT EXISTS (SELECT 1 FROM library_addons WHERE asset_name = ?1)",
+                    [name.as_str()],
+                    |r| r.get(0),
+                )
+                .map_err(resolve_db)?;
+            let on_disk = dir
+                .library_dir(LibraryKind::Addons)
+                .join(name.as_str())
+                .is_file();
+            if !(recorded && on_disk) {
+                missing.push(MissingItem {
+                    kind: MissingKind::Addon { name: name.clone() },
+                    name: display_info(name).0,
+                    provenance: Provenance::Local,
+                });
+            }
+        }
+    }
     // However many references were rewritten, the profile changed once.
     if rewritten {
         tx.execute(
@@ -1273,6 +1302,8 @@ pub enum ApplyStep {
     Crosshairs,
     /// Writing the mastercomfig preset, or removing a managed mastercomfig.
     Graphics,
+    /// Turning library add-ons on and off.
+    Addons,
 }
 
 /// What applying a profile did: the steps that succeeded, the missing items it skipped
@@ -1287,6 +1318,7 @@ pub struct ApplyProfileReport {
     skipped_steps: Vec<(ApplyStep, ApplySkipReason)>,
     pending_modules: Option<Choices>,
     binds_restored: bool,
+    movement: Option<MovementKeys>,
     hud_blocked_name: Option<String>,
 }
 
@@ -1333,6 +1365,12 @@ impl ApplyProfileReport {
     /// commands.
     pub fn binds_restored(&self) -> bool {
         self.binds_restored
+    }
+
+    /// The movement keys `addons.cfg` binds when the Add-ons step turned Null-Canceling
+    /// Movement on.
+    pub fn movement(&self) -> Option<&MovementKeys> {
+        self.movement.as_ref()
     }
 }
 
@@ -1440,9 +1478,9 @@ impl Library {
     /// alone, best effort. Missing items fail with `Missing` before any file is touched unless
     /// `skip_missing`, which leaves what is installed for those slots alone; unless the HUD is
     /// skipped or left, a HUD the library cannot put back then fails with `ExternalHuds` the
-    /// same way. Graphics runs last; see `ApplySkipReason` and `pending_modules`. The profile
-    /// becomes active only when nothing was skipped, no step failed and no module choices are
-    /// pending, so Active means the game matches it.
+    /// same way. Graphics then Add-ons run last; see `ApplySkipReason` and `pending_modules`.
+    /// The profile becomes active only when nothing was skipped, no step failed and no module
+    /// choices are pending, so Active means the game matches it.
     pub fn apply_profile(
         &self,
         id: &ProfileId,
@@ -1568,11 +1606,19 @@ impl Library {
         if let Some(outcome) = graphics.outcome {
             record(ApplyStep::Graphics, outcome);
         }
-        let skipped_steps: Vec<_> = graphics
-            .skip
-            .map(|reason| (ApplyStep::Graphics, reason))
-            .into_iter()
-            .collect();
+        // Add-ons run after Graphics, so their turn-ons see mastercomfig as it now stands.
+        let addons = self.apply_profile_addons(resolved.profile.addons(), &resolved.missing, tf2);
+        if addons.ran && addons.failures.is_empty() && addons.skip.is_none() {
+            applied.push(ApplyStep::Addons);
+        }
+        failed.extend(addons.failures.into_iter().map(|e| (ApplyStep::Addons, e)));
+        let skipped_steps: Vec<_> = [
+            graphics.skip.map(|reason| (ApplyStep::Graphics, reason)),
+            addons.skip.map(|reason| (ApplyStep::Addons, reason)),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
         // Pending module choices still have to reach the game, so the app marks those later.
         let matches_game = failed.is_empty()
@@ -1592,6 +1638,7 @@ impl Library {
             skipped_steps,
             pending_modules: graphics.pending_modules,
             binds_restored: graphics.binds_restored,
+            movement: addons.movement,
             hud_blocked_name,
         })
     }
@@ -1610,7 +1657,10 @@ impl Library {
             .iter()
             .filter_map(|m| match &m.kind {
                 MissingKind::Crosshair { weapon_script } => Some(weapon_script.as_str()),
-                MissingKind::Hud | MissingKind::Hitsound | MissingKind::Killsound => None,
+                MissingKind::Hud
+                | MissingKind::Hitsound
+                | MissingKind::Killsound
+                | MissingKind::Addon { .. } => None,
             })
             .collect();
         let remaining = self
