@@ -42,6 +42,7 @@ mod crosshair_maker_starter;
 mod crosshair_maker_starters;
 mod crosshair_maker_view;
 mod crosshair_picker;
+mod crosshair_picker_strip;
 mod crosshair_repair;
 mod crosshair_store;
 mod crosshair_store_download;
