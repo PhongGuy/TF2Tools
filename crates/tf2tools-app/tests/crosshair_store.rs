@@ -2,13 +2,17 @@ use crate::support;
 
 use std::time::Duration;
 
-use gpui_kit::{TestAppContext, px};
+// `update_window` is a trait method on the test context.
+use gpui_kit::AppContext as _;
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AnyWindowHandle, Entity, TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_store::CrosshairStorePage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
 use tf2tools_app::sync::SyncSummary;
-use tf2tools_core::{GbId, Provenance, StoreItemId, StoreKind, Tf2Install};
+use tf2tools_core::{GbId, Provenance, StoreItemId, StoreKind, StoreSort, Tf2Install};
 
 const C: StoreKind = StoreKind::Crosshairs;
 
@@ -59,10 +63,7 @@ fn the_page_lists_crosshairs_most_liked_first_with_library_state(cx: &mut TestAp
             "card {id}"
         );
     }
-    assert!(
-        !support::present(cx, win, ids::STORE_SEARCH),
-        "v5's Crosshair Store has no search"
-    );
+    assert!(support::present(cx, win, ids::STORE_SEARCH));
     assert!(support::present(cx, win, ids::STORE_SORT));
     assert_eq!(
         support::label_of(cx, win, ids::store_download(C, &gb(1))).as_deref(),
@@ -178,27 +179,34 @@ fn the_crosshair_card_is_v5s_height(cx: &mut TestAppContext) {
     assert!((416.0..=421.0).contains(&height), "{card:?}");
 }
 
-// v5's toolbar less the heading the top bar already shows: the count, then "Sort:" 16 px on and
-// the 144 px select 8 px after.
+// The HUD GameBanana tab's toolbar: the 288x36 search alone at the left over the cards' edge,
+// the count, "Sort:" 16 px on and the 144 px select 8 px after at the right, the grid 24 px under.
 #[gpui_kit::test]
-fn the_crosshair_toolbar_is_count_and_sort_on_one_row_like_v5(cx: &mut TestAppContext) {
+fn the_toolbar_reads_search_left_then_count_and_sort_right_like_v5(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
     support::wait_real(cx, "the grid", |cx| {
         cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
     });
-    assert!(!support::present(cx, win, ids::STORE_SEARCH));
+    let search = support::bounds_of(cx, win, ids::STORE_SEARCH).expect("the search box");
     let count = support::bounds_of(cx, win, ids::STORE_COUNT).unwrap();
     let label = support::bounds_of(cx, win, ids::STORE_SORT_LABEL).unwrap();
     let sort = support::bounds_of(cx, win, ids::STORE_SORT).unwrap();
+    let card = support::bounds_of(cx, win, ids::store_card(C, &gb(3))).unwrap();
+    assert_eq!(search.size, gpui_kit::size(px(288.), px(36.)));
+    assert_eq!(sort.size, gpui_kit::size(px(144.), px(36.)));
     let one = px(1.);
-    for b in [count, label] {
+    for b in [count, label, sort] {
         assert!(
-            (support::mid_y(b) - support::mid_y(sort)).abs() <= one,
-            "{b:?} {sort:?}"
+            (support::mid_y(b) - support::mid_y(search)).abs() <= one,
+            "{b:?} {search:?}"
         );
     }
+    assert!(
+        count.left() - search.right() > px(100.),
+        "{search:?} {count:?}"
+    );
     assert!(
         (label.left() - count.right() - px(16.)).abs() <= one,
         "{count:?} {label:?}"
@@ -207,7 +215,15 @@ fn the_crosshair_toolbar_is_count_and_sort_on_one_row_like_v5(cx: &mut TestAppCo
         (sort.left() - label.right() - px(8.)).abs() <= one,
         "{label:?} {sort:?}"
     );
-    assert_eq!(sort.size.width, px(144.));
+    assert!(
+        (search.left() - card.left()).abs() <= one,
+        "{search:?} {card:?}"
+    );
+    assert_eq!(
+        card.top() - search.bottom(),
+        px(24.),
+        "{card:?} under {search:?}"
+    );
 }
 
 #[gpui_kit::test]
@@ -340,4 +356,198 @@ fn a_long_store_grid_shows_a_bar_beside_its_cards(cx: &mut TestAppContext) {
     let last = ids::store_card(C, &gb(201 - columns));
     assert_clear_of_bar(cx, win, last, bar.clone());
     assert_track_scrolls_virtual(cx, win, bar, ids::store_card(C, &gb(200)));
+}
+
+// Types `text` into the page's search box, waits out the debounce and lands `shown` cards.
+fn search(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    page: &Entity<CrosshairStorePage>,
+    text: &str,
+    shown: u64,
+) {
+    assert!(
+        support::present(cx, win, ids::STORE_SEARCH),
+        "the search box"
+    );
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    let text = text.to_owned();
+    cx.update(|cx| grid.update(cx, |g, cx| g.search_typed(text, cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the search", |cx| {
+        cx.update(|cx| {
+            let g = grid.read(cx);
+            g.shown() == Some(shown) && g.is_loaded() && !g.is_loading()
+        })
+    });
+}
+
+fn shown_ids(cx: &mut TestAppContext, page: &Entity<CrosshairStorePage>) -> Vec<StoreItemId> {
+    cx.update(|cx| {
+        page.read(cx)
+            .grid()
+            .read(cx)
+            .cards()
+            .iter()
+            .map(|c| c.id.clone())
+            .collect()
+    })
+}
+
+#[gpui_kit::test]
+fn the_search_box_asks_for_crosshairs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    support::settle(cx, win);
+    let placeholder = cx
+        .update_window(win, |_, w, _| {
+            w.within(ids::STORE_SEARCH)
+                .elements()
+                .iter()
+                .find_map(|e| e.placeholder().map(str::to_owned))
+        })
+        .unwrap();
+    assert_eq!(placeholder.as_deref(), Some("Search crosshairs..."));
+}
+
+#[gpui_kit::test]
+fn a_search_matches_part_of_a_name_in_any_case(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    for text in ["cross 2", "ROSS 2"] {
+        search(cx, win, &page, text, 1);
+        assert_eq!(shown_ids(cx, &page), [gb(2)], "{text}");
+        assert_eq!(
+            support::label_of(cx, win, ids::STORE_COUNT).as_deref(),
+            Some("1 of 3 crosshairs"),
+            "{text}"
+        );
+        assert!(support::present(cx, win, ids::store_card(C, &gb(2))));
+        assert!(!support::present(cx, win, ids::store_card(C, &gb(1))));
+    }
+}
+
+#[gpui_kit::test]
+fn a_search_matches_the_author(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let seed = |env: &support::Env| {
+        seed(env);
+        rusqlite::Connection::open(env.data.db_path())
+            .unwrap()
+            .execute(
+                "UPDATE store_crosshairs SET author = 'Kestrel' WHERE gb_id = 1",
+                (),
+            )
+            .unwrap();
+    };
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    search(cx, win, &page, "kestrel", 1);
+    assert_eq!(shown_ids(cx, &page), [gb(1)]);
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_COUNT).as_deref(),
+        Some("1 of 3 crosshairs")
+    );
+}
+
+#[gpui_kit::test]
+fn a_new_sort_keeps_the_search_and_reorders_its_matches(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let seed = |env: &support::Env| support::seed_crosshairs(env, 1..=12, 0, false);
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    // "Cross 1" and "Cross 10" to "Cross 12": the most liked first, then the newest first.
+    search(cx, win, &page, "Cross 1", 4);
+    assert_eq!(shown_ids(cx, &page), [gb(12), gb(11), gb(10), gb(1)]);
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    cx.update(|cx| grid.update(cx, |g, cx| g.set_sort(StoreSort::Newest, cx)));
+    support::wait_real(cx, "the sort", |cx| {
+        cx.update(|cx| {
+            let g = grid.read(cx);
+            g.is_loaded() && !g.is_loading() && g.cards().first().map(|c| &c.id) == Some(&gb(1))
+        })
+    });
+    assert_eq!(cx.update(|cx| grid.read(cx).search().to_owned()), "Cross 1");
+    assert_eq!(shown_ids(cx, &page), [gb(1), gb(10), gb(11), gb(12)]);
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_COUNT).as_deref(),
+        Some("4 of 12 crosshairs")
+    );
+}
+
+#[gpui_kit::test]
+fn clearing_the_search_brings_every_crosshair_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    search(cx, win, &page, "Cross 2", 1);
+    search(cx, win, &page, "", 3);
+    assert_eq!(shown_ids(cx, &page), [gb(3), gb(2), gb(1)]);
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_COUNT).as_deref(),
+        Some("3 of 3 crosshairs")
+    );
+}
+
+#[gpui_kit::test]
+fn a_search_with_no_match_says_so_on_the_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    search(cx, win, &page, "zzzq", 0);
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_EMPTY).as_deref(),
+        Some("No crosshairs match your search")
+    );
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Try adjusting your search criteria.")
+    );
+}
+
+#[gpui_kit::test]
+fn the_search_waits_out_the_debounce(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    assert!(
+        support::present(cx, win, ids::STORE_SEARCH),
+        "the search box"
+    );
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    let opened = cx.update(|cx| grid.read(cx).query_started());
+    cx.update(|cx| grid.update(cx, |g, cx| g.search_typed("Cross 2".into(), cx)));
+    cx.executor()
+        .advance_clock(SEARCH_DEBOUNCE - Duration::from_millis(1));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|cx| grid.read(cx).query_started()), opened);
+    assert_eq!(cx.update(|cx| grid.read(cx).shown()), Some(3));
+    cx.executor().advance_clock(Duration::from_millis(1));
+    support::wait_real(cx, "the search", |cx| {
+        cx.update(|cx| grid.read(cx).shown() == Some(1) && !grid.read(cx).is_loading())
+    });
+    assert_eq!(shown_ids(cx, &page), [gb(2)]);
 }

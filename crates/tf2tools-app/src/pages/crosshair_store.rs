@@ -1,4 +1,5 @@
-//! The Crosshair Store: the shared paged store grid of GameBanana crosshair cards.
+//! The Crosshair Store: the shared paged store grid of GameBanana crosshair cards, searched by
+//! name or author.
 
 use std::rc::Rc;
 
@@ -48,9 +49,7 @@ impl CrosshairStorePage {
                 gamebanana_card(KIND, card, image, in_library, IconName::Crosshair, open, cx)
             })
         };
-        let config = StoreGridConfig::new(KIND)
-            .image_card(px(268.5))
-            .without_search();
+        let config = StoreGridConfig::new(KIND).image_card(px(268.5));
         let grid = cx.new(|cx| StoreGrid::new(config, render, window, cx));
         // The banner follows the hub's progress for this store and the grid's rows for its
         // suffix, so the page redraws when either changes.
