@@ -26,6 +26,9 @@ pub const DATA_VAR: &str = "TF2TOOLS_PILOT_DATA";
 /// `1` turns on reduced motion; headless, the kit never hears the system's setting.
 pub const REDUCE_MOTION_VAR: &str = "TF2TOOLS_PILOT_REDUCE_MOTION";
 
+/// `1` adds a managed mastercomfig with changed settings to the seed (see `seed::seed_graphics`).
+pub const GRAPHICS_VAR: &str = "TF2TOOLS_PILOT_GRAPHICS";
+
 /// `1` runs the real app: the platform data dir, the Steam detector and the network, no seed.
 pub const REAL_VAR: &str = "TF2TOOLS_PILOT_REAL";
 
@@ -138,6 +141,11 @@ pub fn picker() -> Arc<dyn PathPicker> {
     Arc::new(NativePicker)
 }
 
+/// Whether `value` (the `GRAPHICS_VAR` value) asks for the Graphics seed: only `1` does.
+pub fn graphics_requested(value: Option<&OsStr>) -> bool {
+    value == Some(OsStr::new("1"))
+}
+
 /// The store `seed::EMPTY_STORE_VAR` names, if set and not empty.
 pub fn empty_store() -> Option<String> {
     std::env::var(seed::EMPTY_STORE_VAR)
@@ -161,8 +169,9 @@ impl PilotApp for Tf2Tools {
 
     /// `boot_plan` from the environment. Seeded: data dir TF2TOOLS_PILOT_DATA if set, else
     /// launch.data_dir; seeds it (game under <data>/fake-tf2/Team Fortress 2, leaving
-    /// TF2TOOLS_PILOT_EMPTY_STORE's store empty), then `start` offline with `picker()` and a
-    /// detector that finds nothing. Real: `start` with `Boot::from_environment()`, on TF2TOOLS_PILOT_DATA if set.
+    /// TF2TOOLS_PILOT_EMPTY_STORE's store empty, adding mastercomfig under
+    /// TF2TOOLS_PILOT_GRAPHICS=1), then `start` offline with `picker()` and a detector that
+    /// finds nothing. Real: `start` with `Boot::from_environment()`, on TF2TOOLS_PILOT_DATA if set.
     fn open(&self, launch: &Launch, cx: &mut App) -> anyhow::Result<()> {
         let plan = boot_plan(
             std::env::var_os(REAL_VAR).as_deref(),
@@ -193,6 +202,9 @@ fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
     if let Ok(root) = &assets {
         let game = data.join("fake-tf2/Team Fortress 2");
         seed::seed_with(data, &game, root.path(), empty_store().as_deref())?;
+        if graphics_requested(std::env::var_os(GRAPHICS_VAR).as_deref()) {
+            seed::seed_graphics(data, &game)?;
+        }
     }
     Ok(Boot {
         data: DataDir::at(data),

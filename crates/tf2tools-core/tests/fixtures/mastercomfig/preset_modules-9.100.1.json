@@ -1,0 +1,299 @@
+{
+  "packet_rate": {
+    "default": "standard",
+    "destitute": "congestion"
+  },
+  "snapshot_buffer": {
+    "default": "auto"
+  },
+  "packet_size": {
+    "default": "large"
+  },
+  "bandwidth": {
+    "default": "2.0Mbps"
+  },
+  "download": {
+    "default": "custom"
+  },
+  "lod": {
+    "destitute": "very_low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "lighting": {
+    "destitute": "very_low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "shading": {
+    "default": "high",
+    "destitute": "low",
+    "low": "low",
+    "custom": ""
+  },
+  "phong": {
+    "default": "rim",
+    "destitute": "off",
+    "low": "off",
+    "custom": ""
+  },
+  "shadows": {
+    "destitute": "off",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "flashlight": {
+    "default": "off",
+    "custom": ""
+  },
+  "effects": {
+    "destitute": "very_low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "tracers": {
+    "default": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "high",
+    "custom": ""
+  },
+  "water": {
+    "destitute": "very_low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "post_processing": {
+    "default": "off",
+    "medium": "low",
+    "high": "calm",
+    "ultra": "calm",
+    "custom": ""
+  },
+  "color_filter": {
+    "default": "off",
+    "custom": ""
+  },
+  "pyrovision": {
+    "default": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "high",
+    "custom": ""
+  },
+  "romevision": {
+    "default": "off",
+    "custom": ""
+  },
+  "motion_blur": {
+    "default": "off",
+    "custom": ""
+  },
+  "anti_aliasing": {
+    "default": "off",
+    "medium": "msaa_2x",
+    "high": "msaa_4x",
+    "ultra": "msaa_8x",
+    "custom": ""
+  },
+  "characters": {
+    "default": "very_low",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "high",
+    "custom": ""
+  },
+  "decals": {
+    "default": "off",
+    "medium": "low",
+    "high": "medium",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "decals_models": {
+    "default": "off",
+    "medium": "low",
+    "high": "medium",
+    "ultra": "high",
+    "custom": ""
+  },
+  "decals_art": {
+    "default": "on",
+    "destitute": "off",
+    "low": "off",
+    "custom": ""
+  },
+  "sprays": {
+    "default": "off",
+    "custom": ""
+  },
+  "sillygibs": {
+    "default": "auto"
+  },
+  "gibs": {
+    "default": "off",
+    "medium": "low",
+    "high": "low",
+    "ultra": "high",
+    "custom": ""
+  },
+  "props": {
+    "default": "low",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "ragdolls": {
+    "default": "off",
+    "medium": "medium",
+    "high": "high",
+    "ultra": "high",
+    "custom": ""
+  },
+  "3dsky": {
+    "default": "off",
+    "high": "on",
+    "ultra": "on",
+    "custom": ""
+  },
+  "jigglebones": {
+    "default": "off",
+    "medium": "on",
+    "high": "on",
+    "ultra": "force_on",
+    "custom": ""
+  },
+  "sheens_speed": {
+    "default": "slow",
+    "destitute": "off",
+    "custom": ""
+  },
+  "sheens_tint": {
+    "default": "high",
+    "custom": ""
+  },
+  "texture_quality": {
+    "default": "high",
+    "high": "ultra",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "texture_filter": {
+    "destitute": "blocky",
+    "low": "trilinear",
+    "medium": "aniso2x",
+    "high": "aniso8x",
+    "ultra": "aniso16x",
+    "custom": ""
+  },
+  "ropes": {
+    "default": "off",
+    "medium": "low",
+    "high": "high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "fpscap": {
+    "default": "400"
+  },
+  "vsync": {
+    "default": "off",
+    "custom": ""
+  },
+  "hud_player_model": {
+    "default": "off",
+    "medium": "on",
+    "high": "on",
+    "ultra": "on",
+    "custom": ""
+  },
+  "hud_server_text": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "hud_contracts": {
+    "default": "custom",
+    "destitute": "hide"
+  },
+  "hud_panels": {
+    "default": "high",
+    "destitute": "off",
+    "low": "low"
+  },
+  "hud_avatars": {
+    "default": "everyone",
+    "destitute": "off",
+    "low": "off"
+  },
+  "match_hud": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "messages": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "killfeed": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "killstreaks": {
+    "default": "high",
+    "destitute": "off",
+    "low": "low"
+  },
+  "hud_achievement": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "console": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "htmlmotd": {
+    "default": "off"
+  },
+  "outlines": {
+    "default": "off",
+    "medium": "low",
+    "high": "ultra",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "dynamic_background": {
+    "default": "off"
+  },
+  "sound": {
+    "default": "low",
+    "medium": "high",
+    "high": "very_high",
+    "ultra": "ultra",
+    "custom": ""
+  },
+  "voice_chat": {
+    "default": "on",
+    "destitute": "off"
+  },
+  "party_mode": {
+    "default": "invite"
+  },
+  "logo": {
+    "default": "on",
+    "destitute": "off"
+  }
+}

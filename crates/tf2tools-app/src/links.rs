@@ -6,6 +6,9 @@ pub const REPORT_PROBLEM_URL: &str = "https://github.com/PhongGuy/TF2Tools/issue
 /// The README, the app's help page.
 pub const HELP_URL: &str = "https://github.com/PhongGuy/TF2Tools#readme";
 
+/// mastercomfig's own documentation, linked from the Graphics status row.
+pub const MASTERCOMFIG_DOCS_URL: &str = "https://docs.mastercomfig.com/";
+
 /// GameBanana's own page for mod `id`: `profile_url` when it is on gamebanana.com over HTTPS,
 /// else the page built from the id, so a listing can never send the player elsewhere.
 pub fn gamebanana_page(profile_url: &str, id: tf2tools_core::GbId) -> String {

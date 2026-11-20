@@ -2981,7 +2981,327 @@ install_parts:
   maps_skipped: "%{name} contém vários mapas. Escolha os que quer instalar. Alguns arquivos extras deste download foram ignorados."
 
 graphics:
+  subtitle: "Configurações gráficas e de jogo do mastercomfig"
+  no_tf2: "Defina a pasta do TF2 nas Configurações para usar o mastercomfig."
+  running: "O TF2 está em execução. Suas mudanças valem a partir da próxima vez que ele abrir."
+  status:
+    not_installed: "O mastercomfig não está instalado"
+    install_hint: "Instale-o para escolher uma predefinição gráfica."
+    installed: "O mastercomfig %{version} está instalado"
+    up_to_date: "O mastercomfig %{version} está instalado e atualizado"
+    saves: "Cada alteração é salva na hora."
+    outside: "O mastercomfig %{version} está instalado fora do TF2Tools"
+    outside_unknown: "O mastercomfig está instalado fora do TF2Tools"
+    take_over_hint: "Assuma o controle para escolher uma predefinição e alterar as configurações aqui."
+    install: "Instalar o mastercomfig"
+    update_to: "Atualizar para %{version}"
+    check: "Verificar atualizações"
+    remove: "Remover"
+    take_over: "Assumir o controle"
+    docs: "Documentação do mastercomfig"
+    credit: "O mastercomfig é feito pela equipe do mastercomfig e compartilhado sob a licença MIT."
+  toast:
+    installed_title: "mastercomfig instalado"
+    installed: "O mastercomfig %{version} está pronto. Escolha uma predefinição abaixo."
+    updated_title: "mastercomfig atualizado"
+    updated: "Agora na versão %{version}."
+    checked_title: "Atualizações verificadas"
+    taken_over_title: "Controle do mastercomfig assumido"
+    taken_over: "O TF2Tools agora cuida do mastercomfig."
+    removed_title: "mastercomfig removido"
+    removed: "O mastercomfig não está mais no TF2."
+    preset_title: "Predefinição aplicada"
+    preset: "%{preset} vale a partir da próxima vez que o TF2 iniciar."
+    dropped_title: "Algumas configurações voltaram à predefinição"
+    dropped: "Estas configurações não existem nesta versão do mastercomfig e voltaram à predefinição: %{names}."
+    own_kept: "Seu próprio modules.cfg foi mantido, então as configurações abaixo não estão em uso. Altere uma para usá-las no lugar."
   settings_note:
     loading: "Carregando a lista de configurações..."
     offline: "A lista de configurações precisa de internet na primeira vez. Conecte-se e abra esta página de novo."
     unsupported: "Esta versão do mastercomfig ainda não é suportada. As predefinições acima continuam funcionando."
+  not_set: "Deixar o TF2 decidir"
+  row:
+    preset_value: "%{preset}: %{value}"
+    reset: "Redefinir"
+  pictures:
+    show: "Mostrar imagens"
+    hide: "Ocultar imagens"
+    thumb: "Imagens de %{name}"
+    yours: "Seu: %{value}"
+    same: "%{value} (igual a %{preset})"
+    zoom: "Ampliar"
+    full: "Imagem inteira"
+    wipe: "Deslize entre a imagem da predefinição e a sua"
+    caption: "Clique em uma imagem para usar essa configuração."
+  changes:
+    title: { one: "%{count} alteração em relação a %{preset}", other: "%{count} alterações em relação a %{preset}" }
+    as_is: "Usando %{preset} sem alterações. Mude qualquer configuração abaixo e ela aparece aqui."
+    chip: "%{name}: %{was} → %{now}"
+    chip_saved: "%{name}: %{now}"
+    undo: "Voltar %{name} para %{was}"
+    reset_all: "Redefinir tudo"
+  settings:
+    search: "Buscar configurações"
+    changed_only: "Só as alteradas"
+    no_match: "Nenhuma configuração corresponde a “%{query}”."
+    nothing_changed: "Nada difere de %{preset}."
+    show_all: "Mostrar todas as configurações"
+    has_changes: "Tem alterações"
+  module:
+    lod:
+      label: "Qualidade dos modelos"
+      description: "O nível de detalhe de jogadores, armas e objetos vistos de perto."
+    lighting:
+      label: "Iluminação"
+      description: "O nível de detalhe das luzes e do sombreamento que elas projetam."
+    shading:
+      label: "Sombreamento"
+      description: "Sombreamento extra nas superfícies. Mudar isso recarrega os materiais do jogo."
+    phong:
+      label: "Superfícies brilhantes"
+      description: "Reflexos brilhantes em jogadores e armas, chamados de phong no jogo."
+    shadows:
+      label: "Sombras"
+      description: "Sombras projetadas por jogadores e objetos."
+    flashlight:
+      label: "Lanterna"
+      description: "Só alguns modos de servidores da comunidade usam. Deixe desligada, a menos que um servidor precise."
+    effects:
+      label: "Partículas"
+      description: "Explosões, fogo, fumaça e efeitos incomuns."
+    tracers:
+      label: "Traçantes"
+      description: "Rastros de bala das armas hitscan."
+    water:
+      label: "Água"
+      description: "Como a água aparece e o que ela reflete."
+    post_processing:
+      label: "Pós-processamento"
+      description: "Bloom e a correção de cor da imagem inteira."
+      value:
+        low: "Só bloom"
+    color_filter:
+      label: "Filtro de cor"
+      description: "Um tom de cor sobre a imagem inteira."
+    pyrovision:
+      label: "Pyrovisão"
+      description: "O nível de detalhe da Pyrolândia vista pelos óculos do Pyro."
+    romevision:
+      label: "Romavisão"
+      description: "Armadura romana nos robôs do Mann vs. Máquina."
+    motion_blur:
+      label: "Desfoque de movimento"
+      description: "Desfoca a tela quando você gira rápido."
+    anti_aliasing:
+      label: "Antisserrilhamento"
+      description: "Suaviza bordas serrilhadas. Custa FPS em placas de vídeo mais fracas."
+    characters:
+      label: "Personagens"
+      description: "O nível de detalhe dos modelos dos jogadores."
+    decals:
+      label: "Decalques"
+      description: "Marcas de tiro, queimaduras e sangue nas paredes."
+    decals_models:
+      label: "Decalques em modelos"
+      description: "Sangue e marcas em jogadores e objetos."
+    decals_art:
+      label: "Arte do mapa"
+      description: "Placas pintadas e arte que o criador do mapa colocou."
+    sprays:
+      label: "Sprays"
+      description: "Imagens que os jogadores grafitam nas paredes."
+    gibs:
+      label: "Gibs"
+      description: "Pedaços de corpos das explosões."
+    sillygibs:
+      label: "Gibs bobos"
+      description: "Troca sangue e pedaços de corpos por peças inofensivas de brinquedo."
+    props:
+      label: "Objetos"
+      description: "O nível de detalhe de objetos pequenos e quantos aparecem."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Os corpos caem moles em vez de tocar uma animação de morte."
+    "3dsky":
+      label: "Céu 3D"
+      description: "O cenário além da borda do mapa. Desligado ganha FPS em mapas abertos."
+    jigglebones:
+      label: "Ossos balançantes"
+      description: "Partes soltas de cosméticos que balançam quando você se move."
+    sheens_speed:
+      label: "Velocidade do brilho"
+      description: "A velocidade com que o brilho de combo passa pelas armas."
+    sheens_tint:
+      label: "Intensidade do brilho"
+      description: "O quanto a cor do brilho de combo é forte."
+    texture_quality:
+      label: "Qualidade das texturas"
+      description: "A nitidez das superfícies. Mais alta usa mais memória de vídeo."
+    texture_filter:
+      label: "Filtragem de texturas"
+      description: "Mantém pisos e paredes nítidos quando vistos de lado."
+    ropes:
+      label: "Cordas"
+      description: "Cabos e cordas pendurados pelos mapas."
+    fpscap:
+      label: "Limite de FPS"
+      description: "O máximo de quadros por segundo que o jogo desenha."
+    vsync:
+      label: "VSync"
+      description: "Sincroniza os quadros com a sua tela para evitar tearing. Adiciona atraso de entrada."
+    hud_player_model:
+      label: "Modelo do jogador"
+      description: "O modelo da sua classe ao lado da sua vida."
+    hud_server_text:
+      label: "Mensagens do servidor"
+      description: "O texto que o servidor mostra no meio da tela."
+    hud_contracts:
+      label: "Contratos"
+      description: "Quais contratos o HUD mostra."
+      value:
+        custom: "Ajuste do jogo"
+    hud_panels:
+      label: "Painéis do HUD"
+      description: "Quantos painéis extras o HUD mostra."
+    hud_avatars:
+      label: "Avatares"
+      description: "Fotos de perfil da Steam no placar e no killfeed."
+    match_hud:
+      label: "HUD da partida"
+      description: "A barra de status das equipes no topo da tela nas partidas."
+    messages:
+      label: "Mensagens do chat"
+      description: "O chat de texto de outros jogadores."
+    killfeed:
+      label: "Killfeed"
+      description: "A lista de abates no canto da tela."
+    killstreaks:
+      label: "Avisos de combo"
+      description: "Contagens de combos e seus anúncios."
+    hud_achievement:
+      label: "Avisos de conquistas"
+      description: "O aviso quando alguém ganha uma conquista."
+    console:
+      label: "Console do desenvolvedor"
+      description: "Abre o console com a tecla `."
+    htmlmotd:
+      label: "Página de boas-vindas"
+      description: "A página web que um servidor mostra quando você entra."
+    outlines:
+      label: "Contornos"
+      description: "Contornos brilhantes em volta de colegas de equipe e objetivos."
+    dynamic_background:
+      label: "Fundo do menu"
+      description: "O mapa em movimento atrás do menu principal."
+    sound:
+      label: "Qualidade do som"
+      description: "Quantos sons tocam ao mesmo tempo e o nível de detalhe deles."
+    voice_chat:
+      label: "Chat de voz"
+      description: "Ouça outros jogadores falando pelo microfone."
+    party_mode:
+      label: "Entrada no grupo"
+      description: "Quem pode entrar no seu grupo."
+    logo:
+      label: "Logo de abertura"
+      description: "O logo mostrado quando o jogo inicia."
+    packet_rate:
+      label: "Taxa de pacotes"
+      description: "Com que frequência você envia e recebe dados do servidor."
+    snapshot_buffer:
+      label: "Buffer de snapshots"
+      description: "O quanto o jogo suaviza as atualizações que recebe do servidor."
+    packet_size:
+      label: "Tamanho dos pacotes"
+      description: "O tamanho dos pacotes e como eles são divididos."
+    bandwidth:
+      label: "Largura de banda"
+      description: "O máximo de dados que o jogo envia por segundo. Ajuste à sua conexão."
+    download:
+      label: "Downloads"
+      description: "Que conteúdo personalizado os servidores podem enviar para você."
+      value:
+        custom: "Ajuste do jogo"
+  value:
+    low: "Baixo"
+    medium: "Médio"
+    high: "Alto"
+    ultra: "Ultra"
+    very_low: "Muito baixo"
+    very_high: "Muito alto"
+    off: "Desligado"
+    on: "Ligado"
+    rim: "Luz de contorno"
+    default: "Padrão"
+    calm: "Calmo"
+    vivid: "Vívido"
+    washed: "Desbotado"
+    dreamy: "Onírico"
+    grayscale: "Escala de cinza"
+    desaturated: "Dessaturado"
+    warm: "Quente"
+    cool: "Frio"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Manter"
+    auto: "Automático"
+    force_on: "Sempre"
+    slow: "Lento"
+    fast: "Rápido"
+    full: "Completo"
+    blocky: "Pixelado"
+    trilinear: "Trilinear"
+    aniso2x: "Anisotrópico 2X"
+    aniso4x: "Anisotrópico 4X"
+    aniso8x: "Anisotrópico 8X"
+    aniso16x: "Anisotrópico 16X"
+    powersaver: "Economia de energia"
+    unlimited: "Ilimitado"
+    custom: "Personalizado"
+    hide: "Ocultar"
+    all: "Todos"
+    active: "Só ativos"
+    everyone: "Todos"
+    friends: "Amigos"
+    dustbowl: "Dustbowl"
+    hidden: "Oculto"
+    open: "Aberto"
+    request: "Sob pedido"
+    invite: "Só convite"
+    congestion: "Congestionamento"
+    standard: "Padrão"
+    x1: "1 instantâneo"
+    x2: "2 instantâneos"
+    anim: "Animação"
+    small: "Pequeno"
+    conservative: "Conservador"
+    large: "Grande"
+    nosounds: "Sem sons"
+    mapsonly: "Só mapas"
+    nothing: "Nada"
+  category:
+    graphics: "Gráficos"
+    hud: "HUD"
+    sound: "Som"
+    misc: "Diversos"
+    networking: "Rede"
+  preset:
+    heading: "Predefinição"
+    more_frames: "Mais quadros"
+    better_looking: "Visual melhor"
+    low:
+      label: "Baixo"
+      line: "Menos efeitos e texturas mais suaves, para PCs mais fracos"
+    medium:
+      label: "Médio"
+      line: "Equilíbrio entre visual e taxa de quadros para a maioria dos PCs"
+    high:
+      label: "Alto"
+      line: "Texturas mais nítidas e mais efeitos, para um PC potente"
+    ultra:
+      label: "Ultra"
+      line: "Tudo ligado, para PCs rápidos e capturas de tela"
+    custom:
+      label: "Personalizado"
+      line: "Só as configurações que você escolher; o TF2 decide o resto"

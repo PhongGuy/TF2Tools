@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use gpui_kit::SharedString;
 
 pub mod format;
+pub mod mastercomfig;
 pub mod names;
 
 /// A language the app offers, by its catalogue code and its name in that language.
@@ -671,6 +672,22 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.category.hud",
+        "graphics.changes.chip",
+        "graphics.changes.chip_saved",
+        "graphics.module.download.label",
+        "graphics.module.gibs.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
+        "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.trilinear",
+        "graphics.value.ultra",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -778,6 +795,20 @@ mod tests {
         "common.sound_kind.hitsound",
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
+        "graphics.category.hud",
+        "graphics.changes.chip",
+        "graphics.changes.chip_saved",
+        "graphics.module.gibs.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
+        "graphics.preset.ultra.label",
+        "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.ultra",
         "hud_maker.board_mode.casual",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
@@ -883,6 +914,29 @@ mod tests {
         "crosshair_maker.starter.value",
         "crosshairs_page.sync.in_game",
         "crosshairs_page.sync.skipped",
+        "graphics.category.hud",
+        "graphics.changes.chip",
+        "graphics.changes.chip_saved",
+        "graphics.module.decals.label",
+        "graphics.module.download.label",
+        "graphics.module.gibs.label",
+        "graphics.module.pyrovision.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.romevision.label",
+        "graphics.module.sprays.label",
+        "graphics.module.vsync.label",
+        // "Zoom" is the language's own loanword for a picture's close-up.
+        "graphics.pictures.zoom",
+        "graphics.preset.ultra.label",
+        "graphics.row.preset_value",
+        "graphics.value.anim",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.trilinear",
+        "graphics.value.ultra",
+        "graphics.value.warm",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
         "hud_maker.borrow.origin.curated",
@@ -1011,6 +1065,24 @@ mod tests {
         "common.sound_kind.killsound",
         "crosshair_maker.position.joined",
         "crosshair_maker.tool.rectangle",
+        "graphics.category.hud",
+        "graphics.module.gibs.label",
+        "graphics.module.hud_avatars.label",
+        "graphics.module.pyrovision.label",
+        "graphics.module.ragdolls.label",
+        "graphics.module.romevision.label",
+        "graphics.module.vsync.label",
+        // "Zoom" is the language's own loanword for a picture's close-up.
+        "graphics.pictures.zoom",
+        "graphics.preset.ultra.label",
+        "graphics.value.anim",
+        "graphics.value.congestion",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+        "graphics.value.standard",
+        "graphics.value.ultra",
         "hud_maker.animations.title",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.brings.animation",
@@ -1104,6 +1176,11 @@ mod tests {
         "common.size.kb",
         "common.size.mb",
         "common.size.tb",
+        "graphics.category.hud",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
         "hud_maker.board_mode.mvm",
         "hud_maker.borrow.origin.curated",
         "hud_maker.label.hud",
@@ -1131,6 +1208,39 @@ mod tests {
         let stale: Vec<&&str> = ZH_SAME_AS_ENGLISH
             .iter()
             .filter(|k| en.get(**k) != zh.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
+    // Graphics values Russian legitimately writes as English does: names and bare formats.
+    const RU_GRAPHICS_SAME_AS_ENGLISH: &[&str] = &[
+        "graphics.category.hud",
+        "graphics.changes.chip",
+        "graphics.changes.chip_saved",
+        "graphics.row.preset_value",
+        "graphics.value.dustbowl",
+        "graphics.value.msaa_2x",
+        "graphics.value.msaa_4x",
+        "graphics.value.msaa_8x",
+    ];
+
+    #[test]
+    fn russian_leaves_no_graphics_word_in_english() {
+        let (en, ru) = (messages("en"), messages("ru"));
+        let left: Vec<&str> = ru
+            .iter()
+            // The section is compared by its first segment, so the key scans read no literal key.
+            .filter(|(k, v)| k.split('.').next() == Some("graphics") && en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !RU_GRAPHICS_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(
+            left.is_empty(),
+            "ru graphics values still in English: {left:?}"
+        );
+        let stale: Vec<&&str> = RU_GRAPHICS_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != ru.get(**k))
             .collect();
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }
@@ -1265,7 +1375,12 @@ mod tests {
             .filter(|k| k.split('.').next().is_some_and(|s| surfaces.contains(s)))
             .filter(|k| {
                 let prefix: Vec<&str> = k.split('.').take(2).collect();
-                prefix != ["hud_maker", "label"] && prefix != ["hud_maker", "part_name"]
+                // Built at runtime from mastercomfig's module names, so no literal names them.
+                prefix != ["hud_maker", "label"]
+                    && prefix != ["hud_maker", "part_name"]
+                    && prefix != ["graphics", "module"]
+                    && prefix != ["graphics", "value"]
+                    && prefix != ["graphics", "category"]
             })
             .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
             .filter(|k| !named.contains(*k))
@@ -1559,10 +1674,24 @@ mod tests {
         "pages/hud_maker/menu_art.rs",
         "pages/hud_maker/snapping.rs",
         "pages/hud_maker/tint.rs",
+        "pages/graphics/jobs.rs",
+        "pages/graphics/mod.rs",
+        "pages/graphics/model.rs",
+        "pages/graphics/picture_panel.rs",
+        "pages/graphics/pictures.rs",
+        "pages/graphics/presets.rs",
+        "pages/graphics/settings.rs",
+        "pages/graphics/status.rs",
+        "pages/graphics/view.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
     const ALLOWED: &[(&str, &str, &str)] = &[
+        (
+            "pages/graphics/model.rs",
+            "GitHub",
+            "a site's name, passed into the shared source sentences",
+        ),
         (
             "old_v4.rs",
             "SystemRoot",
@@ -2184,12 +2313,12 @@ mod tests {
         );
     }
 
-    // A file added to either maker later must join the English scan, or its words go unchecked.
+    // A file added to either maker or the Graphics page later must join the English scan.
     #[test]
-    fn every_maker_file_is_in_the_english_scan() {
+    fn every_maker_and_graphics_file_is_in_the_english_scan() {
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut files = Vec::new();
-        for dir in ["pages/hud_maker", "pages/crosshair_maker"] {
+        for dir in ["pages/hud_maker", "pages/crosshair_maker", "pages/graphics"] {
             rust_files(&src.join(dir), &mut files);
         }
         let missing: Vec<String> = files
@@ -2204,7 +2333,7 @@ mod tests {
             .collect();
         assert!(
             missing.is_empty(),
-            "maker files the English scan skips: {missing:?}"
+            "maker and graphics files the English scan skips: {missing:?}"
         );
     }
 

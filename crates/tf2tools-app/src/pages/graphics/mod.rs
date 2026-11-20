@@ -2,45 +2,54 @@
 
 pub mod jobs;
 pub mod model;
+mod picture_panel;
+pub mod pictures;
+mod presets;
 mod settings;
+mod status;
+pub mod view;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::{SelectEvent, SelectState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::slider::{SliderEvent, SliderState};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, Role,
-    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div, px,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
-use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
+use tf2tools_core::{
+    Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
+};
 
-use crate::i18n::tr;
+use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
-use crate::pages::common::{card_frame, no_tf2_warning};
+use crate::pages::common::no_tf2_warning;
 use crate::pages::profiles::probe::Tf2Probe;
+use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::widgets::labelled;
+use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::{Named as _, labelled};
 use jobs::{ModulesFailure, save_failed};
 use model::{
-    OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
-    describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
-    preset_label, shown_choice, status_card, update_to, value_options,
+    SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
+    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_label, shown_choice,
+    status_card, value_options,
 };
-
-const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
-const FOOTER: &str = "Changes apply the next time TF2 starts.";
+use pictures::PictureIndex;
+use view::Filter;
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
@@ -87,7 +96,7 @@ pub struct GraphicsPage {
     choices: Option<Choices>,
     /// The settings list's catalog, always for the managed install's version.
     catalog: Option<Arc<ModuleCatalog>>,
-    /// One Select per catalog module, built when the catalog arrives.
+    /// One Select per Select row of the catalog, built when the catalog arrives.
     selects: BTreeMap<String, ValueSelect>,
     /// Each Select's pick handler, rebuilt with the Selects.
     select_subscriptions: Vec<Subscription>,
@@ -95,14 +104,63 @@ pub struct GraphicsPage {
     note: Option<SettingsNote>,
     /// The version whose catalog this visit already asked GitHub for.
     asked: Option<String>,
+    /// The settings search; rows filter on its value at render.
+    search: Entity<InputState>,
+    /// "Changed only" is on: the list shows only rows that differ from the preset.
+    changed_only: bool,
+    /// Each shown section's child index in the scroll column, from the last render.
+    section_items: BTreeMap<String, usize>,
     scroll: ScrollHandle,
+    /// The bundled setting pictures, once read off the UI thread.
+    pictures: Option<Arc<PictureIndex>>,
+    /// The image keys the last frame asked for.
+    wanted: Vec<ImageKey>,
+    /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
+    image_viewer: String,
+    /// The module whose pictures are open; at most one row's at a time.
+    open_row: Option<String>,
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    wipe: Entity<SliderState>,
+    /// Whether the compare view shows the crops; one switch for the whole page.
+    zoom: bool,
+    /// The shell's remembered answer to whether TF2 runs; drawing never probes processes.
+    tf2_running: bool,
     _subscriptions: Vec<Subscription>,
 }
+
+/// Below this page width the category rail becomes a chip row above the settings.
+const NARROW: f32 = 900.;
 
 impl GraphicsPage {
     /// Needs the `Services` and `Tf2Global` globals. Loads the status and release off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
+        let search =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("graphics.settings.search")));
+        // The list filters from the input's value at render, so each edit just redraws.
+        let searched = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        });
+        let wipe = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max(100.)
+                .step(1.)
+                .default_value(50.)
+        });
+        let wiped = cx.subscribe(&wipe, |_, _, _: &SliderEvent, cx| cx.notify());
+        let mut subscriptions = vec![tf2, searched, wiped];
+        // Pictures redraw the page as they land, and the page's wants go with it.
+        let image_viewer = format!("graphics:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
         let mut page = Self {
             win: window.window_handle(),
             status: None,
@@ -118,11 +176,121 @@ impl GraphicsPage {
             select_subscriptions: Vec::new(),
             note: None,
             asked: None,
+            search,
+            changed_only: false,
+            section_items: BTreeMap::new(),
             scroll: ScrollHandle::new(),
-            _subscriptions: vec![tf2],
+            pictures: None,
+            wanted: Vec::new(),
+            image_viewer,
+            open_row: None,
+            wipe,
+            zoom: false,
+            tf2_running: false,
+            _subscriptions: subscriptions,
         };
         page.reload(cx);
+        page.load_pictures(cx);
         page
+    }
+
+    /// Takes the shell's answer to whether TF2 runs; redraws only when it changed.
+    pub fn set_tf2_running(&mut self, running: bool, cx: &mut Context<Self>) {
+        if self.tf2_running != running {
+            self.tf2_running = running;
+            cx.notify();
+        }
+    }
+
+    /// Whether TF2 ran when the shell last asked; the running banner shows while it did.
+    pub fn tf2_running(&self) -> bool {
+        self.tf2_running
+    }
+
+    /// The bundled setting pictures once read; an empty index when the folder cannot be read.
+    pub fn pictures(&self) -> Option<&PictureIndex> {
+        self.pictures.as_deref()
+    }
+
+    /// The image keys the last frame asked the image cache for.
+    pub fn wanted_images(&self) -> &[ImageKey] {
+        &self.wanted
+    }
+
+    /// The settings search box's state.
+    pub fn search_input(&self) -> &Entity<InputState> {
+        &self.search
+    }
+
+    /// Whether "Changed only" is on.
+    pub fn changed_only(&self) -> bool {
+        self.changed_only
+    }
+
+    // What the list shows: the search's value and "Changed only".
+    fn filter(&self, cx: &App) -> Filter {
+        Filter {
+            query: self.search.read(cx).value().to_string(),
+            changed_only: self.changed_only,
+        }
+    }
+
+    /// The module whose pictures are open, if any.
+    pub fn open_row(&self) -> Option<&str> {
+        self.open_row.as_deref()
+    }
+
+    /// The compare view's wipe slider.
+    pub fn wipe_state(&self) -> &Entity<SliderState> {
+        &self.wipe
+    }
+
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    pub fn wipe(&self, cx: &App) -> f32 {
+        self.wipe.read(cx).value().start()
+    }
+
+    /// Whether the compare view shows the zoomed crops.
+    pub fn zoom(&self) -> bool {
+        self.zoom
+    }
+
+    // Opens `module`'s pictures, closing any other row's, or closes them when already open.
+    // A freshly opened row starts with the wipe in the middle.
+    fn toggle_pictures(&mut self, module: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_row = if self.open_row.as_deref() == Some(module) {
+            None
+        } else {
+            self.wipe
+                .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
+            Some(module.to_owned())
+        };
+        cx.notify();
+    }
+
+    fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
+        self.zoom = !self.zoom;
+        cx.notify();
+    }
+
+    fn set_changed_only(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.changed_only = on;
+        cx.notify();
+    }
+
+    // Clears the search and "Changed only", so every row shows again.
+    fn show_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.search
+            .update(cx, |search, cx| search.set_value("", window, cx));
+        self.set_changed_only(false, cx);
+    }
+
+    // Scrolls the category `key`'s section to the top of the page, if it is drawn.
+    fn jump(&mut self, key: &str, cx: &mut Context<Self>) {
+        if let Some(&item) = self.section_items.get(key) {
+            self.scroll.scroll_to_top_of_item(item);
+            cx.notify();
+        }
     }
 
     /// True once a load has ended, failed or not, with or without TF2.
@@ -194,6 +362,13 @@ impl GraphicsPage {
         self.selects.get(module).cloned()
     }
 
+    /// `module`'s row as the list draws it; None without a catalog or for an unknown module.
+    pub fn row(&self, module: &str) -> Option<view::RowView> {
+        let catalog = self.catalog.as_ref()?;
+        let module = catalog.module(module)?;
+        Some(view::row(catalog, &self.shown_against(), module))
+    }
+
     fn managed_version(&self) -> Option<&str> {
         match &self.status {
             Some(MastercomfigStatus::Managed { version, .. }) => Some(version),
@@ -223,32 +398,33 @@ impl GraphicsPage {
                     own_file_kept,
                 } = job.await?;
                 let (title, mut text) = if update {
-                    ("mastercomfig updated", format!("Now on {version}."))
+                    let now = tr!("graphics.toast.updated", version = version);
+                    (tr!("graphics.toast.updated_title"), now)
                 } else {
-                    let ready = format!("mastercomfig {version} is ready. Pick a preset below.");
-                    ("mastercomfig installed", ready)
+                    let ready = tr!("graphics.toast.installed", version = version);
+                    (tr!("graphics.toast.installed_title"), ready)
                 };
                 if let Some(note) = dropped_note(&dropped) {
-                    text = format!("{text} {note}");
+                    text = format!("{text} {note}").into();
                 }
                 if own_file_kept {
-                    text = format!("{text} {OWN_MODULES_CFG_KEPT}");
+                    text = format!("{text} {}", own_modules_cfg_kept()).into();
                 }
-                Ok((title.into(), text.into()))
+                Ok((title, text))
             },
             cx,
         );
     }
 
-    // Forces the addon-store sync; the reloaded card then says "Up to date" or "Update to X",
-    // so the toast names no version.
+    // Forces the addon-store sync; the reloaded status row then says whether an update is
+    // offered, so the toast names no version.
     fn check(&mut self, cx: &mut Context<Self>) {
         let job = jobs::check_for_updates(cx);
         self.running = Some(Job::Check);
         self.finish(
             async move {
                 job.await?;
-                Ok(("Checked for updates".into(), SharedString::default()))
+                Ok((tr!("graphics.toast.checked_title"), SharedString::default()))
             },
             cx,
         );
@@ -264,8 +440,8 @@ impl GraphicsPage {
                 s.library.take_over_mastercomfig(&tf2).map_err(|e| {
                     describe_take_over(&e).into_op(tr!("messages.action.take_over_mastercomfig"))
                 })?;
-                let text = "TF2Tools now looks after mastercomfig.";
-                Ok(("mastercomfig taken over".into(), text.into()))
+                let text = tr!("graphics.toast.taken_over");
+                Ok((tr!("graphics.toast.taken_over_title"), text))
             },
             cx,
         );
@@ -294,12 +470,12 @@ impl GraphicsPage {
                         let restored = s.library.remove_mastercomfig(&tf2).map_err(|e| {
                             describe_remove(&e).into_op(tr!("messages.action.remove_mastercomfig"))
                         })?;
-                        let mut text = "mastercomfig is no longer in TF2.".to_owned();
+                        let mut text = tr!("graphics.toast.removed").to_string();
                         if restored {
                             text.push(' ');
                             text.push_str(&crate::pages::addons::model::movement_off());
                         }
-                        Ok(("mastercomfig removed".into(), text.into()))
+                        Ok((tr!("graphics.toast.removed_title"), text.into()))
                     },
                     cx,
                 );
@@ -322,8 +498,8 @@ impl GraphicsPage {
                 s.library
                     .apply_preset(&tf2, preset)
                     .map_err(|e| describe_apply(&e).into_op(tr!("messages.action.apply_preset")))?;
-                let text = format!("{} applies the next time TF2 starts.", preset_label(preset));
-                Ok(("Preset applied".into(), text.into()))
+                let text = tr!("graphics.toast.preset", preset = preset_label(preset));
+                Ok((tr!("graphics.toast.preset_title"), text))
             },
             cx,
         );
@@ -381,8 +557,8 @@ impl GraphicsPage {
                 };
                 match dropped {
                     Ok(dropped) => Ok(dropped_note(&dropped).map(|text| {
-                        let title = "Some settings went back to the preset";
-                        (ToastKind::Warning, title.into(), text.into())
+                        let title = tr!("graphics.toast.dropped_title");
+                        (ToastKind::Warning, title, text)
                     })),
                     Err(ModulesFailure::Foreign) => {
                         Err(OpError::core(save_failed(), foreign_modules_cfg()))
@@ -586,8 +762,8 @@ impl GraphicsPage {
         .detach();
     }
 
-    // One Select per module of the held catalog, each on its shown value; a pick saves it, and
-    // a cleared Select changes nothing.
+    // One Select per Select row of the held catalog, each on its shown value; a pick saves it,
+    // and a cleared Select changes nothing.
     fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.selects.clear();
         self.select_subscriptions.clear();
@@ -595,7 +771,12 @@ impl GraphicsPage {
             return;
         };
         let choices = self.shown_against();
-        for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+        let select_rows = catalog
+            .categories()
+            .iter()
+            .flat_map(|c| c.modules())
+            .filter(|m| view::control_kind(m) == view::ControlKind::Select);
+        for module in select_rows {
             let shown = shown_choice(&catalog, &choices, module.name());
             let options = value_options(module);
             let select = cx.new(|cx| {
@@ -617,9 +798,81 @@ impl GraphicsPage {
         }
     }
 
+    // Saves `value` for `module`, as the row's own control does.
+    fn pick_value(&mut self, module: &str, value: &str, cx: &mut Context<Self>) {
+        self.change(
+            |c, catalog| c.set(catalog, module, ModuleChoice::Value(value.to_owned())),
+            cx,
+        );
+    }
+
     // Drops `module`'s saved choice, so the preset's value applies.
     fn reset_module(&mut self, module: &str, cx: &mut Context<Self>) {
         self.change(|c, _| c.reset(module), cx);
+    }
+
+    // Reads the pictures' manifest and checks their files in the background, once per page.
+    fn load_pictures(&mut self, cx: &mut Context<Self>) {
+        let reading = run_blocking(cx, |s| {
+            Ok(PictureIndex::open(&s.assets.setting_pictures_dir()))
+        });
+        cx.spawn(async move |page, cx| {
+            let index = reading.await.unwrap_or_default();
+            let _ = page.update(cx, |page, cx| {
+                page.pictures = Some(Arc::new(index));
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    // The open row's compare pictures first, as the newest wants, then its strip, then the
+    // current thumbnail of every row with pictures; all thumbnails are wanted, not just the visible.
+    fn image_keys(&self) -> Vec<ImageKey> {
+        let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
+        else {
+            return Vec::new();
+        };
+        let open = self
+            .open_row
+            .as_deref()
+            .and_then(|module| self.row(module))
+            .and_then(|row| pictures::row_pictures(index, &row, self.zoom));
+        let (compared, strip) = open
+            .map(|p| (p.compare.pictures(), p.strip))
+            .unwrap_or_default();
+        let choices = self.shown_against();
+        let thumbs = catalog
+            .categories()
+            .iter()
+            .flat_map(|category| category.modules())
+            .filter(|module| index.has_pictures(module.name()))
+            .filter_map(|module| {
+                let row = view::row(catalog, &choices, module);
+                pictures::row_pictures(index, &row, false)?.thumb
+            })
+            .map(|thumb| ImageKey::card(&index.url(&thumb)));
+        compared
+            .into_iter()
+            .map(|picture| ImageKey::carousel(&index.url(&picture)))
+            .chain(strip.iter().map(|p| ImageKey::card(&index.url(&p.picture))))
+            .chain(thumbs)
+            .collect()
+    }
+
+    // Records this frame's keys and, when they changed, hands them to the image cache after
+    // the draw, so no entity is updated mid-render.
+    fn want_images(&mut self, cx: &mut Context<Self>) {
+        let keys = self.image_keys();
+        if keys == self.wanted {
+            return;
+        }
+        self.wanted = keys.clone();
+        let Some(images) = RemoteImages::global(cx) else {
+            return;
+        };
+        let viewer = self.image_viewer.clone();
+        cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
     }
 
     // Drops every saved choice and keeps the preset.
@@ -652,13 +905,48 @@ impl GraphicsPage {
 impl Render for GraphicsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
-        let warning = missing.then(|| {
-            no_tf2_warning(
-                ids::GRAPHICS_NO_TF2,
-                "Set the TF2 folder in Settings to use mastercomfig.",
-                cx,
+        let warning =
+            missing.then(|| no_tf2_warning(ids::GRAPHICS_NO_TF2, tr!("graphics.no_tf2"), cx));
+        // Each section must be a direct child of the scroll column, so the rail can scroll
+        // to it by index; the children are gathered first to learn those indices.
+        let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
+        self.want_images(cx);
+        let filter = self.filter(cx);
+        let sections = self
+            .catalog
+            .as_deref()
+            .filter(|_| self.preset().is_some())
+            .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
+        let mut children: Vec<AnyElement> = Vec::new();
+        children.extend(warning.map(IntoElement::into_any_element));
+        children.push(
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::GRAPHICS_SUBTITLE,
+                tr!("graphics.subtitle"),
             )
-        });
+            .into_any_element(),
+        );
+        if let Some(card) = self.card() {
+            children.push(self.status_row(&card, cx));
+            if self.tf2_running {
+                children.push(status::running_banner(cx));
+            }
+        }
+        let mut items = BTreeMap::new();
+        if let Some(preset) = self.preset() {
+            children.push(self.presets(preset, narrow, cx));
+            children.push(self.changes_strip(preset, cx));
+            settings::push(
+                self,
+                sections.as_deref(),
+                narrow,
+                &mut children,
+                &mut items,
+                cx,
+            );
+        }
+        self.section_items = items;
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -667,196 +955,127 @@ impl Render for GraphicsPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning)
-            .child(labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::GRAPHICS_SUBTITLE,
-                "Graphics and game settings from mastercomfig",
-            ))
-            .children(self.card().map(|card| self.status_card(&card, cx)))
-            .children(
-                self.preset()
-                    .map(|current| self.presets(current, window, cx)),
-            )
-            .children(self.preset().map(|_| settings::section(self, cx)))
-            .children(self.preset().map(|_| {
-                labelled(
-                    div().text_sm().text_color(cx.theme().muted_foreground),
-                    ids::GRAPHICS_FOOTER,
-                    FOOTER,
-                )
-            }));
-        scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
+            .children(children);
+        let column = scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content);
+        let rail = sections
+            .as_deref()
+            .filter(|_| !narrow)
+            .map(|sections| settings::rail(sections, false, cx));
+        h_flex()
+            .size_full()
+            .items_start()
+            .children(rail)
+            .child(column.flex_1().min_w_0().h_full())
     }
 }
 
 impl GraphicsPage {
-    // The headline, its detail line, the buttons this state offers and the credit line.
-    fn status_card(&self, card: &StatusCard, cx: &mut Context<Self>) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
-        let busy = self.busy;
-        let installing = self.running == Some(Job::Install);
-        let checking = self.running == Some(Job::Check);
-        let mut buttons: Vec<AnyElement> = Vec::new();
-        match card {
-            StatusCard::NotInstalled => buttons.push(
-                Button::new(ids::GRAPHICS_INSTALL)
-                    .primary()
-                    .icon(IconName::Download)
-                    .label("Install")
-                    .loading(installing)
-                    .disabled(busy)
-                    .on_click(cx.listener(|page, _, window, cx| page.install(false, window, cx)))
-                    .into_any_element(),
-            ),
-            StatusCard::Installed { .. } => {
-                if update_to(card).is_some() {
-                    buttons.push(
-                        Button::new(ids::GRAPHICS_UPDATE)
-                            .primary()
-                            .icon(IconName::RefreshCw)
-                            .label("Update")
-                            .loading(installing)
-                            .disabled(busy)
-                            .on_click(
-                                cx.listener(|page, _, window, cx| page.install(true, window, cx)),
-                            )
-                            .into_any_element(),
-                    );
-                }
-                buttons.push(
-                    Button::new(ids::GRAPHICS_CHECK)
-                        .outline()
-                        .icon(IconName::RotateCw)
-                        .label("Check for updates")
-                        .loading(checking)
-                        .disabled(busy)
-                        .on_click(cx.listener(|page, _, _, cx| page.check(cx)))
-                        .into_any_element(),
-                );
-                buttons.push(
-                    Button::new(ids::GRAPHICS_REMOVE)
-                        .outline()
-                        .icon(IconName::Trash)
-                        .label("Remove")
-                        .disabled(busy)
-                        .on_click(cx.listener(|page, _, window, cx| page.remove(window, cx)))
-                        .into_any_element(),
-                );
-            }
-            StatusCard::Outside { .. } => buttons.push(
-                Button::new(ids::GRAPHICS_TAKE_OVER)
-                    .primary()
-                    .label("Take over")
-                    .disabled(busy)
-                    .on_click(cx.listener(|page, _, window, cx| page.take_over(window, cx)))
-                    .into_any_element(),
-            ),
-        }
-        let detail = detail(card).map(|text| {
-            labelled(
-                div().text_sm().text_color(muted),
-                ids::GRAPHICS_DETAIL,
-                text,
-            )
-        });
-        card_frame(cx)
-            .id(ids::GRAPHICS_STATUS)
-            .test_support()
-            .p_6()
-            .child(
-                v_flex()
-                    .gap_4()
-                    .child(
-                        v_flex()
-                            .gap_1()
-                            .child(labelled(
-                                div().text_lg().font_weight(FontWeight::SEMIBOLD),
-                                ids::GRAPHICS_HEADLINE,
-                                headline(card),
-                            ))
-                            .children(detail),
-                    )
-                    .child(h_flex().flex_wrap().gap_2().children(buttons))
-                    .child(labelled(
-                        div().text_xs().text_color(muted),
-                        ids::GRAPHICS_CREDIT,
-                        CREDIT,
-                    )),
-            )
-            .into_any_element()
-    }
-
-    // The five preset cards in comfig-app's order, the current one in the primary border. Each
-    // is a tab stop where Enter or Space picks it; a click does not take focus, as on the pills.
-    fn presets(&self, current: Preset, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    // The player's changes from `preset` as chips with an undo each, and Reset all; a dashed
+    // "as is" strip when there are none. Offline the chips only name the saved values, since
+    // undoing needs the catalogue.
+    fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        let (primary, border, ring, muted, radius) = (
-            theme.primary,
-            theme.border,
-            theme.ring,
-            theme.muted_foreground,
-            theme.radius_lg,
+        let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let preset = preset_label(preset);
+        let catalog = self.catalog.as_deref();
+        let list = view::changes(catalog, &self.shown_against());
+        if list.is_empty() {
+            return labelled(
+                div()
+                    .text_sm()
+                    .text_color(muted)
+                    .p_3()
+                    .border_1()
+                    .border_dashed()
+                    .border_color(border)
+                    .rounded(radius),
+                ids::GRAPHICS_NO_CHANGES,
+                tr!("graphics.changes.as_is", preset = preset),
+            )
+            .into_any_element();
+        }
+        let n = u64::try_from(list.len()).unwrap_or(u64::MAX);
+        let title = counted_plural(
+            "graphics.changes.title",
+            n,
+            &n.to_string(),
+            &[("preset", &preset)],
         );
-        let cards: Vec<AnyElement> = Preset::PICKER
+        let editable = catalog.is_some();
+        let chips: Vec<AnyElement> = list
             .into_iter()
-            .map(|preset| {
-                let chosen = preset == current;
-                let id = ids::graphics_preset(preset);
-                let focus = window
-                    .use_keyed_state(id.clone(), cx, |_, cx| cx.focus_handle().tab_stop(true))
-                    .read(cx)
-                    .clone();
-                let edge = if focus.is_focused(window) {
-                    ring
-                } else if chosen {
-                    primary
-                } else {
-                    border
+            .map(|change| {
+                let sentence = match &change.was {
+                    Some(was) => tr!(
+                        "graphics.changes.chip",
+                        name = change.label,
+                        was = was,
+                        now = change.now
+                    ),
+                    None => tr!(
+                        "graphics.changes.chip_saved",
+                        name = change.label,
+                        now = change.now
+                    ),
                 };
-                card_frame(cx)
-                    .id(id)
-                    .role(Role::Button)
-                    .aria_label(preset_label(preset))
-                    .aria_selected(chosen)
+                let undo = change.was.clone().filter(|_| editable).map(|was| {
+                    let module = change.module.clone();
+                    Button::new(ids::graphics_change_undo(&change.module))
+                        .ghost()
+                        .xsmall()
+                        .icon(IconName::X)
+                        .named(tr!("graphics.changes.undo", name = change.label, was = was))
+                        .disabled(self.busy)
+                        .on_click(cx.listener(move |page, _, _, cx| page.reset_module(&module, cx)))
+                });
+                h_flex()
+                    .id(ids::graphics_change(&change.module))
+                    .aria_label(sentence)
                     .test_support()
-                    .track_focus(&focus)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
-                    .flex_1()
-                    .min_w(px(160.))
-                    .p_4()
+                    .gap_1()
+                    .pl_2()
+                    .pr_1()
+                    .py_0p5()
+                    .text_sm()
+                    .border_1()
+                    .border_color(border)
                     .rounded(radius)
-                    .border_color(edge)
-                    .cursor_pointer()
-                    .when(self.busy, |card| card.opacity(0.6))
-                    .on_click(cx.listener(move |page, _, window, cx| page.pick(preset, window, cx)))
-                    .child(
-                        v_flex()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(preset_label(preset)),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(muted)
-                                    .child(preset_description(preset)),
-                            ),
+                    .child(change.label)
+                    .children(
+                        change
+                            .was
+                            .map(|was| div().text_color(muted).child(format!("{was} →"))),
                     )
+                    .child(div().font_weight(FontWeight::MEDIUM).child(change.now))
+                    .children(undo)
                     .into_any_element()
             })
             .collect();
+        let reset_all = editable.then(|| {
+            Button::new(ids::GRAPHICS_RESET_ALL)
+                .outline()
+                .small()
+                .label(tr!("graphics.changes.reset_all"))
+                .disabled(self.busy)
+                .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
+        });
         v_flex()
+            .id(ids::GRAPHICS_CHANGES)
+            .aria_label(title.clone())
+            .test_support()
             .gap_3()
+            .p_3()
+            .border_1()
+            .border_color(border)
+            .rounded(radius)
             .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Preset"),
+                h_flex()
+                    .justify_between()
+                    .gap_4()
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
+                    .children(reset_all),
             )
-            .child(h_flex().flex_wrap().gap_4().children(cards))
+            .child(h_flex().flex_wrap().gap_2().children(chips))
             .into_any_element()
     }
 }

@@ -857,14 +857,26 @@ pub const ADDONS_GB: &str = "addons-gb";
 pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
 pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
-/// The mastercomfig status card.
+/// The mastercomfig status row.
 pub const GRAPHICS_STATUS: &str = "graphics-status";
-/// The status card's title line, labelled with its text.
+/// The banner under the status row while TF2 runs, labelled with its text.
+pub const GRAPHICS_RUNNING: &str = "graphics-running";
+/// The preset segmented control's frame on the Graphics page.
+pub const GRAPHICS_PRESETS: &str = "graphics-presets";
+/// The preset control's heading, labelled with its text.
+pub const GRAPHICS_PRESET_HEADING: &str = "graphics-preset-heading";
+/// The current preset's line beside the heading, labelled with its text.
+pub const GRAPHICS_PRESET_LINE: &str = "graphics-preset-line";
+/// The "More frames ... Better looking" scale under the four ranked presets.
+pub const GRAPHICS_PRESET_SCALE: &str = "graphics-preset-scale";
+/// The status row's headline, labelled with its text.
 pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
-/// The line under the status card's title, labelled with its text; absent when it has none.
+/// The line under the status row's headline, labelled with its text; always drawn.
 pub const GRAPHICS_DETAIL: &str = "graphics-detail";
-/// The status card's credit to the mastercomfig team and comfig-app.
+/// The status row's credit to the mastercomfig team, present only while it is not installed.
 pub const GRAPHICS_CREDIT: &str = "graphics-credit";
+/// The status row's "mastercomfig docs" link, present in every state.
+pub const GRAPHICS_DOCS: &str = "graphics-docs";
 /// Install, shown when mastercomfig is not in tf/custom.
 pub const GRAPHICS_INSTALL: &str = "graphics-install";
 /// Update, shown for a managed install behind the recorded release.
@@ -875,14 +887,26 @@ pub const GRAPHICS_CHECK: &str = "graphics-check";
 pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 /// Take over, shown for an install TF2Tools did not make.
 pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
-/// "Changes apply the next time TF2 starts.", under the preset cards.
-pub const GRAPHICS_FOOTER: &str = "graphics-footer";
-/// The settings section under the preset cards, present for a managed install.
+/// The settings search toolbar, or the note standing in for it without a catalogue; managed only.
 pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
 /// The note shown in place of the settings list, labelled with its text.
 pub const GRAPHICS_SETTINGS_NOTE: &str = "graphics-settings-note";
-/// "Reset all": drops every setting back to the preset.
+/// The changes strip's "Reset all": drops every setting back to the preset.
 pub const GRAPHICS_RESET_ALL: &str = "graphics-reset-all";
+/// The changes strip while settings differ from the preset, labelled with its title.
+pub const GRAPHICS_CHANGES: &str = "graphics-changes";
+/// The dashed strip shown while nothing differs from the preset, labelled with its text.
+pub const GRAPHICS_NO_CHANGES: &str = "graphics-no-changes";
+/// The settings search box.
+pub const GRAPHICS_SEARCH: &str = "graphics-search";
+/// The "Changed only" switch beside the search.
+pub const GRAPHICS_CHANGED_ONLY: &str = "graphics-changed-only";
+/// Shown in place of the rows when none pass the filter, labelled with why.
+pub const GRAPHICS_EMPTY: &str = "graphics-empty";
+/// The empty state's "Show all settings": clears the search and "Changed only".
+pub const GRAPHICS_SHOW_ALL: &str = "graphics-show-all";
+/// The category rail, a column beside the list or a chip row above it when narrow.
+pub const GRAPHICS_RAIL: &str = "graphics-rail";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
@@ -989,7 +1013,7 @@ pub fn grid_scrollbar(grid: &str) -> ElementId {
     keyed("grid-scrollbar", grid)
 }
 
-/// A preset card on the Graphics page: "graphics-preset:<name>".
+/// A preset segment on the Graphics page: "graphics-preset:<name>".
 pub fn graphics_preset(preset: Preset) -> ElementId {
     keyed("graphics-preset", preset.name())
 }
@@ -1019,7 +1043,158 @@ pub fn graphics_module_reset(name: &str) -> ElementId {
     keyed("graphics-module-reset", name)
 }
 
-/// One entry of a row's Select: "graphics-value:<module>=<value>", empty for Game default.
+/// A chip in the changes strip, labelled with its sentence: "graphics-change:<module>".
+pub fn graphics_change(module: &str) -> ElementId {
+    keyed("graphics-change", module)
+}
+
+/// A change chip's undo button: "graphics-change-undo:<module>".
+pub fn graphics_change_undo(module: &str) -> ElementId {
+    keyed("graphics-change-undo", module)
+}
+
+/// A category rail entry, labelled with the category's name: "graphics-rail:<key>".
+pub fn graphics_rail(key: &str) -> ElementId {
+    keyed("graphics-rail", key)
+}
+
+/// A rail entry's module count, labelled with it: "graphics-rail-count:<key>".
+pub fn graphics_rail_count(key: &str) -> ElementId {
+    keyed("graphics-rail-count", key)
+}
+
+/// A rail entry's dot, drawn only while its category has changes: "graphics-rail-dot:<key>".
+pub fn graphics_rail_dot(key: &str) -> ElementId {
+    keyed("graphics-rail-dot", key)
+}
+
+/// A category's section in the settings list: "graphics-section:<key>".
+pub fn graphics_section(key: &str) -> ElementId {
+    keyed("graphics-section", key)
+}
+
+/// A settings row: "graphics-row:<module>".
+pub fn graphics_row(module: &str) -> ElementId {
+    keyed("graphics-row", module)
+}
+
+/// A row's thumbnail Button, which opens its pictures: "graphics-thumb:<module>".
+pub fn graphics_thumb(module: &str) -> ElementId {
+    keyed("graphics-thumb", module)
+}
+
+/// The thumbnail's picture area inside its Button: "graphics-thumb-area:<module>".
+pub fn graphics_thumb_area(module: &str) -> ElementId {
+    keyed("graphics-thumb-area", module)
+}
+
+/// The thumbnail's image, drawn only once decoded: "graphics-thumb-image:<module>".
+pub fn graphics_thumb_image(module: &str) -> ElementId {
+    keyed("graphics-thumb-image", module)
+}
+
+/// A row's Show/Hide pictures Button: "graphics-pictures-toggle:<module>".
+pub fn graphics_pictures_toggle(module: &str) -> ElementId {
+    keyed("graphics-pictures-toggle", module)
+}
+
+/// A row's open pictures panel: "graphics-pictures:<module>".
+pub fn graphics_pictures(module: &str) -> ElementId {
+    keyed("graphics-pictures", module)
+}
+
+/// The open row's compare view: "graphics-compare:<module>".
+pub fn graphics_compare(module: &str) -> ElementId {
+    keyed("graphics-compare", module)
+}
+
+/// The overlay from the wipe line to the compare view's right edge: "graphics-compare-clip:<module>".
+pub fn graphics_compare_clip(module: &str) -> ElementId {
+    keyed("graphics-compare-clip", module)
+}
+
+/// The player's picture inside the overlay: "graphics-compare-yours:<module>".
+pub fn graphics_compare_yours(module: &str) -> ElementId {
+    keyed("graphics-compare-yours", module)
+}
+
+/// A compare picture's area, `side` being preset or yours: "graphics-compare-area:<module>=<side>".
+pub fn graphics_compare_area(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-area", &format!("{module}={side}"))
+}
+
+/// A compare picture's image, drawn only once decoded: "graphics-compare-image:<module>=<side>".
+pub fn graphics_compare_image(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-image", &format!("{module}={side}"))
+}
+
+/// The wipe Slider's wrapper: "graphics-compare-slider:<module>".
+pub fn graphics_compare_slider(module: &str) -> ElementId {
+    keyed("graphics-compare-slider", module)
+}
+
+/// A compare pill, `side` being preset, yours or same: "graphics-compare-pill:<module>=<side>".
+pub fn graphics_compare_pill(module: &str, side: &str) -> ElementId {
+    keyed("graphics-compare-pill", &format!("{module}={side}"))
+}
+
+/// The open row's Zoom / Full picture Button: "graphics-zoom:<module>".
+pub fn graphics_zoom(module: &str) -> ElementId {
+    keyed("graphics-zoom", module)
+}
+
+/// The open row's strip of value pictures: "graphics-strip:<module>".
+pub fn graphics_strip(module: &str) -> ElementId {
+    keyed("graphics-strip", module)
+}
+
+/// One value's picture Button in the strip: "graphics-strip-picture:<module>=<value>".
+pub fn graphics_strip_picture(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-picture", &format!("{module}={value}"))
+}
+
+/// The picture area inside a strip picture: "graphics-strip-area:<module>=<value>".
+pub fn graphics_strip_area(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-area", &format!("{module}={value}"))
+}
+
+/// A strip picture's decoded image: "graphics-strip-image:<module>=<value>".
+pub fn graphics_strip_image(module: &str, value: &str) -> ElementId {
+    keyed("graphics-strip-image", &format!("{module}={value}"))
+}
+
+/// The preset's tag inside its value's strip picture: "graphics-strip-tag:<module>".
+pub fn graphics_strip_tag(module: &str) -> ElementId {
+    keyed("graphics-strip-tag", module)
+}
+
+/// The caption under the strip: "graphics-strip-caption:<module>".
+pub fn graphics_strip_caption(module: &str) -> ElementId {
+    keyed("graphics-strip-caption", module)
+}
+
+/// An off/on row's Switch: "graphics-switch:<module>".
+pub fn graphics_switch(module: &str) -> ElementId {
+    keyed("graphics-switch", module)
+}
+
+/// The frame of a row's segmented control: "graphics-segments:<module>".
+pub fn graphics_segments(module: &str) -> ElementId {
+    keyed("graphics-segments", module)
+}
+
+/// One segment of a row's segmented control: "graphics-segment:<module>=<value>".
+pub fn graphics_segment(module: &str, value: &str) -> ElementId {
+    keyed("graphics-segment", &format!("{module}={value}"))
+}
+
+/// A changed row's "Preset: value" line, labelled with its text:
+/// "graphics-module-preset:<module>".
+pub fn graphics_module_preset(module: &str) -> ElementId {
+    keyed("graphics-module-preset", module)
+}
+
+/// One entry of a row's Select: "graphics-value:<module>=<value>", empty for Let TF2 decide.
 pub fn graphics_value(module: &str, choice: &ModuleChoice) -> ElementId {
     let value = match choice {
         ModuleChoice::Value(v) => v.as_str(),

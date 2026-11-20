@@ -1,7 +1,7 @@
 use crate::support;
 
 use tf2tools_app::pages::graphics::model::{
-    StatusCard, describe_install, detail, headline, preset_description, preset_label, status_card,
+    StatusCard, describe_install, detail, headline, preset_label, preset_line, status_card,
     update_to,
 };
 use tf2tools_core::{InstallMastercomfigError, MastercomfigStatus, Preset};
@@ -18,48 +18,56 @@ fn the_card_compares_the_install_with_the_recorded_release() {
     let outside = |v: Option<&str>| MastercomfigStatus::Outside {
         version: v.map(str::to_owned),
     };
+    let saves = "Every change saves at once.";
+    let take_over = "Take over to pick a preset and change settings here.";
     let cases = [
         (
             MastercomfigStatus::NotInstalled,
             Some("9.100.1"),
             "mastercomfig isn't installed",
-            Some("Install it to pick a graphics preset."),
+            "Install it to pick a graphics preset.",
             None,
         ),
-        (managed("9.100.1"), None, "mastercomfig 9.100.1", None, None),
+        (
+            managed("9.100.1"),
+            None,
+            "mastercomfig 9.100.1 is installed",
+            saves,
+            None,
+        ),
         (
             managed("9.100.1"),
             Some("9.100.1"),
-            "mastercomfig 9.100.1",
-            Some("Up to date"),
+            "mastercomfig 9.100.1 is installed and up to date",
+            saves,
             None,
         ),
         (
             managed("9.100.1"),
             Some("9.101.0"),
-            "mastercomfig 9.100.1",
-            Some("Update to 9.101.0"),
+            "mastercomfig 9.100.1 is installed",
+            saves,
             Some("9.101.0"),
         ),
         (
             outside(Some("9.99.0")),
             Some("9.100.1"),
-            "mastercomfig 9.99.0",
-            Some("Managed outside TF2Tools"),
+            "mastercomfig 9.99.0 is installed outside TF2Tools",
+            take_over,
             None,
         ),
         (
             outside(None),
             None,
-            "mastercomfig",
-            Some("Managed outside TF2Tools"),
+            "mastercomfig is installed outside TF2Tools",
+            take_over,
             None,
         ),
     ];
     for (status, latest, head, line, update) in cases {
         let card = status_card(&status, latest);
-        assert_eq!(headline(&card), head, "{status:?}");
-        assert_eq!(detail(&card).as_deref(), line, "{status:?}");
+        assert_eq!(headline(&card).as_ref(), head, "{status:?}");
+        assert_eq!(detail(&card).as_ref(), line, "{status:?}");
         assert_eq!(update_to(&card), update, "{status:?}");
     }
     assert_eq!(
@@ -72,21 +80,23 @@ fn the_card_compares_the_install_with_the_recorded_release() {
 }
 
 #[test]
-fn preset_cards_carry_comfig_app_s_descriptions() {
-    let shown: Vec<(&str, &str)> = Preset::PICKER
+fn preset_lines_are_our_own_words() {
+    let shown: Vec<(String, String)> = Preset::PICKER
         .iter()
-        .map(|p| (preset_label(*p), preset_description(*p)))
+        .map(|p| (preset_label(*p).to_string(), preset_line(*p).to_string()))
         .collect();
-    assert_eq!(
-        shown,
-        [
-            ("Ultra", "Absolute maximum graphical quality"),
-            ("High", "High graphical quality"),
-            ("Medium", "Medium graphical quality"),
-            ("Low", "Low graphical quality"),
-            ("Custom", "Skip setting quality options unless set by you"),
-        ]
-    );
+    let want = [
+        ("Ultra", "Everything on, for fast PCs and screenshots"),
+        (
+            "High",
+            "Sharper textures and more effects, for a capable PC",
+        ),
+        ("Medium", "A balance of look and frame rate for most PCs"),
+        ("Low", "Fewer effects and softer textures, for low-end PCs"),
+        ("Custom", "Only the settings you pick; TF2 decides the rest"),
+    ]
+    .map(|(l, d)| (l.to_owned(), d.to_owned()));
+    assert_eq!(shown, want);
 }
 
 #[test]

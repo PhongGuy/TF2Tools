@@ -182,6 +182,74 @@ fn fill(
     seed_store(dir, empty_store)
 }
 
+/// The mastercomfig release the Graphics seed installs; its full catalogue and preset data
+/// are core fixtures.
+const MC_TAG: &str = "9.100.1";
+const MC_MODULES: &[u8] = include_bytes!(
+    "../../../crates/tf2tools-core/tests/fixtures/mastercomfig/modules-9.100.1.json"
+);
+const MC_PRESETS: &[u8] = include_bytes!(
+    "../../../crates/tf2tools-core/tests/fixtures/mastercomfig/preset_modules-9.100.1.json"
+);
+
+/// Adds mastercomfig 9.100.1 to a seeded library and its fake game, managed by TF2Tools on
+/// High: a base VPK naming its version, setup_hook.cfg, the full catalogue cached, and
+/// modules.cfg with vsync=on (switch), motion_blur=high (segments), fpscap=144 (select) and
+/// decals left to TF2 (select). Offline; does nothing once mastercomfig is managed.
+pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
+    use tf2tools_core::{
+        Endpoints, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
+    };
+
+    let dir = DataDir::at(data);
+    let db = Database::open(&dir)?;
+    let lib = Library::new(db.clone(), dir.clone());
+    let tf2 = Tf2Install::from_path(game)?;
+    if matches!(
+        lib.mastercomfig_status(&tf2)?,
+        MastercomfigStatus::Managed { .. }
+    ) {
+        return Ok(());
+    }
+
+    // A hand-placed base taken over and set to High is what an install leaves, without the download.
+    let custom = tf2.custom_dir();
+    fs::create_dir_all(&custom).with_context(|| format!("cannot create {}", custom.display()))?;
+    let echo = format!("alias version_comfig\"echo mastercomfig version: {MC_TAG}\"\n");
+    fs::write(
+        custom.join("mastercomfig-base.vpk"),
+        vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())]),
+    )?;
+    lib.take_over_mastercomfig(&tf2)?;
+    lib.apply_preset(&tf2, Preset::High)?;
+
+    // Cached where the Graphics page looks, so it never fetches the catalogue.
+    let cached = dir.mastercomfig_dir().join(MC_TAG);
+    fs::create_dir_all(&cached).with_context(|| format!("cannot create {}", cached.display()))?;
+    fs::write(cached.join("modules.json"), MC_MODULES)?;
+    fs::write(cached.join("preset_modules.json"), MC_PRESETS)?;
+    let catalog = ModuleCatalog::parse(MC_TAG, MC_MODULES, MC_PRESETS)?;
+
+    // None of these needs an override VPK, so the apply stays offline.
+    let mut choices = lib
+        .mastercomfig_choices()?
+        .context("mastercomfig is not managed after the take-over")?;
+    for (module, value) in [
+        ("vsync", Some("on")),
+        ("motion_blur", Some("high")),
+        ("fpscap", Some("144")),
+        ("decals", None),
+    ] {
+        let choice = value.map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()));
+        choices.set(&catalog, module, choice);
+    }
+    let store = StoreClient::new(db, dir, Endpoints::default());
+    tokio::runtime::Builder::new_current_thread()
+        .build()?
+        .block_on(store.apply_mastercomfig_modules(&tf2, &catalog, &choices, false))?;
+    Ok(())
+}
+
 // Sound names cycle through these, numbered so the 60 rows stay distinct.
 const SOUND_NAMES: [&str; 6] = [
     "Crisp Ding",

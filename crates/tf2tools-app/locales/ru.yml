@@ -2955,7 +2955,327 @@ install_parts:
   maps_skipped: "В %{name} несколько карт. Выберите, какие установить. Часть дополнительных файлов из этой загрузки пропущена."
 
 graphics:
+  subtitle: "Настройки графики и игры из mastercomfig"
+  no_tf2: "Укажите папку TF2 в настройках, чтобы пользоваться mastercomfig."
+  running: "TF2 запущена. Изменения вступят в силу при её следующем запуске."
+  status:
+    not_installed: "mastercomfig не установлен"
+    install_hint: "Установите его, чтобы выбрать графический пресет."
+    installed: "mastercomfig %{version} установлен"
+    up_to_date: "mastercomfig %{version} установлен, обновлений нет"
+    saves: "Каждое изменение сохраняется сразу."
+    outside: "mastercomfig %{version} установлен не через TF2Tools"
+    outside_unknown: "mastercomfig установлен не через TF2Tools"
+    take_over_hint: "Возьмите его под управление, чтобы выбирать пресет и менять настройки здесь."
+    install: "Установить mastercomfig"
+    update_to: "Обновить до %{version}"
+    check: "Проверить обновления"
+    remove: "Удалить"
+    take_over: "Взять под управление"
+    docs: "Документация mastercomfig"
+    credit: "mastercomfig создаёт команда mastercomfig и распространяет по лицензии MIT."
+  toast:
+    installed_title: "mastercomfig установлен"
+    installed: "mastercomfig %{version} готов. Выберите пресет ниже."
+    updated_title: "mastercomfig обновлён"
+    updated: "Теперь версия %{version}."
+    checked_title: "Обновления проверены"
+    taken_over_title: "mastercomfig под управлением"
+    taken_over: "Теперь TF2Tools управляет mastercomfig."
+    removed_title: "mastercomfig удалён"
+    removed: "mastercomfig больше нет в TF2."
+    preset_title: "Пресет применён"
+    preset: "Пресет «%{preset}» вступит в силу при следующем запуске TF2."
+    dropped_title: "Некоторые настройки вернулись к пресету"
+    dropped: "Этих настроек нет в этой версии mastercomfig, и они вернулись к пресету: %{names}."
+    own_kept: "Ваш собственный modules.cfg сохранён, поэтому настройки ниже не используются. Измените любую из них, чтобы использовать их вместо него."
   settings_note:
     loading: "Загрузка списка настроек..."
     offline: "В первый раз списку настроек нужно подключение к интернету. Подключитесь и откройте эту страницу снова."
     unsupported: "Эта версия mastercomfig пока не поддерживается. Пресеты выше по-прежнему работают."
+  not_set: "Пусть решает TF2"
+  row:
+    preset_value: "%{preset}: %{value}"
+    reset: "Сбросить"
+  pictures:
+    show: "Показать изображения"
+    hide: "Скрыть изображения"
+    thumb: "Изображения: %{name}"
+    yours: "Ваше: %{value}"
+    same: "%{value} (как в пресете «%{preset}»)"
+    zoom: "Приблизить"
+    full: "Всё изображение"
+    wipe: "Сдвиньте, чтобы сравнить изображение пресета с вашим"
+    caption: "Нажмите на изображение, чтобы выбрать эту настройку."
+  changes:
+    title: { one: "%{count} изменение относительно пресета «%{preset}»", few: "%{count} изменения относительно пресета «%{preset}»", many: "%{count} изменений относительно пресета «%{preset}»" }
+    as_is: "Пресет «%{preset}» используется без изменений. Измените любую настройку ниже, и она появится здесь."
+    chip: "%{name}: %{was} → %{now}"
+    chip_saved: "%{name}: %{now}"
+    undo: "Вернуть «%{name}» к значению «%{was}»"
+    reset_all: "Сбросить всё"
+  settings:
+    search: "Поиск настроек"
+    changed_only: "Только изменённые"
+    no_match: "Нет настроек по запросу «%{query}»."
+    nothing_changed: "Ничто не отличается от пресета «%{preset}»."
+    show_all: "Показать все настройки"
+    has_changes: "Есть изменения"
+  module:
+    lod:
+      label: "Качество моделей"
+      description: "Насколько детальны игроки, оружие и предметы вблизи."
+    lighting:
+      label: "Освещение"
+      description: "Насколько детальны источники света и тени от них."
+    shading:
+      label: "Затенение"
+      description: "Дополнительное затенение поверхностей. При изменении игра перезагружает материалы."
+    phong:
+      label: "Блестящие поверхности"
+      description: "Блики на игроках и оружии, в игре это называется phong."
+    shadows:
+      label: "Тени"
+      description: "Тени от игроков и предметов."
+    flashlight:
+      label: "Фонарик"
+      description: "Нужен только в некоторых режимах серверов сообщества. Оставьте выключенным, если сервер его не требует."
+    effects:
+      label: "Частицы"
+      description: "Взрывы, огонь, дым и необычные эффекты."
+    tracers:
+      label: "Трассеры"
+      description: "Следы пуль от оружия мгновенного попадания."
+    water:
+      label: "Вода"
+      description: "Как выглядит вода и что в ней отражается."
+    post_processing:
+      label: "Постобработка"
+      description: "Свечение и цветокоррекция всего изображения."
+      value:
+        low: "Только блум"
+    color_filter:
+      label: "Цветовой фильтр"
+      description: "Цветовой оттенок поверх всего изображения."
+    pyrovision:
+      label: "Пирозрение"
+      description: "Насколько детальна Пироландия сквозь очки Поджигателя."
+    romevision:
+      label: "Римовидение"
+      description: "Римские доспехи на роботах в режиме «Манн против машин»."
+    motion_blur:
+      label: "Размытие в движении"
+      description: "Размывает экран, когда вы быстро поворачиваетесь."
+    anti_aliasing:
+      label: "Сглаживание"
+      description: "Сглаживает зубчатые края. Снижает FPS на слабых видеокартах."
+    characters:
+      label: "Персонажи"
+      description: "Насколько детальны модели игроков."
+    decals:
+      label: "Декали"
+      description: "Следы от пуль, подпалины и кровь на стенах."
+    decals_models:
+      label: "Декали на моделях"
+      description: "Кровь и следы на игроках и предметах."
+    decals_art:
+      label: "Рисунки на карте"
+      description: "Нарисованные вывески и рисунки, которые разместил автор карты."
+    sprays:
+      label: "Спреи"
+      description: "Изображения, которые игроки наносят на стены."
+    gibs:
+      label: "Ошмётки"
+      description: "Части тел от взрывов."
+    sillygibs:
+      label: "Игрушечные ошмётки"
+      description: "Заменяет кровь и части тел безобидными игрушечными деталями."
+    props:
+      label: "Предметы"
+      description: "Насколько детальны мелкие предметы и сколько их видно."
+    ragdolls:
+      label: "Рэгдоллы"
+      description: "Тела безвольно падают вместо анимации смерти."
+    "3dsky":
+      label: "3D-небо"
+      description: "Пейзаж за краем карты. Если выключить, FPS на открытых картах вырастет."
+    jigglebones:
+      label: "Качающиеся детали"
+      description: "Свободные части косметики, которые качаются при движении."
+    sheens_speed:
+      label: "Скорость блеска"
+      description: "Как быстро блеск серии убийств бежит по оружию."
+    sheens_tint:
+      label: "Яркость блеска"
+      description: "Насколько насыщен цвет блеска серии убийств."
+    texture_quality:
+      label: "Качество текстур"
+      description: "Насколько чёткими выглядят поверхности. Чем выше, тем больше видеопамяти."
+    texture_filter:
+      label: "Фильтрация текстур"
+      description: "Сохраняет полы и стены чёткими, когда вы смотрите под углом."
+    ropes:
+      label: "Канаты"
+      description: "Кабели и канаты, висящие на картах."
+    fpscap:
+      label: "Ограничение FPS"
+      description: "Наибольшее число кадров в секунду, которое рисует игра."
+    vsync:
+      label: "Вертикальная синхронизация"
+      description: "Подгоняет кадры под монитор, чтобы картинка не рвалась. Добавляет задержку ввода."
+    hud_player_model:
+      label: "Модель игрока"
+      description: "Модель вашего класса рядом со здоровьем."
+    hud_server_text:
+      label: "Сообщения сервера"
+      description: "Текст, который сервер выводит в центре экрана."
+    hud_contracts:
+      label: "Контракты"
+      description: "Какие контракты показывает HUD."
+      value:
+        custom: "Настройка игры"
+    hud_panels:
+      label: "Панели HUD"
+      description: "Сколько дополнительных панелей показывает HUD."
+    hud_avatars:
+      label: "Аватары"
+      description: "Фото профилей Steam в таблице счёта и ленте убийств."
+    match_hud:
+      label: "HUD матча"
+      description: "Полоса состояния команд вверху экрана в матчах."
+    messages:
+      label: "Сообщения чата"
+      description: "Текстовый чат других игроков."
+    killfeed:
+      label: "Лента убийств"
+      description: "Список убийств в углу экрана."
+    killstreaks:
+      label: "Серии убийств"
+      description: "Счётчики серий убийств и их объявления."
+    hud_achievement:
+      label: "Уведомления о достижениях"
+      description: "Баннер, когда кто-то получает достижение."
+    console:
+      label: "Консоль разработчика"
+      description: "Открывает консоль клавишей `."
+    htmlmotd:
+      label: "Приветственная страница"
+      description: "Веб-страница, которую сервер показывает при входе."
+    outlines:
+      label: "Контуры"
+      description: "Светящиеся контуры вокруг союзников и целей."
+    dynamic_background:
+      label: "Фон меню"
+      description: "Движущаяся карта за главным меню."
+    sound:
+      label: "Качество звука"
+      description: "Сколько звуков играет одновременно и насколько они детальны."
+    voice_chat:
+      label: "Голосовой чат"
+      description: "Слышать, как другие игроки говорят в микрофон."
+    party_mode:
+      label: "Вход в группу"
+      description: "Кто может вступить в вашу группу."
+    logo:
+      label: "Логотип при запуске"
+      description: "Логотип, который показывается при запуске игры."
+    packet_rate:
+      label: "Частота пакетов"
+      description: "Как часто вы отправляете данные серверу и получаете их от него."
+    snapshot_buffer:
+      label: "Буфер снимков"
+      description: "Насколько игра сглаживает обновления, которые получает от сервера."
+    packet_size:
+      label: "Размер пакетов"
+      description: "Насколько велики пакеты и как они делятся."
+    bandwidth:
+      label: "Пропускная способность"
+      description: "Наибольший объём данных, который игра отправляет в секунду. Подберите под своё соединение."
+    download:
+      label: "Загрузки"
+      description: "Какой пользовательский контент серверы могут вам отправлять."
+      value:
+        custom: "Настройка игры"
+  value:
+    low: "Низкое"
+    medium: "Среднее"
+    high: "Высокое"
+    ultra: "Ультра"
+    very_low: "Очень низкое"
+    very_high: "Очень высокое"
+    off: "Выкл."
+    on: "Вкл."
+    rim: "Контурный свет"
+    default: "По умолчанию"
+    calm: "Спокойный"
+    vivid: "Яркий"
+    washed: "Блёклый"
+    dreamy: "Мечтательный"
+    grayscale: "Оттенки серого"
+    desaturated: "Обесцвеченный"
+    warm: "Тёплый"
+    cool: "Холодный"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Оставить"
+    auto: "Авто"
+    force_on: "Всегда"
+    slow: "Медленно"
+    fast: "Быстро"
+    full: "Полный"
+    blocky: "Пиксельная"
+    trilinear: "Трилинейная"
+    aniso2x: "Анизотропная 2х"
+    aniso4x: "Анизотропная 4х"
+    aniso8x: "Анизотропная 8х"
+    aniso16x: "Анизотропная 16х"
+    powersaver: "Энергосбережение"
+    unlimited: "Без ограничений"
+    custom: "Свой вариант"
+    hide: "Скрыть"
+    all: "Все"
+    active: "Только активные"
+    everyone: "Все"
+    friends: "Друзья"
+    dustbowl: "Dustbowl"
+    hidden: "Скрыт"
+    open: "Открытый"
+    request: "По запросу"
+    invite: "По приглашению"
+    congestion: "Перегрузка"
+    standard: "Стандартный"
+    x1: "1 снимок"
+    x2: "2 снимка"
+    anim: "Анимация"
+    small: "Малый"
+    conservative: "Осторожный"
+    large: "Большой"
+    nosounds: "Без звуков"
+    mapsonly: "Только карты"
+    nothing: "Ничего"
+  category:
+    graphics: "Графика"
+    hud: "HUD"
+    sound: "Звук"
+    misc: "Прочее"
+    networking: "Сеть"
+  preset:
+    heading: "Пресет"
+    more_frames: "Больше кадров"
+    better_looking: "Красивее"
+    low:
+      label: "Низкое"
+      line: "Меньше эффектов и мягче текстуры, для слабых ПК"
+    medium:
+      label: "Среднее"
+      line: "Баланс картинки и частоты кадров для большинства ПК"
+    high:
+      label: "Высокое"
+      line: "Чётче текстуры и больше эффектов, для мощного ПК"
+    ultra:
+      label: "Ультра"
+      line: "Всё включено, для быстрых ПК и скриншотов"
+    custom:
+      label: "Своё"
+      line: "Только выбранные вами настройки; остальное решает TF2"

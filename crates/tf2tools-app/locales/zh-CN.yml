@@ -2979,7 +2979,327 @@ install_parts:
   maps_skipped: "%{name} 包含多张地图。请选择要安装的地图。此下载中的部分额外文件已被跳过。"
 
 graphics:
+  subtitle: "来自 mastercomfig 的图形与游戏设置"
+  no_tf2: "请在设置中指定 TF2 文件夹以使用 mastercomfig。"
+  running: "TF2 正在运行。你的更改将在下次启动时生效。"
+  status:
+    not_installed: "未安装 mastercomfig"
+    install_hint: "安装后即可选择图形预设。"
+    installed: "已安装 mastercomfig %{version}"
+    up_to_date: "已安装 mastercomfig %{version}，已是最新版本"
+    saves: "每项更改都会立即保存。"
+    outside: "mastercomfig %{version} 并非通过 TF2Tools 安装"
+    outside_unknown: "mastercomfig 并非通过 TF2Tools 安装"
+    take_over_hint: "接管后即可在此选择预设并更改设置。"
+    install: "安装 mastercomfig"
+    update_to: "更新到 %{version}"
+    check: "检查更新"
+    remove: "移除"
+    take_over: "接管"
+    docs: "mastercomfig 文档"
+    credit: "mastercomfig 由 mastercomfig 团队制作，并以 MIT 许可证分享。"
+  toast:
+    installed_title: "已安装 mastercomfig"
+    installed: "mastercomfig %{version} 已就绪。请在下方选择预设。"
+    updated_title: "已更新 mastercomfig"
+    updated: "现为 %{version}。"
+    checked_title: "已检查更新"
+    taken_over_title: "已接管 mastercomfig"
+    taken_over: "现在由 TF2Tools 管理 mastercomfig。"
+    removed_title: "已移除 mastercomfig"
+    removed: "TF2 中已不再有 mastercomfig。"
+    preset_title: "已应用预设"
+    preset: "预设“%{preset}”将在下次启动 TF2 时生效。"
+    dropped_title: "部分设置已恢复为预设值"
+    dropped: "此 mastercomfig 版本中没有以下设置，已恢复为预设值：%{names}。"
+    own_kept: "已保留您自己的 modules.cfg，因此下方的设置不会生效。更改其中任意一项即可改用这些设置。"
   settings_note:
     loading: "正在加载设置列表…"
     offline: "首次加载设置列表需要联网。请连接网络后重新打开此页面。"
     unsupported: "尚不支持此 mastercomfig 版本。上方的预设仍可使用。"
+  not_set: "由 TF2 决定"
+  row:
+    preset_value: "%{preset}：%{value}"
+    reset: "重置"
+  pictures:
+    show: "显示图片"
+    hide: "隐藏图片"
+    thumb: "%{name} 的图片"
+    yours: "你的：%{value}"
+    same: "%{value}（与 %{preset} 相同）"
+    zoom: "放大"
+    full: "完整图片"
+    wipe: "滑动以对比预设的图片和你的图片"
+    caption: "点击图片即可使用该设置。"
+  changes:
+    title: { other: "相对 %{preset} 有 %{count} 处更改" }
+    as_is: "正在原样使用 %{preset}。更改下方任一设置后，它会显示在这里。"
+    chip: "%{name}：%{was} → %{now}"
+    chip_saved: "%{name}：%{now}"
+    undo: "将 %{name} 恢复为 %{was}"
+    reset_all: "全部重置"
+  settings:
+    search: "搜索设置"
+    changed_only: "仅显示已更改"
+    no_match: "没有与“%{query}”匹配的设置。"
+    nothing_changed: "与 %{preset} 没有任何不同。"
+    show_all: "显示全部设置"
+    has_changes: "有更改"
+  module:
+    lod:
+      label: "模型质量"
+      description: "玩家、武器和道具近看时的精细程度。"
+    lighting:
+      label: "光照"
+      description: "灯光及其投下阴影的精细程度。"
+    shading:
+      label: "着色"
+      description: "表面的额外着色。更改后游戏会重新加载材质。"
+    phong:
+      label: "表面光泽"
+      description: "玩家和武器上的光泽高光，游戏中称为 phong。"
+    shadows:
+      label: "阴影"
+      description: "玩家和道具投下的阴影。"
+    flashlight:
+      label: "手电筒"
+      description: "只有部分社区服务器模式会用到。除非服务器需要，否则保持关闭。"
+    effects:
+      label: "粒子效果"
+      description: "爆炸、火焰、烟雾和稀有特效。"
+    tracers:
+      label: "弹道轨迹"
+      description: "即中武器的子弹轨迹。"
+    water:
+      label: "水面"
+      description: "水的外观以及它反射的内容。"
+    post_processing:
+      label: "后期处理"
+      description: "整个画面的泛光和调色。"
+      value:
+        low: "仅泛光"
+    color_filter:
+      label: "色彩滤镜"
+      description: "覆盖整个画面的色调。"
+    pyrovision:
+      label: "火焰兵幻境"
+      description: "透过火焰兵护目镜看到的火焰兵幻境的精细程度。"
+    romevision:
+      label: "罗马视觉"
+      description: "曼恩 vs. 机器中机器人身上的罗马盔甲。"
+    motion_blur:
+      label: "动态模糊"
+      description: "快速转身时模糊画面。"
+    anti_aliasing:
+      label: "抗锯齿"
+      description: "平滑锯齿边缘。在较弱的显卡上会降低帧数。"
+    characters:
+      label: "角色"
+      description: "玩家模型的精细程度。"
+    decals:
+      label: "贴花"
+      description: "墙上的弹孔、焦痕和血迹。"
+    decals_models:
+      label: "模型贴花"
+      description: "玩家和道具身上的血迹和痕迹。"
+    decals_art:
+      label: "地图美术"
+      description: "地图作者放置的标牌和图案。"
+    sprays:
+      label: "喷漆"
+      description: "玩家喷在墙上的图案。"
+    gibs:
+      label: "碎块"
+      description: "爆炸炸出的肢体碎块。"
+    sillygibs:
+      label: "搞笑碎块"
+      description: "把血液和肢体换成无害的玩具碎块。"
+    props:
+      label: "道具"
+      description: "小型道具的精细程度和显示数量。"
+    ragdolls:
+      label: "布娃娃效果"
+      description: "身体会瘫软倒下，而不是播放死亡动画。"
+    "3dsky":
+      label: "3D 天空"
+      description: "地图边界外的景物。关闭可在开阔地图上提高帧数。"
+    jigglebones:
+      label: "晃动骨骼"
+      description: "饰品上随移动摆动的松散部件。"
+    sheens_speed:
+      label: "光泽速度"
+      description: "连杀光泽在武器上流动的速度。"
+    sheens_tint:
+      label: "光泽强度"
+      description: "连杀光泽颜色的浓烈程度。"
+    texture_quality:
+      label: "纹理质量"
+      description: "表面看起来的清晰程度。越高占用的显存越多。"
+    texture_filter:
+      label: "纹理过滤"
+      description: "斜看时保持地面和墙壁清晰。"
+    ropes:
+      label: "绳索"
+      description: "地图上悬挂的电缆和绳索。"
+    fpscap:
+      label: "帧率上限"
+      description: "游戏每秒最多绘制的帧数。"
+    vsync:
+      label: "垂直同步"
+      description: "让画面与显示器同步以防止撕裂。会增加输入延迟。"
+    hud_player_model:
+      label: "玩家模型"
+      description: "生命值旁边显示的职业模型。"
+    hud_server_text:
+      label: "服务器消息"
+      description: "服务器在屏幕中央显示的文字。"
+    hud_contracts:
+      label: "合同"
+      description: "HUD 显示哪些合同。"
+      value:
+        custom: "游戏设置"
+    hud_panels:
+      label: "HUD 面板"
+      description: "HUD 显示多少额外面板。"
+    hud_avatars:
+      label: "头像"
+      description: "记分板和击杀信息中的 Steam 头像。"
+    match_hud:
+      label: "比赛 HUD"
+      description: "比赛中屏幕顶部的队伍状态栏。"
+    messages:
+      label: "聊天消息"
+      description: "其他玩家的文字聊天。"
+    killfeed:
+      label: "击杀信息"
+      description: "屏幕角落的击杀列表。"
+    killstreaks:
+      label: "连杀提示"
+      description: "连杀计数及其播报。"
+    hud_achievement:
+      label: "成就弹窗"
+      description: "有人获得成就时显示的横幅。"
+    console:
+      label: "开发者控制台"
+      description: "按 ` 键打开控制台。"
+    htmlmotd:
+      label: "服务器欢迎页"
+      description: "加入服务器时显示的网页。"
+    outlines:
+      label: "轮廓"
+      description: "队友和目标周围的发光轮廓。"
+    dynamic_background:
+      label: "菜单背景"
+      description: "主菜单后面的动态地图。"
+    sound:
+      label: "音质"
+      description: "同时播放的声音数量及其细节。"
+    voice_chat:
+      label: "语音聊天"
+      description: "听到其他玩家通过麦克风说话。"
+    party_mode:
+      label: "加入小队"
+      description: "谁可以加入你的小队。"
+    logo:
+      label: "启动标志"
+      description: "游戏启动时显示的标志。"
+    packet_rate:
+      label: "数据包速率"
+      description: "向服务器发送和从服务器接收数据的频率。"
+    snapshot_buffer:
+      label: "快照缓冲"
+      description: "游戏对服务器更新的平滑程度。"
+    packet_size:
+      label: "数据包大小"
+      description: "数据包的大小及其拆分方式。"
+    bandwidth:
+      label: "带宽"
+      description: "游戏每秒最多发送的数据量。请按网络连接设置。"
+    download:
+      label: "下载"
+      description: "允许服务器发送哪些自定义内容。"
+      value:
+        custom: "游戏设置"
+  value:
+    low: "低"
+    medium: "中等"
+    high: "高"
+    ultra: "极高"
+    very_low: "非常低"
+    very_high: "非常高"
+    off: "关闭"
+    on: "开启"
+    rim: "轮廓光"
+    default: "默认"
+    calm: "平静"
+    vivid: "鲜艳"
+    washed: "褪色"
+    dreamy: "梦幻"
+    grayscale: "灰度"
+    desaturated: "低饱和"
+    warm: "暖色"
+    cool: "冷色"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "保留"
+    auto: "自动"
+    force_on: "始终"
+    slow: "慢"
+    fast: "快"
+    full: "完全"
+    blocky: "像素化"
+    trilinear: "三线性"
+    aniso2x: "异向 2X"
+    aniso4x: "异向 4X"
+    aniso8x: "异向 8X"
+    aniso16x: "异向 16X"
+    powersaver: "节能"
+    unlimited: "无限制"
+    custom: "自定义"
+    hide: "隐藏"
+    all: "全部"
+    active: "仅进行中"
+    everyone: "所有人"
+    friends: "好友"
+    dustbowl: "Dustbowl"
+    hidden: "不显示"
+    open: "开放"
+    request: "需申请"
+    invite: "仅限邀请"
+    congestion: "拥塞"
+    standard: "标准"
+    x1: "1 个快照"
+    x2: "2 个快照"
+    anim: "动画"
+    small: "小"
+    conservative: "保守"
+    large: "大"
+    nosounds: "不含声音"
+    mapsonly: "仅地图"
+    nothing: "无"
+  category:
+    graphics: "图形"
+    hud: "HUD"
+    sound: "声音"
+    misc: "其他"
+    networking: "网络"
+  preset:
+    heading: "预设"
+    more_frames: "更高帧率"
+    better_looking: "画面更好"
+    low:
+      label: "低"
+      line: "更少特效和更柔和的纹理，适合低配电脑"
+    medium:
+      label: "中等"
+      line: "在画面与帧率之间取得平衡，适合大多数电脑"
+    high:
+      label: "高"
+      line: "更清晰的纹理和更多特效，适合性能较好的电脑"
+    ultra:
+      label: "极高"
+      line: "全部开启，适合高性能电脑和截图"
+    custom:
+      label: "自定义"
+      line: "只应用你选择的设置，其余由 TF2 决定"

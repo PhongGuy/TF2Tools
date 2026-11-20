@@ -4,8 +4,8 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, pick, saved, shown, toasted, value,
-    wait_for_list,
+    HEADER, choose, found, idle, modules_cfg, open, pick, reveal, row_value, saved, scroll_to_top,
+    shown, toasted, value, wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
@@ -55,16 +55,16 @@ fn a_pick_writes_modules_cfg_and_the_preset_s_value_clears_it(cx: &mut TestAppCo
         .entity_id();
     assert_eq!(after, row, "the row keeps its Select");
 
-    choose(cx, &page, "lod", Some(ModuleChoice::NotSet));
+    choose(cx, &page, "decals", Some(ModuleChoice::NotSet));
     support::wait_real(cx, "Game default", |cx| {
-        saved(cx, &page, "lod") == Some(ModuleChoice::NotSet)
+        saved(cx, &page, "decals") == Some(ModuleChoice::NotSet)
     });
     idle(cx, &page);
     assert_eq!(
         modules_cfg(&env).as_deref(),
-        Some(format!("{HEADER}alias lod\nfpscap=120\n").as_str())
+        Some(format!("{HEADER}alias decals\nfpscap=120\n").as_str())
     );
-    assert_eq!(shown(cx, &page, "lod"), Some(ModuleChoice::NotSet));
+    assert_eq!(shown(cx, &page, "decals"), Some(ModuleChoice::NotSet));
 
     choose(cx, &page, "fpscap", Some(value("400")));
     support::wait_real(cx, "the preset's value", |cx| {
@@ -73,7 +73,7 @@ fn a_pick_writes_modules_cfg_and_the_preset_s_value_clears_it(cx: &mut TestAppCo
     idle(cx, &page);
     assert_eq!(
         modules_cfg(&env).as_deref(),
-        Some(format!("{HEADER}alias lod\n").as_str())
+        Some(format!("{HEADER}alias decals\n").as_str())
     );
     assert!(!support::present(
         cx,
@@ -81,10 +81,10 @@ fn a_pick_writes_modules_cfg_and_the_preset_s_value_clears_it(cx: &mut TestAppCo
         ids::graphics_module_reset("fpscap")
     ));
 
-    choose(cx, &page, "lod", None);
+    choose(cx, &page, "decals", None);
     idle(cx, &page);
     assert_eq!(
-        saved(cx, &page, "lod"),
+        saved(cx, &page, "decals"),
         Some(ModuleChoice::NotSet),
         "a cleared Select changes nothing"
     );
@@ -98,6 +98,7 @@ fn reset_and_reset_all_go_back_to_the_preset(cx: &mut TestAppContext) {
         &env,
         r#"{"fpscap":"120","hud_avatars":"off","lod":null}"#,
     );
+    reveal(cx, &s, ids::graphics_module_reset("fpscap"));
     support::click_id(cx, s.win, ids::graphics_module_reset("fpscap"));
     support::wait_real(cx, "the reset", |cx| saved(cx, &page, "fpscap").is_none());
     idle(cx, &page);
@@ -106,6 +107,7 @@ fn reset_and_reset_all_go_back_to_the_preset(cx: &mut TestAppContext) {
         Some(format!("{HEADER}alias lod\nhud_avatars=off\n").as_str())
     );
     assert_eq!(shown(cx, &page, "fpscap"), Some(value("400")));
+    scroll_to_top(cx, &s);
     support::click_id(cx, s.win, ids::GRAPHICS_RESET_ALL);
     support::wait_real(cx, "the reset all", |cx| {
         cx.update(|cx| {
@@ -116,8 +118,8 @@ fn reset_and_reset_all_go_back_to_the_preset(cx: &mut TestAppContext) {
     });
     idle(cx, &page);
     assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
-    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
-    assert!(support::disabled_of(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
+    assert!(!support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
 }
 
 #[gpui_kit::test]

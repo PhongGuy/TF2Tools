@@ -2980,7 +2980,327 @@ install_parts:
   maps_skipped: "%{name} enthält mehrere Karten. Wähle die aus, die installiert werden sollen. Einige zusätzliche Dateien in diesem Download wurden übersprungen."
 
 graphics:
+  subtitle: "Grafik- und Spieleinstellungen von mastercomfig"
+  no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um mastercomfig zu nutzen."
+  running: "TF2 läuft. Deine Änderungen wirken ab dem nächsten Start von TF2."
+  status:
+    not_installed: "mastercomfig ist nicht installiert"
+    install_hint: "Installiere es, um eine Grafik-Voreinstellung zu wählen."
+    installed: "mastercomfig %{version} ist installiert"
+    up_to_date: "mastercomfig %{version} ist installiert und aktuell"
+    saves: "Jede Änderung wird sofort gespeichert."
+    outside: "mastercomfig %{version} wurde außerhalb von TF2Tools installiert"
+    outside_unknown: "mastercomfig wurde außerhalb von TF2Tools installiert"
+    take_over_hint: "Übernimm es, um hier eine Voreinstellung zu wählen und Einstellungen zu ändern."
+    install: "mastercomfig installieren"
+    update_to: "Auf %{version} aktualisieren"
+    check: "Nach Updates suchen"
+    remove: "Entfernen"
+    take_over: "Übernehmen"
+    docs: "mastercomfig-Dokumentation"
+    credit: "mastercomfig wird vom mastercomfig-Team entwickelt und unter der MIT-Lizenz geteilt."
+  toast:
+    installed_title: "mastercomfig installiert"
+    installed: "mastercomfig %{version} ist bereit. Wähle unten eine Voreinstellung."
+    updated_title: "mastercomfig aktualisiert"
+    updated: "Jetzt auf %{version}."
+    checked_title: "Nach Updates gesucht"
+    taken_over_title: "mastercomfig übernommen"
+    taken_over: "TF2Tools kümmert sich jetzt um mastercomfig."
+    removed_title: "mastercomfig entfernt"
+    removed: "mastercomfig ist nicht mehr in TF2."
+    preset_title: "Voreinstellung angewendet"
+    preset: "%{preset} gilt ab dem nächsten Start von TF2."
+    dropped_title: "Einige Einstellungen sind zur Voreinstellung zurückgekehrt"
+    dropped: "Diese Einstellungen gibt es in dieser mastercomfig-Version nicht, daher gilt wieder die Voreinstellung: %{names}."
+    own_kept: "Deine eigene modules.cfg wurde behalten, daher werden die Einstellungen unten nicht verwendet. Ändere eine davon, um sie stattdessen zu verwenden."
   settings_note:
     loading: "Die Einstellungsliste wird geladen..."
     offline: "Die Einstellungsliste braucht beim ersten Mal eine Internetverbindung. Stell eine Verbindung her und öffne diese Seite dann erneut."
     unsupported: "Diese mastercomfig-Version wird noch nicht unterstützt. Die Voreinstellungen oben funktionieren trotzdem."
+  not_set: "TF2 entscheiden lassen"
+  row:
+    preset_value: "%{preset}: %{value}"
+    reset: "Zurücksetzen"
+  pictures:
+    show: "Bilder zeigen"
+    hide: "Bilder ausblenden"
+    thumb: "Bilder von %{name}"
+    yours: "Deins: %{value}"
+    same: "%{value} (wie bei %{preset})"
+    zoom: "Zoom"
+    full: "Ganzes Bild"
+    wipe: "Zwischen dem Bild der Voreinstellung und deinem schieben"
+    caption: "Klicke auf ein Bild, um diese Einstellung zu verwenden."
+  changes:
+    title: { one: "%{count} Änderung gegenüber %{preset}", other: "%{count} Änderungen gegenüber %{preset}" }
+    as_is: "%{preset} wird unverändert genutzt. Ändere unten eine Einstellung, dann erscheint sie hier."
+    chip: "%{name}: %{was} → %{now}"
+    chip_saved: "%{name}: %{now}"
+    undo: "%{name} auf %{was} zurücksetzen"
+    reset_all: "Alle zurücksetzen"
+  settings:
+    search: "Einstellungen durchsuchen"
+    changed_only: "Nur geänderte"
+    no_match: "Keine Einstellung passt zu „%{query}“."
+    nothing_changed: "Nichts weicht von %{preset} ab."
+    show_all: "Alle Einstellungen zeigen"
+    has_changes: "Hat Änderungen"
+  module:
+    lod:
+      label: "Modellqualität"
+      description: "Wie detailliert Spieler, Waffen und Requisiten aus der Nähe sind."
+    lighting:
+      label: "Beleuchtung"
+      description: "Wie detailliert Lichter und die Schattierung sind, die sie werfen."
+    shading:
+      label: "Schattierung"
+      description: "Zusätzliche Schattierung auf Oberflächen. Eine Änderung lädt die Materialien des Spiels neu."
+    phong:
+      label: "Glänzende Oberflächen"
+      description: "Glanzlichter auf Spielern und Waffen, im Spiel Phong genannt."
+    shadows:
+      label: "Schatten"
+      description: "Schatten, die Spieler und Requisiten werfen."
+    flashlight:
+      label: "Taschenlampe"
+      description: "Nur einige Community-Server-Modi nutzen sie. Lass sie aus, außer ein Server braucht sie."
+    effects:
+      label: "Partikel"
+      description: "Explosionen, Feuer, Rauch und Unusual-Effekte."
+    tracers:
+      label: "Leuchtspuren"
+      description: "Kugelspuren von Hitscan-Waffen."
+    water:
+      label: "Wasser"
+      description: "Wie Wasser aussieht und was es spiegelt."
+    post_processing:
+      label: "Nachbearbeitung"
+      description: "Bloom und die Farbkorrektur über dem ganzen Bild."
+      value:
+        low: "Nur Bloom"
+    color_filter:
+      label: "Farbfilter"
+      description: "Ein Farbton über dem ganzen Bild."
+    pyrovision:
+      label: "Pyrovision"
+      description: "Wie detailliert Pyroland durch die Brille des Pyro aussieht."
+    romevision:
+      label: "Romevision"
+      description: "Römische Rüstung für Roboter in Mann vs. Machine."
+    motion_blur:
+      label: "Bewegungsunschärfe"
+      description: "Verwischt das Bild, während du dich schnell drehst."
+    anti_aliasing:
+      label: "Kantenglättung"
+      description: "Glättet gezackte Kanten. Kostet auf schwächeren Grafikkarten FPS."
+    characters:
+      label: "Charaktere"
+      description: "Wie detailliert Spielermodelle aussehen."
+    decals:
+      label: "Decals"
+      description: "Einschusslöcher, Brandspuren und Blut an Wänden."
+    decals_models:
+      label: "Decals auf Modellen"
+      description: "Blut und Spuren auf Spielern und Requisiten."
+    decals_art:
+      label: "Map-Kunst"
+      description: "Bemalte Schilder und Kunst, die der Mapper platziert hat."
+    sprays:
+      label: "Sprays"
+      description: "Bilder, die Spieler an Wände sprühen."
+    gibs:
+      label: "Gibs"
+      description: "Körperteile von Explosionen."
+    sillygibs:
+      label: "Alberne Gibs"
+      description: "Ersetzt Blut und Körperteile durch harmlose Spielzeugteile."
+    props:
+      label: "Requisiten"
+      description: "Wie detailliert kleine Requisiten sind und wie viele erscheinen."
+    ragdolls:
+      label: "Ragdolls"
+      description: "Körper fallen schlaff um, statt eine Todesanimation abzuspielen."
+    "3dsky":
+      label: "3D-Himmel"
+      description: "Landschaft hinter dem Rand der Map. Aus bringt FPS auf offenen Maps."
+    jigglebones:
+      label: "Wackelteile"
+      description: "Lose Teile von Cosmetics, die bei Bewegung schwingen."
+    sheens_speed:
+      label: "Glanz-Tempo"
+      description: "Wie schnell der Killserien-Glanz über Waffen läuft."
+    sheens_tint:
+      label: "Glanz-Stärke"
+      description: "Wie kräftig die Farbe des Killserien-Glanzes ist."
+    texture_quality:
+      label: "Texturqualität"
+      description: "Wie scharf Oberflächen aussehen. Höher braucht mehr Grafikspeicher."
+    texture_filter:
+      label: "Texturfilterung"
+      description: "Hält Böden und Wände scharf, wenn du sie schräg siehst."
+    ropes:
+      label: "Seile"
+      description: "Kabel und Seile, die über Maps hängen."
+    fpscap:
+      label: "FPS-Limit"
+      description: "Wie viele Bilder pro Sekunde das Spiel höchstens zeichnet."
+    vsync:
+      label: "VSync"
+      description: "Passt die Bilder an deinen Bildschirm an, damit nichts zerreißt. Erhöht die Eingabeverzögerung."
+    hud_player_model:
+      label: "Spielermodell"
+      description: "Dein Klassenmodell neben deiner Gesundheit."
+    hud_server_text:
+      label: "Servernachrichten"
+      description: "Text, den der Server in der Bildschirmmitte anzeigt."
+    hud_contracts:
+      label: "Aufträge"
+      description: "Welche Aufträge das HUD anzeigt."
+      value:
+        custom: "Spieleinstellung"
+    hud_panels:
+      label: "HUD-Elemente"
+      description: "Wie viele zusätzliche Elemente das HUD anzeigt."
+    hud_avatars:
+      label: "Avatare"
+      description: "Steam-Profilbilder auf der Punktetafel und im Killfeed."
+    match_hud:
+      label: "Match-HUD"
+      description: "Die Team-Statusleiste oben am Bildschirm in Matches."
+    messages:
+      label: "Chatnachrichten"
+      description: "Der Textchat anderer Spieler."
+    killfeed:
+      label: "Killfeed"
+      description: "Die Liste der Kills in der Bildschirmecke."
+    killstreaks:
+      label: "Killserien-Hinweise"
+      description: "Killserien-Zähler und ihre Ansagen."
+    hud_achievement:
+      label: "Errungenschafts-Meldungen"
+      description: "Das Banner, wenn jemand eine Errungenschaft erhält."
+    console:
+      label: "Entwicklerkonsole"
+      description: "Öffnet die Konsole mit der Taste `."
+    htmlmotd:
+      label: "Willkommensseite des Servers"
+      description: "Die Webseite, die ein Server beim Beitreten zeigt."
+    outlines:
+      label: "Umrisse"
+      description: "Leuchtende Umrisse um Teammitglieder und Ziele."
+    dynamic_background:
+      label: "Menühintergrund"
+      description: "Die bewegte Karte hinter dem Hauptmenü."
+    sound:
+      label: "Soundqualität"
+      description: "Wie viele Sounds gleichzeitig spielen und wie detailliert sie sind."
+    voice_chat:
+      label: "Sprachchat"
+      description: "Hör andere Spieler über ihr Mikrofon sprechen."
+    party_mode:
+      label: "Party-Beitritt"
+      description: "Wer deiner Party beitreten darf."
+    logo:
+      label: "Startlogo"
+      description: "Das Logo, das beim Spielstart erscheint."
+    packet_rate:
+      label: "Paketrate"
+      description: "Wie oft du Daten an den Server sendest und von ihm empfängst."
+    snapshot_buffer:
+      label: "Snapshot-Puffer"
+      description: "Wie stark das Spiel die Updates vom Server glättet."
+    packet_size:
+      label: "Paketgröße"
+      description: "Wie groß Pakete sind und wie sie aufgeteilt werden."
+    bandwidth:
+      label: "Bandbreite"
+      description: "Wie viele Daten das Spiel höchstens pro Sekunde sendet. Pass sie an deine Verbindung an."
+    download:
+      label: "Downloads"
+      description: "Welche benutzerdefinierten Inhalte dir Server schicken dürfen."
+      value:
+        custom: "Spieleinstellung"
+  value:
+    low: "Niedrig"
+    medium: "Mittel"
+    high: "Hoch"
+    ultra: "Ultra"
+    very_low: "Sehr niedrig"
+    very_high: "Sehr hoch"
+    off: "Aus"
+    on: "An"
+    rim: "Kantenlicht"
+    default: "Standard"
+    calm: "Ruhig"
+    vivid: "Lebhaft"
+    washed: "Verwaschen"
+    dreamy: "Verträumt"
+    grayscale: "Graustufen"
+    desaturated: "Entsättigt"
+    warm: "Warm"
+    cool: "Kühl"
+    msaa_2x: "MSAA 2x"
+    msaa_4x: "MSAA 4x"
+    msaa_8x: "MSAA 8x"
+    keep: "Beibehalten"
+    auto: "Automatisch"
+    force_on: "Immer"
+    slow: "Langsam"
+    fast: "Schnell"
+    full: "Voll"
+    blocky: "Pixelig"
+    trilinear: "Trilinear"
+    aniso2x: "Anisotropisch 2×"
+    aniso4x: "Anisotropisch 4×"
+    aniso8x: "Anisotropisch 8×"
+    aniso16x: "Anisotropisch 16×"
+    powersaver: "Energiesparen"
+    unlimited: "Unbegrenzt"
+    custom: "Eigener Wert"
+    hide: "Ausblenden"
+    all: "Alle"
+    active: "Nur aktive"
+    everyone: "Alle"
+    friends: "Freunde"
+    dustbowl: "Dustbowl"
+    hidden: "Versteckt"
+    open: "Offen"
+    request: "Auf Anfrage"
+    invite: "Nur Einladung"
+    congestion: "Überlastung"
+    standard: "Normal"
+    x1: "1 Snapshot"
+    x2: "2 Snapshots"
+    anim: "Animation"
+    small: "Klein"
+    conservative: "Vorsichtig"
+    large: "Groß"
+    nosounds: "Ohne Sounds"
+    mapsonly: "Nur Karten"
+    nothing: "Nichts"
+  category:
+    graphics: "Grafik"
+    hud: "HUD"
+    sound: "Ton"
+    misc: "Sonstiges"
+    networking: "Netzwerk"
+  preset:
+    heading: "Voreinstellung"
+    more_frames: "Höhere Bildrate"
+    better_looking: "Bessere Optik"
+    low:
+      label: "Niedrig"
+      line: "Weniger Effekte und weichere Texturen, für schwache PCs"
+    medium:
+      label: "Mittel"
+      line: "Ein Ausgleich aus Optik und Bildrate für die meisten PCs"
+    high:
+      label: "Hoch"
+      line: "Schärfere Texturen und mehr Effekte, für einen leistungsstarken PC"
+    ultra:
+      label: "Ultra"
+      line: "Alles an, für schnelle PCs und Screenshots"
+    custom:
+      label: "Eigene"
+      line: "Nur die Einstellungen, die du wählst; den Rest bestimmt TF2"

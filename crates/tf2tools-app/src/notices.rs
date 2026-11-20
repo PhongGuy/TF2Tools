@@ -21,7 +21,6 @@ const TITLES: &[(&str, &str)] = &[
     ("Valve-notice.txt", "Valve and Team Fortress 2"),
     ("rars-Apache-2.0.txt", "rars RAR reader (Apache-2.0)"),
     ("crosshairs-notice.txt", "Built-in crosshairs"),
-    ("comfig-app-MIT.txt", "mastercomfig app preset text (MIT)"),
     (THIRD_PARTY, "Rust crates TF2Tools is built from"),
 ];
 
