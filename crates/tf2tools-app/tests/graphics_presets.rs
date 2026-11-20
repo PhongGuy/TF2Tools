@@ -37,21 +37,43 @@ fn the_ranked_four_read_low_to_ultra_with_custom_apart(cx: &mut TestAppContext) 
         Preset::Custom,
     ]
     .map(|p| at(cx, &s, ids::graphics_preset(p)));
+    let status = at(cx, &s, ids::GRAPHICS_STATUS);
+    let card = at(cx, &s, ids::GRAPHICS_PRESETS);
     assert!(
-        low.right() <= medium.left() + px(1.)
-            && medium.right() <= high.left() + px(1.)
-            && high.right() <= ultra.left() + px(1.),
-        "{low:?} {medium:?} {high:?} {ultra:?}"
+        near(card.left(), status.left()) && near(card.right(), status.right()),
+        "the preset card is as wide as the status card: {card:?} {status:?}"
     );
+    assert!(card.top() >= status.bottom(), "{card:?} {status:?}");
+    let widths = [low, medium, high, ultra].map(|b| b.size.width);
     assert!(
-        ultra.right() + px(4.) <= custom.left(),
-        "a divider sets Custom apart: {ultra:?} {custom:?}"
+        widths.iter().all(|w| (*w - widths[0]).abs() <= px(1.)),
+        "equal segments: {widths:?}"
+    );
+    for (a, b) in [(low, medium), (medium, high), (high, ultra)] {
+        assert!(
+            a.right() <= b.left() && b.left() - a.right() <= px(4.),
+            "{a:?} {b:?}"
+        );
+    }
+    assert!(
+        ultra.right() + px(8.) <= custom.left(),
+        "Custom sits apart: {ultra:?} {custom:?}"
     );
     assert!(near(low.top(), custom.top()));
+    assert!(
+        status.right() - custom.right() <= px(24.),
+        "the pill fills the card: {custom:?} {status:?}"
+    );
+    assert!(low.left() - status.left() <= px(24.), "{low:?} {status:?}");
+    assert!(
+        low.size.width >= px(120.),
+        "the ranked four fill the width: {low:?}"
+    );
     let scale = at(cx, &s, ids::GRAPHICS_PRESET_SCALE);
     assert!(scale.top() >= low.bottom(), "{scale:?}");
     assert!(
-        near(scale.left(), low.left()) && near(scale.right(), ultra.right()),
+        (scale.left() - low.left()).abs() <= px(5.)
+            && (scale.right() - ultra.right()).abs() <= px(5.),
         "{scale:?}"
     );
     assert_eq!(

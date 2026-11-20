@@ -1678,6 +1678,7 @@ mod tests {
         "pages/graphics/mod.rs",
         "pages/graphics/model.rs",
         "pages/graphics/picture_panel.rs",
+        "pages/graphics/pill.rs",
         "pages/graphics/pictures.rs",
         "pages/graphics/presets.rs",
         "pages/graphics/settings.rs",

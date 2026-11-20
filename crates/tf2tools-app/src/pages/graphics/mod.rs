@@ -4,6 +4,7 @@ pub mod jobs;
 pub mod model;
 mod picture_panel;
 pub mod pictures;
+mod pill;
 mod presets;
 mod settings;
 mod status;
