@@ -3,7 +3,7 @@
 use crate::support;
 
 use gpui_kit::{Bounds, ElementId, Pixels, TestAppContext, px, size};
-use support::graphics::{found, open, picture_page, reveal, wait_for_list};
+use support::graphics::{found, open, picture_page, reveal, toggle_pictures, wait_for_list};
 use tf2tools_app::ids;
 
 fn at(
@@ -211,5 +211,50 @@ fn the_page_opens_on_the_status_card_with_no_subtitle(cx: &mut TestAppContext) {
     assert!(
         status.top() - view.top() <= tf2tools_app::shell::CONTENT_PADDING + px(2.),
         "{status:?} {view:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_pictures_open_inside_the_card_with_zoom_on_the_picture(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", "{}");
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_zoom("lod"));
+    let card = at(cx, &s, ids::graphics_section("graphics"));
+    let panel = at(cx, &s, ids::graphics_pictures("lod"));
+    assert!(
+        panel.left() - card.left() <= px(2.) && card.right() - panel.right() <= px(2.),
+        "the panel runs the card's width: {panel:?} {card:?}"
+    );
+    let picture = at(cx, &s, ids::graphics_compare("lod"));
+    let zoom = at(cx, &s, ids::graphics_zoom("lod"));
+    assert!(
+        zoom.left() >= picture.left()
+            && zoom.right() <= picture.right()
+            && zoom.top() >= picture.top()
+            && zoom.bottom() <= picture.bottom(),
+        "Zoom sits on the picture: {zoom:?} {picture:?}"
+    );
+    assert!(
+        picture.right() - zoom.right() <= px(16.) && picture.bottom() - zoom.bottom() <= px(16.),
+        "{zoom:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_changed_row_s_bar_marks_its_line_and_not_its_open_panel(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", r#"{"lod":"high"}"#);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_pictures("lod"));
+    let bar = at(cx, &s, ids::graphics_row_bar("lod"));
+    let panel = at(cx, &s, ids::graphics_pictures("lod"));
+    assert!(
+        bar.bottom() <= panel.top(),
+        "the bar and tint stop at the row line: {bar:?} {panel:?}"
     );
 }

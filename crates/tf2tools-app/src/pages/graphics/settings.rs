@@ -382,10 +382,13 @@ fn row(
             .child(lead.flex_1())
             .child(controls)
     };
-    // A changed row is tinted with a 3 px accent bar down its left edge, drawn as an overlay
-    // so the row's single border colour stays free for the rule above it.
+    // A changed row's line is tinted with a 3 px accent bar down its left edge, drawn as an
+    // overlay so the row's single border colour stays free for the rule above it. The open
+    // panel runs the card's full width under the line, outside the tint.
     let bar = row.changed.then(|| {
         div()
+            .id(ids::graphics_row_bar(name))
+            .test_support()
             .absolute()
             .left_0()
             .top_0()
@@ -393,16 +396,17 @@ fn row(
             .w(px(3.))
             .bg(tint)
     });
-    v_flex()
-        .id(ids::graphics_row(name))
-        .test_support()
+    let line = div()
         .relative()
         .px_4()
         .py_3()
-        .when(!first, |this| this.border_t_1().border_color(border))
         .when(row.changed, |this| this.bg(tint.opacity(0.07)))
         .children(bar)
-        .gap_3()
+        .child(line);
+    v_flex()
+        .id(ids::graphics_row(name))
+        .test_support()
+        .when(!first, |this| this.border_t_1().border_color(border))
         .child(line)
         .children(panel)
         .into_any_element()

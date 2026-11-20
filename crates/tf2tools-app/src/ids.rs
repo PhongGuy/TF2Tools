@@ -1076,6 +1076,11 @@ pub fn graphics_row(module: &str) -> ElementId {
     keyed("graphics-row", module)
 }
 
+/// A changed row's accent bar down its line's left edge: "graphics-row-bar:<module>".
+pub fn graphics_row_bar(module: &str) -> ElementId {
+    keyed("graphics-row-bar", module)
+}
+
 /// A row's thumbnail Button, which opens its pictures: "graphics-thumb:<module>".
 pub fn graphics_thumb(module: &str) -> ElementId {
     keyed("graphics-thumb", module)

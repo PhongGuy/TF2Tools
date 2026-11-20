@@ -2,7 +2,7 @@
 
 use crate::support;
 
-use gpui_kit::{Pixels, TestAppContext};
+use gpui_kit::{Pixels, TestAppContext, px};
 use support::graphics::{
     HEADER, idle, modules_cfg, picture_page, picture_url, reveal, saved, toggle_pictures, value,
     wants,
@@ -42,6 +42,19 @@ fn the_strip_shows_every_value_with_a_picture_and_tags_the_preset_s(cx: &mut Tes
     assert!(
         tag.left() >= medium.left() && tag.right() <= medium.right(),
         "{tag:?} {medium:?}"
+    );
+    let picture = support::bounds_of(cx, s.win, ids::graphics_strip_area("lod", "medium")).unwrap();
+    assert!(
+        tag.top() >= picture.bottom() && tag.top() - picture.bottom() <= px(10.),
+        "the tag sits on the label line: {tag:?} {picture:?}"
+    );
+    assert!(
+        tag.left() >= medium.left() + px(20.),
+        "the tag follows the label inline: {tag:?} {medium:?}"
+    );
+    assert!(
+        medium.bottom() - tag.bottom() <= px(12.),
+        "one line under the picture: {tag:?} {medium:?}"
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_strip_caption("lod")).as_deref(),
