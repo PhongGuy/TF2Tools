@@ -744,6 +744,8 @@ pub const SYNC_BANNER_COUNT: &str = "sync-banner-count";
 pub const STORE_PREVIEW: &str = "store-preview";
 /// The spinner inside `STORE_PREVIEW`; present only while its preview loads.
 pub const STORE_PREVIEW_SPINNER: &str = "store-preview-spinner";
+/// The text `STORE_PREVIEW` shows, labelled with it: Play Preview, Cancel or Stop Preview.
+pub const STORE_PREVIEW_LABEL: &str = "store-preview-label";
 /// A store's sync button, labelled "Refresh", or "Syncing..." while that store syncs.
 pub const STORE_REFRESH: &str = "store-refresh";
 /// The Addon Store header badge, labelled with the store's release tag.

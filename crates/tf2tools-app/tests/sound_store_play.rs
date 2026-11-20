@@ -421,18 +421,23 @@ fn the_detail_preview_button_spins_while_the_preview_loads(cx: &mut TestAppConte
     support::wait_real(cx, "the detail's preview button", |cx| {
         support::present(cx, win, ids::STORE_PREVIEW)
     });
+    // The shown text, read off its own element, follows the state as the accessible name does.
+    let shown = move |cx: &mut TestAppContext| support::label_of(cx, win, ids::STORE_PREVIEW_LABEL);
+    assert_eq!(shown(cx).as_deref(), Some("Play Preview"));
     support::click_id(cx, win, ids::STORE_PREVIEW);
     assert!(support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
     assert_eq!(
         support::label_of(cx, win, ids::STORE_PREVIEW).as_deref(),
         Some("Cancel")
     );
+    assert_eq!(shown(cx).as_deref(), Some("Cancel"));
     support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
     assert!(!support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
     assert_eq!(
         support::label_of(cx, win, ids::STORE_PREVIEW).as_deref(),
         Some("Stop Preview")
     );
+    assert_eq!(shown(cx).as_deref(), Some("Stop Preview"));
 }
 
 // The spinner stands in for the 16 px icon: drawn inside the button, never larger than the icon.
@@ -475,10 +480,15 @@ fn the_detail_preview_button_keeps_its_width_from_loading_to_playing(cx: &mut Te
     support::wait_real(cx, "the detail's preview button", |cx| {
         support::present(cx, win, ids::STORE_PREVIEW)
     });
+    let idle = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
     support::click_id(cx, win, ids::STORE_PREVIEW);
     assert!(support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
     let loading = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
     support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
     let playing = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
     assert_eq!(loading.size.width, playing.size.width);
+    assert_eq!(
+        idle.size.width, playing.size.width,
+        "the idle button is as wide too"
+    );
 }

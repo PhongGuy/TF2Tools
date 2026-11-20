@@ -4,9 +4,9 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
 use gpui_kit::{
-    App, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
+    AnyElement, App, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
     TestSupportExt as _, WeakEntity, div, transparent_black,
 };
 use tf2tools_core::{StoreItem, StoreItemId};
@@ -19,8 +19,9 @@ use crate::ids;
 use crate::pages::common::badge_of;
 use crate::store_detail::DetailBody;
 use crate::store_preview::{play_preview, preview_key};
+use crate::widgets::labelled;
 
-/// v5's sound detail: category badge, likes and views, a "Play Preview" / "Stop Preview" button
+/// v5's sound detail: category badge, likes and views, a "Play Preview" / "Cancel" / "Stop Preview" button
 /// (`ids::STORE_PREVIEW`, only with a preview URL) toggling `player`, and the tags.
 pub fn sound_body(player: WeakEntity<Player>) -> DetailBody {
     DetailBody::new(move |item: &StoreItem, _, cx: &mut App| {
@@ -70,9 +71,13 @@ pub fn sound_body(player: WeakEntity<Player>) -> DetailBody {
     })
 }
 
-// Toggles the page's player on this sound's preview; it reads "Stop" while that preview plays.
-// While its bytes download a spinner replaces the icon beside the same "Stop Preview" text, so
-// the button keeps its width, and a screen reader hears "Cancel".
+// The button's 16 px icon, drawn as a child so it sits before the text slot.
+fn icon(name: IconName) -> AnyElement {
+    Icon::new(name).with_size(Size::Medium).into_any_element()
+}
+
+// Toggles the page's player on this sound's preview. It reads "Play Preview", "Cancel" with a
+// spinner while the bytes download, then "Stop Preview" while the preview plays.
 fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Option<Button> {
     let StoreItemId::GameBanana(id) = *item.id() else {
         return None;
@@ -86,26 +91,39 @@ fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Op
         item.name().to_owned(),
         item.author().to_owned(),
     );
-    let button = Button::new(ids::STORE_PREVIEW).outline();
-    // A button with children draws them after its label, so while loading the spinner and the
-    // text are both children, in the icon-then-label order.
-    let button = match state {
-        None => button
-            .icon(IconName::Play)
-            .label(tr!("sound_store.preview.play")),
-        Some(PlayState::Playing) => button
-            .icon(IconName::Square)
-            .label(tr!("sound_store.preview.stop")),
-        Some(PlayState::Loading) => button
-            .child(
-                div()
-                    .id(ids::STORE_PREVIEW_SPINNER)
-                    .test_support()
-                    .child(Spinner::new()),
-            )
-            .child(tr!("sound_store.preview.stop"))
-            .accessibility_label(tr!("sounds.button.cancel_preview")),
+    let play = tr!("sound_store.preview.play");
+    let cancel = tr!("sounds.button.cancel_preview");
+    let stop = tr!("sound_store.preview.stop");
+    let (lead, shown) = match state {
+        None => (icon(IconName::Play), play.clone()),
+        Some(PlayState::Playing) => (icon(IconName::Square), stop.clone()),
+        Some(PlayState::Loading) => (
+            div()
+                .id(ids::STORE_PREVIEW_SPINNER)
+                .test_support()
+                .child(Spinner::new())
+                .into_any_element(),
+            cancel.clone(),
+        ),
     };
+    // The text slot is as wide as the widest of the three labels in this locale: the others sit
+    // in it with no height and hidden, so the button keeps one width through every state.
+    let slot = v_flex()
+        .items_center()
+        .child(labelled(
+            div().whitespace_nowrap(),
+            ids::STORE_PREVIEW_LABEL,
+            shown.clone(),
+        ))
+        .children(
+            [play, cancel, stop]
+                .map(|text| div().h_0().invisible().whitespace_nowrap().child(text)),
+        );
+    let button = Button::new(ids::STORE_PREVIEW)
+        .outline()
+        .child(lead)
+        .child(slot)
+        .accessibility_label(shown);
     let button = button.on_click(move |_, _, cx| {
         if let Some(player) = player.upgrade() {
             play_preview(&player, id, &name, &author, cx);
