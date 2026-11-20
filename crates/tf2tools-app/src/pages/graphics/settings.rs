@@ -4,10 +4,10 @@
 
 use std::collections::BTreeMap;
 
+use super::GraphicsPage;
 use super::model::{SettingsNote, preset_label, settings_note_text};
-use super::rows::{CHANGED, RowExtras};
-use super::view::{self, EmptyState, RowView, SectionView};
-use super::{GraphicsPage, picture_panel, pictures};
+use super::rows::CHANGED;
+use super::view::{self, EmptyState, SectionView};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::card_frame;
@@ -129,10 +129,8 @@ fn section_view(
         .iter()
         .enumerate()
         .filter_map(|(i, r)| {
-            let extras = row_extras(page, r, cx);
-            page.editor.update(cx, |e, cx| {
-                e.settings_row_with(&r.module, i == 0, narrow, extras, cx)
-            })
+            page.editor
+                .update(cx, |e, cx| e.settings_row(&r.module, i == 0, narrow, cx))
         })
         .collect();
     let theme = cx.theme();
@@ -271,31 +269,3 @@ const RAIL_WIDTH: f32 = 184.;
 
 /// The space between the wide rail and the list it sits beside.
 const RAIL_GUTTER: f32 = 24.;
-
-// The page's picture pieces for `row`: its thumbnail and Show pictures when it has pictures,
-// and the panel while it is the open row. The panel compares the crops while zoom is on, the
-// same pictures the page wants; the thumbnail and strip stay on the full pictures.
-fn row_extras(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) -> RowExtras {
-    let name = row.module.as_str();
-    let pictures = page
-        .pictures
-        .as_deref()
-        .and_then(|index| pictures::row_pictures(index, row, false));
-    let thumb = pictures
-        .as_ref()
-        .map(|p| picture_panel::thumbnail(page, name, &row.label, p, cx));
-    let toggle = pictures
-        .as_ref()
-        .map(|_| picture_panel::toggle(page, name, cx));
-    let panel = page
-        .pictures
-        .as_deref()
-        .filter(|_| page.open_row() == Some(name))
-        .and_then(|index| pictures::row_pictures(index, row, page.zoom()))
-        .map(|p| picture_panel::panel(page, name, &p, cx));
-    RowExtras {
-        thumb,
-        toggle,
-        panel,
-    }
-}

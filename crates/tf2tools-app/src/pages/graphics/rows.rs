@@ -13,8 +13,8 @@ use gpui_kit::{
 use tf2tools_core::ModuleChoice;
 
 use super::GraphicsChoicesEditor;
-use super::pill;
 use super::view::{ControlKind, RowView};
+use super::{picture_panel, pictures, pill};
 use crate::i18n::tr;
 use crate::ids;
 use crate::links::MASTERCOMFIG_DOCS_URL;
@@ -23,36 +23,15 @@ use crate::widgets::labelled;
 /// The left bar and tint that mark a row the player changed from the preset.
 pub(super) const CHANGED: u32 = 0x1447e6;
 
-/// A row's picture pieces, built by the page until the editor owns the pictures.
-#[derive(Default)]
-pub(super) struct RowExtras {
-    pub thumb: Option<AnyElement>,
-    pub toggle: Option<AnyElement>,
-    pub panel: Option<AnyElement>,
-}
-
 impl GraphicsChoicesEditor {
-    /// One settings row; None without a catalog or for an unknown module. Every row but the
-    /// card's `first` rules itself off from the one above.
+    /// One settings row, with its thumbnail, Show pictures and open panel when the module has
+    /// pictures; None without a catalog or for an unknown module. Every row but the card's
+    /// `first` rules itself off from the one above.
     pub fn settings_row(
         &self,
         module: &str,
         first: bool,
         narrow: bool,
-        cx: &mut Context<Self>,
-    ) -> Option<AnyElement> {
-        self.settings_row_with(module, first, narrow, RowExtras::default(), cx)
-    }
-
-    // The title, description and Learn more, plus the preset's value when changed, on the
-    // left; Reset when changed and the row's control on the right. Picture pieces from
-    // `extras` go before the text, under it, and below the line.
-    pub(super) fn settings_row_with(
-        &self,
-        module: &str,
-        first: bool,
-        narrow: bool,
-        extras: RowExtras,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let row = self.row(module)?;
@@ -99,9 +78,22 @@ impl GraphicsChoicesEditor {
             ControlKind::Segmented => self.segments(&row, cx),
             ControlKind::Select => self.select(&row),
         };
-        let toggle = extras
-            .toggle
-            .map(|toggle| h_flex().ml(px(-8.)).child(toggle));
+        // The panel compares the crops while zoom is on, the same pictures the editor wants;
+        // the thumbnail and strip stay on the full pictures.
+        let index = self.pictures.as_deref();
+        let pictures = index.and_then(|index| pictures::row_pictures(index, &row, false));
+        let thumb = pictures
+            .as_ref()
+            .map(|p| picture_panel::thumbnail(self, name, &row.label, p, cx));
+        let toggle = pictures.as_ref().map(|_| {
+            h_flex()
+                .ml(px(-8.))
+                .child(picture_panel::toggle(self, name, cx))
+        });
+        let panel = index
+            .filter(|_| self.open_row() == Some(name))
+            .and_then(|index| pictures::row_pictures(index, &row, self.zoom()))
+            .map(|p| picture_panel::panel(self, name, &p, cx));
         let border = cx.theme().border;
         let tint = Hsla::from(rgb(CHANGED));
         let text = v_flex()
@@ -126,7 +118,7 @@ impl GraphicsChoicesEditor {
             .min_w_0()
             .items_start()
             .gap_3()
-            .children(extras.thumb)
+            .children(thumb)
             .child(text);
         let line = if narrow {
             v_flex()
@@ -168,7 +160,7 @@ impl GraphicsChoicesEditor {
                 .test_support()
                 .when(!first, |this| this.border_t_1().border_color(border))
                 .child(line)
-                .children(extras.panel)
+                .children(panel)
                 .into_any_element(),
         )
     }

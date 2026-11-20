@@ -1,6 +1,7 @@
-//! The Graphics choices editor: the presets card, the changes strip and the settings rows
-//! over choices its host owns. It only proposes edits as `ChoicesEdit` events; the host saves them and calls back
-//! with `set_choices`, so it always shows what was saved.
+//! The Graphics choices editor: the presets card, the changes strip and the settings rows,
+//! with their pictures, over choices its host owns. It only proposes edits as `ChoicesEdit`
+//! events; the host saves them and calls back with `set_choices`, so it always shows what
+//! was saved.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -8,19 +9,22 @@ use std::sync::Arc;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
 use gpui_kit::{
-    AnyElement, AppContext as _, Context, Entity, EventEmitter, FontWeight,
+    AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
     Styled as _, Subscription, TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
 use super::model::{ValueOption, preset_label, scoped_value_options, shown_choice};
+use super::pictures::{self, PictureIndex};
 use super::view;
 use crate::i18n::{counted_plural, tr};
 use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
+use crate::remote_images::{ImageKey, RemoteImages};
 use crate::widgets::{Named as _, labelled};
 
 /// An edit the editor proposes to its host; the editor's own choices stay as they are.
@@ -43,6 +47,19 @@ pub struct GraphicsChoicesEditor {
     pub(super) selects: BTreeMap<String, ValueSelect>,
     /// Each Select's pick handler, rebuilt with the Selects.
     select_subscriptions: Vec<Subscription>,
+    /// The bundled setting pictures, once the host has read them.
+    pub(super) pictures: Option<Arc<PictureIndex>>,
+    /// The module whose pictures are open; at most one row's at a time.
+    open_row: Option<String>,
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    wipe: Entity<SliderState>,
+    /// Whether the compare view shows the crops; one switch for the whole editor.
+    zoom: bool,
+    /// The image keys the last frame asked for.
+    wanted: Vec<ImageKey>,
+    /// This editor's own `RemoteImages` viewer, so two editors never clear each other's wants.
+    image_viewer: String,
+    _subscriptions: Vec<Subscription>,
 }
 
 /// A settings row's value picker.
@@ -56,8 +73,25 @@ impl GraphicsChoicesEditor {
         scope: IdScope,
         choices: Choices,
         _window: &mut Window,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> Self {
+        let wipe = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max(100.)
+                .step(1.)
+                .default_value(50.)
+        });
+        let mut subscriptions = vec![cx.subscribe(&wipe, |_, _, _: &SliderEvent, cx| cx.notify())];
+        // Pictures redraw the editor as they land; its wants go when it does.
+        let image_viewer = format!("graphics-editor:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
         Self {
             scope,
             choices,
@@ -65,6 +99,13 @@ impl GraphicsChoicesEditor {
             disabled: false,
             selects: BTreeMap::new(),
             select_subscriptions: Vec::new(),
+            pictures: None,
+            open_row: None,
+            wipe,
+            zoom: false,
+            wanted: Vec::new(),
+            image_viewer,
+            _subscriptions: subscriptions,
         }
     }
 
@@ -161,6 +202,113 @@ impl GraphicsChoicesEditor {
                 select.set_selected_value(&shown, window, cx)
             });
         }
+    }
+
+    /// Takes the bundled setting pictures the rows draw from; notifies.
+    pub fn set_pictures(&mut self, pictures: Option<Arc<PictureIndex>>, cx: &mut Context<Self>) {
+        self.pictures = pictures;
+        cx.notify();
+    }
+
+    /// The setting pictures, once the host has handed them in.
+    pub fn pictures(&self) -> Option<&PictureIndex> {
+        self.pictures.as_deref()
+    }
+
+    /// The module whose pictures are open, if any.
+    pub fn open_row(&self) -> Option<&str> {
+        self.open_row.as_deref()
+    }
+
+    /// Whether the compare view shows the zoomed crops.
+    pub fn zoom(&self) -> bool {
+        self.zoom
+    }
+
+    /// How far across the compare view the preset's picture shows, 0 to 100.
+    pub fn wipe(&self, cx: &App) -> f32 {
+        self.wipe.read(cx).value().start()
+    }
+
+    /// The compare view's wipe slider.
+    pub fn wipe_state(&self) -> &Entity<SliderState> {
+        &self.wipe
+    }
+
+    /// The image keys the last `want_images` asked for.
+    pub fn wanted_images(&self) -> &[ImageKey] {
+        &self.wanted
+    }
+
+    // Opens `module`'s pictures, closing any other row's, or closes them when already open.
+    // A freshly opened row starts with the wipe in the middle.
+    pub(super) fn toggle_pictures(
+        &mut self,
+        module: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_row = if self.open_row.as_deref() == Some(module) {
+            None
+        } else {
+            self.wipe
+                .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
+            Some(module.to_owned())
+        };
+        cx.notify();
+    }
+
+    pub(super) fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
+        self.zoom = !self.zoom;
+        cx.notify();
+    }
+
+    // The open row's compare pictures first, as the newest wants, then its strip, then the
+    // current thumbnail of every row with pictures; all thumbnails are wanted, not just the visible.
+    fn image_keys(&self) -> Vec<ImageKey> {
+        let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
+        else {
+            return Vec::new();
+        };
+        let open = self
+            .open_row
+            .as_deref()
+            .and_then(|module| self.row(module))
+            .and_then(|row| pictures::row_pictures(index, &row, self.zoom));
+        let (compared, strip) = open
+            .map(|p| (p.compare.pictures(), p.strip))
+            .unwrap_or_default();
+        let thumbs = catalog
+            .categories()
+            .iter()
+            .flat_map(|category| category.modules())
+            .filter(|module| index.has_pictures(module.name()))
+            .filter_map(|module| {
+                let row = view::row(catalog, &self.choices, module);
+                pictures::row_pictures(index, &row, false)?.thumb
+            })
+            .map(|thumb| ImageKey::card(&index.url(&thumb)));
+        compared
+            .into_iter()
+            .map(|picture| ImageKey::carousel(&index.url(&picture)))
+            .chain(strip.iter().map(|p| ImageKey::card(&index.url(&p.picture))))
+            .chain(thumbs)
+            .collect()
+    }
+
+    /// Hands the image cache this frame's picture wants; a host calls it once per frame it
+    /// draws rows. The cache hears of a change after the draw, so no entity updates mid-render.
+    pub fn want_images(&mut self, cx: &mut Context<Self>) {
+        let keys = self.image_keys();
+        if keys == self.wanted {
+            return;
+        }
+        self.wanted = keys.clone();
+        let Some(images) = RemoteImages::global(cx) else {
+            return;
+        };
+        let viewer = self.image_viewer.clone();
+        cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
     }
 
     /// While disabled, every control is drawn disabled and proposes nothing; notifies.

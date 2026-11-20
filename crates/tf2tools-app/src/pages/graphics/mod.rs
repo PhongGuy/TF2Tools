@@ -16,23 +16,21 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::slider::{SliderEvent, SliderState};
+use gpui_kit::component::slider::SliderState;
 use gpui_kit::component::v_flex;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, InteractiveElement as _,
     IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, px,
 };
-use tf2tools_core::{
-    Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
-};
+use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
 use crate::i18n::tr;
 use crate::ids::{self, IdScope};
 use crate::local_messages::describe_store_status;
 use crate::pages::common::no_tf2_warning;
 use crate::pages::profiles::probe::Tf2Probe;
-use crate::remote_images::{ImageKey, RemoteImages};
+use crate::remote_images::ImageKey;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -110,16 +108,13 @@ pub struct GraphicsPage {
     scroll: ScrollHandle,
     /// The bundled setting pictures, once read off the UI thread.
     pictures: Option<Arc<PictureIndex>>,
-    /// The image keys the last frame asked for.
+    /// The editor's image wants, copied after each frame asks for them.
     wanted: Vec<ImageKey>,
-    /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
-    image_viewer: String,
-    /// The module whose pictures are open; at most one row's at a time.
+    /// The editor's open row and zoom, mirrored on each of its notifies.
     open_row: Option<String>,
-    /// How far across the compare view the preset's picture shows, 0 to 100.
-    wipe: Entity<SliderState>,
-    /// Whether the compare view shows the crops; one switch for the whole page.
     zoom: bool,
+    /// The editor's wipe slider, held from construction.
+    wipe: Entity<SliderState>,
     /// The shell's remembered answer to whether TF2 runs; drawing never probes processes.
     tf2_running: bool,
     /// The presets card and changes strip, fed the shown choices and proposing edits.
@@ -142,14 +137,6 @@ impl GraphicsPage {
                 cx.notify();
             }
         });
-        let wipe = cx.new(|_| {
-            SliderState::new()
-                .min(0.)
-                .max(100.)
-                .step(1.)
-                .default_value(50.)
-        });
-        let wiped = cx.subscribe(&wipe, |_, _, _: &SliderEvent, cx| cx.notify());
         let editor = cx.new(|cx| {
             GraphicsChoicesEditor::new(IdScope::PAGE, Choices::new(Preset::Medium), window, cx)
         });
@@ -162,21 +149,17 @@ impl GraphicsPage {
                 ChoicesEdit::Modules { to, .. } => page.change_to(to.clone(), cx),
             },
         );
-        // The page hands out the editor's live Selects, so it copies them on every change.
+        // The page hands out the editor's live Selects and pictures state, so it copies them
+        // on every change.
         let mirrored = cx.observe(&editor, |page, editor, cx| {
-            page.selects = editor.read(cx).selects.clone();
+            let editor = editor.read(cx);
+            page.selects = editor.selects.clone();
+            page.open_row = editor.open_row().map(str::to_owned);
+            page.zoom = editor.zoom();
             cx.notify();
         });
-        let mut subscriptions = vec![tf2, searched, wiped, edits, mirrored];
-        // Pictures redraw the page as they land, and the page's wants go with it.
-        let image_viewer = format!("graphics:{}", cx.entity_id());
-        if let Some(images) = RemoteImages::global(cx) {
-            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
-            let released = image_viewer.clone();
-            subscriptions.push(cx.on_release(move |_, cx| {
-                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
-            }));
-        }
+        let wipe = editor.read(cx).wipe_state().clone();
+        let subscriptions = vec![tf2, searched, edits, mirrored];
         let mut page = Self {
             win: window.window_handle(),
             status: None,
@@ -198,10 +181,9 @@ impl GraphicsPage {
             scroll: ScrollHandle::new(),
             pictures: None,
             wanted: Vec::new(),
-            image_viewer,
             open_row: None,
-            wipe,
             zoom: false,
+            wipe,
             tf2_running: false,
             editor,
             _subscriptions: subscriptions,
@@ -275,24 +257,6 @@ impl GraphicsPage {
     /// Whether the compare view shows the zoomed crops.
     pub fn zoom(&self) -> bool {
         self.zoom
-    }
-
-    // Opens `module`'s pictures, closing any other row's, or closes them when already open.
-    // A freshly opened row starts with the wipe in the middle.
-    fn toggle_pictures(&mut self, module: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.open_row = if self.open_row.as_deref() == Some(module) {
-            None
-        } else {
-            self.wipe
-                .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
-            Some(module.to_owned())
-        };
-        cx.notify();
-    }
-
-    fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
-        self.zoom = !self.zoom;
-        cx.notify();
     }
 
     fn set_changed_only(&mut self, on: bool, cx: &mut Context<Self>) {
@@ -539,16 +503,6 @@ impl GraphicsPage {
             },
             cx,
         );
-    }
-
-    // Saves the choices `edit` makes from the shown ones, through `change_to`.
-    fn change(&mut self, edit: impl FnOnce(&mut Choices, &ModuleCatalog), cx: &mut Context<Self>) {
-        let Some(catalog) = self.catalog.clone() else {
-            return;
-        };
-        let mut to = self.shown_against();
-        edit(&mut to, &catalog);
-        self.change_to(to, cx);
     }
 
     // Saves `new` in place of the shown choices; choices equal to them do nothing. Only a
@@ -804,14 +758,6 @@ impl GraphicsPage {
         .detach();
     }
 
-    // Saves `value` for `module`, as the row's own control does.
-    fn pick_value(&mut self, module: &str, value: &str, cx: &mut Context<Self>) {
-        self.change(
-            |c, catalog| c.set(catalog, module, ModuleChoice::Value(value.to_owned())),
-            cx,
-        );
-    }
-
     // Reads the pictures' manifest and checks their files in the background, once per page.
     fn load_pictures(&mut self, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
@@ -820,60 +766,14 @@ impl GraphicsPage {
         cx.spawn(async move |page, cx| {
             let index = reading.await.unwrap_or_default();
             let _ = page.update(cx, |page, cx| {
-                page.pictures = Some(Arc::new(index));
+                let index = Arc::new(index);
+                page.pictures = Some(Arc::clone(&index));
+                page.editor
+                    .update(cx, |e, cx| e.set_pictures(Some(index), cx));
                 cx.notify();
             });
         })
         .detach();
-    }
-
-    // The open row's compare pictures first, as the newest wants, then its strip, then the
-    // current thumbnail of every row with pictures; all thumbnails are wanted, not just the visible.
-    fn image_keys(&self) -> Vec<ImageKey> {
-        let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
-        else {
-            return Vec::new();
-        };
-        let open = self
-            .open_row
-            .as_deref()
-            .and_then(|module| self.row(module))
-            .and_then(|row| pictures::row_pictures(index, &row, self.zoom));
-        let (compared, strip) = open
-            .map(|p| (p.compare.pictures(), p.strip))
-            .unwrap_or_default();
-        let choices = self.shown_against();
-        let thumbs = catalog
-            .categories()
-            .iter()
-            .flat_map(|category| category.modules())
-            .filter(|module| index.has_pictures(module.name()))
-            .filter_map(|module| {
-                let row = view::row(catalog, &choices, module);
-                pictures::row_pictures(index, &row, false)?.thumb
-            })
-            .map(|thumb| ImageKey::card(&index.url(&thumb)));
-        compared
-            .into_iter()
-            .map(|picture| ImageKey::carousel(&index.url(&picture)))
-            .chain(strip.iter().map(|p| ImageKey::card(&index.url(&p.picture))))
-            .chain(thumbs)
-            .collect()
-    }
-
-    // Records this frame's keys and, when they changed, hands them to the image cache after
-    // the draw, so no entity is updated mid-render.
-    fn want_images(&mut self, cx: &mut Context<Self>) {
-        let keys = self.image_keys();
-        if keys == self.wanted {
-            return;
-        }
-        self.wanted = keys.clone();
-        let Some(images) = RemoteImages::global(cx) else {
-            return;
-        };
-        let viewer = self.image_viewer.clone();
-        cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
     }
 
     // The only writer of `busy`, so the editor's controls rest at the same moments.
@@ -913,7 +813,10 @@ impl Render for GraphicsPage {
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
-        self.want_images(cx);
+        self.wanted = self.editor.update(cx, |e, cx| {
+            e.want_images(cx);
+            e.wanted_images().to_vec()
+        });
         let filter = self.filter(cx);
         let sections = self
             .catalog

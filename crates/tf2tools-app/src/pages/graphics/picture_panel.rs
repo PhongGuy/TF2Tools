@@ -15,11 +15,13 @@ use gpui_kit::{
     TestSupportExt as _, div, hsla, px, relative, transparent_black,
 };
 
-use super::GraphicsPage;
+use tf2tools_core::ModuleChoice;
+
+use super::GraphicsChoicesEditor;
 use super::model::preset_label;
 use super::pictures::{Compare, RowPictures};
 use crate::i18n::tr;
-use crate::ids;
+use crate::ids::{self, IdScope};
 use crate::pages::huds::rounded_picture;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::widgets::{Named as _, labelled};
@@ -29,7 +31,7 @@ const THUMB_WIDTH: f32 = 96.;
 const THUMB_HEIGHT: f32 = 54.;
 /// A strip value card's picture, also 16:9.
 const STRIP_WIDTH: f32 = 112.;
-/// The compare view's widest size; it shrinks with a narrow page.
+/// The compare view's widest size; it shrinks with a narrow editor.
 const COMPARE_MAX_WIDTH: f32 = 720.;
 /// The compare view's corner radius.
 const COMPARE_RADIUS: f32 = 8.;
@@ -68,20 +70,21 @@ fn rounded(
 /// picture for the value the slot stays empty; a picture that failed to decode leaves an
 /// unfilled box, so the row keeps its shape either way.
 pub(super) fn thumbnail(
-    page: &GraphicsPage,
+    editor: &GraphicsChoicesEditor,
     module: &str,
     label: &str,
     pictures: &RowPictures,
-    cx: &mut Context<GraphicsPage>,
+    cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
-    let key = page
+    let s = editor.scope;
+    let key = editor
         .pictures
         .as_deref()
         .zip(pictures.thumb.as_deref())
         .map(|(index, thumb)| ImageKey::card(&index.url(thumb)));
     let picture = rounded(
-        ids::graphics_thumb_area(module),
-        ids::graphics_thumb_image(module),
+        s.id(ids::graphics_thumb_area(module)),
+        s.id(ids::graphics_thumb_image(module)),
         key.as_ref(),
         px(7.),
         cx,
@@ -89,12 +92,12 @@ pub(super) fn thumbnail(
     let target = module.to_owned();
     // A 1 px frame with an 8 px radius, in the accent while the row's pictures are open;
     // the picture inside is rounded 7 px itself so its corners stay within the frame's arc.
-    let frame = if page.open_row() == Some(module) {
+    let frame = if editor.open_row() == Some(module) {
         cx.theme().primary
     } else {
         cx.theme().border
     };
-    Button::new(ids::graphics_thumb(module))
+    Button::new(s.id(ids::graphics_thumb(module)))
         .ghost()
         .p_0()
         .flex_none()
@@ -103,32 +106,37 @@ pub(super) fn thumbnail(
         .border_color(frame)
         .rounded(px(8.))
         .named(tr!("graphics.pictures.thumb", name = label))
-        .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
+        .on_click(
+            cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
+        )
         .child(div().w(px(THUMB_WIDTH)).child(picture))
         .into_any_element()
 }
 
 /// "Show pictures", or "Hide pictures" while the row is open.
 pub(super) fn toggle(
-    page: &GraphicsPage,
+    editor: &GraphicsChoicesEditor,
     module: &str,
-    cx: &mut Context<GraphicsPage>,
+    cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
-    let open = page.open_row() == Some(module);
+    let s = editor.scope;
+    let open = editor.open_row() == Some(module);
     let label = if open {
         tr!("graphics.pictures.hide")
     } else {
         tr!("graphics.pictures.show")
     };
     let target = module.to_owned();
-    Button::new(ids::graphics_pictures_toggle(module))
+    Button::new(s.id(ids::graphics_pictures_toggle(module)))
         .ghost()
         .xsmall()
         .h(px(24.))
         .px_2()
         .font_weight(FontWeight::MEDIUM)
         .label(label)
-        .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
+        .on_click(
+            cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
+        )
         .into_any_element()
 }
 
@@ -136,18 +144,19 @@ pub(super) fn toggle(
 /// compare view with the zoom toggle on its corner when the setting has crops, then the
 /// strip of value pictures and its caption.
 pub(super) fn panel(
-    page: &GraphicsPage,
+    editor: &GraphicsChoicesEditor,
     module: &str,
     pictures: &RowPictures,
-    cx: &mut Context<GraphicsPage>,
+    cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
+    let s = editor.scope;
     let zoom = pictures.has_zoom.then(|| {
-        let label = if page.zoom() {
+        let label = if editor.zoom() {
             tr!("graphics.pictures.full")
         } else {
             tr!("graphics.pictures.zoom")
         };
-        Button::new(ids::graphics_zoom(module))
+        Button::new(s.id(ids::graphics_zoom(module)))
             .ghost()
             .absolute()
             .right(px(10.))
@@ -160,13 +169,13 @@ pub(super) fn panel(
             .font_weight(FontWeight::MEDIUM)
             .text_color(hsla(0., 0., 1., 1.))
             .label(label)
-            .on_click(cx.listener(|page, _, _, cx| page.toggle_zoom(cx)))
+            .on_click(cx.listener(|editor, _, _, cx| editor.toggle_zoom(cx)))
     });
     let theme = cx.theme();
     let (fill, border) = (theme.background, theme.border);
     // The bottom rule overlaps the next row's top rule, so the two never double.
     v_flex()
-        .id(ids::graphics_pictures(module))
+        .id(s.id(ids::graphics_pictures(module)))
         .test_support()
         .w_full()
         .pt_1()
@@ -177,13 +186,13 @@ pub(super) fn panel(
         .bg(fill)
         .border_b_1()
         .border_color(border)
-        .children(compare(page, module, &pictures.compare, zoom, cx))
+        .children(compare(editor, module, &pictures.compare, zoom, cx))
         .when(!pictures.strip.is_empty(), |panel| {
             panel
-                .child(strip(page, module, pictures, cx))
+                .child(strip(editor, module, pictures, cx))
                 .child(labelled(
                     div().text_xs().text_color(cx.theme().muted_foreground),
-                    ids::graphics_strip_caption(module),
+                    s.id(ids::graphics_strip_caption(module)),
                     tr!("graphics.pictures.caption"),
                 ))
         })
@@ -194,12 +203,13 @@ pub(super) fn panel(
 // chosen one outlined in the primary colour and the preset's tagged with the preset's name,
 // or "Preset" when that name repeats the value's label.
 fn strip(
-    page: &GraphicsPage,
+    editor: &GraphicsChoicesEditor,
     module: &str,
     pictures: &RowPictures,
-    cx: &mut Context<GraphicsPage>,
+    cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
-    let preset = preset_label(page.shown_against().preset());
+    let s = editor.scope;
+    let preset = preset_label(editor.choices.preset());
     let theme = cx.theme();
     let (ring, picked, border, muted) = (
         theme.primary,
@@ -208,13 +218,13 @@ fn strip(
         theme.muted_foreground,
     );
     let buttons = pictures.strip.iter().map(|entry| {
-        let key = page
+        let key = editor
             .pictures
             .as_deref()
             .map(|index| ImageKey::card(&index.url(&entry.picture)));
         let image = rounded(
-            ids::graphics_strip_area(module, &entry.value),
-            ids::graphics_strip_image(module, &entry.value),
+            s.id(ids::graphics_strip_area(module, &entry.value)),
+            s.id(ids::graphics_strip_image(module, &entry.value)),
             key.as_ref(),
             px(5.),
             cx,
@@ -227,14 +237,14 @@ fn strip(
                 preset.clone()
             };
             div()
-                .id(ids::graphics_strip_tag(module))
+                .id(s.id(ids::graphics_strip_tag(module)))
                 .aria_label(text.clone())
                 .test_support()
                 .text_color(muted)
                 .child(text)
         });
         let (target, value) = (module.to_owned(), entry.value.clone());
-        Button::new(ids::graphics_strip_picture(module, &entry.value))
+        Button::new(s.id(ids::graphics_strip_picture(module, &entry.value)))
             .ghost()
             .pt_1()
             .px_1()
@@ -250,8 +260,11 @@ fn strip(
                 }
             })
             .accessibility_label(entry.label.clone())
-            .disabled(page.busy)
-            .on_click(cx.listener(move |page, _, _, cx| page.pick_value(&target, &value, cx)))
+            .disabled(editor.disabled)
+            .on_click(cx.listener(move |editor, _, _, cx| {
+                let choice = ModuleChoice::Value(value.clone());
+                editor.propose(|c, catalog| c.set(catalog, &target, choice), cx)
+            }))
             .child(
                 v_flex()
                     .w(px(STRIP_WIDTH))
@@ -273,7 +286,7 @@ fn strip(
             )
     });
     h_flex()
-        .id(ids::graphics_strip(module))
+        .id(s.id(ids::graphics_strip(module)))
         .test_support()
         .flex_wrap()
         .gap_2()
@@ -285,26 +298,27 @@ fn strip(
 // line to the right edge shows the matching right part of yours, which keeps the box's full
 // width so both pictures line up.
 fn compare(
-    page: &GraphicsPage,
+    editor: &GraphicsChoicesEditor,
     module: &str,
     compare: &Compare,
     zoom: Option<Button>,
-    cx: &mut Context<GraphicsPage>,
+    cx: &mut Context<GraphicsChoicesEditor>,
 ) -> Option<AnyElement> {
-    let index = page.pictures.as_deref()?;
+    let s = editor.scope;
+    let index = editor.pictures.as_deref()?;
     let key = |path: &Path| ImageKey::carousel(&index.url(path));
     // Each side rounds its own corners, since gpui clips children only to rectangles.
     let side = |name: &str, path: &Path, cx: &App| {
         rounded(
-            ids::graphics_compare_area(module, name),
-            ids::graphics_compare_image(module, name),
+            s.id(ids::graphics_compare_area(module, name)),
+            s.id(ids::graphics_compare_image(module, name)),
             Some(&key(path)),
             px(COMPARE_RADIUS),
             cx,
         )
     };
     let frame = div()
-        .id(ids::graphics_compare(module))
+        .id(s.id(ids::graphics_compare(module)))
         .test_support()
         .relative()
         .mt_3()
@@ -321,7 +335,7 @@ fn compare(
             pill: text,
         } => frame
             .child(full(side("preset", picture, cx)))
-            .child(pill(module, "same", text, false))
+            .child(pill(s, module, "same", text, false))
             .children(zoom),
         Compare::Single {
             picture,
@@ -331,7 +345,7 @@ fn compare(
             let name = if *yours { "yours" } else { "preset" };
             frame
                 .child(full(side(name, picture, cx)))
-                .child(pill(module, name, text, *yours))
+                .child(pill(s, module, name, text, *yours))
                 .children(zoom)
         }
         Compare::Wipe {
@@ -340,7 +354,7 @@ fn compare(
             preset_pill,
             yours_pill,
         } => {
-            let w = page.wipe(cx) / 100.;
+            let w = editor.wipe(cx) / 100.;
             // The line sits apart from the clip: a border would narrow the clip's content box
             // and so the width yours takes from it.
             let line = (w < WIPE_ALL_PRESET).then(|| {
@@ -355,7 +369,7 @@ fn compare(
             });
             let clip = (w < WIPE_ALL_PRESET).then(|| {
                 div()
-                    .id(ids::graphics_compare_clip(module))
+                    .id(s.id(ids::graphics_compare_clip(module)))
                     .test_support()
                     .absolute()
                     .top_0()
@@ -365,7 +379,7 @@ fn compare(
                     .overflow_hidden()
                     .child(
                         div()
-                            .id(ids::graphics_compare_yours(module))
+                            .id(s.id(ids::graphics_compare_yours(module)))
                             .test_support()
                             .absolute()
                             .top_0()
@@ -376,21 +390,21 @@ fn compare(
                     )
             });
             let slider = div()
-                .id(ids::graphics_compare_slider(module))
+                .id(s.id(ids::graphics_compare_slider(module)))
                 .aria_label(tr!("graphics.pictures.wipe"))
                 .test_support()
                 .w_full()
                 .max_w(px(COMPARE_MAX_WIDTH))
                 .child(
-                    Slider::new(page.wipe_state())
+                    Slider::new(editor.wipe_state())
                         .accessibility_label(tr!("graphics.pictures.wipe")),
                 );
             let view = frame
                 .child(full(side("preset", preset, cx)))
                 .children(clip)
                 .children(line)
-                .child(pill(module, "preset", preset_pill, false))
-                .child(pill(module, "yours", yours_pill, true))
+                .child(pill(s, module, "preset", preset_pill, false))
+                .child(pill(s, module, "yours", yours_pill, true))
                 .children(zoom);
             return Some(
                 v_flex()
@@ -406,9 +420,15 @@ fn compare(
 }
 
 // A label over a compare picture's top corner: left for the preset's side, right for yours.
-fn pill(module: &str, side: &str, text: &SharedString, right: bool) -> impl IntoElement {
+fn pill(
+    s: IdScope,
+    module: &str,
+    side: &str,
+    text: &SharedString,
+    right: bool,
+) -> impl IntoElement {
     div()
-        .id(ids::graphics_compare_pill(module, side))
+        .id(s.id(ids::graphics_compare_pill(module, side)))
         .aria_label(text.clone())
         .test_support()
         .absolute()
