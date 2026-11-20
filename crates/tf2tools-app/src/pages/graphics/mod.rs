@@ -117,7 +117,8 @@ pub struct GraphicsPage {
     wipe: Entity<SliderState>,
     /// The shell's remembered answer to whether TF2 runs; drawing never probes processes.
     tf2_running: bool,
-    /// The presets card and changes strip, fed the shown choices and proposing edits.
+    /// The presets card, changes strip, settings rows and their pictures, fed the shown choices
+    /// and proposing edits.
     editor: Entity<GraphicsChoicesEditor>,
     _subscriptions: Vec<Subscription>,
 }

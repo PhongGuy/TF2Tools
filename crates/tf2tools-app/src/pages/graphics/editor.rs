@@ -264,7 +264,8 @@ impl GraphicsChoicesEditor {
     }
 
     // The open row's compare pictures first, as the newest wants, then its strip, then the
-    // current thumbnail of every row with pictures; all thumbnails are wanted, not just the visible.
+    // current thumbnail of every row with pictures; every thumbnail is wanted, not only the
+    // visible ones.
     fn image_keys(&self) -> Vec<ImageKey> {
         let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
         else {

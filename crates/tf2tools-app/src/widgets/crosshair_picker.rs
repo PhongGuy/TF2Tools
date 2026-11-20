@@ -36,11 +36,14 @@ const ROW_HEIGHT: Pixels = px(28.);
 
 /// A gallery tile's width and height, the gap between tiles, and its drawing's black square.
 const TILE_WIDTH: Pixels = px(88.);
-const TILE_HEIGHT: Pixels = px(106.);
-const TILE_GAP: Pixels = px(8.);
+const TILE_HEIGHT: Pixels = px(TILE_HEIGHT_PX);
+const TILE_GAP: Pixels = px(TILE_GAP_PX);
 const TILE_SQUARE: Pixels = px(80.);
+/// The raw sizes behind `TILE_HEIGHT` and `TILE_GAP`, since `Pixels` has no const arithmetic.
+const TILE_HEIGHT_PX: f32 = 106.;
+const TILE_GAP_PX: f32 = 8.;
 /// The strip's tile row: one tile with a gap above and below.
-const STRIP_ROW_HEIGHT: Pixels = px(106. + 8. * 2.);
+const STRIP_ROW_HEIGHT: Pixels = px(TILE_HEIGHT_PX + TILE_GAP_PX * 2.);
 
 /// Asked by the strip's Import button; the host runs the import.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -592,7 +595,8 @@ impl CrosshairPicker {
             move |this, range, _, cx| {
                 range
                     .map(|ix| {
-                        let (id, name, crosshair) = this.tile_parts(tiles[ix]);
+                        let (id, name, crosshair) =
+                            tile_parts(this.scope, &this.builtins, &this.library, tiles[ix]);
                         let selected = this.selected.as_ref();
                         let tile = tile_element(
                             id,
@@ -631,31 +635,6 @@ impl CrosshairPicker {
             .into_any_element()
     }
 
-    // A gallery tile's scoped id, its name and the crosshair it picks.
-    fn tile_parts(&self, tile: Row) -> (ElementId, String, CrosshairRef) {
-        match tile {
-            Row::Library(i) => {
-                let c = &self.library[i];
-                (
-                    self.scope.id(ids::crosshair_library(c.folder_name())),
-                    c.name().to_owned(),
-                    CrosshairRef::Library(c.id().clone()),
-                )
-            }
-            Row::Builtin(i) => {
-                let b = &self.builtins.all()[i];
-                (
-                    self.scope.id(ids::crosshair_builtin(b.name())),
-                    b.display_name().to_owned(),
-                    CrosshairRef::Builtin(b.name().to_owned()),
-                )
-            }
-            Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
-                unreachable!("the gallery holds no headers")
-            }
-        }
-    }
-
     // The tile grid. The canvas records the painted width; a change asks for another frame,
     // since a refresh requested while drawing is dropped.
     fn grid(&self, tiles: Rc<[Row]>, cx: &mut Context<Self>) -> AnyElement {
@@ -686,27 +665,7 @@ impl CrosshairPicker {
                     let start = row * columns;
                     let end = (start + columns).min(tiles.len());
                     let cells = tiles[start..end].iter().map(|tile| {
-                        let (id, name, crosshair) = match *tile {
-                            Row::Library(i) => {
-                                let c = &library[i];
-                                (
-                                    scope.id(ids::crosshair_library(c.folder_name())),
-                                    c.name().to_owned(),
-                                    CrosshairRef::Library(c.id().clone()),
-                                )
-                            }
-                            Row::Builtin(i) => {
-                                let b = &builtins.all()[i];
-                                (
-                                    scope.id(ids::crosshair_builtin(b.name())),
-                                    b.display_name().to_owned(),
-                                    CrosshairRef::Builtin(b.name().to_owned()),
-                                )
-                            }
-                            Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
-                                unreachable!("the gallery holds no headers")
-                            }
-                        };
+                        let (id, name, crosshair) = tile_parts(scope, &builtins, &library, *tile);
                         tile_element(
                             id,
                             name,
@@ -927,6 +886,36 @@ fn option(
         )
         .child(div().min_w_0().truncate().text_sm().child(name))
         .into_any_element()
+}
+
+// A gallery tile's scoped id, its name and the crosshair it picks.
+fn tile_parts(
+    scope: IdScope,
+    builtins: &BuiltinCrosshairs,
+    library: &[CrosshairEntry],
+    tile: Row,
+) -> (ElementId, String, CrosshairRef) {
+    match tile {
+        Row::Library(i) => {
+            let c = &library[i];
+            (
+                scope.id(ids::crosshair_library(c.folder_name())),
+                c.name().to_owned(),
+                CrosshairRef::Library(c.id().clone()),
+            )
+        }
+        Row::Builtin(i) => {
+            let b = &builtins.all()[i];
+            (
+                scope.id(ids::crosshair_builtin(b.name())),
+                b.display_name().to_owned(),
+                CrosshairRef::Builtin(b.name().to_owned()),
+            )
+        }
+        Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
+            unreachable!("the gallery holds no headers")
+        }
+    }
 }
 
 // A gallery tile: the crosshair at its in-game size on a black square, ringed in the theme's

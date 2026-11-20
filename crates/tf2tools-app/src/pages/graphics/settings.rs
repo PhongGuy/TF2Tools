@@ -4,14 +4,6 @@
 
 use std::collections::BTreeMap;
 
-use super::GraphicsPage;
-use super::model::{SettingsNote, preset_label, settings_note_text};
-use super::rows::CHANGED;
-use super::view::{self, EmptyState, SectionView};
-use crate::i18n::tr;
-use crate::ids;
-use crate::pages::common::card_frame;
-use crate::widgets::labelled;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::Icon;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -24,6 +16,15 @@ use gpui_kit::{
     ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
     div, px, rgb,
 };
+
+use super::GraphicsPage;
+use super::model::{SettingsNote, preset_label, settings_note_text};
+use super::rows::CHANGED;
+use super::view::{self, EmptyState, SectionView};
+use crate::i18n::tr;
+use crate::ids;
+use crate::pages::common::card_frame;
+use crate::widgets::labelled;
 
 /// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
 /// search toolbar (or the note while there is no catalog), one section per category with shown
