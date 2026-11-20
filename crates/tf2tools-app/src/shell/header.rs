@@ -8,9 +8,9 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, TitleBar, h_flex,
 };
 use gpui_kit::{
-    App, Context, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, Pixels, Role, SharedString, Stateful, StatefulInteractiveElement as _,
-    Styled as _, TestSupportExt as _, div, px, transparent_black,
+    AnyView, App, Context, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, Pixels, Role, SharedString, Stateful,
+    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px, transparent_black,
 };
 
 use tf2tools_core::StoreKind;
@@ -32,10 +32,12 @@ use crate::widgets::tip::tip_box;
 /// Steam's link that starts TF2 (app 440).
 pub const PLAY_TF2_URL: &str = "steam://run/440";
 
-/// Element `header`, `HEADER_HEIGHT` tall, titled for `page`, inside the kit's title bar.
+/// Element `header`, `HEADER_HEIGHT` tall, titled for `page` or showing its `slot` view, inside
+/// the kit's title bar.
 /// `tf2_running` is the shell's remembered answer, so drawing never scans processes.
 pub(super) fn render(
     page: Page,
+    slot: Option<AnyView>,
     tf2_running: bool,
     window_width: Pixels,
     cx: &mut Context<Shell>,
@@ -57,13 +59,14 @@ pub(super) fn render(
                     window.remove_window();
                 }
             })
-            .child(content(page, tf2_running, window_width, cx)),
+            .child(content(page, slot, tf2_running, window_width, cx)),
     )
 }
 
 // v5's header row: the sidebar toggle, the page title and the status slot.
 fn content(
     page: Page,
+    slot: Option<AnyView>,
     tf2_running: bool,
     window_width: Pixels,
     cx: &mut Context<Shell>,
@@ -103,8 +106,16 @@ fn content(
                         ),
                 ),
         )
-        .child(
-            div()
+        // A page's own header view takes the title's place and the room up to the status group.
+        .child(match slot {
+            Some(view) => div()
+                .id(ids::HEADER_SLOT)
+                .test_support()
+                .flex_1()
+                .min_w_0()
+                .child(view)
+                .into_any_element(),
+            None => div()
                 .id(ids::HEADER_TITLE)
                 .aria_label(title.clone())
                 .test_support()
@@ -112,8 +123,9 @@ fn content(
                 .truncate()
                 .text_lg()
                 .font_weight(FontWeight::SEMIBOLD)
-                .child(title),
-        )
+                .child(title)
+                .into_any_element(),
+        })
         .children((page == Page::HudMaker).then(|| shortcuts_button(cx)))
         // v5's status slot: the rings in their own `gap-1.5` row, then the TF2 badge.
         .child(

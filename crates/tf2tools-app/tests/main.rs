@@ -86,6 +86,7 @@ mod graphics_status;
 mod graphics_strip;
 mod graphics_thumbs;
 mod graphics_view;
+mod header_slot;
 mod help_links;
 mod hud_copy_card;
 mod hud_copy_update;

@@ -19,6 +19,8 @@ pub const SIDEBAR_TOGGLE: &str = "sidebar-toggle";
 pub const SIDEBAR_GROUPS: &str = "sidebar-groups";
 pub const HEADER: &str = "header";
 pub const HEADER_TITLE: &str = "header-title";
+/// The header row's stand-in for the title while a page has put its own view there.
+pub const HEADER_SLOT: &str = "header-slot";
 /// The header's own row, left of any window buttons the title bar draws on this platform.
 pub const HEADER_ROW: &str = "header-row";
 pub const TF2_BADGE: &str = "tf2-badge";

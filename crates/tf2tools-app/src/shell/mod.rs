@@ -6,6 +6,7 @@ mod error_view;
 pub mod external_huds;
 pub mod font_check;
 mod header;
+pub mod header_slot;
 pub mod leave;
 pub mod root;
 pub mod route;
@@ -128,6 +129,9 @@ impl Shell {
             cx.notify();
         })
         .detach();
+        // A page's header view swaps in and out through the slot, so the header redraws with it.
+        let slot = header_slot::HeaderSlot::global(cx);
+        cx.observe(&slot, |_, _, cx| cx.notify()).detach();
         // A player back from moving the game folder, or from closing TF2, sees the header catch up.
         cx.observe_window_activation(window, |_, window, cx| {
             if window.is_window_active() {
@@ -468,6 +472,9 @@ impl Shell {
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let slot_view = header_slot::HeaderSlot::global(cx)
+            .read(cx)
+            .view_for(self.page);
         let theme = cx.theme();
         let (bg, fg) = (theme.background, theme.foreground);
         // The content area never scrolls; each page owns its scrolling, so grids get a bounded height.
@@ -701,6 +708,7 @@ impl Render for Shell {
                     .h_full()
                     .child(header::render(
                         self.page,
+                        slot_view,
                         self.tf2_running,
                         window.viewport_size().width,
                         cx,
