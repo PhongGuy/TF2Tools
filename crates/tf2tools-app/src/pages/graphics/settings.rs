@@ -15,7 +15,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
     ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
-    div, px, rgb,
+    div, px, relative, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
@@ -273,10 +273,10 @@ const RAIL_GUTTER: f32 = 24.;
 /// The left bar and tint that mark a row the player changed from the preset.
 const CHANGED: u32 = 0x1447e6;
 
-// The title, description and Learn more, plus the preset's value when changed, on the left;
-// Reset when changed and the row's control on the right. A module with pictures adds its
-// thumbnail before the text and Show pictures under it, and the open row's panel goes below
-// the line. Every row but the card's `first` rules itself off from the one above.
+// The title, description and Learn more, with the preset's value beside it when changed, on
+// the left; Reset when changed and the row's control on the right. A module with pictures
+// adds its thumbnail before the text and Show pictures under it, and the open row's panel
+// goes below the line. Every row but the card's `first` rules itself off from the one above.
 fn row(
     page: &GraphicsPage,
     row: RowView,
@@ -293,22 +293,27 @@ fn row(
             text,
         )
     });
-    // The docs link reads as part of the description: its size and muted colour, underlined.
-    let learn_more = h_flex().child(
-        Button::new(ids::graphics_learn_more(name))
-            .link()
-            .xsmall()
-            .text_color(muted)
-            .label(tr!("graphics.row.learn_more"))
-            .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
-    );
+    // Set solid, so the Learn more link alone gives the line its height.
     let preset = row.changed.then(|| {
         labelled(
-            div().text_xs().text_color(muted),
+            div().text_xs().line_height(relative(1.)).text_color(muted),
             ids::graphics_module_preset(name),
             row.preset_text.clone(),
         )
     });
+    // The docs link reads as part of the description: its size and muted colour, underlined.
+    // The preset's value shares its line, so a pick never adds a line to the text.
+    let learn_more = h_flex()
+        .gap_3()
+        .child(
+            Button::new(ids::graphics_learn_more(name))
+                .link()
+                .xsmall()
+                .text_color(muted)
+                .label(tr!("graphics.row.learn_more"))
+                .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
+        )
+        .children(preset);
     let reset = row.changed.then(|| {
         let module = name.to_owned();
         Button::new(ids::graphics_module_reset(name))
@@ -357,7 +362,6 @@ fn row(
         ))
         .children(description)
         .child(learn_more)
-        .children(preset)
         .children(toggle);
     let controls = h_flex().flex_none().gap_2().children(reset).child(control);
     // The thumbnail always sits beside the text. On a narrow page (the one without the rail)

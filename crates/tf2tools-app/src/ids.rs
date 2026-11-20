@@ -1121,6 +1121,11 @@ pub fn graphics_compare_clip(module: &str) -> ElementId {
     keyed("graphics-compare-clip", module)
 }
 
+/// The wipe line between the preset's picture and yours: "graphics-compare-line:<module>".
+pub fn graphics_compare_line(module: &str) -> ElementId {
+    keyed("graphics-compare-line", module)
+}
+
 /// The player's picture inside the overlay: "graphics-compare-yours:<module>".
 pub fn graphics_compare_yours(module: &str) -> ElementId {
     keyed("graphics-compare-yours", module)
