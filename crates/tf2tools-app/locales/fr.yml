@@ -716,6 +716,7 @@ profiles:
       killsound: "KILLSOUND"
       crosshair: "VISEUR"
       item: "OBJET"
+      addon: "ADD-ON"
   editor:
     name_blank: "Donne un nom à ce profil"
     pick_hud: "Choisis un HUD, ou choisis Aucun"
@@ -745,6 +746,17 @@ profiles:
     failed_steps: "Impossible de mettre en place\u00A0: %{steps}. Vérifiez que TF2 est fermé et que TF2Tools peut écrire dans votre dossier TF2, puis réessayez."
     activate_failed: "Impossible d'activer le profil"
     missing: "Certains objets sont manquants"
+    applied_line: "%{name} appliqué. TF2 le prendra en compte au prochain lancement."
+    apply_failed: "Impossible d'appliquer %{name}"
+    kept_only: "Configuration existante conservée pour\u00A0: %{list} (introuvables dans votre bibliothèque)"
+    skipped: "%{part} est resté tel quel\u00A0: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig n'est pas installé, installez-le d'abord sur la page Graphismes"
+    not_managed: "TF2Tools n'a pas installé votre mastercomfig, prenez-le d'abord en charge sur la page Graphismes"
+    addons_need_base: "les add-ons ont besoin de mastercomfig, qui n'est pas installé"
+  modules:
+    no_catalog: "Ouvrez une fois la page Graphismes pour que TF2Tools puisse lire les paramètres de votre mastercomfig"
+    foreign: "Votre modules.cfg n'a pas été écrit par TF2Tools\u00A0; ouvrez la page Graphismes pour le remplacer"
   activity:
     saved_current: "Configuration actuelle enregistrée comme profil\u00A0: %{name}"
     deleted: "Profil supprimé\u00A0: %{name}"

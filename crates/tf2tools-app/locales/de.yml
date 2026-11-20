@@ -714,6 +714,7 @@ profiles:
       killsound: "KILLSOUND"
       crosshair: "FADENKREUZ"
       item: "EINTRAG"
+      addon: "ADD-ON"
   editor:
     name_blank: "Gib diesem Profil einen Namen"
     pick_hud: "Wähle ein HUD oder „Keine“"
@@ -743,6 +744,17 @@ profiles:
     failed_steps: "Konnte nicht eingerichtet werden: %{steps}. Stell sicher, dass TF2 geschlossen ist und TF2Tools in deinen TF2-Ordner schreiben darf, und versuch es dann erneut."
     activate_failed: "Profil konnte nicht aktiviert werden"
     missing: "Einige Einträge fehlen"
+    applied_line: "%{name} angewendet. TF2 übernimmt es beim nächsten Start."
+    apply_failed: "%{name} konnte nicht angewendet werden"
+    kept_only: "Bisheriges behalten für: %{list} (fehlt in deiner Bibliothek)"
+    skipped: "%{part} blieb unverändert: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig ist nicht installiert, installiere es zuerst auf der Grafik-Seite"
+    not_managed: "TF2Tools hat dein mastercomfig nicht installiert, übernimm es zuerst auf der Grafik-Seite"
+    addons_need_base: "Add-ons brauchen mastercomfig, das nicht installiert ist"
+  modules:
+    no_catalog: "Öffne einmal die Grafik-Seite, damit TF2Tools die Einstellungen deines mastercomfig lesen kann"
+    foreign: "Deine modules.cfg stammt nicht von TF2Tools; öffne die Grafik-Seite, um sie zu ersetzen"
   activity:
     saved_current: "Aktuelles Setup als Profil gespeichert: %{name}"
     deleted: "Profil gelöscht: %{name}"

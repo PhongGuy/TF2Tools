@@ -715,6 +715,7 @@ profiles:
       killsound: "KILLSOUND"
       crosshair: "MIRA"
       item: "ITEM"
+      addon: "ADD-ON"
   editor:
     name_blank: "Dê um nome a este perfil"
     pick_hud: "Escolha um HUD ou escolha Nenhum"
@@ -744,6 +745,17 @@ profiles:
     failed_steps: "Não foi possível colocar estes itens no lugar: %{steps}. Verifique se o TF2 está fechado e se o TF2Tools pode gravar na sua pasta do TF2, e tente de novo."
     activate_failed: "Não foi possível ativar o perfil"
     missing: "Alguns itens estão ausentes"
+    applied_line: "%{name} aplicado. O TF2 vai usá-lo na próxima vez que iniciar."
+    apply_failed: "Não foi possível aplicar %{name}"
+    kept_only: "Mantido o que você tinha para: %{list} (ausentes da sua biblioteca)"
+    skipped: "%{part} ficou como estava: %{reason}"
+  skip:
+    graphics_not_installed: "o mastercomfig não está instalado, então instale-o primeiro na página Gráficos"
+    not_managed: "o TF2Tools não instalou seu mastercomfig, então assuma o controle dele primeiro na página Gráficos"
+    addons_need_base: "add-ons precisam do mastercomfig, que não está instalado"
+  modules:
+    no_catalog: "Abra a página Gráficos uma vez para o TF2Tools ler as configurações do seu mastercomfig"
+    foreign: "Seu modules.cfg não foi gravado pelo TF2Tools; abra a página Gráficos para substituí-lo"
   activity:
     saved_current: "Configuração atual salva como perfil: %{name}"
     deleted: "Perfil excluído: %{name}"

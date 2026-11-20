@@ -691,6 +691,7 @@ profiles:
       killsound: "KILLSOUND"
       crosshair: "CROSSHAIR"
       item: "ITEM"
+      addon: "ADD-ON"
   editor:
     name_blank: "Give this profile a name"
     pick_hud: "Pick a HUD, or choose None"
@@ -720,6 +721,17 @@ profiles:
     failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
     activate_failed: "Failed to activate profile"
     missing: "Some items are missing"
+    applied_line: "%{name} applied. TF2 picks it up the next time it starts."
+    apply_failed: "Couldn't apply %{name}"
+    kept_only: "Kept what you had for: %{list} (missing from your library)"
+    skipped: "%{part} was left as it is: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig isn't installed, so install it on the Graphics page first"
+    not_managed: "TF2Tools didn't install your mastercomfig, so take it over on the Graphics page first"
+    addons_need_base: "add-ons need mastercomfig, which isn't installed"
+  modules:
+    no_catalog: "Open the Graphics page once so TF2Tools can read your mastercomfig's settings"
+    foreign: "Your modules.cfg was not written by TF2Tools; open the Graphics page to replace it"
   activity:
     saved_current: "Saved current setup as profile: %{name}"
     deleted: "Deleted profile: %{name}"

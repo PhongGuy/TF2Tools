@@ -1,12 +1,17 @@
 use crate::support;
 
 use gpui_kit::{SharedString, TestAppContext};
+use tf2tools_app::pages::profiles::model::{ApplyOutcome, modules_no_catalog, outcome_toast};
 use tf2tools_app::pages::profiles::model::{
     activated_description, failed_description, kept_parts, kind_label, load_closes_editor, matches,
     redownload_target, report_details, step_label, success_title,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
-use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
+use tf2tools_app::shell::toast::ToastKind;
+use tf2tools_core::ApplySkipReason;
+use tf2tools_core::{
+    AddonName, ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind,
+};
 
 fn parts(names: &[&'static str]) -> Vec<SharedString> {
     names.iter().map(|&n| n.into()).collect()
@@ -35,6 +40,13 @@ fn steps_and_kinds_have_v5_s_labels() {
     assert_eq!(step_label(ApplyStep::Killsound), "Killsound");
     assert_eq!(step_label(ApplyStep::Crosshairs), "Crosshairs");
     assert_eq!(step_label(ApplyStep::Graphics), "Graphics");
+    assert_eq!(step_label(ApplyStep::Addons), "Add-ons");
+    assert_eq!(
+        kind_label(&MissingKind::Addon {
+            name: AddonName::new("mastercomfig-addon-no-pyroland.vpk").unwrap()
+        }),
+        "ADD-ON"
+    );
     assert_eq!(kind_label(&MissingKind::Hud), "HUD");
     assert_eq!(kind_label(&MissingKind::Hitsound), "HITSOUND");
     assert_eq!(kind_label(&MissingKind::Killsound), "KILLSOUND");
@@ -190,4 +202,109 @@ fn a_load_closes_only_an_editor_open_when_it_started_and_missing_from_it() {
     assert!(!load_closes_editor(Some(&made), &made, [&other, &made]));
     // The editor open now replaced the one open at the start, so the load predates it.
     assert!(!load_closes_editor(Some(&other), &made, [&other]));
+}
+
+const APPLIED: &str = "Comp applied. TF2 picks it up the next time it starts.";
+
+fn outcome(active: bool) -> ApplyOutcome {
+    ApplyOutcome {
+        name: "Comp".into(),
+        active,
+        ..ApplyOutcome::default()
+    }
+}
+
+#[test]
+fn a_clean_apply_is_one_success_line() {
+    assert_eq!(
+        outcome_toast(&outcome(true)),
+        (ToastKind::Success, APPLIED.into(), String::new())
+    );
+}
+
+#[test]
+fn outcome_toast_warns_when_the_profile_stayed_inactive() {
+    let (kind, title, description) = outcome_toast(&outcome(false));
+    assert_eq!(
+        (kind, title.as_str(), description.as_str()),
+        (ToastKind::Warning, APPLIED, "")
+    );
+}
+
+#[test]
+fn kept_items_and_skipped_steps_follow_as_sentences() {
+    let mut o = outcome(false);
+    o.kept = parts(&["HUD"]);
+    o.skipped_steps = vec![(
+        ApplyStep::Graphics,
+        ApplySkipReason::MastercomfigNotInstalled,
+    )];
+    let (kind, title, description) = outcome_toast(&o);
+    assert_eq!((kind, title.as_str()), (ToastKind::Warning, APPLIED));
+    assert_eq!(
+        description,
+        "Kept what you had for: HUD (missing from your library). Graphics was left as it is: mastercomfig isn't installed, so install it on the Graphics page first."
+    );
+    let mut o = outcome(false);
+    o.skipped_steps = vec![
+        (ApplyStep::Graphics, ApplySkipReason::MastercomfigNotManaged),
+        (ApplyStep::Addons, ApplySkipReason::MastercomfigNotInstalled),
+    ];
+    assert_eq!(
+        outcome_toast(&o).2,
+        "Graphics was left as it is: TF2Tools didn't install your mastercomfig, so take it over on the Graphics page first. Add-ons was left as it is: add-ons need mastercomfig, which isn't installed."
+    );
+}
+
+#[test]
+fn the_movement_line_and_the_note_end_the_description() {
+    let mut o = outcome(true);
+    o.movement = Some("Your movement keys are back to normal.".into());
+    o.note = Some("A copy of manual is in your library.".into());
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Warning,
+            APPLIED.into(),
+            "Your movement keys are back to normal. A copy of manual is in your library.".into()
+        )
+    );
+}
+
+#[test]
+fn a_hud_kept_out_of_its_folder_warns_after_the_kept_line() {
+    let mut o = outcome(true);
+    o.blocked = Some("m0rehud".into());
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Warning,
+            APPLIED.into(),
+            "A folder named m0rehud is already in your custom folder, so parts of this HUD may not show. Move or rename that folder and install again.".into()
+        )
+    );
+    o.kept = parts(&["Hitsound"]);
+    assert!(outcome_toast(&o).2.starts_with(
+        "Kept what you had for: Hitsound (missing from your library). A folder named m0rehud"
+    ));
+}
+
+#[test]
+fn a_failure_names_its_steps_and_the_graphics_reason() {
+    let mut o = outcome(false);
+    o.name = "Potato".into();
+    o.failed = vec![(ApplyStep::Graphics, modules_no_catalog().to_string())];
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Error,
+            "Couldn't apply Potato".into(),
+            "Graphics: Open the Graphics page once so TF2Tools can read your mastercomfig's settings.".into()
+        )
+    );
+    o.failed.insert(0, (ApplyStep::Hud, "denied".into()));
+    assert_eq!(
+        outcome_toast(&o).2,
+        "Couldn't put these in place: HUD. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again. Graphics: Open the Graphics page once so TF2Tools can read your mastercomfig's settings."
+    );
 }

@@ -689,6 +689,7 @@ profiles:
       killsound: "КИЛСАУНД"
       crosshair: "ПРИЦЕЛ"
       item: "ЭЛЕМЕНТ"
+      addon: "ДОПОЛНЕНИЕ"
   editor:
     name_blank: "Дайте профилю имя"
     pick_hud: "Выберите HUD или «Нет»"
@@ -718,6 +719,17 @@ profiles:
     failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыта и TF2Tools может записывать в папку TF2, затем попробуйте снова."
     activate_failed: "Не удалось включить профиль"
     missing: "Некоторые элементы отсутствуют"
+    applied_line: "%{name} применён. TF2 подхватит его при следующем запуске."
+    apply_failed: "Не удалось применить %{name}"
+    kept_only: "Без изменений: %{list} (нет в библиотеке)"
+    skipped: "%{part}: оставлено как было, %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig не установлен, сначала установите его на странице «Графика»"
+    not_managed: "ваш mastercomfig установлен не через TF2Tools, сначала возьмите его под управление на странице «Графика»"
+    addons_need_base: "дополнениям нужен mastercomfig, а он не установлен"
+  modules:
+    no_catalog: "Откройте страницу «Графика» один раз, чтобы TF2Tools прочитала настройки вашего mastercomfig"
+    foreign: "Ваш modules.cfg записан не TF2Tools; откройте страницу «Графика», чтобы заменить его"
   activity:
     saved_current: "Текущая сборка сохранена как профиль: %{name}"
     deleted: "Профиль удалён: %{name}"
