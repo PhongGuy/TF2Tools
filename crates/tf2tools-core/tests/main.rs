@@ -251,6 +251,7 @@ mod panic_mark;
 mod payloads;
 mod png;
 mod profile_apply;
+mod profile_apply_modes;
 mod profile_current_setup;
 mod profile_edit;
 mod profile_resolve;

@@ -551,7 +551,8 @@ impl ProfilesPage {
 enum Activation {
     Applied {
         profile: Profile,
-        report: ApplyProfileReport,
+        // Boxed since the report carries a whole profile and dwarfs the other variants.
+        report: Box<ApplyProfileReport>,
         hud_folder: Option<String>,
         /// What the toast adds about the HUDs kept or removed on the way.
         note: Option<String>,
@@ -624,7 +625,7 @@ fn apply_job(
         .flatten();
     Ok(Activation::Applied {
         profile,
-        report,
+        report: Box::new(report),
         hud_folder,
         note: plan.note().filter(|_| hud_step_ran),
     })

@@ -979,14 +979,17 @@ impl MissingItem {
     }
 }
 
-/// A profile with every reference resolved against the library. A slot is `None` when it
-/// is empty or missing; `crosshairs` keeps every row, a resolved one under its new folder.
+/// A profile with every reference resolved against the library, per step: Leave runs no
+/// step, None uninstalls, and a missing item reads as None (its step is skipped anyway).
+/// Set crosshairs keep every row, a resolved one under its new folder. `profile` is the
+/// row as re-read after the rewrites.
 pub(super) struct Resolved {
-    pub(super) hud: Option<HudId>,
-    pub(super) hitsound: Option<SoundId>,
-    pub(super) killsound: Option<SoundId>,
-    pub(super) crosshairs: Vec<ProfileCrosshair>,
+    pub(super) hud: SlotMode<HudId>,
+    pub(super) hitsound: SlotMode<SoundId>,
+    pub(super) killsound: SlotMode<SoundId>,
+    pub(super) crosshairs: SlotMode<Vec<ProfileCrosshair>>,
     pub(super) missing: Vec<MissingItem>,
+    pub(super) profile: Profile,
 }
 
 /// The library id of the row with `folder`, when that row exists and its folder is a
@@ -1146,27 +1149,39 @@ pub(super) fn resolve_profile(
             }
         }
     };
-    // Only Set content is resolved; until Leave gets its own apply, it acts as None here.
-    let sounds = profile.sounds.as_set();
-    let hud = slot(
-        profile.hud.as_set(),
-        &HUD_SLOT,
-        LibraryKind::Huds,
-        MissingKind::Hud,
-    )?;
-    let hitsound = slot(
-        sounds.and_then(|s| s.hit.as_ref()),
-        &HITSOUND_SLOT,
-        LibraryKind::Sounds,
-        MissingKind::Hitsound,
-    )?;
-    let killsound = slot(
-        sounds.and_then(|s| s.kill.as_ref()),
-        &KILLSOUND_SLOT,
-        LibraryKind::Sounds,
-        MissingKind::Killsound,
-    )?;
+    // Only Set content is resolved; Leave and None pass through as the step to run.
+    // A Set sound side left empty means TF2's default, so that side uninstalls.
+    let found = |id: Option<String>| id.map_or(SlotMode::None, SlotMode::Set);
+    let hud = match &profile.hud {
+        SlotMode::Set(item) => found(slot(
+            Some(item),
+            &HUD_SLOT,
+            LibraryKind::Huds,
+            MissingKind::Hud,
+        )?),
+        SlotMode::Leave => SlotMode::Leave,
+        SlotMode::None => SlotMode::None,
+    };
+    let (hitsound, killsound) = match &profile.sounds {
+        SlotMode::Set(sounds) => (
+            found(slot(
+                sounds.hit.as_ref(),
+                &HITSOUND_SLOT,
+                LibraryKind::Sounds,
+                MissingKind::Hitsound,
+            )?),
+            found(slot(
+                sounds.kill.as_ref(),
+                &KILLSOUND_SLOT,
+                LibraryKind::Sounds,
+                MissingKind::Killsound,
+            )?),
+        ),
+        SlotMode::Leave => (SlotMode::Leave, SlotMode::Leave),
+        SlotMode::None => (SlotMode::None, SlotMode::None),
+    };
 
+    let crosshairs_mode = profile.crosshairs.map_ref(|_| ());
     let saved = match profile.crosshairs {
         SlotMode::Set(list) => list,
         SlotMode::Leave | SlotMode::None => Vec::new(),
@@ -1229,13 +1244,17 @@ pub(super) fn resolve_profile(
         )
         .map_err(resolve_db)?;
     }
+    let profile = load_profile(&tx, id.as_str())
+        .map_err(resolve_db)?
+        .ok_or_else(|| ResolveError::NotFound(id.to_string()))?;
     tx.commit().map_err(resolve_db)?;
     Ok(Resolved {
-        hud: hud.map(HudId::new),
-        hitsound: hitsound.map(SoundId::new),
-        killsound: killsound.map(SoundId::new),
-        crosshairs,
+        hud: hud.map_ref(|id| HudId::new(id.clone())),
+        hitsound: hitsound.map_ref(|id| SoundId::new(id.clone())),
+        killsound: killsound.map_ref(|id| SoundId::new(id.clone())),
+        crosshairs: crosshairs_mode.map_ref(|()| crosshairs),
         missing,
+        profile,
     })
 }
 
@@ -1258,6 +1277,7 @@ pub enum ApplyStep {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ApplyProfileReport {
+    profile: Profile,
     applied: Vec<ApplyStep>,
     skipped: Vec<MissingItem>,
     failed: Vec<(ApplyStep, String)>,
@@ -1265,6 +1285,12 @@ pub struct ApplyProfileReport {
 }
 
 impl ApplyProfileReport {
+    /// The applied profile as saved once its references were resolved and rewritten, so
+    /// `Library::mark_profile_active` accepts it.
+    pub fn profile(&self) -> &Profile {
+        &self.profile
+    }
+
     /// The steps that succeeded, in run order.
     pub fn applied(&self) -> &[ApplyStep] {
         &self.applied
@@ -1387,11 +1413,12 @@ impl Library {
     }
 
     /// Applies a profile to `tf2`: resolves it (a builtin the catalog lacks is missing),
-    /// then installs or uninstalls the HUD, each sound and the crosshairs, best effort.
-    /// Missing items fail with `Missing` before any file is touched unless `skip_missing`,
-    /// which leaves what is installed for those slots alone; unless the HUD is skipped, a HUD
-    /// the library cannot put back then fails with `ExternalHuds` the same way. The profile becomes active only
-    /// when nothing was skipped and no step failed, so Active means the game matches it.
+    /// then, slot by slot, installs a Set item, uninstalls a None one and leaves a Leave one
+    /// alone, best effort. Missing items fail with `Missing` before any file is touched unless
+    /// `skip_missing`, which leaves what is installed for those slots alone; unless the HUD is
+    /// skipped or left, a HUD the library cannot put back then fails with `ExternalHuds` the
+    /// same way. The profile becomes active only when nothing was skipped and no step
+    /// failed, so Active means the game matches it.
     pub fn apply_profile(
         &self,
         id: &ProfileId,
@@ -1423,11 +1450,12 @@ impl Library {
         }
         // Asked before any step, so a refused apply leaves sounds and crosshairs alone too.
         // A skipped HUD removes nothing, so there is nothing to ask about.
+        // A HUD left as is removes nothing either.
         let skipped = |kind: MissingKind| resolved.missing.iter().any(|m| m.kind == kind);
+        let run_hud = !matches!(resolved.hud, SlotMode::Leave) && !skipped(MissingKind::Hud);
         // Held from the external check through the HUD step, so no copy changes between them.
-        let hud_guards = (!skipped(MissingKind::Hud))
-            .then(|| (super::live_link::hud_swap_lock(), self.copies_read()));
-        if !skipped(MissingKind::Hud) {
+        let hud_guards = run_hud.then(|| (super::live_link::hud_swap_lock(), self.copies_read()));
+        if run_hud {
             let unnamed =
                 self.unnamed_huds(&game_custom_dir(tf2)?, discard)
                     .map_err(|e| match e {
@@ -1457,17 +1485,20 @@ impl Library {
             Ok(()) => applied.push(step),
             Err(message) => failed.push((step, message)),
         };
-        // A skipped slot runs no step, so whatever is installed there stays; an empty
-        // slot still uninstalls, since the profile asks for nothing there.
+        // A skipped or Leave slot runs no step, so whatever is installed there stays; a
+        // None slot still uninstalls, since the profile asks for nothing there.
         let mut hud_blocked_name = None;
-        if !skipped(MissingKind::Hud) {
+        if run_hud {
             let hud = match &resolved.hud {
-                Some(hud) => self
-                    .install_hud_discarding_locked(hud, tf2, discard)
-                    .map(|done| {
-                        hud_blocked_name = done.blocked_name().map(str::to_owned);
-                    }),
-                None => self.uninstall_hud_discarding_locked(tf2, discard),
+                SlotMode::Set(hud) => {
+                    self.install_hud_discarding_locked(hud, tf2, discard)
+                        .map(|done| {
+                            hud_blocked_name = done.blocked_name().map(str::to_owned);
+                        })
+                }
+                SlotMode::None | SlotMode::Leave => {
+                    self.uninstall_hud_discarding_locked(tf2, discard)
+                }
             };
             record(ApplyStep::Hud, hud.map_err(|e| e.to_string()));
         }
@@ -1490,15 +1521,24 @@ impl Library {
                 continue;
             }
             let result = match sound {
-                Some(sound) => self.install_sound(sound, kind, tf2),
-                None => self.uninstall_sound(kind, tf2),
+                SlotMode::Leave => continue,
+                SlotMode::Set(sound) => self.install_sound(sound, kind, tf2),
+                SlotMode::None => self.uninstall_sound(kind, tf2),
             };
             record(step, result.map_err(|e| e.to_string()));
         }
-        record(
-            ApplyStep::Crosshairs,
-            self.apply_profile_crosshairs(&resolved.crosshairs, &resolved.missing, tf2, builtins),
-        );
+        // None passes an empty list, which clears every weapon.
+        let crosshairs = match &resolved.crosshairs {
+            SlotMode::Set(list) => Some(list.as_slice()),
+            SlotMode::None => Some(&[][..]),
+            SlotMode::Leave => None,
+        };
+        if let Some(crosshairs) = crosshairs {
+            record(
+                ApplyStep::Crosshairs,
+                self.apply_profile_crosshairs(crosshairs, &resolved.missing, tf2, builtins),
+            );
+        }
 
         if failed.is_empty() && resolved.missing.is_empty() {
             self.db
@@ -1506,6 +1546,7 @@ impl Library {
                 .map_err(apply_db)?;
         }
         Ok(ApplyProfileReport {
+            profile: resolved.profile,
             applied,
             skipped: resolved.missing,
             failed,
@@ -1577,6 +1618,31 @@ impl Library {
             self.apply_crosshairs(tf2, builtins).map(drop)
         }
         .map_err(|e| e.to_string())
+    }
+
+    /// Marks `profile` active only while its saved `updated_at` equals `profile.updated_at()`:
+    /// `Ok(true)` when marked, `Ok(false)` when it was edited since, `NotFound` when gone.
+    pub fn mark_profile_active(&self, profile: &Profile) -> Result<bool, ProfileError> {
+        let marked = self
+            .db
+            .write(|conn| {
+                let tx = conn.transaction()?;
+                let saved: Option<String> = tx
+                    .query_row(
+                        "SELECT updated_at FROM profiles WHERE id = ?1",
+                        [profile.id.as_str()],
+                        |r| r.get(0),
+                    )
+                    .optional()?;
+                let marked = saved.map(|at| at == profile.updated_at);
+                if marked == Some(true) {
+                    save_setting(&tx, ACTIVE_PROFILE_KEY, profile.id.as_str())?;
+                }
+                tx.commit()?;
+                Ok(marked)
+            })
+            .map_err(profile_db)?;
+        marked.ok_or_else(|| not_found(&profile.id))
     }
 
     /// The profile last applied in full with nothing skipped, when its row still exists.
