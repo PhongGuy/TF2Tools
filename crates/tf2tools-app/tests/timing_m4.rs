@@ -102,7 +102,7 @@ fn logs_scroll_without_rows_says_so(cx: &mut TestAppContext) {
     assert!(err.contains("nothing to scroll in logs-scroll"), "{err}");
 }
 
-use tf2tools_core::{CrosshairRef, DraftCrosshair, ProfileDraft};
+use tf2tools_core::{CrosshairRef, DraftCrosshair, ProfileDraft, SlotMode};
 
 fn two_profiles(s: &support::ShellWindow) {
     let first = s.services.builtins.all()[0].name().to_owned();
@@ -110,10 +110,11 @@ fn two_profiles(s: &support::ShellWindow) {
         ("Timing A", "tf_weapon_scattergun"),
         ("Timing B", "tf_weapon_rocketlauncher"),
     ] {
-        let draft = ProfileDraft::new(name).with_crosshairs(vec![DraftCrosshair::Set {
-            weapon_script: script.into(),
-            crosshair: CrosshairRef::Builtin(first.clone()),
-        }]);
+        let draft =
+            ProfileDraft::new(name).with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
+                weapon_script: script.into(),
+                crosshair: CrosshairRef::Builtin(first.clone()),
+            }]));
         s.services.library.create_profile(&draft).unwrap();
     }
 }

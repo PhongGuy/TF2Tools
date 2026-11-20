@@ -513,7 +513,7 @@ impl ProfileEditor {
 
     // The saved HUD's picture URL, once the galleries have loaded.
     fn slot_hud_url(&self) -> Option<&str> {
-        let folder = self.saved.hud()?.folder_name();
+        let folder = model::hud_item(&self.saved)?.folder_name();
         self.galleries
             .as_ref()?
             .images
@@ -970,8 +970,8 @@ impl ProfileEditor {
         };
         // A sound slot plays its saved sound; a missing one has nothing to play.
         let item = match slot {
-            Slot::Hitsound => self.saved.hitsound(),
-            Slot::Killsound => self.saved.killsound(),
+            Slot::Hitsound => model::hit(&self.saved),
+            Slot::Killsound => model::kill(&self.saved),
             Slot::Hud | Slot::Crosshairs => None,
         };
         let play = item
@@ -1168,7 +1168,7 @@ impl ProfileEditor {
             .div_ceil(self.grid.columns())
             .clamp(1, PICKER_MAX_ROWS);
         let grid_height = self.grid.row_height_for(height) * rows as f32;
-        let saved = self.saved.hud().map(|h| h.folder_name().to_owned());
+        let saved = model::hud_item(&self.saved).map(|h| h.folder_name().to_owned());
         let images = Rc::clone(&galleries.images);
         let editor = cx.entity().downgrade();
         let count = shown.len();
@@ -1242,8 +1242,8 @@ impl ProfileEditor {
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let (kind, saved) = match slot {
-            Slot::Hitsound => (SoundKind::Hitsound, self.saved.hitsound()),
-            Slot::Killsound => (SoundKind::Killsound, self.saved.killsound()),
+            Slot::Hitsound => (SoundKind::Hitsound, model::hit(&self.saved)),
+            Slot::Killsound => (SoundKind::Killsound, model::kill(&self.saved)),
             // Only the sound slots show this list.
             Slot::Hud | Slot::Crosshairs => return Vec::new(),
         };

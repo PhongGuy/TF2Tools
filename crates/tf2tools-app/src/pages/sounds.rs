@@ -21,7 +21,7 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    DraftSlot, InstalledSounds, LibraryError, LogLevel, NewLogEntry, ProfileDraft, ProfileError,
+    DraftItem, InstalledSounds, LibraryError, LogLevel, NewLogEntry, ProfileDraft, ProfileError,
     ProfileId, Provenance, SoundEntry, SoundFormat, SoundKind,
 };
 
@@ -34,7 +34,7 @@ use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     describe_import, describe_library, describe_profile, describe_tf2_install,
 };
-use crate::pages::profiles::model::not_applied;
+use crate::pages::profiles::model::{not_applied, sound as profile_sound, sounds_with};
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -384,17 +384,11 @@ impl SoundsPage {
                     describe_profile(&e).into_op(tr!("messages.action.add_to_profile"))
                 };
                 let before = s.library.profile(&id).map_err(failed)?;
-                let draft = ProfileDraft::from_profile(&before);
-                let slot = DraftSlot::Item(sound_id);
-                let (draft, old) = match kind {
-                    SoundKind::Hitsound => (draft.with_hitsound(slot), before.hitsound()),
-                    SoundKind::Killsound | _ => (draft.with_killsound(slot), before.killsound()),
-                };
+                let sounds = sounds_with(&before, kind, Some(DraftItem::Pick(sound_id)));
+                let draft = ProfileDraft::from_profile(&before).with_sounds(sounds);
+                let old = profile_sound(&before, kind);
                 let update = s.library.update_profile(&id, &draft).map_err(failed)?;
-                let after = match kind {
-                    SoundKind::Hitsound => update.profile().hitsound(),
-                    SoundKind::Killsound | _ => update.profile().killsound(),
-                };
+                let after = profile_sound(update.profile(), kind);
                 let replaced = old
                     .filter(|old| Some(old.folder_name()) != after.map(|a| a.folder_name()))
                     .map(|old| old.name());

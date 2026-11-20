@@ -9,8 +9,8 @@ use anyhow::Context as _;
 use chrono::{SecondsFormat, TimeDelta, Utc};
 use image::{Rgba, RgbaImage};
 use tf2tools_core::{
-    AddonName, BuiltinCrosshairs, CrosshairRef, DataDir, Database, DraftSlot, Library,
-    ProfileDraft, Provenance, SoundKind, Tf2Install,
+    AddonName, BuiltinCrosshairs, CrosshairRef, DataDir, Database, DraftItem, Library,
+    ProfileDraft, Provenance, SlotMode, SoundKind, Tf2Install,
 };
 
 const HUDS: [&str; 3] = ["budhud", "flawhud", "rayshud"];
@@ -105,7 +105,7 @@ fn fill(
         fs::write(&zip, hud_zip(name)?)?;
         let hud = lib.import_hud(&zip, Provenance::Local)?;
         if name == CASUAL_HUD {
-            casual = casual.with_hud(DraftSlot::Item(hud.id().clone()));
+            casual = casual.with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
         }
         if name == INSTALLED_HUD {
             lib.install_hud(hud.id(), tf2)?;
@@ -117,7 +117,10 @@ fn fill(
         fs::write(&wav, sine_wav(pitch))?;
         let sound = lib.import_sound(&wav, name, Provenance::Local)?;
         if name == CASUAL_HITSOUND {
-            casual = casual.with_hitsound(DraftSlot::Item(sound.id().clone()));
+            casual = casual.with_sounds(SlotMode::Set((
+                Some(DraftItem::Pick(sound.id().clone())),
+                None,
+            )));
         }
         let kind = match name {
             HITSOUND => Some(SoundKind::Hitsound),
@@ -167,11 +170,13 @@ fn fill(
     lib.create_profile(&ProfileDraft::new("Vanilla"))?;
     lib.apply_profile(competitive.id(), tf2, builtins, false)?;
 
-    // A draft can only name library items, so the missing store HUD is written as v5 left it.
+    // A draft can only name library items, so the missing store HUD is written as v5 left it,
+    // with the Set mode a new draft's None HUD lacks.
     let arena = lib.create_profile(&ProfileDraft::new("Arena"))?;
     let (hud_id, hud_name) = MISSING_HUD;
     rusqlite::Connection::open(dir.db_path())?.execute(
-        "UPDATE profiles SET hud_folder_name = ?2, hud_name = ?3, hud_store_hud_id = ?2
+        "UPDATE profiles SET hud_folder_name = ?2, hud_name = ?3, hud_store_hud_id = ?2,
+             hud_mode = 'set'
          WHERE id = ?1",
         [arena.id().as_str(), hud_id, hud_name],
     )?;

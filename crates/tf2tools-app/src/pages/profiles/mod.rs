@@ -619,7 +619,7 @@ fn apply_job(
         plan.log_discarded(s);
     }
     // An apply that put a HUD in place names its folder, so the font check can claim it at once.
-    let hud_folder = (profile.hud().is_some() && hud_step_ran)
+    let hud_folder = (model::hud_item(&profile).is_some() && hud_step_ran)
         .then(|| active_hud(s, tf2))
         .flatten();
     Ok(Activation::Applied {
@@ -915,17 +915,17 @@ fn active_card(profile: &Profile, cx: &App) -> AnyElement {
             (
                 ids::PROFILES_ACTIVE_HUD,
                 IconName::Paintbrush,
-                profile.hud(),
+                model::hud_item(profile),
             ),
             (
                 ids::PROFILES_ACTIVE_HITSOUND,
                 IconName::Volume2,
-                profile.hitsound(),
+                model::hit(profile),
             ),
             (
                 ids::PROFILES_ACTIVE_KILLSOUND,
                 IconName::Volume2,
-                profile.killsound(),
+                model::kill(profile),
             ),
         ];
         for (id, icon, item) in slots {
@@ -939,13 +939,13 @@ fn active_card(profile: &Profile, cx: &App) -> AnyElement {
                 ));
             }
         }
-        if !profile.crosshairs().is_empty() {
+        if !model::crosshair_list(profile).is_empty() {
             badges = badges.child(icon_badge(
                 ids::PROFILES_ACTIVE_CROSSHAIRS,
                 Tag::secondary(),
                 transparent_black(),
                 IconName::Crosshair,
-                model::crosshair_count(profile.crosshairs().len()),
+                model::crosshair_count(model::crosshair_list(profile).len()),
             ));
         }
     }
@@ -1094,16 +1094,20 @@ fn profile_card(
         ));
     } else {
         let slots = [
-            (ids::profile_hud(id), IconName::Paintbrush, profile.hud()),
+            (
+                ids::profile_hud(id),
+                IconName::Paintbrush,
+                model::hud_item(profile),
+            ),
             (
                 ids::profile_hitsound(id),
                 IconName::Volume2,
-                profile.hitsound(),
+                model::hit(profile),
             ),
             (
                 ids::profile_killsound(id),
                 IconName::Volume2,
-                profile.killsound(),
+                model::kill(profile),
             ),
         ];
         for (badge_id, icon, item) in slots {
@@ -1117,13 +1121,13 @@ fn profile_card(
                 ));
             }
         }
-        if !profile.crosshairs().is_empty() {
+        if !model::crosshair_list(profile).is_empty() {
             badges = badges.child(icon_badge(
                 ids::profile_crosshairs(id),
                 outline(),
                 theme.border,
                 IconName::Crosshair,
-                model::crosshair_count(profile.crosshairs().len()),
+                model::crosshair_count(model::crosshair_list(profile).len()),
             ));
         }
     }

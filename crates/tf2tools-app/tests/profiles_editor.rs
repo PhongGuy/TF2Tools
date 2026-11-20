@@ -20,8 +20,8 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileCrosshairRef, ProfileDraft,
-    ProfileId, Provenance, SoundEntry, SoundKind, Tf2Install, TfClass, weapons,
+    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileCrosshairRef, ProfileDraft,
+    ProfileId, Provenance, SlotMode, SoundEntry, SoundKind, Tf2Install, TfClass, weapons,
 };
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -60,13 +60,15 @@ fn full_profile(s: &support::ShellWindow, env: &support::Env, name: &str) -> Pro
     let kill = seed_sound(s, env, "Bell");
     let first = s.services.builtins.all()[0].name().to_owned();
     let draft = ProfileDraft::new(name)
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![DraftCrosshair::Set {
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Builtin(first),
-        }]);
+        }]));
     s.services.library.create_profile(&draft).unwrap()
 }
 
@@ -298,11 +300,17 @@ fn queued_edits_build_on_each_other(cx: &mut TestAppContext) {
     let after = saved(&s, comp.id());
     assert_eq!(after.name(), "Pubs");
     assert_eq!(
-        after.hud().map(|h| h.folder_name()),
+        after.hud().as_set().map(|h| h.folder_name()),
         Some(budhud.folder_name())
     );
-    assert_eq!(after.hitsound(), comp.hitsound());
-    assert_eq!(after.crosshairs(), comp.crosshairs());
+    assert_eq!(
+        after.sounds().as_set().and_then(|s| s.hit.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.hit.as_ref())
+    );
+    assert_eq!(
+        after.crosshairs().as_set().map_or(&[][..], Vec::as_slice),
+        comp.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+    );
     assert_eq!(cx.update(|cx| editor.read(cx).saved().clone()), after);
     assert!(
         support::log_rows(&s.services).is_empty(),
@@ -527,7 +535,10 @@ fn a_slot_save_clears_its_missing_mark(cx: &mut TestAppContext) {
     let comp = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(rayshud.id().clone())))
+        .create_profile(
+            &ProfileDraft::new("Comp")
+                .with_hud(SlotMode::Set(DraftItem::Pick(rayshud.id().clone()))),
+        )
         .unwrap();
     s.services.library.delete_hud(rayshud.id()).unwrap();
     let page = open_profiles(cx, &s);
@@ -711,7 +722,7 @@ fn slot_cards_show_the_profile(cx: &mut TestAppContext) {
             .map(|k| support::label_of(cx, s.win, ids::profile_slot(k)))
             .collect()
     };
-    let hud = comp.hud().unwrap().name().to_owned();
+    let hud = comp.hud().as_set().unwrap().name().to_owned();
     assert_eq!(
         texts(cx),
         [
@@ -748,7 +759,7 @@ fn picking_a_hud_saves_at_once_and_marks_it(cx: &mut TestAppContext) {
     let budhud = seed_hud(&s, &env, "budhud");
     let page = open_profiles(cx, &s);
     let editor = open_editor(cx, &s, &page, comp.id());
-    let rays = comp.hud().unwrap().folder_name().to_owned();
+    let rays = comp.hud().as_set().unwrap().folder_name().to_owned();
     assert_eq!(
         support::selected_of(cx, s.win, ids::profile_pick_hud(&rays)),
         Some(true)
@@ -763,11 +774,17 @@ fn picking_a_hud_saves_at_once_and_marks_it(cx: &mut TestAppContext) {
     wait_idle(cx, &s, &editor);
     let after = saved(&s, comp.id());
     assert_eq!(
-        after.hud().map(|h| h.folder_name()),
+        after.hud().as_set().map(|h| h.folder_name()),
         Some(budhud.folder_name())
     );
-    assert_eq!(after.hitsound(), comp.hitsound());
-    assert_eq!(after.crosshairs(), comp.crosshairs());
+    assert_eq!(
+        after.sounds().as_set().and_then(|s| s.hit.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.hit.as_ref())
+    );
+    assert_eq!(
+        after.crosshairs().as_set().map_or(&[][..], Vec::as_slice),
+        comp.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+    );
     assert_eq!(
         support::label_of(cx, s.win, ids::profile_slot("hud")).as_deref(),
         Some(budhud.name())
@@ -793,7 +810,7 @@ fn search_narrows_the_gallery(cx: &mut TestAppContext) {
         s.win,
         ids::profile_pick_hud(budhud.folder_name())
     ));
-    let rays = comp.hud().unwrap().folder_name().to_owned();
+    let rays = comp.hud().as_set().unwrap().folder_name().to_owned();
     assert!(!support::present(cx, s.win, ids::profile_pick_hud(&rays)));
 }
 
@@ -807,9 +824,18 @@ fn clear_empties_a_slot_at_once(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::profile_slot_clear("hitsound"));
     wait_idle(cx, &s, &editor);
     let after = saved(&s, comp.id());
-    assert!(after.hitsound().is_none());
-    assert_eq!(after.hud(), comp.hud());
-    assert_eq!(after.killsound(), comp.killsound());
+    assert!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .is_none()
+    );
+    assert_eq!(after.hud().as_set(), comp.hud().as_set());
+    assert_eq!(
+        after.sounds().as_set().and_then(|s| s.kill.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.kill.as_ref())
+    );
     assert_eq!(
         support::label_of(cx, s.win, ids::profile_slot("hitsound")).as_deref(),
         Some("None")
@@ -872,7 +898,7 @@ fn picking_a_hud_deleted_meanwhile_toasts(cx: &mut TestAppContext) {
         !support::present(cx, s.win, ids::profile_pick_hud(budhud.folder_name()))
     });
     wait_idle(cx, &s, &editor);
-    assert_eq!(saved(&s, comp.id()).hud(), comp.hud());
+    assert_eq!(saved(&s, comp.id()).hud().as_set(), comp.hud().as_set());
 }
 
 #[gpui_kit::test]
@@ -929,8 +955,22 @@ fn picking_sounds_fills_each_sound_slot(cx: &mut TestAppContext) {
     );
     wait_idle(cx, &s, &editor);
     let after = saved(&s, comp.id());
-    assert_eq!(after.hitsound().map(|x| x.name()), Some("Bell"));
-    assert_eq!(after.killsound().map(|x| x.name()), Some("Classic Ding"));
+    assert_eq!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .map(|x| x.name()),
+        Some("Bell")
+    );
+    assert_eq!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.kill.as_ref())
+            .map(|x| x.name()),
+        Some("Classic Ding")
+    );
 }
 
 #[gpui_kit::test]
@@ -947,7 +987,13 @@ fn the_play_buttons_preview_without_picking(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::profile_pick_play(bell.folder_name()));
     support::wait_real(cx, "the row preview", |_| s.audio.plays().len() >= 2);
     wait_idle(cx, &s, &editor);
-    assert_eq!(saved(&s, comp.id()).hitsound(), comp.hitsound());
+    assert_eq!(
+        saved(&s, comp.id())
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.hit.as_ref())
+    );
 }
 
 // A gallery pick and a slot Clear in the same frame: the queue keeps both.
@@ -965,11 +1011,20 @@ fn two_clicks_in_one_frame_both_land(cx: &mut TestAppContext) {
     wait_idle(cx, &s, &editor);
     let after = saved(&s, comp.id());
     assert_eq!(
-        after.hud().map(|h| h.folder_name()),
+        after.hud().as_set().map(|h| h.folder_name()),
         Some(budhud.folder_name())
     );
-    assert!(after.hitsound().is_none());
-    assert_eq!(after.killsound(), comp.killsound());
+    assert!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .is_none()
+    );
+    assert_eq!(
+        after.sounds().as_set().and_then(|s| s.kill.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.kill.as_ref())
+    );
 }
 
 #[gpui_kit::test]
@@ -1010,7 +1065,7 @@ fn a_deleted_item_shows_missing(cx: &mut TestAppContext) {
     s.services.library.delete_hud(rays.id()).unwrap();
     let page = open_profiles(cx, &s);
     let editor = open_editor(cx, &s, &page, comp.id());
-    let hud = comp.hud().unwrap().name().to_owned();
+    let hud = comp.hud().as_set().unwrap().name().to_owned();
     assert_eq!(
         support::label_of(cx, s.win, ids::profile_slot_missing("hud")).as_deref(),
         Some(format!("Missing: {hud}").as_str())
@@ -1131,16 +1186,23 @@ fn a_weapon_click_saves_the_picked_crosshair(cx: &mut TestAppContext) {
     );
     wait_idle(cx, &s, &editor);
     let after = saved(&s, vanilla.id());
-    assert_eq!(after.crosshairs().len(), 1);
     assert_eq!(
-        after.crosshairs()[0].weapon_script(),
+        after
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .len(),
+        1
+    );
+    assert_eq!(
+        after.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].weapon_script(),
         "tf_weapon_scattergun"
     );
     let CrosshairRef::Builtin(name) = second else {
         unreachable!()
     };
     assert_eq!(
-        after.crosshairs()[0].crosshair(),
+        after.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].crosshair(),
         &ProfileCrosshairRef::Builtin(name)
     );
     assert!(
@@ -1161,7 +1223,14 @@ fn a_bulk_button_sets_every_target(cx: &mut TestAppContext) {
     select_builtin(cx, &s, &editor, 0);
     support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
     wait_idle(cx, &s, &editor);
-    assert_eq!(saved(&s, vanilla.id()).crosshairs().len(), scout_count());
+    assert_eq!(
+        saved(&s, vanilla.id())
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .len(),
+        scout_count()
+    );
     assert_eq!(
         support::label_of(cx, s.win, ids::profile_slot("crosshairs")),
         Some(format!("{} weapons", scout_count()))
@@ -1174,7 +1243,7 @@ fn a_row_clear_removes_one_weapon(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let first = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
-    let draft = ProfileDraft::new("Two").with_crosshairs(vec![
+    let draft = ProfileDraft::new("Two").with_crosshairs(SlotMode::Set(vec![
         DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: first.clone(),
@@ -1183,7 +1252,7 @@ fn a_row_clear_removes_one_weapon(cx: &mut TestAppContext) {
             weapon_script: "tf_weapon_pistol_scout".into(),
             crosshair: first,
         },
-    ]);
+    ]));
     let two = s.services.library.create_profile(&draft).unwrap();
     let page = open_profiles(cx, &s);
     let editor = open_editor(cx, &s, &page, two.id());
@@ -1197,6 +1266,8 @@ fn a_row_clear_removes_one_weapon(cx: &mut TestAppContext) {
     wait_idle(cx, &s, &editor);
     let left: Vec<String> = saved(&s, two.id())
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .map(|c| c.weapon_script().to_owned())
         .collect();
@@ -1217,11 +1288,22 @@ fn clear_all_asks_first_and_cancel_keeps_them(cx: &mut TestAppContext) {
     );
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     wait_idle(cx, &s, &editor);
-    assert_eq!(saved(&s, comp.id()).crosshairs().len(), 1);
+    assert_eq!(
+        saved(&s, comp.id())
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .len(),
+        1
+    );
     support::click_id(cx, s.win, ids::profile_slot_clear("crosshairs"));
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     support::wait_real(cx, "the crosshairs to clear", |_| {
-        saved(&s, comp.id()).crosshairs().is_empty()
+        saved(&s, comp.id())
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .is_empty()
     });
     wait_idle(cx, &s, &editor);
     assert_eq!(
@@ -1241,10 +1323,10 @@ fn a_missing_library_crosshair_reads_missing(cx: &mut TestAppContext) {
         .library
         .import_crosshair(&png, "Zebra", Provenance::Local)
         .unwrap();
-    let draft = ProfileDraft::new("Z").with_crosshairs(vec![DraftCrosshair::Set {
+    let draft = ProfileDraft::new("Z").with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
         weapon_script: "tf_weapon_scattergun".into(),
         crosshair: CrosshairRef::Library(zebra.id().clone()),
-    }]);
+    }]));
     let z = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_crosshair(zebra.id()).unwrap();
     let page = open_profiles(cx, &s);
@@ -1267,10 +1349,10 @@ fn a_library_crosshair_is_never_labelled_missing_before_the_library_loads(cx: &m
         .library
         .import_crosshair(&png, "Zebra", Provenance::Local)
         .unwrap();
-    let draft = ProfileDraft::new("Z").with_crosshairs(vec![DraftCrosshair::Set {
+    let draft = ProfileDraft::new("Z").with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
         weapon_script: "tf_weapon_scattergun".into(),
         crosshair: CrosshairRef::Library(zebra.id().clone()),
-    }]);
+    }]));
     let z = s.services.library.create_profile(&draft).unwrap();
     let page = open_profiles(cx, &s);
     let id = z.id().clone();
@@ -1325,7 +1407,13 @@ fn assigning_a_deleted_crosshair_toasts(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
     toast_is(cx, &s, "That crosshair is no longer in your library");
     wait_idle(cx, &s, &editor);
-    assert!(saved(&s, vanilla.id()).crosshairs().is_empty());
+    assert!(
+        saved(&s, vanilla.id())
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .is_empty()
+    );
 }
 
 // The sound list builds only the rows in view, yet the last of a long library can be reached.
@@ -1355,7 +1443,11 @@ fn a_long_sound_library_scrolls_to_its_last_row(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, row);
     wait_idle(cx, &s, &editor);
     assert_eq!(
-        saved(&s, comp.id()).hitsound().map(|x| x.folder_name()),
+        saved(&s, comp.id())
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .map(|x| x.folder_name()),
         Some(last.folder_name())
     );
 }
@@ -1437,10 +1529,30 @@ fn new_profile_saves_the_installed_setup_and_opens_it(cx: &mut TestAppContext) {
     assert_eq!(profiles.len(), 1);
     let made = &profiles[0];
     assert_eq!(made.name(), "Profile 1");
-    assert_eq!(made.hud().map(|h| h.folder_name()), Some("rayshud"));
-    assert_eq!(made.hitsound().map(|h| h.name()), Some("Ding"));
-    assert!(made.killsound().is_none());
-    assert_eq!(made.crosshairs().len(), 1);
+    assert_eq!(
+        made.hud().as_set().map(|h| h.folder_name()),
+        Some("rayshud")
+    );
+    assert_eq!(
+        made.sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .map(|h| h.name()),
+        Some("Ding")
+    );
+    assert!(
+        made.sounds()
+            .as_set()
+            .and_then(|s| s.kill.as_ref())
+            .is_none()
+    );
+    assert_eq!(
+        made.crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .len(),
+        1
+    );
     let input = cx.update(|cx| editor.read(cx).name_input().clone());
     let (focused, selected) = cx
         .update_window(s.win, |_, w, cx| {
@@ -1482,7 +1594,14 @@ fn start_empty_from_the_menu_ignores_what_is_installed(cx: &mut TestAppContext) 
     toast_is(cx, &s, "Empty profile created");
     let made = cx.update(|cx| editor.read(cx).saved().clone());
     assert_eq!(made.name(), "Profile 2");
-    assert!(made.hud().is_none() && made.crosshairs().is_empty());
+    assert!(
+        made.hud().as_set().is_none()
+            && made
+                .crosshairs()
+                .as_set()
+                .map_or(&[][..], Vec::as_slice)
+                .is_empty()
+    );
     let row = &support::log_rows(&s.services)[0];
     assert_eq!(
         (row.action(), row.message()),
@@ -1642,8 +1761,11 @@ fn the_editor_is_read_only_while_its_profile_activates(cx: &mut TestAppContext) 
     });
     wait_idle(cx, &s, &editor);
     let after = saved(&s, comp.id());
-    assert_eq!(after.hud(), comp.hud());
-    assert_eq!(after.hitsound(), comp.hitsound());
+    assert_eq!(after.hud().as_set(), comp.hud().as_set());
+    assert_eq!(
+        after.sounds().as_set().and_then(|s| s.hit.as_ref()),
+        comp.sounds().as_set().and_then(|s| s.hit.as_ref())
+    );
     assert_eq!(
         cx.update(|cx| editor.read(cx).selected()),
         tf2tools_app::pages::profiles::editor_model::Slot::Hud
@@ -1671,7 +1793,7 @@ fn enqueue_refuses_while_the_page_is_busy(cx: &mut TestAppContext) {
     support::wait_real(cx, "the create", |cx| {
         cx.update(|cx| !page.read(cx).is_busy())
     });
-    assert_eq!(saved(&s, comp.id()).hud(), comp.hud());
+    assert_eq!(saved(&s, comp.id()).hud().as_set(), comp.hud().as_set());
 }
 
 #[gpui_kit::test]

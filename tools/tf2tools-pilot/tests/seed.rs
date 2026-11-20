@@ -137,11 +137,23 @@ fn the_seed_has_its_profiles_with_competitive_active() {
     let profiles = &profiles[1..];
     let comp = &profiles[1];
     assert_eq!(lib.active_profile().unwrap().as_ref(), Some(comp.id()));
-    assert_eq!(comp.hud().map(|h| h.folder_name()), Some("rayshud"));
-    assert_eq!(comp.crosshairs().len(), 2);
-    assert_eq!(profiles[0].hud().map(|h| h.folder_name()), Some("flawhud"));
-    assert!(profiles[0].killsound().is_none());
-    assert!(profiles[2].hud().is_none() && profiles[2].crosshairs().is_empty());
+    assert_eq!(comp.hud().as_set().map(|h| h.folder_name()), Some("rayshud"));
+    assert_eq!(comp.crosshairs().as_set().map_or(0, Vec::len), 2);
+    assert_eq!(
+        profiles[0].hud().as_set().map(|h| h.folder_name()),
+        Some("flawhud")
+    );
+    assert!(
+        profiles[0]
+            .sounds()
+            .as_set()
+            .and_then(|s| s.kill.as_ref())
+            .is_none()
+    );
+    assert!(
+        profiles[2].hud().as_set().is_none()
+            && profiles[2].crosshairs().as_set().map_or(0, Vec::len) == 0
+    );
     let tf2 = Tf2Install::from_path(&game).unwrap();
     assert!(tf2.custom_dir().join("rayshud").is_dir());
 }

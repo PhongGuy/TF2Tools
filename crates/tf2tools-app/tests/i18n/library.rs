@@ -31,8 +31,8 @@ use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
-    AddonSection, DraftSlot, GbId, ProfileDraft, Provenance, SoundKind, StoreKind, SyncError,
-    Tf2Install, TfClass, WeaponSlot,
+    AddonSection, DraftItem, GbId, ProfileDraft, Provenance, SlotMode, SoundKind, StoreKind,
+    SyncError, Tf2Install, TfClass, WeaponSlot,
 };
 
 use crate::LocaleGuard;
@@ -523,7 +523,8 @@ fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
         .library
         .import_hud(&archive, Provenance::Local)
         .unwrap();
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);

@@ -3,10 +3,12 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingItem,
-    MissingKind, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, SoundId, SoundKind,
+    BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftItem, HudId, MissingItem,
+    MissingKind, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, SlotMode, SoundId,
+    SoundKind,
 };
 
+use super::model::{crosshair_list, hit, hud_item, kill, sounds_with};
 use crate::i18n::{names, tr};
 
 /// One of the editor's four slots, in page order.
@@ -62,22 +64,24 @@ impl Edit {
     /// `ProfileDraft::from_profile(saved)` (every slot and crosshair Keep) plus this one change.
     /// Assign replaces each target's saved entry in place with a Set and appends targets the
     /// profile lacks, in `scripts` order. ClearWeapon drops that entry. ClearSlot(Crosshairs)
-    /// and ClearCrosshairs empty the list. Rename sets the name as typed (core trims it).
+    /// and ClearCrosshairs make the slot None. A sound edit keeps the other sound, or TF2's
+    /// default when Sounds was not Set. Rename sets the name as typed (core trims it).
     pub fn draft(&self, saved: &Profile) -> ProfileDraft {
         let keep = ProfileDraft::from_profile(saved);
         match self {
-            Self::SetHud(id) => keep.with_hud(DraftSlot::Item(id.clone())),
-            Self::SetSound(SoundKind::Hitsound, id) => {
-                keep.with_hitsound(DraftSlot::Item(id.clone()))
+            Self::SetHud(id) => keep.with_hud(SlotMode::Set(DraftItem::Pick(id.clone()))),
+            Self::SetSound(kind, id) => {
+                keep.with_sounds(sounds_with(saved, *kind, Some(DraftItem::Pick(id.clone()))))
             }
-            Self::SetSound(SoundKind::Killsound | _, id) => {
-                keep.with_killsound(DraftSlot::Item(id.clone()))
+            Self::ClearSlot(Slot::Hud) => keep.with_hud(SlotMode::None),
+            Self::ClearSlot(Slot::Hitsound) => {
+                keep.with_sounds(sounds_with(saved, SoundKind::Hitsound, None))
             }
-            Self::ClearSlot(Slot::Hud) => keep.with_hud(DraftSlot::Empty),
-            Self::ClearSlot(Slot::Hitsound) => keep.with_hitsound(DraftSlot::Empty),
-            Self::ClearSlot(Slot::Killsound) => keep.with_killsound(DraftSlot::Empty),
+            Self::ClearSlot(Slot::Killsound) => {
+                keep.with_sounds(sounds_with(saved, SoundKind::Killsound, None))
+            }
             Self::ClearSlot(Slot::Crosshairs) | Self::ClearCrosshairs => {
-                keep.with_crosshairs(Vec::new())
+                keep.with_crosshairs(SlotMode::None)
             }
             Self::Rename(name) => keep.with_name(name.as_str()),
             Self::Assign { scripts, crosshair } => {
@@ -87,7 +91,7 @@ impl Edit {
                     weapon_script: script.to_owned(),
                     crosshair: crosshair.clone(),
                 };
-                let saved_list = saved.crosshairs();
+                let saved_list = crosshair_list(saved);
                 let mut list: Vec<DraftCrosshair> = saved_list
                     .iter()
                     .map(|c| {
@@ -100,17 +104,16 @@ impl Edit {
                     .collect();
                 let lacks = |s: &&String| saved_list.iter().all(|c| c.weapon_script() != *s);
                 list.extend(scripts.iter().filter(lacks).map(|s| set(s)));
-                keep.with_crosshairs(list)
+                keep.with_crosshairs(SlotMode::Set(list))
             }
-            Self::ClearWeapon(script) => keep.with_crosshairs(
-                saved
-                    .crosshairs()
+            Self::ClearWeapon(script) => keep.with_crosshairs(SlotMode::Set(
+                crosshair_list(saved)
                     .iter()
                     .filter(|c| c.weapon_script() != script)
                     .cloned()
                     .map(DraftCrosshair::Keep)
                     .collect(),
-            ),
+            )),
         }
     }
 }
@@ -137,11 +140,11 @@ pub enum SlotState {
 /// Crosshairs: Set(weapon_count(n)) or Empty; a missing crosshair shows on its weapon row.
 pub fn slot_state(profile: &Profile, slot: Slot, missing: &[MissingItem]) -> SlotState {
     let (item, kind) = match slot {
-        Slot::Hud => (profile.hud(), MissingKind::Hud),
-        Slot::Hitsound => (profile.hitsound(), MissingKind::Hitsound),
-        Slot::Killsound => (profile.killsound(), MissingKind::Killsound),
+        Slot::Hud => (hud_item(profile), MissingKind::Hud),
+        Slot::Hitsound => (hit(profile), MissingKind::Hitsound),
+        Slot::Killsound => (kill(profile), MissingKind::Killsound),
         Slot::Crosshairs => {
-            let n = profile.crosshairs().len();
+            let n = crosshair_list(profile).len();
             return if n == 0 {
                 SlotState::Empty
             } else {
@@ -207,8 +210,7 @@ pub fn crosshair_labels(
     builtins: &BuiltinCrosshairs,
     library: &[CrosshairEntry],
 ) -> Vec<(String, String)> {
-    profile
-        .crosshairs()
+    crosshair_list(profile)
         .iter()
         .map(|c| {
             (

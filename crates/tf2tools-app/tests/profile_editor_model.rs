@@ -9,7 +9,7 @@ use tf2tools_app::pages::profiles::editor_model::{
 };
 use tf2tools_app::services::Services;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
+    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, Provenance, SlotMode,
     SoundEntry, SoundKind,
 };
 
@@ -63,13 +63,15 @@ fn fixture() -> Fixture {
         (hud("rayshud"), hud("budhud"), sound("Ding"), sound("Bell"));
     let first = s.builtins.all()[0].name().to_owned();
     let draft = ProfileDraft::new("Comp")
-        .with_hud(DraftSlot::Item(rayshud.id().clone()))
-        .with_hitsound(DraftSlot::Item(ding.id().clone()))
-        .with_killsound(DraftSlot::Item(bell.id().clone()))
-        .with_crosshairs(vec![DraftCrosshair::Set {
+        .with_hud(SlotMode::Set(DraftItem::Pick(rayshud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(ding.id().clone())),
+            Some(DraftItem::Pick(bell.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Builtin(first),
-        }]);
+        }]));
     let comp = s.library.create_profile(&draft).unwrap();
     Fixture {
         _env: env,
@@ -106,35 +108,63 @@ fn each_slot_edit_changes_only_its_slot() {
     let bud = f.budhud.id().clone();
     assert_eq!(
         Edit::SetHud(bud.clone()).draft(&f.comp),
-        keep().with_hud(DraftSlot::Item(bud))
+        keep().with_hud(SlotMode::Set(DraftItem::Pick(bud)))
     );
     assert_eq!(
         Edit::SetSound(SoundKind::Hitsound, f.bell.id().clone()).draft(&f.comp),
-        keep().with_hitsound(DraftSlot::Item(f.bell.id().clone()))
+        keep().with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(f.bell.id().clone())),
+            f.comp
+                .sounds()
+                .as_set()
+                .and_then(|s| s.kill.clone())
+                .map(DraftItem::Keep),
+        )))
     );
     assert_eq!(
         Edit::SetSound(SoundKind::Killsound, f.ding.id().clone()).draft(&f.comp),
-        keep().with_killsound(DraftSlot::Item(f.ding.id().clone()))
+        keep().with_sounds(SlotMode::Set((
+            f.comp
+                .sounds()
+                .as_set()
+                .and_then(|s| s.hit.clone())
+                .map(DraftItem::Keep),
+            Some(DraftItem::Pick(f.ding.id().clone())),
+        )))
     );
     assert_eq!(
         Edit::ClearSlot(Slot::Hud).draft(&f.comp),
-        keep().with_hud(DraftSlot::Empty)
+        keep().with_hud(SlotMode::None)
     );
     assert_eq!(
         Edit::ClearSlot(Slot::Hitsound).draft(&f.comp),
-        keep().with_hitsound(DraftSlot::Empty)
+        keep().with_sounds(SlotMode::Set((
+            None,
+            f.comp
+                .sounds()
+                .as_set()
+                .and_then(|s| s.kill.clone())
+                .map(DraftItem::Keep)
+        )))
     );
     assert_eq!(
         Edit::ClearSlot(Slot::Killsound).draft(&f.comp),
-        keep().with_killsound(DraftSlot::Empty)
+        keep().with_sounds(SlotMode::Set((
+            f.comp
+                .sounds()
+                .as_set()
+                .and_then(|s| s.hit.clone())
+                .map(DraftItem::Keep),
+            None
+        )))
     );
     assert_eq!(
         Edit::ClearSlot(Slot::Crosshairs).draft(&f.comp),
-        keep().with_crosshairs(Vec::new())
+        keep().with_crosshairs(SlotMode::None)
     );
     assert_eq!(
         Edit::ClearCrosshairs.draft(&f.comp),
-        keep().with_crosshairs(Vec::new())
+        keep().with_crosshairs(SlotMode::None)
     );
     assert_eq!(
         Edit::Rename("Pubs".into()).draft(&f.comp),
@@ -149,13 +179,22 @@ fn a_saved_draft_keeps_the_other_slots() {
     let done = f.s.library.update_profile(f.comp.id(), &draft).unwrap();
     let saved = done.profile();
     assert_eq!(
-        saved.hud().map(|h| h.folder_name()),
+        saved.hud().as_set().map(|h| h.folder_name()),
         Some(f.budhud.folder_name())
     );
     assert_eq!(saved.name(), "Comp");
-    assert_eq!(saved.hitsound(), f.comp.hitsound());
-    assert_eq!(saved.killsound(), f.comp.killsound());
-    assert_eq!(saved.crosshairs(), f.comp.crosshairs());
+    assert_eq!(
+        saved.sounds().as_set().and_then(|s| s.hit.as_ref()),
+        f.comp.sounds().as_set().and_then(|s| s.hit.as_ref())
+    );
+    assert_eq!(
+        saved.sounds().as_set().and_then(|s| s.kill.as_ref()),
+        f.comp.sounds().as_set().and_then(|s| s.kill.as_ref())
+    );
+    assert_eq!(
+        saved.crosshairs().as_set().map_or(&[][..], Vec::as_slice),
+        f.comp.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+    );
 }
 
 #[test]
@@ -176,19 +215,21 @@ fn assign_replaces_targets_in_place_and_appends_new_ones() {
     };
     assert_eq!(
         bulk.draft(&f.comp),
-        keep().with_crosshairs(vec![
+        keep().with_crosshairs(SlotMode::Set(vec![
             set("tf_weapon_scattergun"),
             set("tf_weapon_pistol_scout")
-        ])
+        ]))
     );
     let one = Edit::Assign {
         scripts: vec!["tf_weapon_bat".into()],
         crosshair: second.clone(),
     };
-    let saved = DraftCrosshair::Keep(f.comp.crosshairs()[0].clone());
+    let saved = DraftCrosshair::Keep(
+        f.comp.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].clone(),
+    );
     assert_eq!(
         one.draft(&f.comp),
-        keep().with_crosshairs(vec![saved, set("tf_weapon_bat")])
+        keep().with_crosshairs(SlotMode::Set(vec![saved, set("tf_weapon_bat")]))
     );
 }
 
@@ -198,7 +239,7 @@ fn clearing_a_weapon_drops_only_that_entry() {
     let keep = || ProfileDraft::from_profile(&f.comp);
     assert_eq!(
         Edit::ClearWeapon("tf_weapon_scattergun".into()).draft(&f.comp),
-        keep().with_crosshairs(Vec::new())
+        keep().with_crosshairs(SlotMode::Set(Vec::new()))
     );
     assert_eq!(
         Edit::ClearWeapon("tf_weapon_bat".into()).draft(&f.comp),
@@ -232,7 +273,7 @@ fn slot_texts_name_the_item_say_none_or_say_missing() {
             .map(|&slot| slot_text(&slot_state(p, slot, missing), slot))
             .collect()
     };
-    let hud_name = f.comp.hud().unwrap().name().to_owned();
+    let hud_name = f.comp.hud().as_set().unwrap().name().to_owned();
     assert_eq!(
         texts(&f.comp, &[]),
         [
@@ -256,7 +297,7 @@ fn slot_texts_name_the_item_say_none_or_say_missing() {
             .list_huds()
             .unwrap()
             .into_iter()
-            .find(|h| h.folder_name() == f.comp.hud().unwrap().folder_name())
+            .find(|h| h.folder_name() == f.comp.hud().as_set().unwrap().folder_name())
             .unwrap();
     f.s.library.delete_hud(rayshud.id()).unwrap();
     let missing = f.s.library.missing_items(f.comp.id()).unwrap();
@@ -282,7 +323,7 @@ fn crosshair_labels_name_builtins_library_and_missing() {
         .library
         .import_crosshair(&png, "Zebra", Provenance::Local)
         .unwrap();
-    let draft = ProfileDraft::new("P").with_crosshairs(vec![
+    let draft = ProfileDraft::new("P").with_crosshairs(SlotMode::Set(vec![
         DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Builtin(first.name().into()),
@@ -291,7 +332,7 @@ fn crosshair_labels_name_builtins_library_and_missing() {
             weapon_script: "tf_weapon_rocketlauncher".into(),
             crosshair: CrosshairRef::Library(zebra.id().clone()),
         },
-    ]);
+    ]));
     let profile = s.library.create_profile(&draft).unwrap();
     let library = s.library.list_crosshairs().unwrap();
     let mut labels = crosshair_labels(&profile, &s.builtins, &library);
@@ -310,6 +351,8 @@ fn crosshair_labels_name_builtins_library_and_missing() {
     let library = s.library.list_crosshairs().unwrap();
     let rocket = profile
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .find(|c| c.weapon_script() == "tf_weapon_rocketlauncher")
         .unwrap();

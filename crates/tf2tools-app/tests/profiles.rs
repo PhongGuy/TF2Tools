@@ -16,7 +16,7 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
+    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, Provenance, SlotMode,
     SoundEntry, Tf2Install,
 };
 use tf2tools_core::{GbId, LibraryKind};
@@ -80,13 +80,15 @@ fn full_profile(s: &support::ShellWindow, env: &support::Env, name: &str) -> Pro
     let kill = seed_sound(s, env, "Bell");
     let first = s.services.builtins.all().first().unwrap().name().to_owned();
     let draft = ProfileDraft::new(name)
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![DraftCrosshair::Set {
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Builtin(first),
-        }]);
+        }]));
     s.services.library.create_profile(&draft).unwrap()
 }
 
@@ -522,9 +524,11 @@ fn a_second_activate_while_one_runs_does_nothing(cx: &mut TestAppContext) {
     let other = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Other").with_hud(DraftSlot::Item(
-            s.services.library.list_huds().unwrap()[0].id().clone(),
-        )))
+        .create_profile(
+            &ProfileDraft::new("Other").with_hud(SlotMode::Set(DraftItem::Pick(
+                s.services.library.list_huds().unwrap()[0].id().clone(),
+            ))),
+        )
         .unwrap();
     let page = open_profiles(cx, &s);
     let (a, b) = (comp.id().clone(), other.id().clone());
@@ -617,8 +621,11 @@ fn profile_missing_its_hud(s: &support::ShellWindow, env: &support::Env) -> Prof
     let hud = seed_hud(s, env, "rayshud", Provenance::Local);
     let hit = seed_sound(s, env, "Classic Ding");
     let draft = ProfileDraft::new("Comp")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()));
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            None,
+        )));
     let profile = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     profile
@@ -753,7 +760,9 @@ fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
     let comp = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone())))
+        .create_profile(
+            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
+        )
         .unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);
@@ -935,7 +944,9 @@ fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppCon
     let comp = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone())))
+        .create_profile(
+            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
+        )
         .unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let page = open_profiles(cx, &s);
@@ -985,7 +996,8 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
         "#base \"../../custom/m0rehud/resource/ui/base.res\"\n",
     )
     .unwrap();
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     let mine = env.game.join("tf/custom/m0rehud");
     std::fs::create_dir_all(&mine).unwrap();
@@ -1079,7 +1091,7 @@ fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext
     let comp = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_crosshairs(crosshairs))
+        .create_profile(&ProfileDraft::new("Comp").with_crosshairs(SlotMode::Set(crosshairs)))
         .unwrap();
     let _page = open_profiles(cx, &s);
     support::click_id(cx, s.win, ids::profile_activate(comp.id()));

@@ -26,9 +26,9 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    CopyUpdate, DownloadUpdate, DraftSlot, GbId, HudEntry, HudId, HudInstall, HudStatus,
+    CopyUpdate, DownloadUpdate, DraftItem, GbId, HudEntry, HudId, HudInstall, HudStatus,
     LibraryEntry, LibraryError, LogLevel, NewLogEntry, Platform, ProfileDraft, ProfileError,
-    ProfileId, Provenance, StoreFile, StoreItem, StoreItemId, StoreKind, Tf2Install,
+    ProfileId, Provenance, SlotMode, StoreFile, StoreItem, StoreItemId, StoreKind, Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -769,10 +769,11 @@ impl HudsPage {
                 describe_profile(&e).into_op(tr!("messages.action.add_to_profile"))
             };
             let before = s.library.profile(&id).map_err(failed)?;
-            let draft = ProfileDraft::from_profile(&before).with_hud(DraftSlot::Item(hud_id));
+            let draft = ProfileDraft::from_profile(&before)
+                .with_hud(SlotMode::Set(DraftItem::Pick(hud_id)));
             let update = s.library.update_profile(&id, &draft).map_err(failed)?;
-            let after = update.profile().hud().map(|h| h.folder_name());
-            let replaced = (before.hud())
+            let after = update.profile().hud().as_set().map(|h| h.folder_name());
+            let replaced = (before.hud().as_set())
                 .filter(|old| Some(old.folder_name()) != after)
                 .map(|old| old.name());
             let title = added_title(&name, update.profile().name(), None, replaced);

@@ -3,8 +3,8 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    ApplyProfileReport, ApplyStep, MissingKind, Profile, ProfileId, Provenance, SoundKind,
-    StoreItemId, StoreKind,
+    ApplyProfileReport, ApplyStep, DraftItem, MissingKind, Profile, ProfileCrosshair, ProfileId,
+    ProfileItem, Provenance, SlotMode, SoundId, SoundKind, StoreItemId, StoreKind,
 };
 
 use crate::i18n::{names, tr};
@@ -19,12 +19,57 @@ pub fn crosshair_count(n: usize) -> String {
     crate::i18n::plural("profiles.crosshairs", u64::try_from(n).unwrap_or(u64::MAX)).to_string()
 }
 
+/// The HUD the profile sets, if its HUD slot is Set.
+pub(crate) fn hud_item(profile: &Profile) -> Option<&ProfileItem> {
+    profile.hud().as_set()
+}
+
+/// The hitsound the profile sets; `None` when its Sounds slot is not Set or keeps TF2's own.
+pub(crate) fn hit(profile: &Profile) -> Option<&ProfileItem> {
+    profile.sounds().as_set().and_then(|s| s.hit.as_ref())
+}
+
+/// The killsound the profile sets; `None` when its Sounds slot is not Set or keeps TF2's own.
+pub(crate) fn kill(profile: &Profile) -> Option<&ProfileItem> {
+    profile.sounds().as_set().and_then(|s| s.kill.as_ref())
+}
+
+/// The sound of `kind` the profile sets.
+pub(crate) fn sound(profile: &Profile, kind: SoundKind) -> Option<&ProfileItem> {
+    match kind {
+        SoundKind::Hitsound => hit(profile),
+        SoundKind::Killsound | _ => kill(profile),
+    }
+}
+
+/// The crosshairs the profile assigns; empty unless its Crosshairs slot is Set.
+pub(crate) fn crosshair_list(profile: &Profile) -> &[ProfileCrosshair] {
+    profile.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+}
+
+/// A draft's hitsound and killsound; `None` is TF2's default.
+type DraftSounds = (Option<DraftItem<SoundId>>, Option<DraftItem<SoundId>>);
+
+/// The Sounds slot of a draft of `saved` whose `kind` side becomes `side`. The other side
+/// is the saved sound, kept, or TF2's default when the slot was not Set.
+pub(crate) fn sounds_with(
+    saved: &Profile,
+    kind: SoundKind,
+    side: Option<DraftItem<SoundId>>,
+) -> SlotMode<DraftSounds> {
+    let keep = |item: Option<&ProfileItem>| item.cloned().map(DraftItem::Keep);
+    SlotMode::Set(match kind {
+        SoundKind::Hitsound => (side, keep(kill(saved))),
+        SoundKind::Killsound | _ => (keep(hit(saved)), side),
+    })
+}
+
 /// No HUD, no sounds and no crosshairs.
 pub fn is_empty(profile: &Profile) -> bool {
-    profile.hud().is_none()
-        && profile.hitsound().is_none()
-        && profile.killsound().is_none()
-        && profile.crosshairs().is_empty()
+    hud_item(profile).is_none()
+        && hit(profile).is_none()
+        && kill(profile).is_none()
+        && crosshair_list(profile).is_empty()
 }
 
 /// Whether a finished load closes the editor open on `open_now`: only when that editor was
@@ -98,19 +143,19 @@ pub fn installed_parts(profile: &Profile, report: &ApplyProfileReport) -> Vec<Sh
     let filled = [
         (
             ApplyStep::Hud,
-            profile.hud().is_some() && !skipped(&MissingKind::Hud),
+            hud_item(profile).is_some() && !skipped(&MissingKind::Hud),
         ),
         (
             ApplyStep::Hitsound,
-            profile.hitsound().is_some() && !skipped(&MissingKind::Hitsound),
+            hit(profile).is_some() && !skipped(&MissingKind::Hitsound),
         ),
         (
             ApplyStep::Killsound,
-            profile.killsound().is_some() && !skipped(&MissingKind::Killsound),
+            kill(profile).is_some() && !skipped(&MissingKind::Killsound),
         ),
         (
             ApplyStep::Crosshairs,
-            profile.crosshairs().len() > skipped_crosshairs,
+            crosshair_list(profile).len() > skipped_crosshairs,
         ),
     ];
     filled

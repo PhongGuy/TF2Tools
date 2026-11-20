@@ -14,8 +14,8 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::external_huds::{HudAction, dialog_text, names_text};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    DraftSlot, ExternalHud, GbId, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
-    ReinstallError, Tf2Install,
+    DraftItem, ExternalHud, GbId, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
+    ReinstallError, SlotMode, Tf2Install,
 };
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -573,7 +573,8 @@ fn library_huds_are_never_asked_about(cx: &mut TestAppContext) {
 }
 
 fn hud_profile(s: &support::ShellWindow, hud: &HudEntry) -> Profile {
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     s.services.library.create_profile(&draft).unwrap()
 }
 
