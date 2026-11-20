@@ -78,6 +78,7 @@ pub(crate) use movement::NULL_MOVEMENT;
 pub(crate) use movement::movement_keys;
 pub use movement::{MoveDirection, MovementKeys};
 pub(crate) use packed::{HUD_ZIP, ItemSource, read_packed_entry};
+pub use profile_setup::CurrentSetup;
 pub use profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, MissingItem, MissingKind, Profile,
@@ -257,6 +258,7 @@ macro_rules! text_id {
 }
 
 // Declared below `text_id!`, which a module can only use after the macro's definition.
+mod profile_setup;
 mod profile_slots;
 mod profiles;
 

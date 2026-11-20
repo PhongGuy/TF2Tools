@@ -96,10 +96,10 @@ pub use hud_maker::{background_corners, corner_radius, paints_background};
 pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
-    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftItem, ExternalHud,
-    GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus,
-    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud,
-    MakeTarget, MastercomfigStatus, MissingItem, MissingKind, MoveDirection, MovementKeys,
+    CrosshairFormat, CrosshairId, CrosshairRef, CurrentSetup, DraftCrosshair, DraftItem,
+    ExternalHud, GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall,
+    HudStatus, InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry,
+    MadeHud, MakeTarget, MastercomfigStatus, MissingItem, MissingKind, MoveDirection, MovementKeys,
     PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileAddons, ProfileCrosshair,
     ProfileCrosshairRef, ProfileDraft, ProfileGraphics, ProfileId, ProfileItem, ProfileSounds,
     ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason, SkippedAssignment,

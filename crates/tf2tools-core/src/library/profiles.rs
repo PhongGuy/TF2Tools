@@ -9,9 +9,10 @@ use std::fmt;
 use rusqlite::{Connection, OptionalExtension, Row};
 
 use super::crosshairs::{SOURCE_BUILTIN, SOURCE_LIBRARY, is_weapon_script};
+use super::profile_setup::CurrentSetup;
 use super::profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
 use super::{
-    AddonName, Choices, CrosshairRef, ExternalHud, GbId, HudId, HudStatus, Library, Preset,
+    AddonName, Assignment, Choices, CrosshairRef, ExternalHud, GbId, HudId, Library, Preset,
     Provenance, SoundId, SoundKind, game_custom_dir, modules_json, new_id, now, parse_modules,
     profile_db, read_setting, save_setting,
 };
@@ -375,6 +376,39 @@ impl ProfileDraft {
         }
     }
 
+    /// A new draft of what is installed now: a managed HUD, the managed sounds and the
+    /// crosshair assignments as kept references, and Graphics as found. Add-ons are the
+    /// installed ones only, unless mastercomfig is not installed, where they are left alone.
+    pub fn from_current(name: impl Into<String>, setup: &CurrentSetup) -> Self {
+        let keep = |item: &Option<ProfileItem>| item.clone().map(DraftItem::Keep);
+        let hud = match &setup.hud {
+            SlotMode::Set(item) => SlotMode::Set(DraftItem::Keep(item.clone())),
+            SlotMode::None | SlotMode::Leave => SlotMode::None,
+        };
+        let addons = match setup.graphics {
+            SlotMode::None => SlotMode::Leave,
+            SlotMode::Set(_) | SlotMode::Leave => {
+                let on = setup.addons.iter().cloned().map(DraftItem::keep_addon);
+                SlotMode::Set((on.collect(), true))
+            }
+        };
+        Self {
+            name: name.into(),
+            hud,
+            sounds: SlotMode::Set((keep(&setup.sounds.hit), keep(&setup.sounds.kill))),
+            crosshairs: SlotMode::Set(
+                setup
+                    .crosshairs
+                    .iter()
+                    .cloned()
+                    .map(DraftCrosshair::Keep)
+                    .collect(),
+            ),
+            graphics: setup.graphics.map_ref(|g| g.choices.clone()),
+            addons,
+        }
+    }
+
     /// Replaces the name; it is trimmed when saved.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
@@ -523,6 +557,63 @@ fn kept_values(spec: &SlotSpec, kept: &ProfileItem) -> SlotValues {
         store_gb_id,
         store_hud_id,
     }
+}
+
+/// The library HUD with this id, as a profile records it.
+pub(super) fn hud_item(conn: &Connection, id: &HudId) -> Result<ProfileItem, ProfileError> {
+    library_item(conn, &HUD_SLOT, id.as_str())
+}
+
+/// The library sound with this id, as a profile records it.
+pub(super) fn sound_item(conn: &Connection, id: &SoundId) -> Result<ProfileItem, ProfileError> {
+    library_item(conn, &HITSOUND_SLOT, id.as_str())
+}
+
+/// Reads a library row the way a `Pick` would save it, then back as the profile reads it.
+fn library_item(conn: &Connection, spec: &SlotSpec, id: &str) -> Result<ProfileItem, ProfileError> {
+    let pick = DraftItem::Pick(id);
+    let values = resolve_slot(conn, spec, Some(&pick), |id: &&str| *id, None)?.unwrap_or_default();
+    item(
+        values.folder_name,
+        values.name,
+        values.store_hud_id,
+        values.store_gb_id,
+    )
+    .ok_or_else(|| ProfileError::ItemNotFound {
+        what: format!("{} {id}", spec.label),
+    })
+}
+
+/// The given assignments as profile crosshair rows, sorted by weapon script.
+pub(super) fn assigned_crosshairs(
+    conn: &Connection,
+    assignments: &[Assignment],
+) -> Result<Vec<ProfileCrosshair>, ProfileError> {
+    let drafts: Vec<DraftCrosshair> = assignments
+        .iter()
+        .map(|a| DraftCrosshair::Set {
+            weapon_script: a.weapon_script().to_owned(),
+            crosshair: a.crosshair().clone(),
+        })
+        .collect();
+    let mut out: Vec<ProfileCrosshair> = resolve_crosshairs(conn, &drafts)?
+        .into_iter()
+        .map(
+            |(weapon_script, source, reference, gb_id)| ProfileCrosshair {
+                weapon_script,
+                crosshair: if source == SOURCE_BUILTIN {
+                    ProfileCrosshairRef::Builtin(reference)
+                } else {
+                    ProfileCrosshairRef::Library {
+                        folder_name: reference,
+                    }
+                },
+                store_gb_id: gb_id.and_then(|id| u64::try_from(id).ok()).map(GbId::new),
+            },
+        )
+        .collect();
+    out.sort_by(|a, b| a.weapon_script.cmp(&b.weapon_script));
+    Ok(out)
 }
 
 /// The draft's add-on names, once each and sorted. A `Pick` must be in the library; a
@@ -828,7 +919,7 @@ fn save_draft(
 
 /// The trimmed name, after checking it and, under a Set crosshair slot, every assigned
 /// weapon script.
-fn validated_name(draft: &ProfileDraft) -> Result<&str, ProfileError> {
+pub(super) fn validated_name(draft: &ProfileDraft) -> Result<&str, ProfileError> {
     let name = draft.name.trim();
     if name.is_empty() {
         return Err(ProfileError::EmptyName);
@@ -1259,55 +1350,6 @@ impl Library {
         self.db
             .write(|conn| Ok(save_draft(conn, id.as_str(), name, draft, false)))
             .map_err(profile_db)?
-    }
-
-    /// Creates a profile named `name` from what is installed now: the HUD from `hud_status`
-    /// (only `Managed`), each sound slot from `installed_sounds` (only a managed one), and the
-    /// crosshairs from `assignments()`. Anything else leaves that slot empty.
-    pub fn save_current_profile(
-        &self,
-        name: &str,
-        tf2: &Tf2Install,
-    ) -> Result<Profile, ProfileError> {
-        // Scan into a draft and go through `create_profile`, so validation and the row
-        // write have a single path. A blank name is refused before the scan can fail.
-        validated_name(&ProfileDraft::new(name))?;
-        // A slot with nothing managed installed is None, as migration 24 reads old profiles.
-        let hud = match self.hud_status(tf2)? {
-            HudStatus::Managed { id, .. } => SlotMode::Set(DraftItem::Pick(id)),
-            HudStatus::NotInstalled | HudStatus::Unmanaged { .. } | HudStatus::Multiple { .. } => {
-                SlotMode::None
-            }
-        };
-        let installed = self.installed_sounds(tf2)?;
-        let sound = |kind| {
-            installed
-                .slot(kind)
-                .managed()
-                .map(|id| DraftItem::Pick(id.clone()))
-        };
-        let sounds = match (sound(SoundKind::Hitsound), sound(SoundKind::Killsound)) {
-            (None, None) => SlotMode::None,
-            pair => SlotMode::Set(pair),
-        };
-        let crosshairs: Vec<DraftCrosshair> = self
-            .assignments()?
-            .into_iter()
-            .map(|a| DraftCrosshair::Set {
-                weapon_script: a.weapon_script().to_owned(),
-                crosshair: a.crosshair().clone(),
-            })
-            .collect();
-        let crosshairs = if crosshairs.is_empty() {
-            SlotMode::None
-        } else {
-            SlotMode::Set(crosshairs)
-        };
-        let draft = ProfileDraft::new(name)
-            .with_hud(hud)
-            .with_sounds(sounds)
-            .with_crosshairs(crosshairs);
-        self.create_profile(&draft)
     }
 
     /// Deletes a profile and its crosshair rows, and clears the active id when it named
