@@ -47,8 +47,9 @@ const STORE_KEYS: [&str; 5] = ["curated", "huds_gb", "sounds", "crosshairs", "ad
 /// (Classic Ding as hitsound, Bell as killsound); crosshairs My Dot, My Circle; two assignments
 /// (tf_weapon_scattergun -> the catalog's first builtin, tf_weapon_rocketlauncher -> My Dot) applied;
 /// addons no-pyroland, no-soundscapes, no-tutorial at release 9.100.1, installed; tf2_path saved;
-/// profiles Competitive (the seeded setup, active), Casual (flawhud, Beep), Vanilla (empty) and
-/// Arena (the store HUD arenahud, which is not in the library);
+/// profiles Competitive (the seeded setup, active, leaving Graphics and Add-ons), Casual (flawhud,
+/// Beep, no crosshairs), Vanilla (None in every slot) and Arena (the store HUD arenahud, which is
+/// not in the library);
 /// 12 activity log rows over the last three days; store rows with cached images (see `seed_store`).
 /// Does nothing when `data` already holds tf2tools.db.
 pub fn seed(data: &Path, game: &Path, assets: &Path) -> anyhow::Result<()> {
@@ -165,10 +166,19 @@ fn fill(
     }
 
     // Applying Competitive reinstalls the setup it was saved from, so tf/custom is unchanged.
-    let competitive = lib.save_current_profile("Competitive", tf2)?;
+    // Leaving Graphics and Add-ons makes it apply the same with or without the Graphics seed.
+    let saved = lib.save_current_profile("Competitive", tf2)?;
+    let draft = ProfileDraft::from_profile(&saved)
+        .with_graphics(SlotMode::Leave)
+        .with_addons(SlotMode::Leave);
+    let competitive = lib.update_profile(saved.id(), &draft)?;
     lib.create_profile(&casual)?;
-    lib.create_profile(&ProfileDraft::new("Vanilla"))?;
-    lib.apply_profile(competitive.id(), tf2, builtins, false)?;
+    lib.create_profile(
+        &ProfileDraft::new("Vanilla")
+            .with_graphics(SlotMode::None)
+            .with_addons(SlotMode::None),
+    )?;
+    lib.apply_profile(competitive.profile().id(), tf2, builtins, false)?;
 
     // A draft can only name library items, so the missing store HUD is written as v5 left it,
     // with the Set mode a new draft's None HUD lacks.
@@ -200,10 +210,12 @@ const MC_PRESETS: &[u8] = include_bytes!(
 /// Adds mastercomfig 9.100.1 to a seeded library and its fake game, managed by TF2Tools on
 /// High: a base VPK naming its version, setup_hook.cfg, the full catalogue cached, and
 /// modules.cfg with vsync=on (switch), motion_blur=high (segments), fpscap=144 (select) and
-/// decals left to TF2 (select). Offline; does nothing once mastercomfig is managed.
+/// decals left to TF2 (select); and profiles Potato (Low with shadows=off and fpscap=60, only
+/// no-pyroland, the rest left) and Screenshots (Ultra, no HUD, sounds or crosshairs, add-ons
+/// left). Offline; does nothing once mastercomfig is managed.
 pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     use tf2tools_core::{
-        Endpoints, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
+        Choices, Endpoints, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
     };
 
     let dir = DataDir::at(data);
@@ -252,6 +264,24 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     tokio::runtime::Builder::new_current_thread()
         .build()?
         .block_on(store.apply_mastercomfig_modules(&tf2, &catalog, &choices, false))?;
+
+    // Potato and Screenshots cover the Graphics and Add-ons modes the plain seed leaves out.
+    let mut low = Choices::new(Preset::Low);
+    for (module, value) in [("shadows", "off"), ("fpscap", "60")] {
+        low.set(&catalog, module, ModuleChoice::Value(value.to_owned()));
+    }
+    let pyroland = AddonName::new(ADDONS[0]).context("invalid seeded addon name")?;
+    lib.create_profile(
+        &ProfileDraft::new("Potato")
+            .with_hud(SlotMode::Leave)
+            .with_sounds(SlotMode::Leave)
+            .with_crosshairs(SlotMode::Leave)
+            .with_graphics(SlotMode::Set(low))
+            .with_addons(SlotMode::Set((vec![DraftItem::keep_addon(pyroland)], true))),
+    )?;
+    lib.create_profile(
+        &ProfileDraft::new("Screenshots").with_graphics(SlotMode::Set(Choices::new(Preset::Ultra))),
+    )?;
     Ok(())
 }
 
