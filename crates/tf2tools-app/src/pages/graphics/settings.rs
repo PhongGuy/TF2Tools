@@ -139,11 +139,11 @@ fn section_view(
         .id(ids::graphics_section(&section.key))
         .test_support()
         .ml(indent)
+        // Clipping drops a flex item's content height as its floor, so the card keeps it
+        // explicitly rather than shrink to fit the scroll column.
         .flex_none()
         .flex()
         .flex_col()
-        // Clipping drops a flex item's content height as its floor, so the card keeps it
-        // explicitly rather than shrink to fit the scroll column.
         .overflow_hidden()
         .child(labelled(
             div()

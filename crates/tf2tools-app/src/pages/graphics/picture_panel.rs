@@ -44,7 +44,7 @@ fn rounded(
     area: ElementId,
     image: ElementId,
     key: Option<&ImageKey>,
-    radius: Option<Pixels>,
+    radius: Pixels,
     cx: &App,
 ) -> AnyElement {
     let failed = key
@@ -57,10 +57,10 @@ fn rounded(
             .aspect_ratio(16. / 9.)
             .border_1()
             .border_color(cx.theme().border)
-            .when_some(radius, |area, r| area.rounded(r))
+            .rounded(radius)
             .into_any_element()
     } else {
-        rounded_picture(area, image, key, radius, cx).into_any_element()
+        rounded_picture(area, image, key, Some(radius), cx).into_any_element()
     }
 }
 
@@ -83,7 +83,7 @@ pub(super) fn thumbnail(
         ids::graphics_thumb_area(module),
         ids::graphics_thumb_image(module),
         key.as_ref(),
-        Some(px(7.)),
+        px(7.),
         cx,
     );
     let target = module.to_owned();
@@ -191,7 +191,8 @@ pub(super) fn panel(
 }
 
 // One card per value with a picture, in catalogue order: its picture over its label, the
-// chosen one outlined in the primary colour and the preset's carrying the preset's name.
+// chosen one outlined in the primary colour and the preset's tagged with the preset's name,
+// or "Preset" when that name repeats the value's label.
 fn strip(
     page: &GraphicsPage,
     module: &str,
@@ -215,7 +216,7 @@ fn strip(
             ids::graphics_strip_area(module, &entry.value),
             ids::graphics_strip_image(module, &entry.value),
             key.as_ref(),
-            Some(px(5.)),
+            px(5.),
             cx,
         );
         // A tag naming the card's own label would read "Medium Medium"; it says "Preset" then.
@@ -298,7 +299,7 @@ fn compare(
             ids::graphics_compare_area(module, name),
             ids::graphics_compare_image(module, name),
             Some(&key(path)),
-            Some(px(COMPARE_RADIUS)),
+            px(COMPARE_RADIUS),
             cx,
         )
     };

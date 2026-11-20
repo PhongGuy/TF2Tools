@@ -270,3 +270,32 @@ fn graphics_segments_use_the_shared_pill_look() {
     let source = include_str!("../src/pages/graphics/settings.rs");
     assert!(source.contains("pill::segment_look(") && source.contains("pill::row_track("));
 }
+
+// A checked pill segment wears the page background with foreground text on the secondary
+// track, so its text must read clearly and the segment must stand apart from its track.
+#[gpui_kit::test]
+fn a_checked_pill_segment_stands_out_from_its_track(cx: &mut TestAppContext) {
+    let pill = include_str!("../src/pages/graphics/pill.rs");
+    assert!(
+        pill.contains(".bg(theme.background)")
+            && pill.contains(".text_color(theme.foreground)")
+            && pill.contains(".bg(cx.theme().secondary)"),
+        "pill.rs no longer draws the look this test checks"
+    );
+    support::init(cx);
+    cx.update(|cx| {
+        let t = Theme::global(cx);
+        assert!(
+            (t.foreground.l - t.background.l).abs() >= 0.5,
+            "{} text on a {} segment",
+            hex(t.foreground),
+            hex(t.background)
+        );
+        assert!(
+            (t.background.l - t.secondary.l).abs() >= 0.08,
+            "a {} segment on a {} track",
+            hex(t.background),
+            hex(t.secondary)
+        );
+    });
+}

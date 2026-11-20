@@ -32,7 +32,7 @@ use tf2tools_core::{
 use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
-use crate::pages::common::no_tf2_warning;
+use crate::pages::common::{card_frame, no_tf2_warning};
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -980,7 +980,7 @@ impl GraphicsPage {
     fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
-        let (accent, fill, card) = (theme.sidebar_primary, theme.background, theme.group_box);
+        let (accent, fill) = (theme.sidebar_primary, theme.background);
         let preset = preset_label(preset);
         let catalog = self.catalog.as_deref();
         let list = view::changes(catalog, &self.shown_against());
@@ -1068,18 +1068,17 @@ impl GraphicsPage {
                 .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
         });
         // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
-        h_flex()
+        card_frame(cx)
             .id(ids::GRAPHICS_CHANGES)
             .aria_label(title.clone())
             .test_support()
+            .flex()
+            .items_center()
             .flex_wrap()
             .gap_2()
             .py_3()
             .px_4()
-            .bg(card)
-            .border_1()
             .border_color(accent)
-            .rounded(radius)
             .child(div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title))
             .children(chips)
             .child(div().flex_1())

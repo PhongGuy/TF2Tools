@@ -1539,18 +1539,14 @@ pub(crate) fn rounded_picture(
 }
 
 /// The picture's 16:9 box in `fill`, rounded by `radius`.
-fn picture_area(
-    area_id: ElementId,
-    radius: Option<Pixels>,
-    fill: impl Into<Hsla>,
-) -> Stateful<Div> {
+fn picture_area(area_id: ElementId, radius: Option<Pixels>, fill: Hsla) -> Stateful<Div> {
     div()
         .id(area_id)
         .flex_none()
         .w_full()
         .aspect_ratio(16. / 9.)
         .overflow_hidden()
-        .bg(fill.into())
+        .bg(fill)
         .when_some(radius, |area, r| area.rounded(r))
 }
 
