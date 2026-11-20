@@ -1030,6 +1030,7 @@ sounds:
   button:
     play: "Tocar"
     stop: "Parar"
+    cancel_preview: "Cancelar"
     uninstall: "Desinstalar"
     removing: "Removendo..."
     delete: "Excluir da biblioteca"

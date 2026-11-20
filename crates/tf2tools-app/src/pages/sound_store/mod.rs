@@ -14,7 +14,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{GbId, StoreCard, StoreItemId, StoreKind};
 
-use crate::audio::player::{Player, sound_player};
+use crate::audio::player::{PlayState, Player, sound_player};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::filter_badge;
@@ -43,8 +43,8 @@ pub struct SoundStorePage {
     player: Entity<Player>,
     category: Category,
     downloaded: SessionDownloads,
-    /// The key of the preview the cards last drew as playing.
-    playing_key: Option<SharedString>,
+    /// The key and phase of the preview the cards last drew as loading or playing.
+    playing_key: Option<(SharedString, PlayState)>,
     scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -76,14 +76,17 @@ impl SoundStorePage {
             .map(|hub| cx.observe(&hub, |_, _, cx| cx.notify()))
             .into_iter()
             .collect();
-        // A play, stop or failure flips a card's icon and the open detail's preview button;
-        // the detail does not observe the player, so the whole window redraws. Any other
-        // player change (the volume) leaves both alone.
+        // A play, its bytes landing, a stop or a failure flips a card's icon and the open
+        // detail's preview button; the detail does not observe the player, so the whole window
+        // redraws. Any other player change (the volume) leaves both alone.
         subscriptions.push(cx.observe_in(
             &player,
             window,
             |page: &mut Self, player, window, cx| {
-                let key = player.read(cx).now_playing().map(|p| p.key.clone());
+                let player = player.read(cx);
+                let key = player
+                    .now_playing()
+                    .and_then(|p| Some((p.key.clone(), player.state_of(&p.key)?)));
                 if key == page.playing_key {
                     return;
                 }
@@ -187,15 +190,12 @@ impl SoundStorePage {
     }
 }
 
-// Whether `card`'s preview is what the player holds; a dropped player plays nothing.
-fn card_playing(player: &WeakEntity<Player>, card: &StoreCard, cx: &App) -> bool {
+// Where `card`'s preview is in the player, if it holds it; a dropped player plays nothing.
+fn card_playing(player: &WeakEntity<Player>, card: &StoreCard, cx: &App) -> Option<PlayState> {
     let (Some(player), StoreItemId::GameBanana(id)) = (player.upgrade(), &card.id) else {
-        return false;
+        return None;
     };
-    player
-        .read(cx)
-        .now_playing()
-        .is_some_and(|now| now.key == preview_key(*id))
+    player.read(cx).state_of(&preview_key(*id))
 }
 
 impl Render for SoundStorePage {

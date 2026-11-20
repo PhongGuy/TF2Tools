@@ -10,6 +10,7 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, search_placeholder};
 use tf2tools_app::pages::addon_store::model::AddonState;
 use tf2tools_app::pages::addon_store::{InfoLink, info_links, info_text};
+use tf2tools_app::pages::crosshair_store::CrosshairStorePage;
 use tf2tools_app::pages::hud_store::HudStorePage;
 use tf2tools_app::pages::hud_store::bodies::{curated_body, gamebanana_body};
 use tf2tools_app::pages::sound_store::model::{Category, category_label};
@@ -386,6 +387,35 @@ fn the_curated_search_follows_a_language_switch(cx: &mut TestAppContext) {
         shown_text(cx, win, ids::STORE_SEARCH).as_deref(),
         Some("Поиск HUD...")
     );
+}
+
+// The Crosshair Store's search box speaks each language, not English.
+#[gpui_kit::test]
+fn the_crosshair_search_reads_in_every_language(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let (win, page) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_crosshairs(env, 1..=3, 0, false),
+        CrosshairStorePage::new,
+    );
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    let english = shown_text(cx, win, ids::STORE_SEARCH);
+    assert_eq!(english.as_deref(), Some("Search crosshairs..."));
+    for lang in ["ru", "pt-BR", "es", "de", "fr", "zh-CN"] {
+        tf2tools_app::i18n::apply(lang);
+        cx.update(|cx| cx.refresh_windows());
+        let text = shown_text(cx, win, ids::STORE_SEARCH);
+        assert!(
+            text.as_deref().is_some_and(|t| !t.trim().is_empty()),
+            "{lang}: {text:?}"
+        );
+        assert_ne!(text, english, "{lang}");
+    }
 }
 
 #[gpui_kit::test]

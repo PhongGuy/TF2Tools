@@ -888,6 +888,22 @@ impl StoreServer {
         format!("{}{route}", self.uri())
     }
 
+    /// Serves `body` at `{uri}/preview/{gb_id}.mp3` only after `delay`, and returns that URL.
+    pub fn mount_preview_after(&self, gb_id: u64, body: Vec<u8>, delay: Duration) -> String {
+        let route = format!("/preview/{gb_id}.mp3");
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route.clone()))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(body)
+                        .set_delay(delay),
+                )
+                .mount(&self.server),
+        );
+        format!("{}{route}", self.uri())
+    }
+
     /// GameBanana Mod `gb_id` listing `files` (name, body); file i is served at `/dl/{gb_id}/{i}` after `delay`.
     pub fn mount_gb_files(&self, gb_id: u64, files: &[(&str, Vec<u8>)], delay: Duration) {
         let uri = self.uri();

@@ -853,8 +853,8 @@ impl StoreGrid {
             .into_any_element()
     }
 
-    // v5's order: search left with count and Sort right; a grid without search (the Crosshair
-    // Store) keeps count and Sort at the right, since the top bar already names the page.
+    // v5's order: search left with count and Sort right; a grid without search keeps count and
+    // Sort at the right, since the top bar already names the page.
     fn header(&self, cx: &App) -> impl IntoElement {
         let left = if self.config.search {
             self.search_box(cx).into_any_element()

@@ -1028,6 +1028,7 @@ sounds:
   button:
     play: "播放"
     stop: "停止"
+    cancel_preview: "取消"
     uninstall: "卸载"
     removing: "正在移除…"
     delete: "从库中删除"

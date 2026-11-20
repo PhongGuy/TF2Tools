@@ -197,6 +197,7 @@ mod payload_checklist;
 mod picker;
 mod play_tf2;
 mod player;
+mod player_states;
 mod previews;
 mod profile_draft;
 mod profile_editor_model;

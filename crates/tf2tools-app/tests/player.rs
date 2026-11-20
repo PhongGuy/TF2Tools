@@ -10,15 +10,15 @@ use tf2tools_app::services::{OpError, Services};
 use tf2tools_core::Volume;
 
 /// A window whose root is a Player, over a fresh library saved at `volume` percent.
-struct Host {
-    win: AnyWindowHandle,
-    player: Entity<Player>,
-    audio: Arc<RecordingAudio>,
+pub(crate) struct Host {
+    pub(crate) win: AnyWindowHandle,
+    pub(crate) player: Entity<Player>,
+    pub(crate) audio: Arc<RecordingAudio>,
     services: Services,
     _env: support::Env,
 }
 
-fn host(cx: &mut TestAppContext, volume: u8) -> Host {
+pub(crate) fn host(cx: &mut TestAppContext, volume: u8) -> Host {
     let env = support::env();
     support::init(cx);
     let audio = Arc::new(RecordingAudio::new());
@@ -48,7 +48,7 @@ fn host(cx: &mut TestAppContext, volume: u8) -> Host {
     }
 }
 
-fn now(name: &str) -> NowPlaying {
+pub(crate) fn now(name: &str) -> NowPlaying {
     NowPlaying {
         key: name.to_owned().into(),
         name: name.to_owned().into(),
@@ -64,11 +64,11 @@ fn toggle(cx: &mut TestAppContext, h: &Host, name: &str, bytes: Vec<u8>) {
     });
 }
 
-fn plays(h: &Host) -> Vec<Vec<u8>> {
+pub(crate) fn plays(h: &Host) -> Vec<Vec<u8>> {
     h.audio.plays().into_iter().map(|(wav, _)| wav).collect()
 }
 
-fn playing(cx: &mut TestAppContext, h: &Host) -> Option<String> {
+pub(crate) fn playing(cx: &mut TestAppContext, h: &Host) -> Option<String> {
     cx.update(|cx| h.player.read(cx).now_playing().map(|n| n.name.to_string()))
 }
 

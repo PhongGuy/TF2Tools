@@ -8,6 +8,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
@@ -27,7 +28,7 @@ use tf2tools_core::{
 
 use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
-use crate::audio::player::{NowPlaying, Player, sound_player};
+use crate::audio::player::{NowPlaying, PlayState, Player, sound_player};
 use crate::i18n::{names, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
@@ -576,11 +577,7 @@ impl SoundsPage {
         let body = match slot {
             Some(slot) => {
                 let key = slot_key(kind);
-                let playing = self
-                    .player
-                    .read(cx)
-                    .now_playing()
-                    .is_some_and(|now| now.key == key);
+                let state = self.player.read(cx).state_of(&key);
                 let uninstalling = self.busy == Some(Busy::Uninstall(kind));
                 let name = slot.name.clone();
                 // Uninstall keeps its label only while the whole name fits beside it, measured in
@@ -630,22 +627,17 @@ impl SoundsPage {
                             .min_w_0()
                             .gap_2()
                             .child(
-                                Button::new(ids::sound_slot_play(kind))
-                                    .ghost()
-                                    .icon(if playing {
-                                        IconName::Square
-                                    } else {
-                                        IconName::Play
-                                    })
-                                    .size(px(32.))
-                                    .named(if playing {
-                                        tr!("sounds.button.stop")
-                                    } else {
-                                        tr!("sounds.button.play")
-                                    })
-                                    .on_click(cx.listener(move |page, _, window, cx| {
+                                with_play_state(
+                                    Button::new(ids::sound_slot_play(kind)).ghost(),
+                                    ids::sound_slot_play_spinner(kind),
+                                    state,
+                                )
+                                .size(px(32.))
+                                .on_click(cx.listener(
+                                    move |page, _, window, cx| {
                                         page.play_slot(kind, name.clone(), window, cx)
-                                    })),
+                                    },
+                                )),
                             )
                             .child(shown),
                     )
@@ -842,11 +834,32 @@ pub(crate) fn play_button(id: impl Into<ElementId>, playing: bool) -> Button {
         })
 }
 
+/// Gives `button` its face for the player's `state` of its sound: Play, Stop while playing, and
+/// while loading a 16 px spinner (`spinner`) in the icon's place, named "Cancel". The click still
+/// toggles in every state, so it cancels a load. The caller sizes the button, since a button with
+/// children pads like a labelled one and `p_0` drops that padding.
+pub(crate) fn with_play_state(
+    button: Button,
+    spinner: impl Into<ElementId>,
+    state: Option<PlayState>,
+) -> Button {
+    match state {
+        None => button.icon(IconName::Play).named(tr!("sounds.button.play")),
+        Some(PlayState::Playing) => button
+            .icon(IconName::Square)
+            .named(tr!("sounds.button.stop")),
+        Some(PlayState::Loading) => button
+            .p_0()
+            .child(div().id(spinner).test_support().child(Spinner::new()))
+            .named(tr!("sounds.button.cancel_preview")),
+    }
+}
+
 // v5's library sound card: the name with its VPK badge, then play and delete at the bottom
 // left and the outline Hit and Kill installs at the right.
 fn sound_card(
     sound: &SoundEntry,
-    playing: bool,
+    playing: Option<PlayState>,
     busy: Option<&Busy>,
     page: &WeakEntity<SoundsPage>,
     width: Pixels,
@@ -909,7 +922,15 @@ fn sound_card(
                     h_flex()
                         .gap_1()
                         .child(
-                            play_button(ids::sound_play(folder), playing).on_click(on_card(
+                            with_play_state(
+                                Button::new(ids::sound_play(folder)).ghost(),
+                                ids::sound_play_spinner(folder),
+                                playing,
+                            )
+                            // An icon-only kit button is already this square; the size holds
+                            // the spinner's face to it too.
+                            .size(px(32.))
+                            .on_click(on_card(
                                 page,
                                 sound,
                                 SoundsPage::play_sound,
@@ -1024,11 +1045,11 @@ impl SoundsPage {
         } else if shown.is_empty() {
             Some(empty_library(!query.is_empty(), cx))
         } else {
-            let playing = self
-                .player
-                .read(cx)
+            // The held sound's key and phase; only its card shows Stop or the spinner.
+            let player = self.player.read(cx);
+            let held = player
                 .now_playing()
-                .map(|now| now.key.clone());
+                .and_then(|now| Some((now.key.clone(), player.state_of(&now.key)?)));
             let page = cx.entity().downgrade();
             let busy = self.busy.clone();
             let sounds = Rc::clone(&self.sounds);
@@ -1037,8 +1058,12 @@ impl SoundsPage {
                 |_| CARD_HEIGHT,
                 move |ix, width, window, cx| {
                     let sound = &sounds[shown[ix]];
-                    let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
-                    sound_card(sound, on, busy.as_ref(), &page, width, window, cx)
+                    let key = sound_key(sound.folder_name());
+                    let state = held
+                        .as_ref()
+                        .filter(|(now, _)| *now == key)
+                        .map(|(_, s)| *s);
+                    sound_card(sound, state, busy.as_ref(), &page, width, window, cx)
                 },
             ))
         };

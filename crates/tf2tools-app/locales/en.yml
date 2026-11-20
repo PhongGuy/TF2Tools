@@ -1006,6 +1006,7 @@ sounds:
   button:
     play: "Play"
     stop: "Stop"
+    cancel_preview: "Cancel"
     uninstall: "Uninstall"
     removing: "Removing..."
     delete: "Delete from library"
