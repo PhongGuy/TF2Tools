@@ -3,9 +3,8 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    ApplyProfileReport, ApplySkipReason, ApplyStep, DraftItem, MissingKind, Profile,
-    ProfileCrosshair, ProfileId, ProfileItem, Provenance, SlotMode, SoundId, SoundKind,
-    StoreItemId, StoreKind,
+    ApplySkipReason, ApplyStep, DraftItem, MissingKind, Profile, ProfileCrosshair, ProfileId,
+    ProfileItem, Provenance, SlotMode, SoundId, SoundKind, StoreItemId, StoreKind,
 };
 
 use crate::i18n::{names, tr};
@@ -122,51 +121,6 @@ pub fn kind_label(kind: &MissingKind) -> SharedString {
     }
 }
 
-/// The slots the apply installed something into, in step order, as `step_label`s: a slot the
-/// profile fills, whose step is in `applied`, and that was not skipped (Crosshairs: at least one
-/// crosshair was not skipped).
-pub fn installed_parts(profile: &Profile, report: &ApplyProfileReport) -> Vec<SharedString> {
-    let skipped = |kind: &MissingKind| report.skipped().iter().any(|m| m.kind() == kind);
-    let skipped_crosshairs = report
-        .skipped()
-        .iter()
-        .filter(|m| matches!(m.kind(), MissingKind::Crosshair { .. }))
-        .count();
-    let filled = [
-        (
-            ApplyStep::Hud,
-            hud_item(profile).is_some() && !skipped(&MissingKind::Hud),
-        ),
-        (
-            ApplyStep::Hitsound,
-            hit(profile).is_some() && !skipped(&MissingKind::Hitsound),
-        ),
-        (
-            ApplyStep::Killsound,
-            kill(profile).is_some() && !skipped(&MissingKind::Killsound),
-        ),
-        (
-            ApplyStep::Crosshairs,
-            crosshair_list(profile).len() > skipped_crosshairs,
-        ),
-    ];
-    filled
-        .into_iter()
-        .filter(|(step, installed)| *installed && report.applied().contains(step))
-        .map(|(step, _)| step_label(step))
-        .collect()
-}
-
-/// The success toast's title: "activated" when the game now matches the profile, "applied"
-/// when missing items were skipped and so the profile is not marked Active.
-pub fn success_title(name: &str, skipped: bool) -> String {
-    if skipped {
-        tr!("profiles.toast.applied", name = name).into()
-    } else {
-        tr!("profiles.toast.activated", name = name).into()
-    }
-}
-
 /// The slots whose missing items were skipped, once each in step order, as `step_label`s.
 pub fn kept_parts(kinds: &[MissingKind]) -> Vec<SharedString> {
     let crosshair = |k: &MissingKind| matches!(k, MissingKind::Crosshair { .. });
@@ -183,21 +137,6 @@ pub fn kept_parts(kinds: &[MissingKind]) -> Vec<SharedString> {
     .filter(|(_, kept)| *kept)
     .map(|(step, _)| step_label(step))
     .collect()
-}
-
-/// The success toast's description: v5's "Installed: ..." or "All customizations cleared";
-/// with skipped slots, which ones kept what the player had.
-pub fn activated_description(installed: &[SharedString], kept: &[SharedString]) -> String {
-    let join = |parts: &[SharedString]| crate::i18n::separated(parts);
-    let lead: SharedString = match (installed.is_empty(), kept.is_empty()) {
-        (true, true) => return tr!("profiles.toast.cleared").into(),
-        (true, false) => tr!("profiles.toast.nothing_new"),
-        (false, _) => tr!("profiles.toast.installed", list = join(installed)),
-    };
-    if kept.is_empty() {
-        return lead.into();
-    }
-    tr!("profiles.toast.kept", lead = lead, list = join(kept)).into()
 }
 
 /// The failure toast's description: the HUD, sound and crosshair failures as one sentence

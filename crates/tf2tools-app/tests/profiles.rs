@@ -477,7 +477,7 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(env.game.join("tf/custom/rayshud").is_dir());
     assert_eq!(
@@ -645,7 +645,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(env.game.join("tf/custom/rayshud").is_dir());
 }
@@ -670,7 +670,7 @@ fn the_tf2_probe_runs_off_the_ui_thread(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert_eq!(
         *calls.lock().unwrap(),
@@ -710,7 +710,7 @@ fn a_second_activate_while_one_runs_does_nothing(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     support::wait_real(cx, "idle", |cx| {
         cx.update(|cx| page.read(cx).activating().is_none())
@@ -744,9 +744,8 @@ fn a_failed_step_toasts_the_steps_and_leaves_nothing_active(cx: &mut TestAppCont
     let (changes, _sub) = count_changes(cx);
     support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the failure toast", |cx| {
-        support::label_of(cx, s.win, ids::TOAST).is_some_and(|t| {
-            t.starts_with("Failed to activate profile. Couldn't put these in place: HUD")
-        })
+        support::label_of(cx, s.win, ids::TOAST)
+            .is_some_and(|t| t.starts_with("Couldn't apply Comp. Couldn't put these in place: HUD"))
     });
     std::fs::set_permissions(&custom, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(s.services.library.active_profile().unwrap(), None);
@@ -884,7 +883,7 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" applied. Installed: Hitsound. Kept what you had for: HUD (missing from your library)",
+        "Comp applied. TF2 picks it up the next time it starts. Kept what you had for: HUD (missing from your library).",
     );
     assert!(!has_dialog(cx, &s));
     // The game does not match the profile, so it is not marked Active.
@@ -991,7 +990,7 @@ fn nothing_else_starts_while_an_activate_runs(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert_eq!(s.services.library.profiles().unwrap().len(), 2);
 }
@@ -1130,9 +1129,9 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. A folder named m0rehud is already in your custom \
-         folder, so parts of this HUD may not show. Move or rename that folder and install \
-         again.",
+        "Comp applied. TF2 picks it up the next time it starts. A folder named m0rehud is \
+         already in your custom folder, so parts of this HUD may not show. Move or rename that \
+         folder and install again.",
     );
     assert!(
         env.game

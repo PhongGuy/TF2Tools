@@ -1319,6 +1319,7 @@ pub struct ApplyProfileReport {
     pending_modules: Option<Choices>,
     binds_restored: bool,
     movement: Option<MovementKeys>,
+    movement_off: bool,
     hud_blocked_name: Option<String>,
 }
 
@@ -1371,6 +1372,12 @@ impl ApplyProfileReport {
     /// Movement on.
     pub fn movement(&self) -> Option<&MovementKeys> {
         self.movement.as_ref()
+    }
+
+    /// Whether the Add-ons step turned Null-Canceling Movement off, which puts the movement
+    /// keys back on the stock commands.
+    pub fn movement_off(&self) -> bool {
+        self.movement_off
     }
 }
 
@@ -1642,6 +1649,7 @@ impl Library {
             pending_modules: graphics.pending_modules,
             binds_restored: graphics.binds_restored,
             movement: addons.movement,
+            movement_off: addons.movement_off,
             hud_blocked_name,
         })
     }

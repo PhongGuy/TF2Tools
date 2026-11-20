@@ -275,7 +275,7 @@ fn a_profile_without_a_hud_checks_nothing(cx: &mut TestAppContext) {
     support::wait_real(cx, "the activate toast", |cx| {
         support::toast_labels(cx, s.win)
             .iter()
-            .any(|l| l.starts_with("Profile \"Vanilla\""))
+            .any(|l| l.starts_with("Vanilla applied."))
     });
     assert_eq!(started(cx), 0);
 }

@@ -471,7 +471,7 @@ fn copy_job(
 }
 
 // The toast line for the keys Null-Canceling Movement now uses, in W, A, S, D order.
-fn movement_line(keys: &MovementKeys, running: bool) -> String {
+pub(crate) fn movement_line(keys: &MovementKeys, running: bool) -> String {
     let order = [
         (MoveDirection::Forward, "forward"),
         (MoveDirection::Left, "left"),

@@ -76,6 +76,7 @@ pub(super) struct AddonsStep {
     pub(super) failures: Vec<String>,
     pub(super) skip: Option<ApplySkipReason>,
     pub(super) movement: Option<MovementKeys>,
+    pub(super) movement_off: bool,
 }
 
 impl Library {
@@ -108,8 +109,9 @@ impl Library {
                 .iter()
                 .filter(|a| a.is_installed() && !wanted.contains(a.name()))
             {
-                if let Err(e) = self.uninstall_addon(addon.name(), tf2) {
-                    step.failures.push(e.to_string());
+                match self.uninstall_addon(addon.name(), tf2) {
+                    Ok(()) => step.movement_off |= addon.name().is_null_movement(),
+                    Err(e) => step.failures.push(e.to_string()),
                 }
             }
         }

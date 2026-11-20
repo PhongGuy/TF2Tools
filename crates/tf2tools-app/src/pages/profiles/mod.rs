@@ -9,6 +9,7 @@ pub mod probe;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -17,24 +18,27 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    WeakEntity, Window, div, px,
+    AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, EventEmitter,
+    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, div, px,
 };
 
 use tf2tools_core::{
-    AddonName, ApplyProfileError, ApplyProfileReport, ApplyStep, CrosshairRef, ExternalHud,
-    LogLevel, MissingItem, MissingKind, NewLogEntry, Profile, ProfileError, ProfileId, StoreKind,
-    Tf2Install,
+    AddonName, ApplyProfileError, ApplyProfileReport, ApplyStep, Choices, CrosshairRef,
+    ExternalHud, LogLevel, MastercomfigStatus, MissingItem, MissingKind, NewLogEntry, Profile,
+    ProfileError, ProfileId, StoreKind, Tf2Install,
 };
 
 use self::editor::ProfileEditor;
 use self::editor_model::{
     Mode, Slot, SlotKind, Summary, SummaryRow, card_lines, left_line, next_profile_name, summary,
 };
+use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
+use super::addons;
 use super::common::{ORANGE_500, SM_ICON_PX, card_frame, no_tf2_warning};
+use super::graphics::jobs::{self, ModulesFailure};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
 use crate::font_check::active_hud;
@@ -42,7 +46,7 @@ use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_apply_profile, describe_profile};
-use crate::pages::huds::{blocked_description, card_images, hud_picture};
+use crate::pages::huds::{card_images, hud_picture};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -280,9 +284,10 @@ impl ProfilesPage {
         let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
             return;
         };
-        if !self.profiles.iter().any(|p| p.id() == &id) {
+        let Some(name) = self.profiles.iter().find(|p| p.id() == &id) else {
             return;
-        }
+        };
+        let name = name.name().to_owned();
         self.activating = Some(id.clone());
         cx.notify();
         let reading = ask.then(|| {
@@ -339,10 +344,10 @@ impl ProfilesPage {
                         })
                     });
                     let done = applying.await;
-                    if !skip_missing && let Ok(Activation::Missing { profile, items }) = &done {
+                    if !skip_missing && let Ok(Activation::Missing { name: shown, items }) = &done {
                         let Ok(answer) = cx.update(|cx| {
                             win.update(cx, |_, window, cx| {
-                                missing_items_dialog(profile.name(), items, window, cx)
+                                missing_items_dialog(shown, items, window, cx)
                             })
                         }) else {
                             return;
@@ -362,10 +367,29 @@ impl ProfilesPage {
                         plan = next;
                         continue;
                     }
+                    // The modules phase runs inside the flow, so `activating` still holds it alone.
                     let tf2 = tf2.clone();
-                    let _ = cx.update(|cx| {
-                        win.update(cx, |_, window, cx| announce(done, tf2, window, cx))
-                    });
+                    match done {
+                        Ok(Activation::Applied {
+                            report,
+                            hud_folder,
+                            note,
+                        }) => {
+                            let outcome = finish_apply(&report, note, &tf2, cx).await;
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| {
+                                    announce(&outcome, hud_folder, tf2, window, cx)
+                                })
+                            });
+                        }
+                        refused => {
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| {
+                                    announce_refusal(refused, &name, window, cx)
+                                })
+                            });
+                        }
+                    }
                     return;
                 }
             };
@@ -603,7 +627,6 @@ impl ProfilesPage {
 // The activate job's result: `OpError` cannot carry the missing items, so `Missing` is a value.
 enum Activation {
     Applied {
-        profile: Profile,
         // Boxed since the report carries a whole profile and dwarfs the other variants.
         report: Box<ApplyProfileReport>,
         hud_folder: Option<String>,
@@ -611,15 +634,12 @@ enum Activation {
         note: Option<String>,
     },
     Missing {
-        profile: Profile,
+        name: String,
         items: Vec<MissingItem>,
     },
     External(Vec<ExternalHud>),
 }
 
-// Reads the profile, carries out `plan`, applies it and writes the activate row for an applied
-// report; a missing item or an unnamed HUD in the way touches nothing, so it becomes a value
-// with no row.
 // Reads the profile, what is installed now and the add-on display names, and words the
 // summary; add-on names only dress the rows, so a failed list falls back to asset names.
 fn summary_job(
@@ -823,33 +843,14 @@ fn apply_job(
     let report = match applied {
         Ok(report) => report,
         Err(ApplyProfileError::Missing(items)) => {
-            return Ok(Activation::Missing { profile, items });
+            return Ok(Activation::Missing {
+                name: profile.name().to_owned(),
+                items,
+            });
         }
         Err(ApplyProfileError::ExternalHuds(huds)) => return Ok(Activation::External(huds)),
         Err(e) => return Err(describe_apply_profile(&e).into_op(failed())),
     };
-    let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
-    let details = model::report_details(report.applied(), &skipped, report.failed());
-    let name = profile.name();
-    let (level, message) = if !report.failed().is_empty() {
-        (
-            LogLevel::Error,
-            tr!("profiles.activity.failed", name = name),
-        )
-    } else if skipped.is_empty() {
-        (
-            LogLevel::Info,
-            tr!("profiles.activity.activated", name = name),
-        )
-    } else {
-        // Missing items were left as they were, so the profile is applied, not active.
-        (
-            LogLevel::Info,
-            tr!("profiles.activity.applied", name = name),
-        )
-    };
-    let entry = NewLogEntry::new(level, "profile", "activate", message).with_details(details);
-    activity::write(s, &entry);
     let hud_step_ran = report.applied().contains(&ApplyStep::Hud);
     if hud_step_ran {
         plan.log_discarded(s);
@@ -859,75 +860,157 @@ fn apply_job(
         .then(|| active_hud(s, tf2))
         .flatten();
     Ok(Activation::Applied {
-        profile,
         report: Box::new(report),
         hud_folder,
         note: plan.note().filter(|_| hud_step_ran),
     })
 }
 
-// Toasts the activate outcome; an applied report (failed steps or not) changed tf/custom, so
-// it also tells every library page to reload.
-fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Window, cx: &mut App) {
-    // An apply that put a HUD in place checks that HUD's fonts once the toast is up.
-    let hud_folder = match &done {
-        Ok(Activation::Applied { hud_folder, .. }) => hud_folder.clone(),
-        _ => None,
+// Finishes an applied report: Graphics' module choices, the active mark and the one activity
+// row, all off the UI thread. Without a modules phase, core already marked it by the same rule.
+async fn finish_apply(
+    report: &ApplyProfileReport,
+    note: Option<String>,
+    tf2: &Tf2Install,
+    cx: &mut AsyncApp,
+) -> ApplyOutcome {
+    let mut failed = report.failed().to_vec();
+    let modules = report.pending_modules().cloned();
+    if let Some(choices) = modules.clone()
+        && let Some(reason) = modules_phase(choices, tf2.clone(), cx).await
+    {
+        failed.push((ApplyStep::Graphics, reason));
+    }
+    let clean =
+        failed.is_empty() && report.skipped().is_empty() && report.skipped_steps().is_empty();
+    let active = if modules.is_some() && clean {
+        // An edit saved meanwhile moves `updated_at`, and then core leaves it inactive.
+        let profile = report.profile().clone();
+        let marking = cx.update(|cx| {
+            run_blocking(cx, move |s| {
+                Ok(matches!(s.library.mark_profile_active(&profile), Ok(true)))
+            })
+        });
+        marking.await.unwrap_or(false)
+    } else {
+        clean && modules.is_none()
     };
-    match done {
-        Ok(Activation::Applied {
-            profile,
-            report,
-            note,
-            ..
-        }) if report.failed().is_empty() => {
-            let title = model::success_title(profile.name(), !report.skipped().is_empty());
-            // A HUD kept out of its expected folder warns as a plain HUD install does.
-            match report.hud_blocked_name() {
-                Some(blocked) => toast(
-                    window,
-                    cx,
-                    ToastKind::Warning,
-                    title,
-                    blocked_description(blocked),
-                ),
-                None => {
-                    let installed = model::installed_parts(&profile, &report);
-                    let kinds: Vec<MissingKind> =
-                        report.skipped().iter().map(|m| m.kind().clone()).collect();
-                    let kept = model::kept_parts(&kinds);
-                    let mut description = model::activated_description(&installed, &kept);
-                    if let Some(note) = note {
-                        description = format!("{description}. {note}");
-                    }
-                    toast(window, cx, ToastKind::Success, title, description)
+    let movement = match report.movement().cloned() {
+        Some(keys) => {
+            let probe = cx.update(|cx| Tf2Probe::get(cx));
+            let running = cx.background_spawn(async move { probe() }).await;
+            Some(addons::movement_line(&keys, running))
+        }
+        None => (report.binds_restored() || report.movement_off())
+            .then(|| addons::model::movement_off().to_string()),
+    };
+    let kinds: Vec<MissingKind> = report.skipped().iter().map(|m| m.kind().clone()).collect();
+    let outcome = ApplyOutcome {
+        name: report.profile().name().to_owned(),
+        active,
+        failed,
+        skipped_steps: report.skipped_steps().to_vec(),
+        kept: model::kept_parts(&kinds),
+        blocked: report.hud_blocked_name().map(str::to_owned),
+        movement,
+        note,
+    };
+    let entry = activity_entry(report, &outcome);
+    let writing = cx.update(|cx| {
+        run_blocking(cx, move |s| {
+            activity::write(s, &entry);
+            Ok(())
+        })
+    });
+    let _ = writing.await;
+    outcome
+}
+
+// Applies `choices` as the Graphics page saves them, against the cached settings catalogue of
+// the installed release; the reason it could not, if any.
+async fn modules_phase(choices: Choices, tf2: Tf2Install, cx: &mut AsyncApp) -> Option<String> {
+    let reading_tf2 = tf2.clone();
+    let reading = cx.update(|cx| {
+        run_blocking(cx, move |s| {
+            Ok(match s.library.mastercomfig_status(&reading_tf2) {
+                Ok(MastercomfigStatus::Managed { version, .. }) => {
+                    s.store.cached_mastercomfig_catalog(&version)
                 }
-            }
-            LibraryEvents::changed(cx);
-        }
-        Ok(Activation::Applied { report, .. }) => {
-            let description = model::failed_description(report.failed());
-            toast(
-                window,
-                cx,
-                ToastKind::Error,
-                tr!("profiles.toast.activate_failed"),
-                description,
-            );
-            LibraryEvents::changed(cx);
-        }
-        // Both are answered in the flow; a refusal that reaches here changed nothing.
-        Ok(Activation::Missing { .. } | Activation::External(_)) => toast(
+                _ => None,
+            })
+        })
+    });
+    let Some(catalog) = reading.await.ok().flatten() else {
+        return Some(model::modules_no_catalog().to_string());
+    };
+    let applying =
+        cx.update(|cx| jobs::apply_modules(tf2, Arc::new(catalog), choices, false, false, cx));
+    match applying.await {
+        Ok(_) => None,
+        Err(ModulesFailure::Foreign) => Some(model::modules_foreign().to_string()),
+        Err(ModulesFailure::Op(e)) => Some(e.description().to_string()),
+    }
+}
+
+// The activate row: activated when the game now matches, applied when nothing failed, failed
+// otherwise; its details name the final failed steps.
+fn activity_entry(report: &ApplyProfileReport, outcome: &ApplyOutcome) -> NewLogEntry {
+    let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
+    let details = model::report_details(report.applied(), &skipped, &outcome.failed);
+    let name = outcome.name.as_str();
+    let (level, message) = if outcome.active {
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.activated", name = name),
+        )
+    } else if outcome.failed.is_empty() {
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.applied", name = name),
+        )
+    } else {
+        (
+            LogLevel::Error,
+            tr!("profiles.activity.failed", name = name),
+        )
+    };
+    NewLogEntry::new(level, "profile", "activate", message).with_details(details)
+}
+
+// Toasts the outcome and tells every library page to reload, since tf/custom changed; an apply
+// that put a HUD in place then checks that HUD's fonts.
+fn announce(
+    outcome: &ApplyOutcome,
+    hud_folder: Option<String>,
+    tf2: Tf2Install,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let (kind, title, description) = model::outcome_toast(outcome);
+    toast(window, cx, kind, title, description);
+    LibraryEvents::changed(cx);
+    if let Some(folder) = hud_folder {
+        ask_about_fonts(window.window_handle(), tf2, folder, cx);
+    }
+}
+
+// A refusal or error that reached the end of the flow changed nothing; the missing items and
+// unnamed HUDs are answered in the flow, so those only arrive here when that went wrong.
+fn announce_refusal(
+    done: Result<Activation, OpError>,
+    name: &str,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    match done {
+        Err(err) => toast_error(window, cx, &err),
+        Ok(_) => toast(
             window,
             cx,
             ToastKind::Error,
-            tr!("profiles.toast.activate_failed"),
+            tr!("profiles.toast.apply_failed", name = name),
             tr!("profiles.toast.missing"),
         ),
-        Err(err) => toast_error(window, cx, &err),
-    }
-    if let Some(folder) = hud_folder {
-        ask_about_fonts(window.window_handle(), tf2, folder, cx);
     }
 }
 

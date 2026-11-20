@@ -183,6 +183,30 @@ fn turning_on_null_canceling_movement_reports_the_keys_it_binds() {
 }
 
 #[test]
+fn turning_off_null_canceling_movement_is_reported() {
+    let env = library_env();
+    write_file(&env.tf2.tf_dir().join("cfg/config.cfg"), STOCK.as_bytes());
+    place_mastercomfig(&env, Some("medium"));
+    let null = import_addon_as(&env, NULL_ADDON);
+    env.lib.install_addon(&null, &env.tf2).unwrap();
+    let p = addons_profile(&env, "Off", SlotMode::Leave, SlotMode::None);
+    let report = apply(&env, &p);
+    assert!(!installed(&env, &null));
+    assert!(report.movement_off());
+}
+
+#[test]
+fn turning_off_another_addon_reports_no_movement_change() {
+    let env = library_env();
+    let flat = import_addon_as(&env, FLAT_ADDON);
+    env.lib.install_addon(&flat, &env.tf2).unwrap();
+    let p = addons_profile(&env, "Off", SlotMode::Leave, SlotMode::None);
+    let report = apply(&env, &p);
+    assert!(!installed(&env, &flat));
+    assert!(!report.movement_off());
+}
+
+#[test]
 fn every_slot_runs_in_order() {
     let env = crosshair_env();
     place_mastercomfig(&env, Some("high"));

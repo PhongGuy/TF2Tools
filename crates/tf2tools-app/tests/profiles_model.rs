@@ -3,8 +3,8 @@ use crate::support;
 use gpui_kit::{SharedString, TestAppContext};
 use tf2tools_app::pages::profiles::model::{ApplyOutcome, modules_no_catalog, outcome_toast};
 use tf2tools_app::pages::profiles::model::{
-    activated_description, failed_description, kept_parts, kind_label, load_closes_editor, matches,
-    redownload_target, report_details, step_label, success_title,
+    failed_description, kept_parts, kind_label, load_closes_editor, matches, redownload_target,
+    report_details, step_label,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::shell::toast::ToastKind;
@@ -54,36 +54,6 @@ fn steps_and_kinds_have_v5_s_labels() {
         weapon_script: "tf_weapon_scattergun".into(),
     };
     assert_eq!(kind_label(&crosshair), "CROSSHAIR");
-}
-
-#[test]
-fn the_activated_toast_reads_like_v5() {
-    assert_eq!(
-        activated_description(&parts(&["HUD", "Hitsound", "Killsound", "Crosshairs"]), &[]),
-        "Installed: HUD, Hitsound, Killsound, Crosshairs"
-    );
-    assert_eq!(
-        activated_description(&[], &[]),
-        "All customizations cleared"
-    );
-}
-
-#[test]
-fn an_apply_with_skips_names_what_it_kept() {
-    assert_eq!(
-        activated_description(&parts(&["Hitsound"]), &parts(&["HUD"])),
-        "Installed: Hitsound. Kept what you had for: HUD (missing from your library)"
-    );
-    assert_eq!(
-        activated_description(&[], &parts(&["HUD", "Crosshairs"])),
-        "Nothing new installed. Kept what you had for: HUD, Crosshairs (missing from your library)"
-    );
-}
-
-#[test]
-fn a_skip_makes_the_title_say_applied_not_activated() {
-    assert_eq!(success_title("Comp", false), "Profile \"Comp\" activated");
-    assert_eq!(success_title("Comp", true), "Profile \"Comp\" applied");
 }
 
 #[test]

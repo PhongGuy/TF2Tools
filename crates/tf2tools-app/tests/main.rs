@@ -202,6 +202,7 @@ mod profile_draft;
 mod profile_editor_model;
 mod profile_summary;
 mod profiles;
+mod profiles_apply;
 mod profiles_editor;
 mod profiles_layout;
 mod profiles_model;

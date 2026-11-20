@@ -258,7 +258,7 @@ fn activate_in_the_editor_applies_the_profile(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     support::wait_real(cx, "the Active badge", |cx| {
         support::present(cx, s.win, ids::PROFILE_EDITOR_ACTIVE_BADGE)
@@ -1646,7 +1646,7 @@ fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(cx.update(|cx| page.read(cx).editor()).is_none());
 }

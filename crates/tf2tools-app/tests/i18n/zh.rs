@@ -318,7 +318,7 @@ fn the_crosshair_position_reads_in_each_languages_order() {
 fn joined_lists_take_the_language_separator() {
     use gpui_kit::SharedString;
     use tf2tools_app::pages::addons::model::movement_on_text;
-    use tf2tools_app::pages::profiles::model::activated_description;
+    use tf2tools_app::pages::profiles::model::{ApplyOutcome, outcome_toast};
     let installed: Vec<SharedString> = vec!["A".into(), "B".into()];
     let keys = vec!["w".to_owned(), "s".to_owned()];
     for (lang, sep) in [("en", ", "), ("zh-CN", "、")] {
@@ -329,7 +329,11 @@ fn joined_lists_take_the_language_separator() {
             "{lang}"
         );
         assert_eq!(i18n::separated(&["a"]), "a", "{lang}");
-        let toast = activated_description(&installed, &[]);
+        let toast = outcome_toast(&ApplyOutcome {
+            kept: installed.clone(),
+            ..Default::default()
+        })
+        .2;
         assert!(toast.contains(&format!("A{sep}B")), "{lang}: {toast}");
         let line = movement_on_text(&keys, &[], false);
         assert!(line.contains(&format!("W{sep}S")), "{lang}: {line}");
