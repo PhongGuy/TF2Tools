@@ -153,6 +153,7 @@ mod hud_visit_page;
 mod huds;
 mod huds_images;
 mod icons;
+mod id_scope;
 mod ids;
 mod kept_pages;
 mod kill_icons;

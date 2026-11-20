@@ -3495,3 +3495,28 @@ pub fn storage_slug(kind: StorageKind) -> &'static str {
 pub fn settings_storage(kind: StorageKind) -> ElementId {
     keyed("settings-storage", storage_slug(kind))
 }
+
+/// Which ids a shared widget draws under: the page's own, or a host's prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct IdScope(Option<&'static str>);
+
+impl IdScope {
+    /// The page's own ids, unchanged.
+    pub const PAGE: Self = Self(None);
+    /// The Profiles editor's hosted crosshair board and picker.
+    pub const PROFILE_CROSSHAIRS: Self = Self(Some("profile-xh"));
+    /// The Profiles editor's hosted Graphics choices.
+    pub const PROFILE_GRAPHICS: Self = Self(Some("profile-gfx"));
+
+    /// Swaps a named id's first word (the text before the first `-`) for this scope's
+    /// prefix, or puts the prefix in front when there is no `-`. Other id kinds pass through.
+    pub fn id(self, id: impl Into<ElementId>) -> ElementId {
+        let id = id.into();
+        if let (Some(prefix), ElementId::Name(name)) = (self.0, &id) {
+            let rest = name.split_once('-').map_or(&**name, |(_, rest)| rest);
+            ElementId::Name(format!("{prefix}-{rest}").into())
+        } else {
+            id
+        }
+    }
+}
