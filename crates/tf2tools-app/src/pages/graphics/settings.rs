@@ -14,8 +14,8 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
-    rgb, transparent_black,
+    ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
+    div, px, rgb, transparent_black,
 };
 use tf2tools_core::ModuleChoice;
 
@@ -24,21 +24,23 @@ use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
 use super::{GraphicsPage, picture_panel, pictures};
 use crate::i18n::tr;
 use crate::ids;
-use crate::shell::CONTENT_PADDING;
 use crate::theme::selected_segment;
 use crate::widgets::labelled;
 
 /// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
 /// search toolbar (or the note while there is no catalog), one section per category with shown
-/// rows, then the empty state. Records each section's child index in `items` for the rail.
+/// rows, then the empty state. On a wide page the list is indented and the rail hangs off the
+/// toolbar into that column, `pin` below its top. Records each section's child index in
+/// `items` for the rail, and returns the toolbar's.
 pub(super) fn push(
     page: &GraphicsPage,
     sections: Option<&[SectionView]>,
     narrow: bool,
+    pin: Pixels,
     children: &mut Vec<AnyElement>,
     items: &mut BTreeMap<String, usize>,
     cx: &mut Context<GraphicsPage>,
-) {
+) -> Option<usize> {
     let Some(sections) = sections else {
         let note = settings_note_text(page.settings_note().unwrap_or(SettingsNote::Loading));
         children.push(
@@ -52,27 +54,46 @@ pub(super) fn push(
                 ))
                 .into_any_element(),
         );
-        return;
+        return None;
     };
-    if narrow {
+    let indent = if narrow {
         children.push(rail(sections, true, cx));
-    }
-    children.push(toolbar(page, cx));
+        px(0.)
+    } else {
+        px(RAIL_WIDTH + RAIL_GUTTER)
+    };
+    let toolbar_item = children.len();
+    let side = (!narrow).then(|| {
+        div()
+            .absolute()
+            .left(-indent)
+            .top(pin)
+            .child(rail(sections, false, cx))
+    });
+    children.push(toolbar(page, indent, side, cx));
     for section in sections.iter().filter(|s| !s.rows.is_empty()) {
         items.insert(section.key.clone(), children.len());
-        children.push(section_view(page, section, narrow, cx));
+        children.push(section_view(page, section, narrow, indent, cx));
     }
-    if let Some(empty) = empty(page, sections, cx) {
+    if let Some(empty) = empty(page, sections, indent, cx) {
         children.push(empty);
     }
+    Some(toolbar_item)
 }
 
-// The search box and the "Changed only" switch over the list.
-fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
+// The search box and the "Changed only" switch over the list, carrying the wide rail.
+fn toolbar(
+    page: &GraphicsPage,
+    indent: Pixels,
+    rail: Option<impl IntoElement>,
+    cx: &mut Context<GraphicsPage>,
+) -> AnyElement {
     let muted = cx.theme().muted_foreground;
     h_flex()
         .id(ids::GRAPHICS_SETTINGS)
         .test_support()
+        .relative()
+        .ml(indent)
         .gap_4()
         .child(
             div()
@@ -93,6 +114,7 @@ fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
                 .label(tr!("graphics.settings.changed_only"))
                 .on_click(cx.listener(|page, on: &bool, _, cx| page.set_changed_only(*on, cx))),
         )
+        .children(rail)
         .into_any_element()
 }
 
@@ -101,6 +123,7 @@ fn section_view(
     page: &GraphicsPage,
     section: &SectionView,
     narrow: bool,
+    indent: Pixels,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
     let rows: Vec<AnyElement> = section
@@ -111,6 +134,7 @@ fn section_view(
     v_flex()
         .id(ids::graphics_section(&section.key))
         .test_support()
+        .ml(indent)
         .gap_2()
         .child(labelled(
             div().font_weight(FontWeight::SEMIBOLD),
@@ -126,6 +150,7 @@ fn section_view(
 fn empty(
     page: &GraphicsPage,
     sections: &[SectionView],
+    indent: Pixels,
     cx: &mut Context<GraphicsPage>,
 ) -> Option<AnyElement> {
     let text = match view::empty_state(sections, &page.filter(cx))? {
@@ -139,6 +164,7 @@ fn empty(
     let muted = cx.theme().muted_foreground;
     Some(
         v_flex()
+            .ml(indent)
             .items_start()
             .gap_3()
             .child(labelled(
@@ -216,8 +242,6 @@ pub(super) fn rail(
             .test_support()
             .flex_none()
             .w(px(RAIL_WIDTH))
-            .pt(CONTENT_PADDING)
-            .pl(CONTENT_PADDING)
             .gap_1()
             .children(entries)
             .into_any_element()
@@ -225,7 +249,10 @@ pub(super) fn rail(
 }
 
 /// The wide rail's entry width, enough for the longest category name beside its count.
-const RAIL_WIDTH: f32 = 200.;
+const RAIL_WIDTH: f32 = 184.;
+
+/// The space between the wide rail and the list it sits beside.
+const RAIL_GUTTER: f32 = 24.;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 const CHANGED: u32 = 0x1447e6;

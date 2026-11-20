@@ -22,6 +22,72 @@ fn full_page(
     (s, page)
 }
 
+fn at(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    id: impl Into<ElementId>,
+) -> gpui_kit::Bounds<gpui_kit::Pixels> {
+    let id = id.into();
+    support::bounds_of(cx, s.win, id.clone()).unwrap_or_else(|| panic!("{id:?} not drawn"))
+}
+
+#[gpui_kit::test]
+fn a_wide_page_starts_the_rail_beside_the_list_below_the_strip(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, r#"{"fpscap":"120"}"#);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    let status = at(cx, &s, ids::GRAPHICS_STATUS);
+    let strip = at(cx, &s, ids::GRAPHICS_CHANGES);
+    let rail = at(cx, &s, ids::GRAPHICS_RAIL);
+    let search = at(cx, &s, ids::GRAPHICS_SEARCH);
+    assert!(
+        status.left() <= rail.left() + px(1.),
+        "the cards span the rail's column: {status:?} {rail:?}"
+    );
+    assert!(
+        strip.right() >= search.right() - px(1.),
+        "{strip:?} {search:?}"
+    );
+    assert!(
+        rail.top() >= strip.bottom(),
+        "the rail starts below the strip: {rail:?} {strip:?}"
+    );
+    assert!(
+        (rail.top() - search.top()).abs() <= px(6.),
+        "the rail lines up with the search: {rail:?} {search:?}"
+    );
+    assert!(rail.right() <= search.left(), "{rail:?} {search:?}");
+}
+
+#[gpui_kit::test]
+fn the_rail_stays_in_view_while_the_list_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    reveal(cx, &s, ids::graphics_section("networking"));
+    let view = at(cx, &s, ids::page(Page::Graphics));
+    let rail = at(cx, &s, ids::GRAPHICS_RAIL);
+    let status = at(cx, &s, ids::GRAPHICS_STATUS);
+    assert!(
+        status.bottom() < view.top(),
+        "scrolled past the status card: {status:?}"
+    );
+    assert!(
+        rail.top() >= view.top() - px(1.)
+            && rail.top() <= view.top() + tf2tools_app::shell::CONTENT_PADDING + px(4.),
+        "the rail pins at the top: {rail:?} {view:?}"
+    );
+    support::click_id(cx, s.win, ids::graphics_rail("graphics"));
+    let section = at(cx, &s, ids::graphics_section("graphics"));
+    let gap = section.top() - view.top();
+    assert!(
+        gap >= px(-2.) && gap <= tf2tools_app::shell::CONTENT_PADDING + px(4.),
+        "{gap:?}"
+    );
+}
+
 #[gpui_kit::test]
 fn search_filters_rows_and_show_all_brings_them_back(cx: &mut TestAppContext) {
     let env = support::env();
@@ -96,6 +162,8 @@ fn a_narrow_page_puts_the_rail_above_the_settings(cx: &mut TestAppContext) {
     let rail = support::bounds_of(cx, s.win, ids::graphics_rail("graphics")).unwrap();
     let section = support::bounds_of(cx, s.win, ids::graphics_section("graphics")).unwrap();
     assert!(rail.bottom() <= section.top(), "{rail:?} {section:?}");
+    let strip = at(cx, &s, ids::GRAPHICS_NO_CHANGES);
+    assert!(rail.top() >= strip.bottom(), "{rail:?} {strip:?}");
 }
 
 #[gpui_kit::test]

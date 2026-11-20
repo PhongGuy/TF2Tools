@@ -20,9 +20,9 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    Window, div, px,
 };
 use tf2tools_core::{
     Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
@@ -110,6 +110,8 @@ pub struct GraphicsPage {
     changed_only: bool,
     /// Each shown section's child index in the scroll column, from the last render.
     section_items: BTreeMap<String, usize>,
+    /// The search toolbar's child index in the scroll column, from the last render.
+    toolbar_item: Option<usize>,
     scroll: ScrollHandle,
     /// The bundled setting pictures, once read off the UI thread.
     pictures: Option<Arc<PictureIndex>>,
@@ -179,6 +181,7 @@ impl GraphicsPage {
             search,
             changed_only: false,
             section_items: BTreeMap::new(),
+            toolbar_item: None,
             scroll: ScrollHandle::new(),
             pictures: None,
             wanted: Vec::new(),
@@ -291,6 +294,20 @@ impl GraphicsPage {
             self.scroll.scroll_to_top_of_item(item);
             cx.notify();
         }
+    }
+
+    // How far below the toolbar's top the wide rail sits, so it pins at the page's top padding
+    // once the toolbar scrolls above it. The toolbar's bounds come from the last frame and are
+    // unscrolled, so the current offset is added; zero until a frame has laid it out.
+    fn rail_pin(&self) -> Pixels {
+        let Some(toolbar) = self
+            .toolbar_item
+            .and_then(|ix| self.scroll.bounds_for_item(ix))
+        else {
+            return px(0.);
+        };
+        let top = toolbar.top() + self.scroll.offset().y;
+        (self.scroll.bounds().top() + CONTENT_PADDING - top).max(px(0.))
     }
 
     /// True once a load has ended, failed or not, with or without TF2.
@@ -934,19 +951,22 @@ impl Render for GraphicsPage {
             }
         }
         let mut items = BTreeMap::new();
+        let mut toolbar = None;
         if let Some(preset) = self.preset() {
             children.push(self.presets(preset, narrow, cx));
             children.push(self.changes_strip(preset, cx));
-            settings::push(
+            toolbar = settings::push(
                 self,
                 sections.as_deref(),
                 narrow,
+                self.rail_pin(),
                 &mut children,
                 &mut items,
                 cx,
             );
         }
         self.section_items = items;
+        self.toolbar_item = toolbar;
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -956,16 +976,7 @@ impl Render for GraphicsPage {
             .p(CONTENT_PADDING)
             .gap_6()
             .children(children);
-        let column = scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content);
-        let rail = sections
-            .as_deref()
-            .filter(|_| !narrow)
-            .map(|sections| settings::rail(sections, false, cx));
-        h_flex()
-            .size_full()
-            .items_start()
-            .children(rail)
-            .child(column.flex_1().min_w_0().h_full())
+        scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
     }
 }
 
