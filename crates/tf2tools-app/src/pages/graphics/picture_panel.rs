@@ -11,7 +11,7 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, div, hsla, px, relative, transparent_black,
 };
 
@@ -20,7 +20,7 @@ use super::model::preset_label;
 use super::pictures::{Compare, RowPictures};
 use crate::i18n::tr;
 use crate::ids;
-use crate::pages::huds::hud_picture;
+use crate::pages::huds::rounded_picture;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::theme::selected_segment;
 use crate::widgets::{Named as _, labelled};
@@ -38,6 +38,17 @@ const WIPE_ALL_PRESET: f32 = 0.995;
 /// A bundled picture, or a muted box while it decodes. A picture that failed to decode
 /// leaves an unfilled box, so its slot keeps its shape.
 fn picture(area: ElementId, image: ElementId, key: Option<&ImageKey>, cx: &App) -> AnyElement {
+    rounded(area, image, key, None, cx)
+}
+
+/// `picture` with every corner of its box and image rounded by `radius`.
+fn rounded(
+    area: ElementId,
+    image: ElementId,
+    key: Option<&ImageKey>,
+    radius: Option<Pixels>,
+    cx: &App,
+) -> AnyElement {
     let failed = key
         .zip(RemoteImages::global(cx))
         .is_some_and(|(key, images)| matches!(images.read(cx).image(key), RemoteImage::Failed));
@@ -48,9 +59,10 @@ fn picture(area: ElementId, image: ElementId, key: Option<&ImageKey>, cx: &App) 
             .aspect_ratio(16. / 9.)
             .border_1()
             .border_color(cx.theme().border)
+            .when_some(radius, |area, r| area.rounded(r))
             .into_any_element()
     } else {
-        hud_picture(area, image, key, cx).into_any_element()
+        rounded_picture(area, image, key, radius, cx).into_any_element()
     }
 }
 
@@ -69,15 +81,16 @@ pub(super) fn thumbnail(
         .as_deref()
         .zip(pictures.thumb.as_deref())
         .map(|(index, thumb)| ImageKey::card(&index.url(thumb)));
-    let picture = picture(
+    let picture = rounded(
         ids::graphics_thumb_area(module),
         ids::graphics_thumb_image(module),
         key.as_ref(),
+        Some(px(7.)),
         cx,
     );
     let target = module.to_owned();
-    // A 1 px frame, in the accent while the row's pictures are open, around the picture
-    // rounded just inside it.
+    // A 1 px frame with an 8 px radius, in the accent while the row's pictures are open;
+    // the picture inside is rounded 7 px itself so its corners stay within the frame's arc.
     let frame = if page.open_row() == Some(module) {
         cx.theme().primary
     } else {
@@ -93,13 +106,7 @@ pub(super) fn thumbnail(
         .rounded(px(8.))
         .named(tr!("graphics.pictures.thumb", name = label))
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
-        .child(
-            div()
-                .w(px(THUMB_WIDTH))
-                .rounded(px(7.))
-                .overflow_hidden()
-                .child(picture),
-        )
+        .child(div().w(px(THUMB_WIDTH)).child(picture))
         .into_any_element()
 }
 

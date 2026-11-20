@@ -18,10 +18,11 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Div,
-    ElementId, Entity, EventEmitter, FontWeight, Global, Hsla, InteractiveElement as _,
-    IntoElement, ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString,
-    Stateful, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
-    TestSupportExt as _, WeakEntity, Window, div, img, px, relative, rgb, transparent_black,
+    ElementId, Entity, EventEmitter, FontWeight, Global, Hsla, ImageSource, Img,
+    InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _, Pixels, Render, Role,
+    ScrollHandle, SharedString, Stateful, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, Subscription, Task, TestSupportExt as _, WeakEntity, Window, div, img, px,
+    relative, rgb, transparent_black,
 };
 
 use tf2tools_core::{
@@ -1514,27 +1515,57 @@ pub(crate) fn hud_picture(
     key: Option<&ImageKey>,
     cx: &App,
 ) -> ObservedElement<Stateful<Div>> {
-    let area = div()
-        .id(area_id)
-        .test_support()
-        .flex_none()
-        .w_full()
-        .aspect_ratio(16. / 9.)
-        .overflow_hidden()
-        .bg(cx.theme().muted);
+    rounded_picture(area_id, image_id, key, None, cx)
+}
+
+/// `hud_picture` with its area and image rounded by `radius`, square when `None`.
+pub(crate) fn rounded_picture(
+    area_id: ElementId,
+    image_id: ElementId,
+    key: Option<&ImageKey>,
+    radius: Option<Pixels>,
+    cx: &App,
+) -> ObservedElement<Stateful<Div>> {
+    let area = picture_area(area_id, radius, cx.theme().muted).test_support();
     let ready = key
         .zip(RemoteImages::global(cx))
         .map(|(key, images)| images.read(cx).image(key));
     match ready {
-        Some(RemoteImage::Ready(image)) => area.child(
-            img(image)
-                .size_full()
-                .object_fit(ObjectFit::Cover)
-                .id(image_id)
-                .test_support(),
-        ),
+        Some(RemoteImage::Ready(image)) => {
+            area.child(picture_image(image, image_id, radius).test_support())
+        }
         _ => area,
     }
+}
+
+/// The picture's 16:9 box in `fill`, rounded by `radius`.
+fn picture_area(
+    area_id: ElementId,
+    radius: Option<Pixels>,
+    fill: impl Into<Hsla>,
+) -> Stateful<Div> {
+    div()
+        .id(area_id)
+        .flex_none()
+        .w_full()
+        .aspect_ratio(16. / 9.)
+        .overflow_hidden()
+        .bg(fill.into())
+        .when_some(radius, |area, r| area.rounded(r))
+}
+
+/// The image covering its box. The radius goes on the image itself, since a parent's
+/// rounding clips only to a rectangle.
+fn picture_image(
+    image: impl Into<ImageSource>,
+    image_id: ElementId,
+    radius: Option<Pixels>,
+) -> Stateful<Img> {
+    img(image)
+        .size_full()
+        .object_fit(ObjectFit::Cover)
+        .when_some(radius, |image, r| image.rounded(r))
+        .id(image_id)
 }
 
 /// The HUD's name, truncated, semibold.
@@ -2176,4 +2207,27 @@ pub(crate) fn install_job(
     );
     activity::write(s, &entry);
     Ok(installed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{picture_area, picture_image};
+    use gpui_kit::{Styled as _, px, transparent_black};
+
+    #[test]
+    fn a_rounded_picture_rounds_its_area_and_its_image() {
+        let r = Some(px(7.).into());
+        let mut area = picture_area("area".into(), Some(px(7.)), transparent_black());
+        let mut image = picture_image("x.png", "image".into(), Some(px(7.)));
+        for corners in [&area.style().corner_radii, &image.style().corner_radii] {
+            assert_eq!(
+                (corners.top_left, corners.top_right),
+                (r, r),
+                "a parent's rounding never clips an image, so both carry the radius"
+            );
+            assert_eq!((corners.bottom_left, corners.bottom_right), (r, r));
+        }
+        let mut square = picture_image("x.png", "image".into(), None);
+        assert_eq!(square.style().corner_radii.top_left, None);
+    }
 }

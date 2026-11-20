@@ -166,7 +166,14 @@ fn at_800_px_the_thumbnail_stays_beside_the_text_and_only_the_control_drops(
         control.top() >= desc.bottom(),
         "the control drops under the text: {control:?} {desc:?}"
     );
-    assert!(row.size.height <= px(150.), "{row:?}");
+    let toggle = at(cx, &s, ids::graphics_pictures_toggle("lod"));
+    assert!(
+        control.top() >= toggle.bottom(),
+        "the text column keeps its full height above the control: {toggle:?} {control:?}"
+    );
+    // Padding, the 97 px text column, the 8 px gap and the 32 px control; the old stacked
+    // layout measured 200 px.
+    assert!(row.size.height <= px(164.), "{row:?}");
 }
 
 #[gpui_kit::test]

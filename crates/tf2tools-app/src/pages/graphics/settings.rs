@@ -364,19 +364,22 @@ fn row(
     // the control drops under them, since a segmented control beside a wrapped description
     // would not fit; otherwise it sits on the right.
     let lead = h_flex()
-        .flex_1()
         .min_w_0()
         .items_start()
         .gap_3()
         .children(thumb)
         .child(text);
     let line = if narrow {
-        v_flex().items_start().gap_2().child(lead).child(controls)
+        v_flex()
+            .items_start()
+            .gap_2()
+            .child(lead.w_full())
+            .child(controls)
     } else {
         h_flex()
             .justify_between()
             .gap_4()
-            .child(lead)
+            .child(lead.flex_1())
             .child(controls)
     };
     // A changed row is tinted with a 3 px accent bar down its left edge, drawn as an overlay
