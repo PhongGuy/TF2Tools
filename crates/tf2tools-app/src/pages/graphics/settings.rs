@@ -288,15 +288,17 @@ fn row(
     let muted = cx.theme().muted_foreground;
     let description = row.description.clone().map(|text| {
         labelled(
-            div().text_xs().text_color(muted),
+            div().text_xs().line_height(px(16.)).text_color(muted),
             ids::graphics_module_description(name),
             text,
         )
     });
+    // The docs link reads as part of the description: its size and muted colour, underlined.
     let learn_more = h_flex().child(
         Button::new(ids::graphics_learn_more(name))
             .link()
-            .small()
+            .xsmall()
+            .text_color(muted)
             .label(tr!("graphics.row.learn_more"))
             .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
     );
@@ -347,8 +349,9 @@ fn row(
         .flex_1()
         .min_w_0()
         .gap_0p5()
+        // The name and description keep shadcn's 20 px and 16 px lines, so a row stays tight.
         .child(labelled(
-            div().text_sm(),
+            div().text_sm().line_height(px(20.)),
             ids::graphics_module(name),
             row.label.clone(),
         ))
@@ -357,29 +360,23 @@ fn row(
         .children(preset)
         .children(toggle);
     let controls = h_flex().flex_none().gap_2().children(reset).child(control);
-    // On a narrow page (the one without the rail) the thumbnail sits above the text and the
-    // control under it, since a segmented control beside a wrapped description would not fit;
-    // otherwise all three sit side by side.
+    // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
+    // the control drops under them, since a segmented control beside a wrapped description
+    // would not fit; otherwise it sits on the right.
+    let lead = h_flex()
+        .flex_1()
+        .min_w_0()
+        .items_start()
+        .gap_3()
+        .children(thumb)
+        .child(text);
     let line = if narrow {
-        v_flex()
-            .items_start()
-            .gap_2()
-            .children(thumb)
-            .child(text)
-            .child(controls)
+        v_flex().items_start().gap_2().child(lead).child(controls)
     } else {
         h_flex()
             .justify_between()
             .gap_4()
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .items_start()
-                    .gap_3()
-                    .children(thumb)
-                    .child(text),
-            )
+            .child(lead)
             .child(controls)
     };
     // A changed row is tinted with a 3 px accent bar down its left edge, drawn as an overlay

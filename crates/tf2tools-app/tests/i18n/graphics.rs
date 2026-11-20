@@ -67,11 +67,7 @@ fn the_status_words_and_a_preset_toast_read_in_russian(cx: &mut TestAppContext) 
     let s = support::shell_window(cx, &env, graphics::found(&env));
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let page = graphics::open(cx, &s);
-    for id in [
-        ids::GRAPHICS_SUBTITLE,
-        ids::GRAPHICS_HEADLINE,
-        ids::GRAPHICS_DETAIL,
-    ] {
+    for id in [ids::GRAPHICS_HEADLINE, ids::GRAPHICS_DETAIL] {
         let text = support::label_of(cx, s.win, id).unwrap_or_default();
         assert!(cyrillic(&text), "{id}: {text:?}");
     }

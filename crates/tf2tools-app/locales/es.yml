@@ -2980,7 +2980,6 @@ install_parts:
   maps_skipped: "%{name} contiene varios mapas. Elige cuáles instalar. Se omitieron algunos archivos extra de esta descarga."
 
 graphics:
-  subtitle: "Ajustes gráficos y de juego de mastercomfig"
   no_tf2: "Elige la carpeta de TF2 en Ajustes para usar mastercomfig."
   running: "TF2 está abierto. Tus cambios se aplican la próxima vez que se inicie."
   status:

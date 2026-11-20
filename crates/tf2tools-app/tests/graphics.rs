@@ -54,10 +54,6 @@ fn graphics_is_a_real_page_rebuilt_on_each_visit(cx: &mut TestAppContext) {
     let _page = open_graphics(cx, &s);
     assert!(support::present(cx, s.win, ids::page(Page::Graphics)));
     assert!(!support::present(cx, s.win, ids::PLACEHOLDER_MESSAGE));
-    assert_eq!(
-        support::label_of(cx, s.win, ids::GRAPHICS_SUBTITLE).as_deref(),
-        Some("Graphics and game settings from mastercomfig")
-    );
     assert!(!support::present(cx, s.win, ids::GRAPHICS_NO_TF2));
     support::click_id(cx, s.win, ids::nav(Page::Huds));
     assert!(cx.update(|cx| s.shell.read(cx).graphics_page()).is_none());

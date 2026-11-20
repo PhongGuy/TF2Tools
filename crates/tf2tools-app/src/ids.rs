@@ -853,8 +853,6 @@ pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 pub const ADDONS_LIBRARY: &str = "addons-library";
 /// The Addons page's "GameBanana add-ons" section title.
 pub const ADDONS_GB: &str = "addons-gb";
-/// The Graphics page's line under the title.
-pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
 pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
 /// The mastercomfig status row.

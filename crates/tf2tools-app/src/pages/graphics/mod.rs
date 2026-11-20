@@ -937,14 +937,6 @@ impl Render for GraphicsPage {
             .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
         let mut children: Vec<AnyElement> = Vec::new();
         children.extend(warning.map(IntoElement::into_any_element));
-        children.push(
-            labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::GRAPHICS_SUBTITLE,
-                tr!("graphics.subtitle"),
-            )
-            .into_any_element(),
-        );
         if let Some(card) = self.card() {
             children.push(self.status_row(&card, cx));
             if self.tf2_running {

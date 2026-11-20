@@ -10,9 +10,9 @@ use gpui_kit::component::slider::Slider;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, hsla, px,
-    relative, transparent_black,
+    AnyElement, App, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
+    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, div, hsla, px, relative, transparent_black,
 };
 
 use super::GraphicsPage;
@@ -76,14 +76,30 @@ pub(super) fn thumbnail(
         cx,
     );
     let target = module.to_owned();
+    // A 1 px frame, in the accent while the row's pictures are open, around the picture
+    // rounded just inside it.
+    let frame = if page.open_row() == Some(module) {
+        cx.theme().primary
+    } else {
+        cx.theme().border
+    };
     Button::new(ids::graphics_thumb(module))
         .ghost()
         .p_0()
         .flex_none()
-        .h(px(THUMB_HEIGHT))
+        .h(px(THUMB_HEIGHT + 2.))
+        .border_1()
+        .border_color(frame)
+        .rounded(px(8.))
         .named(tr!("graphics.pictures.thumb", name = label))
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
-        .child(div().w(px(THUMB_WIDTH)).child(picture))
+        .child(
+            div()
+                .w(px(THUMB_WIDTH))
+                .rounded(px(7.))
+                .overflow_hidden()
+                .child(picture),
+        )
         .into_any_element()
 }
 
@@ -102,7 +118,10 @@ pub(super) fn toggle(
     let target = module.to_owned();
     Button::new(ids::graphics_pictures_toggle(module))
         .ghost()
-        .small()
+        .xsmall()
+        .h(px(24.))
+        .px_2()
+        .font_weight(FontWeight::MEDIUM)
         .label(label)
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
         .into_any_element()
