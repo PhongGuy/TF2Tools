@@ -246,3 +246,249 @@ fn the_player_stays_usable_over_an_open_detail(cx: &mut TestAppContext) {
         "using the player leaves the dialog open"
     );
 }
+
+// A preview the loopback server answers only after this long, so the loading phase is visible.
+const SLOW: std::time::Duration = std::time::Duration::from_millis(1500);
+
+// Pumps the app for `for_how_long` of real time, so a slow response has landed by the end.
+fn idle_real(cx: &mut TestAppContext, for_how_long: std::time::Duration) {
+    let until = std::time::Instant::now() + for_how_long;
+    support::wait_real(cx, "the wait", |_| std::time::Instant::now() >= until);
+}
+
+#[gpui_kit::test]
+fn the_card_play_button_spins_while_the_preview_loads(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    assert!(support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    assert_eq!(
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref(),
+        Some("Cancel")
+    );
+    let loading = support::bounds_of(cx, win, ids::store_play(S, &gb(1))).unwrap();
+    assert_eq!(
+        (loading.size.width, loading.size.height),
+        (gpui_kit::px(36.), gpui_kit::px(36.)),
+        "the spinner keeps v5's size-9 button"
+    );
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    assert_eq!(
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref(),
+        Some("Stop")
+    );
+    assert!(!support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    w.audio.finish();
+    support::wait_real(cx, "the end", |cx| {
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref() == Some("Play")
+    });
+}
+
+#[gpui_kit::test]
+fn a_click_on_a_loading_card_cancels_the_preview(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    assert!(support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    assert_eq!(
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref(),
+        Some("Play")
+    );
+    assert!(!support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    idle_real(cx, SLOW + std::time::Duration::from_millis(500));
+    assert!(
+        w.audio.plays().is_empty(),
+        "a cancelled preview never plays"
+    );
+    assert_eq!(cx.update(|cx| w.page.read(cx).playing(cx)), None);
+}
+
+#[gpui_kit::test]
+fn only_the_newest_loading_card_spins(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let one = server.mount_preview_after(1, vec![1], SLOW);
+    let two = server.mount_preview_after(2, vec![2], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(
+            env,
+            &[
+                (1, "Ding", "hitsound", Some(one.as_str())),
+                (2, "Boom", "killsound", Some(two.as_str())),
+            ],
+        );
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    assert!(support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    support::click_id(cx, win, ids::store_play(S, &gb(2)));
+    assert!(support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(2))
+    ));
+    assert!(!support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    assert_eq!(
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref(),
+        Some("Play")
+    );
+    support::wait_real(cx, "the second preview", |_| w.audio.plays().len() == 1);
+    assert_eq!(w.audio.plays()[0].0, vec![2]);
+}
+
+#[gpui_kit::test]
+fn a_slow_missing_preview_spins_then_toasts(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_status_after("/preview/1.mp3", 404, SLOW);
+    let missing = format!("{}/preview/1.mp3", server.uri());
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(missing.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    assert!(support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    support::wait_real(cx, "the error toast", |cx| {
+        support::present(cx, win, ids::TOAST)
+    });
+    let toast = support::label_of(cx, win, ids::TOAST).unwrap();
+    assert!(toast.starts_with("Couldn't play the preview."), "{toast}");
+    assert!(!support::present(
+        cx,
+        win,
+        ids::store_play_spinner(S, &gb(1))
+    ));
+    assert_eq!(
+        support::label_of(cx, win, ids::store_play(S, &gb(1))).as_deref(),
+        Some("Play")
+    );
+}
+
+#[gpui_kit::test]
+fn the_detail_preview_button_spins_while_the_preview_loads(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_card(S, &gb(1)));
+    support::wait_real(cx, "the detail's preview button", |cx| {
+        support::present(cx, win, ids::STORE_PREVIEW)
+    });
+    // The shown text, read off its own element, follows the state as the accessible name does.
+    let shown = move |cx: &mut TestAppContext| support::label_of(cx, win, ids::STORE_PREVIEW_LABEL);
+    assert_eq!(shown(cx).as_deref(), Some("Play Preview"));
+    support::click_id(cx, win, ids::STORE_PREVIEW);
+    assert!(support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_PREVIEW).as_deref(),
+        Some("Cancel")
+    );
+    assert_eq!(shown(cx).as_deref(), Some("Cancel"));
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    assert!(!support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_PREVIEW).as_deref(),
+        Some("Stop Preview")
+    );
+    assert_eq!(shown(cx).as_deref(), Some("Stop Preview"));
+}
+
+// The spinner stands in for the 16 px icon: drawn inside the button, never larger than the icon.
+#[gpui_kit::test]
+fn the_card_spinner_fits_inside_its_button(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_play(S, &gb(1)));
+    let button = support::bounds_of(cx, win, ids::store_play(S, &gb(1))).unwrap();
+    let spinner = support::bounds_of(cx, win, ids::store_play_spinner(S, &gb(1))).unwrap();
+    assert!(
+        button.contains(&spinner.origin) && button.contains(&spinner.bottom_right()),
+        "{spinner:?} inside {button:?}"
+    );
+    assert!(
+        spinner.size.width <= gpui_kit::px(16.) && spinner.size.height <= gpui_kit::px(16.),
+        "{:?}",
+        spinner.size
+    );
+}
+
+// Loading reads "Stop Preview" beside the spinner, so the button keeps its width when it plays.
+#[gpui_kit::test]
+fn the_detail_preview_button_keeps_its_width_from_loading_to_playing(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview_after(1, vec![4, 5, 6], SLOW);
+    let w = support::sound_store_window(cx, &env, &server, |env| {
+        support::seed_sounds(env, &[(1, "Ding", "hitsound", Some(url.as_str()))]);
+    });
+    let win = w.win;
+    support::click_id(cx, win, ids::store_card(S, &gb(1)));
+    support::wait_real(cx, "the detail's preview button", |cx| {
+        support::present(cx, win, ids::STORE_PREVIEW)
+    });
+    let idle = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
+    support::click_id(cx, win, ids::STORE_PREVIEW);
+    assert!(support::present(cx, win, ids::STORE_PREVIEW_SPINNER));
+    let loading = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    let playing = support::bounds_of(cx, win, ids::STORE_PREVIEW).unwrap();
+    assert_eq!(loading.size.width, playing.size.width);
+    assert_eq!(
+        idle.size.width, playing.size.width,
+        "the idle button is as wide too"
+    );
+}

@@ -2,6 +2,7 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
@@ -13,7 +14,7 @@ use tf2tools_core::{StoreCard, StoreItemId, StoreKind};
 
 use super::body::sound_body;
 use super::model::category_label;
-use crate::audio::player::Player;
+use crate::audio::player::{PlayState, Player};
 use crate::counts::count_stat;
 use crate::i18n::tr;
 use crate::ids;
@@ -33,8 +34,8 @@ const HEADER_HEIGHT: f32 = 88.;
 /// What the page knows about a card beyond its store row.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct CardState {
-    /// The player holds this card's preview.
-    pub playing: bool,
+    /// Where this card's preview is in the player; `None` when the player holds another or none.
+    pub playing: Option<PlayState>,
     /// The library holds this sound, as stored or downloaded this session.
     pub in_library: bool,
 }
@@ -223,16 +224,26 @@ fn play_button(card: &StoreCard, state: CardState, player: &WeakEntity<Player>) 
         return None;
     }
     let (player, name, author) = (player.clone(), card.name.clone(), card.author.clone());
-    // The icon-only button names its action, so a screen reader and a test hear Play or Stop.
-    let (icon, action) = if state.playing {
-        (IconName::Square, tr!("sounds.button.stop"))
-    } else {
-        (IconName::Play, tr!("sounds.button.play"))
+    // The icon-only button names its action, so a screen reader and a test hear Play, Stop or
+    // Cancel. While the preview downloads a 16 px spinner takes the icon's place; a button with
+    // children pads like a labelled one, so `p_0` keeps it centred. The click still cancels.
+    let button = Button::new(ids::store_play(StoreKind::Sounds, &card.id));
+    let (button, action) = match state.playing {
+        None => (button.icon(IconName::Play), tr!("sounds.button.play")),
+        Some(PlayState::Playing) => (button.icon(IconName::Square), tr!("sounds.button.stop")),
+        Some(PlayState::Loading) => (
+            button.p_0().child(
+                div()
+                    .id(ids::store_play_spinner(StoreKind::Sounds, &card.id))
+                    .test_support()
+                    .child(Spinner::new()),
+            ),
+            tr!("sounds.button.cancel_preview"),
+        ),
     };
-    let button = Button::new(ids::store_play(StoreKind::Sounds, &card.id))
+    let button = button
         .ghost()
         .flex_none()
-        .icon(icon)
         .size(px(36.))
         .tooltip(action.clone())
         .accessibility_label(action)

@@ -1000,6 +1000,7 @@ sounds:
   button:
     play: "Lire"
     stop: "Arrêter"
+    cancel_preview: "Annuler"
     uninstall: "Désinstaller"
     removing: "Retrait..."
     delete: "Supprimer de la bibliothèque"

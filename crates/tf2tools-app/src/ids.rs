@@ -646,6 +646,10 @@ pub const HUDS_LIBRARY: &str = "huds-library";
 pub const SOUND_PLAYER: &str = "sound-player";
 /// The player's stop button; present only while a sound plays.
 pub const SOUND_PLAYER_STOP: &str = "sound-player-stop";
+/// The player's cancel button; present only while a sound's bytes load.
+pub const SOUND_PLAYER_CANCEL: &str = "sound-player-cancel";
+/// The spinner inside the player's cancel button.
+pub const SOUND_PLAYER_SPINNER: &str = "sound-player-spinner";
 /// Labelled with the playing sound's name.
 pub const SOUND_PLAYER_NAME: &str = "sound-player-name";
 /// Labelled with the playing sound's subtitle.
@@ -738,6 +742,10 @@ pub const SYNC_BANNER: &str = "sync-banner";
 pub const SYNC_BANNER_COUNT: &str = "sync-banner-count";
 /// The Sound Store detail dialog's "Play Preview" / "Stop Preview" button.
 pub const STORE_PREVIEW: &str = "store-preview";
+/// The spinner inside `STORE_PREVIEW`; present only while its preview loads.
+pub const STORE_PREVIEW_SPINNER: &str = "store-preview-spinner";
+/// The text `STORE_PREVIEW` shows, labelled with it: Play Preview, Cancel or Stop Preview.
+pub const STORE_PREVIEW_LABEL: &str = "store-preview-label";
 /// A store's sync button, labelled "Refresh", or "Syncing..." while that store syncs.
 pub const STORE_REFRESH: &str = "store-refresh";
 /// The Addon Store header badge, labelled with the store's release tag.
@@ -1627,6 +1635,11 @@ pub fn sound_play(folder: &str) -> ElementId {
     keyed("sound-play", folder)
 }
 
+/// The spinner inside a library card's play button while its sound loads.
+pub fn sound_play_spinner(folder: &str) -> ElementId {
+    keyed("sound-play-spinner", folder)
+}
+
 /// A library sound card's "VPK" badge; present only for VPK sounds.
 pub fn sound_vpk(folder: &str) -> ElementId {
     keyed("sound-vpk", folder)
@@ -1685,6 +1698,11 @@ pub fn sound_slot_name(kind: SoundKind) -> ElementId {
 /// A slot's play button; present only when installed.
 pub fn sound_slot_play(kind: SoundKind) -> ElementId {
     keyed("sound-slot-play", kind.name())
+}
+
+/// The spinner inside a slot's play button while its installed sound loads.
+pub fn sound_slot_play_spinner(kind: SoundKind) -> ElementId {
+    keyed("sound-slot-play-spinner", kind.name())
 }
 
 /// A slot's Uninstall button; present only when installed.
@@ -1832,6 +1850,12 @@ pub fn store_download(kind: StoreKind, id: &StoreItemId) -> ElementId {
 /// A store card's preview play button: "store-play:<slug>:<id>", keyed as `store_card`.
 pub fn store_play(kind: StoreKind, id: &StoreItemId) -> ElementId {
     keyed("store-play", &store_key(kind, id))
+}
+
+/// The spinner inside a card's play button while its preview loads:
+/// "store-play-spinner:<slug>:<id>", keyed as `store_card`.
+pub fn store_play_spinner(kind: StoreKind, id: &StoreItemId) -> ElementId {
+    keyed("store-play-spinner", &store_key(kind, id))
 }
 
 /// A card's state badge: "store-state:<slug>:<id>", keyed as `store_card`.

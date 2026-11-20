@@ -906,3 +906,122 @@ fn an_uninstall_that_ends_after_leaving_still_announces_the_change(cx: &mut Test
     assert!(cx.update(|cx| s.shell.read(cx).sounds_page()).is_none());
     assert_eq!(count.get(), 1);
 }
+
+type Load = Result<Vec<u8>, tf2tools_app::services::OpError>;
+
+/// Toggles the page's player on `key` with a load that resolves only when the test sends through
+/// the returned gate, as a play button would while its bytes are still being read.
+fn play_gated(
+    cx: &mut TestAppContext,
+    page: &Entity<SoundsPage>,
+    key: &str,
+) -> async_channel::Sender<Load> {
+    let (tx, rx) = async_channel::bounded::<Load>(1);
+    let player = cx.update(|cx| page.read(cx).player().clone());
+    let now = NowPlaying {
+        key: key.to_owned().into(),
+        name: "Ding".into(),
+        subtitle: "test".into(),
+    };
+    cx.update(|cx| {
+        player.update(cx, |p, cx| {
+            p.toggle_with(
+                now,
+                move |cx| {
+                    cx.background_spawn(async move {
+                        rx.recv().await.unwrap_or_else(|_| {
+                            Err(tf2tools_app::services::OpError::core(
+                                "load".into(),
+                                "gate dropped",
+                            ))
+                        })
+                    })
+                },
+                cx,
+            )
+            .detach()
+        })
+    });
+    tx
+}
+
+/// While a play button's sound loads it shows a 16 px spinner reading "Cancel" at the size of
+/// Stop, and Stop once the sound plays.
+fn assert_spins_then_stops(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    gate: async_channel::Sender<Load>,
+    button: gpui_kit::ElementId,
+    spinner: gpui_kit::ElementId,
+) {
+    assert!(
+        support::present(cx, s.win, spinner.clone()),
+        "{button:?} spins while loading"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, button.clone()).as_deref(),
+        Some("Cancel"),
+        "{button:?} cancels while loading"
+    );
+    let loading = support::bounds_of(cx, s.win, button.clone()).unwrap();
+    let spun = support::bounds_of(cx, s.win, spinner.clone()).unwrap();
+    assert!(
+        loading.contains(&spun.origin) && loading.contains(&spun.bottom_right()),
+        "{spun:?} inside {loading:?}"
+    );
+    assert!(
+        spun.size.width <= px(16.) && spun.size.height <= px(16.),
+        "{:?}",
+        spun.size
+    );
+    gate.send_blocking(Ok(wav(441))).unwrap();
+    support::wait_real(cx, "the play", |_| s.audio.plays().len() == 1);
+    assert!(
+        !support::present(cx, s.win, spinner),
+        "{button:?} stops spinning once playing"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, button.clone()).as_deref(),
+        Some("Stop"),
+        "{button:?} stops once playing"
+    );
+    let playing = support::bounds_of(cx, s.win, button.clone()).unwrap();
+    assert_eq!(loading.size, playing.size, "{button:?} keeps its size");
+}
+
+#[gpui_kit::test]
+fn a_card_spins_while_its_sound_loads(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let ding = seed(&s, &env, "Ding", "wav", &wav(441));
+    let page = open_sounds(cx, &s);
+    let folder = ding.folder_name();
+    let gate = play_gated(cx, &page, &format!("sound:{folder}"));
+    assert_spins_then_stops(
+        cx,
+        &s,
+        gate,
+        ids::sound_play(folder),
+        ids::sound_play_spinner(folder),
+    );
+}
+
+#[gpui_kit::test]
+fn a_slot_spins_while_its_sound_loads(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let ding = seed(&s, &env, "Ding", "wav", &wav(441));
+    s.services
+        .library
+        .install_sound(ding.id(), SoundKind::Hitsound, &tf2(&env))
+        .unwrap();
+    let page = open_sounds(cx, &s);
+    let gate = play_gated(cx, &page, "slot:hitsound");
+    assert_spins_then_stops(
+        cx,
+        &s,
+        gate,
+        ids::sound_slot_play(SoundKind::Hitsound),
+        ids::sound_slot_play_spinner(SoundKind::Hitsound),
+    );
+}
