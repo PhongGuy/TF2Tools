@@ -15,8 +15,11 @@ fn a_row_with_pictures_shows_a_thumbnail_and_a_pictures_button(cx: &mut TestAppC
     let env = support::env();
     let (s, _page) = picture_page(cx, &env, "medium", "{}");
     reveal(cx, &s, ids::graphics_thumb("lod"));
-    let thumb = support::bounds_of(cx, s.win, ids::graphics_thumb("lod")).unwrap();
-    assert_eq!((thumb.size.width, thumb.size.height), (px(96.), px(54.)));
+    let picture = support::bounds_of(cx, s.win, ids::graphics_thumb_area("lod")).unwrap();
+    assert_eq!(
+        (picture.size.width, picture.size.height),
+        (px(96.), px(54.))
+    );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_thumb("lod")).as_deref(),
         Some("Pictures of Model quality")
@@ -38,22 +41,22 @@ fn a_row_with_pictures_shows_a_thumbnail_and_a_pictures_button(cx: &mut TestAppC
 }
 
 #[gpui_kit::test]
-fn the_thumbnail_sits_left_of_the_name_or_above_it_when_narrow(cx: &mut TestAppContext) {
+fn the_thumbnail_sits_left_of_the_name_at_every_width(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, _page) = picture_page(cx, &env, "medium", "{}");
-    reveal(cx, &s, ids::graphics_thumb("lod"));
-    let thumb = support::bounds_of(cx, s.win, ids::graphics_thumb("lod")).unwrap();
-    let name = support::bounds_of(cx, s.win, ids::graphics_module("lod")).unwrap();
-    assert!(thumb.bottom() <= name.top(), "narrow: {thumb:?} {name:?}");
-    cx.simulate_window_resize(s.win, size(px(1400.), px(900.)));
-    support::settle(cx, s.win);
-    reveal(cx, &s, ids::graphics_thumb("lod"));
-    let thumb = support::bounds_of(cx, s.win, ids::graphics_thumb("lod")).unwrap();
-    let name = support::bounds_of(cx, s.win, ids::graphics_module("lod")).unwrap();
-    assert!(
-        thumb.right() <= name.left() && thumb.top() <= name.top() && name.top() < thumb.bottom(),
-        "wide: {thumb:?} {name:?}"
-    );
+    for width in [800., 1400.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(900.)));
+        support::settle(cx, s.win);
+        reveal(cx, &s, ids::graphics_thumb("lod"));
+        let thumb = support::bounds_of(cx, s.win, ids::graphics_thumb("lod")).unwrap();
+        let name = support::bounds_of(cx, s.win, ids::graphics_module("lod")).unwrap();
+        assert!(
+            thumb.right() <= name.left()
+                && thumb.top() <= name.top()
+                && name.top() < thumb.bottom(),
+            "{width}: {thumb:?} {name:?}"
+        );
+    }
 }
 
 #[gpui_kit::test]

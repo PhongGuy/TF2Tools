@@ -10,9 +10,9 @@ use gpui_kit::component::slider::Slider;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, hsla, px,
-    relative, transparent_black,
+    AnyElement, App, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, div, hsla, px, relative, transparent_black,
 };
 
 use super::GraphicsPage;
@@ -20,24 +20,33 @@ use super::model::preset_label;
 use super::pictures::{Compare, RowPictures};
 use crate::i18n::tr;
 use crate::ids;
-use crate::pages::huds::hud_picture;
+use crate::pages::huds::rounded_picture;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
-use crate::theme::selected_segment;
 use crate::widgets::{Named as _, labelled};
 
 /// The thumbnail's size, the pictures' 16:9.
 const THUMB_WIDTH: f32 = 96.;
 const THUMB_HEIGHT: f32 = 54.;
+/// A strip value card's picture, also 16:9.
+const STRIP_WIDTH: f32 = 112.;
 /// The compare view's widest size; it shrinks with a narrow page.
 const COMPARE_MAX_WIDTH: f32 = 720.;
+/// The compare view's corner radius.
+const COMPARE_RADIUS: f32 = 8.;
 /// The wipe line, centred on the clip's left edge.
 const WIPE_LINE_WIDTH: f32 = 2.;
 /// From this wipe on, the player's side is too thin to draw.
 const WIPE_ALL_PRESET: f32 = 0.995;
 
-/// A bundled picture, or a muted box while it decodes. A picture that failed to decode
-/// leaves an unfilled box, so its slot keeps its shape.
-fn picture(area: ElementId, image: ElementId, key: Option<&ImageKey>, cx: &App) -> AnyElement {
+/// A bundled picture with its box and image rounded by `radius`, or a muted box while it
+/// decodes. A picture that failed to decode leaves an unfilled box, so its slot keeps its shape.
+fn rounded(
+    area: ElementId,
+    image: ElementId,
+    key: Option<&ImageKey>,
+    radius: Pixels,
+    cx: &App,
+) -> AnyElement {
     let failed = key
         .zip(RemoteImages::global(cx))
         .is_some_and(|(key, images)| matches!(images.read(cx).image(key), RemoteImage::Failed));
@@ -48,9 +57,10 @@ fn picture(area: ElementId, image: ElementId, key: Option<&ImageKey>, cx: &App) 
             .aspect_ratio(16. / 9.)
             .border_1()
             .border_color(cx.theme().border)
+            .rounded(radius)
             .into_any_element()
     } else {
-        hud_picture(area, image, key, cx).into_any_element()
+        rounded_picture(area, image, key, Some(radius), cx).into_any_element()
     }
 }
 
@@ -69,18 +79,29 @@ pub(super) fn thumbnail(
         .as_deref()
         .zip(pictures.thumb.as_deref())
         .map(|(index, thumb)| ImageKey::card(&index.url(thumb)));
-    let picture = picture(
+    let picture = rounded(
         ids::graphics_thumb_area(module),
         ids::graphics_thumb_image(module),
         key.as_ref(),
+        px(7.),
         cx,
     );
     let target = module.to_owned();
+    // A 1 px frame with an 8 px radius, in the accent while the row's pictures are open;
+    // the picture inside is rounded 7 px itself so its corners stay within the frame's arc.
+    let frame = if page.open_row() == Some(module) {
+        cx.theme().primary
+    } else {
+        cx.theme().border
+    };
     Button::new(ids::graphics_thumb(module))
         .ghost()
         .p_0()
         .flex_none()
-        .h(px(THUMB_HEIGHT))
+        .h(px(THUMB_HEIGHT + 2.))
+        .border_1()
+        .border_color(frame)
+        .rounded(px(8.))
         .named(tr!("graphics.pictures.thumb", name = label))
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
         .child(div().w(px(THUMB_WIDTH)).child(picture))
@@ -101,15 +122,19 @@ pub(super) fn toggle(
     };
     let target = module.to_owned();
     Button::new(ids::graphics_pictures_toggle(module))
-        .outline()
+        .ghost()
         .xsmall()
+        .h(px(24.))
+        .px_2()
+        .font_weight(FontWeight::MEDIUM)
         .label(label)
         .on_click(cx.listener(move |page, _, window, cx| page.toggle_pictures(&target, window, cx)))
         .into_any_element()
 }
 
-/// The open row's pictures panel: the zoom toggle when the setting has crops, the compare
-/// view, then the strip of value pictures and its caption.
+/// The open row's pictures panel, the card's full width on the page's darker fill: the
+/// compare view with the zoom toggle on its corner when the setting has crops, then the
+/// strip of value pictures and its caption.
 pub(super) fn panel(
     page: &GraphicsPage,
     module: &str,
@@ -122,21 +147,37 @@ pub(super) fn panel(
         } else {
             tr!("graphics.pictures.zoom")
         };
-        h_flex().child(
-            Button::new(ids::graphics_zoom(module))
-                .outline()
-                .xsmall()
-                .label(label)
-                .on_click(cx.listener(|page, _, _, cx| page.toggle_zoom(cx))),
-        )
+        Button::new(ids::graphics_zoom(module))
+            .ghost()
+            .absolute()
+            .right(px(10.))
+            .bottom(px(10.))
+            .h(px(26.))
+            .px(px(10.))
+            .rounded_full()
+            .bg(hsla(0., 0., 0., 0.8))
+            .text_xs()
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(hsla(0., 0., 1., 1.))
+            .label(label)
+            .on_click(cx.listener(|page, _, _, cx| page.toggle_zoom(cx)))
     });
+    let theme = cx.theme();
+    let (fill, border) = (theme.background, theme.border);
+    // The bottom rule overlaps the next row's top rule, so the two never double.
     v_flex()
         .id(ids::graphics_pictures(module))
         .test_support()
         .w_full()
-        .gap_2()
-        .children(zoom)
-        .children(compare(page, module, &pictures.compare, cx))
+        .pt_1()
+        .px_4()
+        .pb_4()
+        .gap_3()
+        .mb(px(-1.))
+        .bg(fill)
+        .border_b_1()
+        .border_color(border)
+        .children(compare(page, module, &pictures.compare, zoom, cx))
         .when(!pictures.strip.is_empty(), |panel| {
             panel
                 .child(strip(page, module, pictures, cx))
@@ -149,8 +190,9 @@ pub(super) fn panel(
         .into_any_element()
 }
 
-// One button per value with a picture, in catalogue order: its picture over its word, the
-// chosen one ringed like a selected segment and the preset's carrying the preset's name.
+// One card per value with a picture, in catalogue order: its picture over its label, the
+// chosen one outlined in the primary colour and the preset's tagged with the preset's name,
+// or "Preset" when that name repeats the value's label.
 fn strip(
     page: &GraphicsPage,
     module: &str,
@@ -158,51 +200,76 @@ fn strip(
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
     let preset = preset_label(page.shown_against().preset());
-    let (ring, _) = selected_segment(cx.theme());
+    let theme = cx.theme();
+    let (ring, picked, border, muted) = (
+        theme.primary,
+        theme.secondary,
+        theme.border,
+        theme.muted_foreground,
+    );
     let buttons = pictures.strip.iter().map(|entry| {
         let key = page
             .pictures
             .as_deref()
             .map(|index| ImageKey::card(&index.url(&entry.picture)));
-        let image = picture(
+        let image = rounded(
             ids::graphics_strip_area(module, &entry.value),
             ids::graphics_strip_image(module, &entry.value),
             key.as_ref(),
+            px(5.),
             cx,
         );
+        // A tag naming the card's own label would read "Medium Medium"; it says "Preset" then.
         let tag = entry.preset.then(|| {
+            let text = if entry.label == preset {
+                tr!("graphics.preset.heading")
+            } else {
+                preset.clone()
+            };
             div()
                 .id(ids::graphics_strip_tag(module))
-                .aria_label(preset.clone())
+                .aria_label(text.clone())
                 .test_support()
-                .px_1p5()
-                .rounded_md()
-                .bg(cx.theme().secondary)
-                .text_xs()
-                .child(preset.clone())
+                .text_color(muted)
+                .child(text)
         });
         let (target, value) = (module.to_owned(), entry.value.clone());
         Button::new(ids::graphics_strip_picture(module, &entry.value))
             .ghost()
-            .p_1()
+            .pt_1()
+            .px_1()
+            .pb(px(6.))
             .h_auto()
-            .border_2()
-            .border_color(if entry.chosen {
-                ring
-            } else {
-                transparent_black()
+            .rounded(px(8.))
+            .border_1()
+            .map(|card| {
+                if entry.chosen {
+                    card.border_color(ring).bg(picked)
+                } else {
+                    card.border_color(border).bg(transparent_black())
+                }
             })
             .accessibility_label(entry.label.clone())
             .disabled(page.busy)
             .on_click(cx.listener(move |page, _, _, cx| page.pick_value(&target, &value, cx)))
             .child(
                 v_flex()
-                    .w(px(THUMB_WIDTH))
-                    .items_center()
-                    .gap_1()
+                    .w(px(STRIP_WIDTH))
+                    .gap(px(6.))
+                    .text_xs()
                     .child(image)
-                    .child(div().text_xs().child(entry.label.clone()))
-                    .children(tag),
+                    .child(
+                        h_flex()
+                            .px(px(2.))
+                            .gap(px(6.))
+                            .items_baseline()
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(entry.label.clone()),
+                            )
+                            .children(tag),
+                    ),
             )
     });
     h_flex()
@@ -221,15 +288,18 @@ fn compare(
     page: &GraphicsPage,
     module: &str,
     compare: &Compare,
+    zoom: Option<Button>,
     cx: &mut Context<GraphicsPage>,
 ) -> Option<AnyElement> {
     let index = page.pictures.as_deref()?;
     let key = |path: &Path| ImageKey::carousel(&index.url(path));
+    // Each side rounds its own corners, since gpui clips children only to rectangles.
     let side = |name: &str, path: &Path, cx: &App| {
-        picture(
+        rounded(
             ids::graphics_compare_area(module, name),
             ids::graphics_compare_image(module, name),
             Some(&key(path)),
+            px(COMPARE_RADIUS),
             cx,
         )
     };
@@ -237,9 +307,11 @@ fn compare(
         .id(ids::graphics_compare(module))
         .test_support()
         .relative()
+        .mt_3()
         .w_full()
         .max_w(px(COMPARE_MAX_WIDTH))
         .aspect_ratio(16. / 9.)
+        .rounded(px(COMPARE_RADIUS))
         .overflow_hidden();
     let full = |child: AnyElement| div().absolute().inset_0().size_full().child(child);
     let view = match compare {
@@ -249,7 +321,8 @@ fn compare(
             pill: text,
         } => frame
             .child(full(side("preset", picture, cx)))
-            .child(pill(module, "same", text, false)),
+            .child(pill(module, "same", text, false))
+            .children(zoom),
         Compare::Single {
             picture,
             pill: text,
@@ -259,6 +332,7 @@ fn compare(
             frame
                 .child(full(side(name, picture, cx)))
                 .child(pill(module, name, text, *yours))
+                .children(zoom)
         }
         Compare::Wipe {
             preset,
@@ -316,11 +390,12 @@ fn compare(
                 .children(clip)
                 .children(line)
                 .child(pill(module, "preset", preset_pill, false))
-                .child(pill(module, "yours", yours_pill, true));
+                .child(pill(module, "yours", yours_pill, true))
+                .children(zoom);
             return Some(
                 v_flex()
                     .w_full()
-                    .gap_2()
+                    .gap_3()
                     .child(view)
                     .child(slider)
                     .into_any_element(),

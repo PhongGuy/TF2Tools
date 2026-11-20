@@ -86,12 +86,6 @@ pub fn card_hover(theme: &Theme) -> Hsla {
     theme.accent
 }
 
-/// A checked segment's (fill, text): the primary colour, since the kit's pressed accent sits
-/// barely above the zinc page.
-pub fn selected_segment(theme: &Theme) -> (Hsla, Hsla) {
-    (theme.primary, theme.primary_foreground)
-}
-
 /// A team's solid fill under white text, as logs.tf heads a log with its score banner: its
 /// muted teal-blue and brick-red, the blue a shade darker so white text clears 4.5:1.
 pub fn team_fill(team: tf2tools_core::Team) -> Hsla {

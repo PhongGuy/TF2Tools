@@ -4,6 +4,7 @@ pub mod jobs;
 pub mod model;
 mod picture_panel;
 pub mod pictures;
+mod pill;
 mod presets;
 mod settings;
 mod status;
@@ -20,9 +21,9 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    Window, div, px,
 };
 use tf2tools_core::{
     Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
@@ -31,7 +32,7 @@ use tf2tools_core::{
 use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
-use crate::pages::common::no_tf2_warning;
+use crate::pages::common::{card_frame, no_tf2_warning};
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -110,6 +111,8 @@ pub struct GraphicsPage {
     changed_only: bool,
     /// Each shown section's child index in the scroll column, from the last render.
     section_items: BTreeMap<String, usize>,
+    /// The search toolbar's child index in the scroll column, from the last render.
+    toolbar_item: Option<usize>,
     scroll: ScrollHandle,
     /// The bundled setting pictures, once read off the UI thread.
     pictures: Option<Arc<PictureIndex>>,
@@ -179,6 +182,7 @@ impl GraphicsPage {
             search,
             changed_only: false,
             section_items: BTreeMap::new(),
+            toolbar_item: None,
             scroll: ScrollHandle::new(),
             pictures: None,
             wanted: Vec::new(),
@@ -291,6 +295,20 @@ impl GraphicsPage {
             self.scroll.scroll_to_top_of_item(item);
             cx.notify();
         }
+    }
+
+    // How far below the toolbar's top the wide rail sits, so it pins at the page's top padding
+    // once the toolbar scrolls above it. The toolbar's bounds come from the last frame and are
+    // unscrolled, so the current offset is added; zero until a frame has laid it out.
+    fn rail_pin(&self) -> Pixels {
+        let Some(toolbar) = self
+            .toolbar_item
+            .and_then(|ix| self.scroll.bounds_for_item(ix))
+        else {
+            return px(0.);
+        };
+        let top = toolbar.top() + self.scroll.offset().y;
+        (self.scroll.bounds().top() + CONTENT_PADDING - top).max(px(0.))
     }
 
     /// True once a load has ended, failed or not, with or without TF2.
@@ -919,14 +937,6 @@ impl Render for GraphicsPage {
             .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
         let mut children: Vec<AnyElement> = Vec::new();
         children.extend(warning.map(IntoElement::into_any_element));
-        children.push(
-            labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::GRAPHICS_SUBTITLE,
-                tr!("graphics.subtitle"),
-            )
-            .into_any_element(),
-        );
         if let Some(card) = self.card() {
             children.push(self.status_row(&card, cx));
             if self.tf2_running {
@@ -934,19 +944,22 @@ impl Render for GraphicsPage {
             }
         }
         let mut items = BTreeMap::new();
+        let mut toolbar = None;
         if let Some(preset) = self.preset() {
             children.push(self.presets(preset, narrow, cx));
             children.push(self.changes_strip(preset, cx));
-            settings::push(
+            toolbar = settings::push(
                 self,
                 sections.as_deref(),
                 narrow,
+                self.rail_pin(),
                 &mut children,
                 &mut items,
                 cx,
             );
         }
         self.section_items = items;
+        self.toolbar_item = toolbar;
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -956,16 +969,7 @@ impl Render for GraphicsPage {
             .p(CONTENT_PADDING)
             .gap_6()
             .children(children);
-        let column = scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content);
-        let rail = sections
-            .as_deref()
-            .filter(|_| !narrow)
-            .map(|sections| settings::rail(sections, false, cx));
-        h_flex()
-            .size_full()
-            .items_start()
-            .children(rail)
-            .child(column.flex_1().min_w_0().h_full())
+        scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
     }
 }
 
@@ -976,6 +980,7 @@ impl GraphicsPage {
     fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let (accent, fill) = (theme.sidebar_primary, theme.background);
         let preset = preset_label(preset);
         let catalog = self.catalog.as_deref();
         let list = view::changes(catalog, &self.shown_against());
@@ -984,7 +989,8 @@ impl GraphicsPage {
                 div()
                     .text_sm()
                     .text_color(muted)
-                    .p_3()
+                    .py_3()
+                    .px_4()
                     .border_1()
                     .border_dashed()
                     .border_color(border)
@@ -1023,6 +1029,7 @@ impl GraphicsPage {
                     Button::new(ids::graphics_change_undo(&change.module))
                         .ghost()
                         .xsmall()
+                        .rounded(px(999.))
                         .icon(IconName::X)
                         .named(tr!("graphics.changes.undo", name = change.label, was = was))
                         .disabled(self.busy)
@@ -1032,50 +1039,50 @@ impl GraphicsPage {
                     .id(ids::graphics_change(&change.module))
                     .aria_label(sentence)
                     .test_support()
-                    .gap_1()
-                    .pl_2()
+                    .h(px(28.))
+                    .gap(px(6.))
+                    .pl(px(10.))
                     .pr_1()
-                    .py_0p5()
                     .text_sm()
                     .border_1()
-                    .border_color(border)
-                    .rounded(radius)
-                    .child(change.label)
+                    .border_color(accent)
+                    .bg(fill)
+                    .rounded_full()
+                    .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
                     .children(
-                        change
-                            .was
-                            .map(|was| div().text_color(muted).child(format!("{was} →"))),
+                        change.was.map(|was| {
+                            h_flex().gap(px(6.)).text_color(muted).child(was).child("→")
+                        }),
                     )
-                    .child(div().font_weight(FontWeight::MEDIUM).child(change.now))
+                    .child(change.now)
                     .children(undo)
                     .into_any_element()
             })
             .collect();
         let reset_all = editable.then(|| {
             Button::new(ids::GRAPHICS_RESET_ALL)
-                .outline()
+                .ghost()
                 .small()
                 .label(tr!("graphics.changes.reset_all"))
                 .disabled(self.busy)
                 .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
         });
-        v_flex()
+        // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
+        card_frame(cx)
             .id(ids::GRAPHICS_CHANGES)
             .aria_label(title.clone())
             .test_support()
-            .gap_3()
-            .p_3()
-            .border_1()
-            .border_color(border)
-            .rounded(radius)
-            .child(
-                h_flex()
-                    .justify_between()
-                    .gap_4()
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-                    .children(reset_all),
-            )
-            .child(h_flex().flex_wrap().gap_2().children(chips))
+            .flex()
+            .items_center()
+            .flex_wrap()
+            .gap_2()
+            .py_3()
+            .px_4()
+            .border_color(accent)
+            .child(div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title))
+            .children(chips)
+            .child(div().flex_1())
+            .children(reset_all)
             .into_any_element()
     }
 }

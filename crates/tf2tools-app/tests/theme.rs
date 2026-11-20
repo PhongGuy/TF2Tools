@@ -264,32 +264,38 @@ fn every_store_card_lights_up_with_the_card_hover_fill() {
     }
 }
 
-// A checked segment must read at a glance against the page and its unchecked neighbours, with
-// its own text clearly legible on it.
+// The Graphics rows' segments take their checked look from the pill the preset shares.
+#[test]
+fn graphics_segments_use_the_shared_pill_look() {
+    let source = include_str!("../src/pages/graphics/settings.rs");
+    assert!(source.contains("pill::segment_look(") && source.contains("pill::row_track("));
+}
+
+// A checked pill segment wears the page background with foreground text on the secondary
+// track, so its text must read clearly and the segment must stand apart from its track.
 #[gpui_kit::test]
-fn a_selected_segment_stands_out_from_the_page(cx: &mut TestAppContext) {
+fn a_checked_pill_segment_stands_out_from_its_track(cx: &mut TestAppContext) {
+    let pill = include_str!("../src/pages/graphics/pill.rs");
+    assert!(
+        pill.contains(".bg(theme.background)")
+            && pill.contains(".text_color(theme.foreground)")
+            && pill.contains(".bg(cx.theme().secondary)"),
+        "pill.rs no longer draws the look this test checks"
+    );
     support::init(cx);
     cx.update(|cx| {
         let t = Theme::global(cx);
-        let (fill, text) = tf2tools_app::theme::selected_segment(t);
         assert!(
-            (fill.l - t.background.l).abs() >= 0.5,
-            "a selected segment fills {} on a {} page",
-            hex(fill),
+            (t.foreground.l - t.background.l).abs() >= 0.5,
+            "{} text on a {} segment",
+            hex(t.foreground),
             hex(t.background)
         );
         assert!(
-            (text.l - fill.l).abs() >= 0.5,
-            "{} text on a {} segment",
-            hex(text),
-            hex(fill)
+            (t.background.l - t.secondary.l).abs() >= 0.08,
+            "a {} segment on a {} track",
+            hex(t.background),
+            hex(t.secondary)
         );
     });
-}
-
-// The Graphics rows' segments take their checked look from `selected_segment`.
-#[test]
-fn graphics_segments_use_the_selected_segment_look() {
-    let source = include_str!("../src/pages/graphics/settings.rs");
-    assert!(source.contains("selected_segment("));
 }

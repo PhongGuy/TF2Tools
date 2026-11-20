@@ -2981,7 +2981,6 @@ install_parts:
   maps_skipped: "%{name} contém vários mapas. Escolha os que quer instalar. Alguns arquivos extras deste download foram ignorados."
 
 graphics:
-  subtitle: "Configurações gráficas e de jogo do mastercomfig"
   no_tf2: "Defina a pasta do TF2 nas Configurações para usar o mastercomfig."
   running: "O TF2 está em execução. Suas mudanças valem a partir da próxima vez que ele abrir."
   status:
@@ -3023,6 +3022,7 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Redefinir"
+    learn_more: "Saiba mais"
   pictures:
     show: "Mostrar imagens"
     hide: "Ocultar imagens"

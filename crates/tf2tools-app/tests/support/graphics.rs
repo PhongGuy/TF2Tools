@@ -127,7 +127,8 @@ pub fn pick(
 /// is inside the page; panics if it never is.
 pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
     let area = tf2tools_app::ids::page(Page::Graphics);
-    for _ in 0..200 {
+    // Enough lines to reach the last category of the full catalogue with every row carded.
+    for _ in 0..400 {
         let seen = cx
             .update_window(s.win, |_, w, _| {
                 let page = w.try_find(area.clone()).map(|e| e.bounds());

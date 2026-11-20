@@ -853,8 +853,6 @@ pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 pub const ADDONS_LIBRARY: &str = "addons-library";
 /// The Addons page's "GameBanana add-ons" section title.
 pub const ADDONS_GB: &str = "addons-gb";
-/// The Graphics page's line under the title.
-pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
 pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
 /// The mastercomfig status row.
@@ -1078,6 +1076,11 @@ pub fn graphics_row(module: &str) -> ElementId {
     keyed("graphics-row", module)
 }
 
+/// A changed row's accent bar down its line's left edge: "graphics-row-bar:<module>".
+pub fn graphics_row_bar(module: &str) -> ElementId {
+    keyed("graphics-row-bar", module)
+}
+
 /// A row's thumbnail Button, which opens its pictures: "graphics-thumb:<module>".
 pub fn graphics_thumb(module: &str) -> ElementId {
     keyed("graphics-thumb", module)
@@ -1096,6 +1099,11 @@ pub fn graphics_thumb_image(module: &str) -> ElementId {
 /// A row's Show/Hide pictures Button: "graphics-pictures-toggle:<module>".
 pub fn graphics_pictures_toggle(module: &str) -> ElementId {
     keyed("graphics-pictures-toggle", module)
+}
+
+/// A row's "Learn more" link to the mastercomfig docs: "graphics-learn-more:<module>".
+pub fn graphics_learn_more(module: &str) -> ElementId {
+    keyed("graphics-learn-more", module)
 }
 
 /// A row's open pictures panel: "graphics-pictures:<module>".

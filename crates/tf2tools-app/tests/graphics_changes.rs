@@ -2,7 +2,7 @@
 
 use crate::support;
 
-use gpui_kit::TestAppContext;
+use gpui_kit::{Bounds, Pixels, TestAppContext, px, size};
 use support::graphics::{
     HEADER, found, idle, modules_cfg, open, saved, server_shell, wait_for_list,
 };
@@ -91,4 +91,45 @@ fn offline_the_strip_still_lists_saved_choices(cx: &mut TestAppContext) {
         ids::graphics_change_undo("fpscap")
     ));
     assert!(!support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
+}
+
+#[gpui_kit::test]
+fn the_strip_keeps_its_count_chips_and_reset_all_on_one_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, r#"{"fpscap":"120"}"#);
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    for width in [1280., 800.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(900.)));
+        support::settle(cx, s.win);
+        let at = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+            support::bounds_of(cx, s.win, id).unwrap()
+        };
+        let strip = at(cx, ids::GRAPHICS_CHANGES.into());
+        let chip = at(cx, ids::graphics_change("fpscap"));
+        let reset = at(cx, ids::GRAPHICS_RESET_ALL.into());
+        for b in [chip, reset] {
+            assert!(
+                b.left() >= strip.left()
+                    && b.right() <= strip.right()
+                    && b.bottom() <= strip.bottom(),
+                "{width}: {b:?} spills out of {strip:?}"
+            );
+        }
+        if width > 1000. {
+            let mid = |b: Bounds<Pixels>| b.top() + b.size.height / 2.;
+            assert!(
+                (mid(chip) - mid(reset)).abs() <= px(4.),
+                "one row: {chip:?} {reset:?}"
+            );
+            assert!(
+                strip.right() - reset.right() <= px(20.),
+                "Reset all closes the row: {reset:?}"
+            );
+            assert!(strip.size.height <= px(60.), "a single row: {strip:?}");
+        }
+    }
 }

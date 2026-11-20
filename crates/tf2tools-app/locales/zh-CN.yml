@@ -2979,7 +2979,6 @@ install_parts:
   maps_skipped: "%{name} 包含多张地图。请选择要安装的地图。此下载中的部分额外文件已被跳过。"
 
 graphics:
-  subtitle: "来自 mastercomfig 的图形与游戏设置"
   no_tf2: "请在设置中指定 TF2 文件夹以使用 mastercomfig。"
   running: "TF2 正在运行。你的更改将在下次启动时生效。"
   status:
@@ -3021,6 +3020,7 @@ graphics:
   row:
     preset_value: "%{preset}：%{value}"
     reset: "重置"
+    learn_more: "了解更多"
   pictures:
     show: "显示图片"
     hide: "隐藏图片"

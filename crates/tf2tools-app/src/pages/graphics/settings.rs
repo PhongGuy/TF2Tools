@@ -14,31 +14,34 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
-    rgb, transparent_black,
+    ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
+    div, px, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
 use super::model::{SettingsNote, preset_label, settings_note_text};
 use super::view::{self, ControlKind, EmptyState, RowView, SectionView};
-use super::{GraphicsPage, picture_panel, pictures};
+use super::{GraphicsPage, picture_panel, pictures, pill};
 use crate::i18n::tr;
 use crate::ids;
-use crate::shell::CONTENT_PADDING;
-use crate::theme::selected_segment;
+use crate::links::MASTERCOMFIG_DOCS_URL;
+use crate::pages::common::card_frame;
 use crate::widgets::labelled;
 
 /// Pushes the settings area onto the scroll column's `children`: the narrow rail's chips, the
 /// search toolbar (or the note while there is no catalog), one section per category with shown
-/// rows, then the empty state. Records each section's child index in `items` for the rail.
+/// rows, then the empty state. On a wide page the list is indented and the rail hangs off the
+/// toolbar into that column, `pin` below its top. Records each section's child index in
+/// `items` for the rail, and returns the toolbar's.
 pub(super) fn push(
     page: &GraphicsPage,
     sections: Option<&[SectionView]>,
     narrow: bool,
+    pin: Pixels,
     children: &mut Vec<AnyElement>,
     items: &mut BTreeMap<String, usize>,
     cx: &mut Context<GraphicsPage>,
-) {
+) -> Option<usize> {
     let Some(sections) = sections else {
         let note = settings_note_text(page.settings_note().unwrap_or(SettingsNote::Loading));
         children.push(
@@ -52,27 +55,46 @@ pub(super) fn push(
                 ))
                 .into_any_element(),
         );
-        return;
+        return None;
     };
-    if narrow {
+    let indent = if narrow {
         children.push(rail(sections, true, cx));
-    }
-    children.push(toolbar(page, cx));
+        px(0.)
+    } else {
+        px(RAIL_WIDTH + RAIL_GUTTER)
+    };
+    let toolbar_item = children.len();
+    let side = (!narrow).then(|| {
+        div()
+            .absolute()
+            .left(-indent)
+            .top(pin)
+            .child(rail(sections, false, cx))
+    });
+    children.push(toolbar(page, indent, side, cx));
     for section in sections.iter().filter(|s| !s.rows.is_empty()) {
         items.insert(section.key.clone(), children.len());
-        children.push(section_view(page, section, narrow, cx));
+        children.push(section_view(page, section, narrow, indent, cx));
     }
-    if let Some(empty) = empty(page, sections, cx) {
+    if let Some(empty) = empty(page, sections, indent, cx) {
         children.push(empty);
     }
+    Some(toolbar_item)
 }
 
-// The search box and the "Changed only" switch over the list.
-fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
+// The search box and the "Changed only" switch over the list, carrying the wide rail.
+fn toolbar(
+    page: &GraphicsPage,
+    indent: Pixels,
+    rail: Option<impl IntoElement>,
+    cx: &mut Context<GraphicsPage>,
+) -> AnyElement {
     let muted = cx.theme().muted_foreground;
     h_flex()
         .id(ids::GRAPHICS_SETTINGS)
         .test_support()
+        .relative()
+        .ml(indent)
         .gap_4()
         .child(
             div()
@@ -93,27 +115,45 @@ fn toolbar(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> AnyElement {
                 .label(tr!("graphics.settings.changed_only"))
                 .on_click(cx.listener(|page, on: &bool, _, cx| page.set_changed_only(*on, cx))),
         )
+        .children(rail)
         .into_any_element()
 }
 
-// A category's heading over its shown rows.
+// A category's card: a muted header bar over its shown rows, which run edge to edge.
 fn section_view(
     page: &GraphicsPage,
     section: &SectionView,
     narrow: bool,
+    indent: Pixels,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
     let rows: Vec<AnyElement> = section
         .rows
         .iter()
-        .map(|r| row(page, r.clone(), narrow, cx))
+        .enumerate()
+        .map(|(i, r)| row(page, r.clone(), i == 0, narrow, cx))
         .collect();
-    v_flex()
+    let theme = cx.theme();
+    let (border, muted) = (theme.border, theme.muted_foreground);
+    card_frame(cx)
         .id(ids::graphics_section(&section.key))
         .test_support()
-        .gap_2()
+        .ml(indent)
+        // Clipping drops a flex item's content height as its floor, so the card keeps it
+        // explicitly rather than shrink to fit the scroll column.
+        .flex_none()
+        .flex()
+        .flex_col()
+        .overflow_hidden()
         .child(labelled(
-            div().font_weight(FontWeight::SEMIBOLD),
+            div()
+                .px_4()
+                .py_3()
+                .text_size(px(13.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(muted)
+                .border_b_1()
+                .border_color(border),
             ids::graphics_category(&section.key),
             section.label.clone(),
         ))
@@ -126,6 +166,7 @@ fn section_view(
 fn empty(
     page: &GraphicsPage,
     sections: &[SectionView],
+    indent: Pixels,
     cx: &mut Context<GraphicsPage>,
 ) -> Option<AnyElement> {
     let text = match view::empty_state(sections, &page.filter(cx))? {
@@ -139,6 +180,7 @@ fn empty(
     let muted = cx.theme().muted_foreground;
     Some(
         v_flex()
+            .ml(indent)
             .items_start()
             .gap_3()
             .child(labelled(
@@ -216,8 +258,6 @@ pub(super) fn rail(
             .test_support()
             .flex_none()
             .w(px(RAIL_WIDTH))
-            .pt(CONTENT_PADDING)
-            .pl(CONTENT_PADDING)
             .gap_1()
             .children(entries)
             .into_any_element()
@@ -225,17 +265,22 @@ pub(super) fn rail(
 }
 
 /// The wide rail's entry width, enough for the longest category name beside its count.
-const RAIL_WIDTH: f32 = 200.;
+const RAIL_WIDTH: f32 = 184.;
+
+/// The space between the wide rail and the list it sits beside.
+const RAIL_GUTTER: f32 = 24.;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 const CHANGED: u32 = 0x1447e6;
 
-// The title and description, plus the preset's value when changed, on the left; Reset when
-// changed and the row's control on the right. A module with pictures adds its thumbnail
-// before the text and Show pictures under it, and the open row's panel goes below the line.
+// The title, description and Learn more, plus the preset's value when changed, on the left;
+// Reset when changed and the row's control on the right. A module with pictures adds its
+// thumbnail before the text and Show pictures under it, and the open row's panel goes below
+// the line. Every row but the card's `first` rules itself off from the one above.
 fn row(
     page: &GraphicsPage,
     row: RowView,
+    first: bool,
     narrow: bool,
     cx: &mut Context<GraphicsPage>,
 ) -> AnyElement {
@@ -243,11 +288,20 @@ fn row(
     let muted = cx.theme().muted_foreground;
     let description = row.description.clone().map(|text| {
         labelled(
-            div().text_xs().text_color(muted),
+            div().text_xs().line_height(px(16.)).text_color(muted),
             ids::graphics_module_description(name),
             text,
         )
     });
+    // The docs link reads as part of the description: its size and muted colour, underlined.
+    let learn_more = h_flex().child(
+        Button::new(ids::graphics_learn_more(name))
+            .link()
+            .xsmall()
+            .text_color(muted)
+            .label(tr!("graphics.row.learn_more"))
+            .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
+    );
     let preset = row.changed.then(|| {
         labelled(
             div().text_xs().text_color(muted),
@@ -276,9 +330,12 @@ fn row(
     let thumb = pictures
         .as_ref()
         .map(|p| picture_panel::thumbnail(page, name, &row.label, p, cx));
-    let toggle = pictures
-        .as_ref()
-        .map(|_| h_flex().child(picture_panel::toggle(page, name, cx)));
+    let toggle = pictures.as_ref().map(|_| {
+        h_flex()
+            .ml(px(-8.))
+            .child(picture_panel::toggle(page, name, cx))
+    });
+    let border = cx.theme().border;
     // The open panel compares the crops while zoom is on, the same pictures the page wants;
     // the thumbnail and strip stay on the full pictures.
     let panel = page
@@ -292,50 +349,64 @@ fn row(
         .flex_1()
         .min_w_0()
         .gap_0p5()
+        // The name and description keep shadcn's 20 px and 16 px lines, so a row stays tight.
         .child(labelled(
-            div().text_sm(),
+            div().text_sm().line_height(px(20.)),
             ids::graphics_module(name),
             row.label.clone(),
         ))
         .children(description)
+        .child(learn_more)
         .children(preset)
         .children(toggle);
     let controls = h_flex().flex_none().gap_2().children(reset).child(control);
-    // On a narrow page (the one without the rail) the thumbnail sits above the text and the
-    // control under it, since a segmented control beside a wrapped description would not fit;
-    // otherwise all three sit side by side.
+    // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
+    // the control drops under them, since a segmented control beside a wrapped description
+    // would not fit; otherwise it sits on the right.
+    let lead = h_flex()
+        .min_w_0()
+        .items_start()
+        .gap_3()
+        .children(thumb)
+        .child(text);
     let line = if narrow {
         v_flex()
             .items_start()
             .gap_2()
-            .children(thumb)
-            .child(text)
+            .child(lead.w_full())
             .child(controls)
     } else {
         h_flex()
             .justify_between()
             .gap_4()
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .items_start()
-                    .gap_3()
-                    .children(thumb)
-                    .child(text),
-            )
+            .child(lead.flex_1())
             .child(controls)
     };
+    // A changed row's line is tinted with a 3 px accent bar down its left edge, drawn as an
+    // overlay so the row's single border colour stays free for the rule above it. The open
+    // panel runs the card's full width under the line, outside the tint.
+    let bar = row.changed.then(|| {
+        div()
+            .id(ids::graphics_row_bar(name))
+            .test_support()
+            .absolute()
+            .left_0()
+            .top_0()
+            .bottom_0()
+            .w(px(3.))
+            .bg(tint)
+    });
+    let line = div()
+        .relative()
+        .px_4()
+        .py_3()
+        .when(row.changed, |this| this.bg(tint.opacity(0.07)))
+        .children(bar)
+        .child(line);
     v_flex()
         .id(ids::graphics_row(name))
         .test_support()
-        .pl_3()
-        .border_l(px(3.))
-        .border_color(transparent_black())
-        .when(row.changed, |this| {
-            this.border_color(tint).bg(tint.opacity(0.06))
-        })
-        .gap_3()
+        .when(!first, |this| this.border_t_1().border_color(border))
         .child(line)
         .children(panel)
         .into_any_element()
@@ -360,13 +431,10 @@ fn switch(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) ->
         .into_any_element()
 }
 
-// One standalone Toggle per value in a single frame, so each is a tab stop that Enter and
+// One standalone Toggle per value in a single dark pill, so each is a tab stop that Enter and
 // Space click. A click on the checked segment reports false and changes nothing.
 fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) -> AnyElement {
-    let border = cx.theme().border;
-    let muted = cx.theme().muted_foreground;
-    let (fill, on_fill) = selected_segment(cx.theme());
-    let toggles = row.options.iter().enumerate().filter_map(|(i, option)| {
+    let toggles = row.options.iter().filter_map(|option| {
         // Segments offer only values; anything else has no segment to draw.
         let ModuleChoice::Value(value) = &option.choice else {
             return None;
@@ -381,11 +449,9 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
             .tooltip(option.label.clone())
             .checked(checked)
             .disabled(page.busy)
-            .rounded_none()
-            .px_3()
-            .text_color(muted)
-            .when(checked, |t| t.bg(fill).text_color(on_fill))
-            .when(i > 0, |t| t.border_l_1().border_color(border))
+            .h(px(26.))
+            .px(px(10.))
+            .text_size(px(13.))
             .on_click(move |&next, _, cx| {
                 if !next {
                     return;
@@ -395,15 +461,11 @@ fn segments(page: &GraphicsPage, row: &RowView, cx: &mut Context<GraphicsPage>) 
                     page.change(|c, catalog| c.set(catalog, &module, choice), cx)
                 });
             });
-        Some(toggle)
+        Some(pill::segment_look(toggle, checked, cx))
     });
-    h_flex()
+    pill::row_track(cx)
         .id(ids::graphics_segments(&row.module))
         .test_support()
-        .border_1()
-        .border_color(border)
-        .rounded(cx.theme().radius)
-        .overflow_hidden()
         .children(toggles)
         .into_any_element()
 }

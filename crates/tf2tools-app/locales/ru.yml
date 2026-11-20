@@ -2955,7 +2955,6 @@ install_parts:
   maps_skipped: "В %{name} несколько карт. Выберите, какие установить. Часть дополнительных файлов из этой загрузки пропущена."
 
 graphics:
-  subtitle: "Настройки графики и игры из mastercomfig"
   no_tf2: "Укажите папку TF2 в настройках, чтобы пользоваться mastercomfig."
   running: "TF2 запущена. Изменения вступят в силу при её следующем запуске."
   status:
@@ -2997,6 +2996,7 @@ graphics:
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Сбросить"
+    learn_more: "Подробнее"
   pictures:
     show: "Показать изображения"
     hide: "Скрыть изображения"
