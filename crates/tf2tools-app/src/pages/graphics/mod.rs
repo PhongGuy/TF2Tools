@@ -980,6 +980,7 @@ impl GraphicsPage {
     fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let (accent, fill, card) = (theme.sidebar_primary, theme.background, theme.group_box);
         let preset = preset_label(preset);
         let catalog = self.catalog.as_deref();
         let list = view::changes(catalog, &self.shown_against());
@@ -988,7 +989,8 @@ impl GraphicsPage {
                 div()
                     .text_sm()
                     .text_color(muted)
-                    .p_3()
+                    .py_3()
+                    .px_4()
                     .border_1()
                     .border_dashed()
                     .border_color(border)
@@ -1027,6 +1029,7 @@ impl GraphicsPage {
                     Button::new(ids::graphics_change_undo(&change.module))
                         .ghost()
                         .xsmall()
+                        .rounded(px(999.))
                         .icon(IconName::X)
                         .named(tr!("graphics.changes.undo", name = change.label, was = was))
                         .disabled(self.busy)
@@ -1036,50 +1039,51 @@ impl GraphicsPage {
                     .id(ids::graphics_change(&change.module))
                     .aria_label(sentence)
                     .test_support()
-                    .gap_1()
-                    .pl_2()
+                    .h(px(28.))
+                    .gap(px(6.))
+                    .pl(px(10.))
                     .pr_1()
-                    .py_0p5()
                     .text_sm()
                     .border_1()
-                    .border_color(border)
-                    .rounded(radius)
-                    .child(change.label)
+                    .border_color(accent)
+                    .bg(fill)
+                    .rounded_full()
+                    .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
                     .children(
-                        change
-                            .was
-                            .map(|was| div().text_color(muted).child(format!("{was} →"))),
+                        change.was.map(|was| {
+                            h_flex().gap(px(6.)).text_color(muted).child(was).child("→")
+                        }),
                     )
-                    .child(div().font_weight(FontWeight::MEDIUM).child(change.now))
+                    .child(change.now)
                     .children(undo)
                     .into_any_element()
             })
             .collect();
         let reset_all = editable.then(|| {
             Button::new(ids::GRAPHICS_RESET_ALL)
-                .outline()
+                .ghost()
                 .small()
                 .label(tr!("graphics.changes.reset_all"))
                 .disabled(self.busy)
                 .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
         });
-        v_flex()
+        // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
+        h_flex()
             .id(ids::GRAPHICS_CHANGES)
             .aria_label(title.clone())
             .test_support()
-            .gap_3()
-            .p_3()
+            .flex_wrap()
+            .gap_2()
+            .py_3()
+            .px_4()
+            .bg(card)
             .border_1()
-            .border_color(border)
+            .border_color(accent)
             .rounded(radius)
-            .child(
-                h_flex()
-                    .justify_between()
-                    .gap_4()
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-                    .children(reset_all),
-            )
-            .child(h_flex().flex_wrap().gap_2().children(chips))
+            .child(div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title))
+            .children(chips)
+            .child(div().flex_1())
+            .children(reset_all)
             .into_any_element()
     }
 }
