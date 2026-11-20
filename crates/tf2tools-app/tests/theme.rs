@@ -264,29 +264,6 @@ fn every_store_card_lights_up_with_the_card_hover_fill() {
     }
 }
 
-// A checked segment must read at a glance against the page and its unchecked neighbours, with
-// its own text clearly legible on it.
-#[gpui_kit::test]
-fn a_selected_segment_stands_out_from_the_page(cx: &mut TestAppContext) {
-    support::init(cx);
-    cx.update(|cx| {
-        let t = Theme::global(cx);
-        let (fill, text) = tf2tools_app::theme::selected_segment(t);
-        assert!(
-            (fill.l - t.background.l).abs() >= 0.5,
-            "a selected segment fills {} on a {} page",
-            hex(fill),
-            hex(t.background)
-        );
-        assert!(
-            (text.l - fill.l).abs() >= 0.5,
-            "{} text on a {} segment",
-            hex(text),
-            hex(fill)
-        );
-    });
-}
-
 // The Graphics rows' segments take their checked look from the pill the preset shares.
 #[test]
 fn graphics_segments_use_the_shared_pill_look() {

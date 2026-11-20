@@ -218,13 +218,19 @@ fn strip(
             Some(px(5.)),
             cx,
         );
+        // A tag naming the card's own label would read "Medium Medium"; it says "Preset" then.
         let tag = entry.preset.then(|| {
+            let text = if entry.label == preset {
+                tr!("graphics.preset.heading")
+            } else {
+                preset.clone()
+            };
             div()
                 .id(ids::graphics_strip_tag(module))
-                .aria_label(preset.clone())
+                .aria_label(text.clone())
                 .test_support()
                 .text_color(muted)
-                .child(preset.clone())
+                .child(text)
         });
         let (target, value) = (module.to_owned(), entry.value.clone());
         Button::new(ids::graphics_strip_picture(module, &entry.value))
