@@ -1527,28 +1527,64 @@ pub(crate) fn rounded_picture(
     radius: Option<Pixels>,
     cx: &App,
 ) -> ObservedElement<Stateful<Div>> {
-    let area = picture_area(area_id, radius, cx.theme().muted).test_support();
+    picture(area_id, image_id, key, radius.map(Rounding::All), cx)
+}
+
+/// `hud_picture` with only its top corners rounded by `radius`, to sit at the top of a card.
+pub(crate) fn top_rounded_picture(
+    area_id: ElementId,
+    image_id: ElementId,
+    key: Option<&ImageKey>,
+    radius: Pixels,
+    cx: &App,
+) -> ObservedElement<Stateful<Div>> {
+    picture(area_id, image_id, key, Some(Rounding::Top(radius)), cx)
+}
+
+/// Which corners of a picture are rounded, and by how much.
+#[derive(Debug, Clone, Copy)]
+enum Rounding {
+    All(Pixels),
+    Top(Pixels),
+}
+
+fn round<E: gpui_kit::Styled>(element: E, rounding: Option<Rounding>) -> E {
+    match rounding {
+        Some(Rounding::All(r)) => element.rounded(r),
+        Some(Rounding::Top(r)) => element.rounded_t(r),
+        None => element,
+    }
+}
+
+fn picture(
+    area_id: ElementId,
+    image_id: ElementId,
+    key: Option<&ImageKey>,
+    rounding: Option<Rounding>,
+    cx: &App,
+) -> ObservedElement<Stateful<Div>> {
+    let area = picture_area(area_id, rounding, cx.theme().muted).test_support();
     let ready = key
         .zip(RemoteImages::global(cx))
         .map(|(key, images)| images.read(cx).image(key));
     match ready {
         Some(RemoteImage::Ready(image)) => {
-            area.child(picture_image(image, image_id, radius).test_support())
+            area.child(picture_image(image, image_id, rounding).test_support())
         }
         _ => area,
     }
 }
 
-/// The picture's 16:9 box in `fill`, rounded by `radius`.
-fn picture_area(area_id: ElementId, radius: Option<Pixels>, fill: Hsla) -> Stateful<Div> {
-    div()
+/// The picture's 16:9 box in `fill`, rounded by `rounding`.
+fn picture_area(area_id: ElementId, rounding: Option<Rounding>, fill: Hsla) -> Stateful<Div> {
+    let area = div()
         .id(area_id)
         .flex_none()
         .w_full()
         .aspect_ratio(16. / 9.)
         .overflow_hidden()
-        .bg(fill)
-        .when_some(radius, |area, r| area.rounded(r))
+        .bg(fill);
+    round(area, rounding)
 }
 
 /// The image covering its box. The radius goes on the image itself, since a parent's
@@ -1556,13 +1592,13 @@ fn picture_area(area_id: ElementId, radius: Option<Pixels>, fill: Hsla) -> State
 fn picture_image(
     image: impl Into<ImageSource>,
     image_id: ElementId,
-    radius: Option<Pixels>,
+    rounding: Option<Rounding>,
 ) -> Stateful<Img> {
-    img(image)
-        .size_full()
-        .object_fit(ObjectFit::Cover)
-        .when_some(radius, |image, r| image.rounded(r))
-        .id(image_id)
+    round(
+        img(image).size_full().object_fit(ObjectFit::Cover),
+        rounding,
+    )
+    .id(image_id)
 }
 
 /// The HUD's name, truncated, semibold.
@@ -2208,14 +2244,15 @@ pub(crate) fn install_job(
 
 #[cfg(test)]
 mod tests {
-    use super::{picture_area, picture_image};
+    use super::{Rounding, picture_area, picture_image};
     use gpui_kit::{Styled as _, px, transparent_black};
 
     #[test]
     fn a_rounded_picture_rounds_its_area_and_its_image() {
         let r = Some(px(7.).into());
-        let mut area = picture_area("area".into(), Some(px(7.)), transparent_black());
-        let mut image = picture_image("x.png", "image".into(), Some(px(7.)));
+        let all = Some(Rounding::All(px(7.)));
+        let mut area = picture_area("area".into(), all, transparent_black());
+        let mut image = picture_image("x.png", "image".into(), all);
         for corners in [&area.style().corner_radii, &image.style().corner_radii] {
             assert_eq!(
                 (corners.top_left, corners.top_right),
@@ -2226,5 +2263,17 @@ mod tests {
         }
         let mut square = picture_image("x.png", "image".into(), None);
         assert_eq!(square.style().corner_radii.top_left, None);
+    }
+
+    #[test]
+    fn a_top_rounded_picture_keeps_its_bottom_corners_square() {
+        let r = Some(px(12.).into());
+        let top = Some(Rounding::Top(px(12.)));
+        let mut area = picture_area("area".into(), top, transparent_black());
+        let mut image = picture_image("x.png", "image".into(), top);
+        for corners in [&area.style().corner_radii, &image.style().corner_radii] {
+            assert_eq!((corners.top_left, corners.top_right), (r, r));
+            assert_eq!((corners.bottom_left, corners.bottom_right), (None, None));
+        }
     }
 }

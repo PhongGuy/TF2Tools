@@ -46,7 +46,7 @@ use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_apply_profile, describe_profile};
-use crate::pages::huds::{card_images, hud_picture};
+use crate::pages::huds::{card_images, top_rounded_picture};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -68,6 +68,9 @@ const MIN_CARD_WIDTH: Pixels = px(250.);
 // The lead line's flex basis; narrower than this beside New profile, the button wraps under it.
 const LEAD_BASIS: Pixels = px(280.);
 const SLOT_ICON: Pixels = px(14.);
+// The mock's card radius; the picture rounds its top corners to match, since gpui never
+// clips a child to its parent's rounding.
+const CARD_RADIUS: Pixels = px(12.);
 // The Apply summary dialog and its rows' label column.
 const SUMMARY_WIDTH: Pixels = px(520.);
 const SUMMARY_LABEL_WIDTH: Pixels = px(96.);
@@ -1276,10 +1279,11 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
                 .hud_images
                 .get(hud.folder_name())
                 .map(|url| ImageKey::card(url));
-            hud_picture(
+            top_rounded_picture(
                 ids::profile_card_picture(id),
                 ids::profile_card_image(id),
                 key.as_ref(),
+                CARD_RADIUS,
                 cx,
             )
             .into_any_element()
@@ -1293,6 +1297,7 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
                 .justify_center()
                 .w_full()
                 .aspect_ratio(16. / 9.)
+                .rounded_t(CARD_RADIUS)
                 .bg(theme.muted);
             match Mode::of(profile.hud()) {
                 Mode::None => {
@@ -1310,7 +1315,7 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
     // The pill is drawn light on dark, the theme's foreground under its background.
     let pill = active.then(|| {
         let text = tr!("profiles.badge.active");
-        div()
+        h_flex()
             .id(ids::profile_card_active(id))
             .aria_label(text.clone())
             .test_support()
@@ -1322,14 +1327,22 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
             .rounded_full()
             .bg(theme.foreground)
             .text_color(theme.background)
+            .gap(px(6.))
             .text_xs()
             .font_weight(FontWeight::SEMIBOLD)
+            .child(
+                Icon::new(IconName::Check)
+                    .with_size(Size::Size(px(12.)))
+                    .text_color(theme.background),
+            )
             .child(text)
     });
     div()
         .relative()
         .flex_none()
         .w_full()
+        .border_b_1()
+        .border_color(theme.border)
         .child(picture)
         .children(pill)
         .into_any_element()
@@ -1352,7 +1365,7 @@ fn card_line(id: &ProfileId, slot: SlotKind, text: String, left: bool, cx: &App)
         .h(px(20.))
         .gap_2()
         .min_w_0()
-        .text_sm()
+        .text_size(px(13.))
         .when(left, |line| {
             line.italic().text_color(theme.muted_foreground)
         })
@@ -1382,7 +1395,6 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
         let (page, id) = (ctx.page.clone(), id.clone());
         Button::new(ids::profile_card_apply(&id))
             .primary()
-            .flex_1()
             .label(tr!("profiles.button.apply"))
             .loading(ctx.activating.as_ref() == Some(&id))
             .disabled(!has_tf2 || busy)
@@ -1414,7 +1426,7 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
         .flex()
         .flex_col()
         .overflow_hidden()
-        .rounded(px(12.))
+        .rounded(CARD_RADIUS)
         .border_color(if active {
             theme.foreground
         } else {
@@ -1444,7 +1456,6 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
                     h_flex().mt_auto().gap_2().children(apply).child(
                         Button::new(ids::profile_card_edit(id))
                             .outline()
-                            .flex_1()
                             .label(tr!("profiles.button.edit"))
                             .disabled(busy)
                             .on_click(on_edit),
