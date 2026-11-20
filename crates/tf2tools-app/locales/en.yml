@@ -617,10 +617,9 @@ store_grid:
     filters: "Try adjusting your search or filter criteria."
 
 profiles:
-  crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
   weapons: { one: "%{count} weapon", other: "%{count} weapons" }
-  search: "Search profiles..."
   not_applied: "Changes not applied yet"
+  lead: "A profile switches your whole setup at once: HUD, sounds, crosshairs, graphics and add-ons. A new one starts as a copy of what you have now."
   default_name: "Profile %{n}"
   no_tf2: "Set the TF2 folder in Settings to activate profiles."
   part:
@@ -629,22 +628,16 @@ profiles:
     addons: "Add-ons"
     crosshairs: "Crosshairs"
     item: "Item"
-  heading:
-    active: "Active Profile"
-    library: "Your Profiles"
   badge:
     active: "Active"
   button:
     activate: "Activate"
     activating: "Activating..."
-    edit: "Edit profile"
+    apply: "Apply"
+    edit: "Edit"
     delete: "Delete profile"
     new: "New profile"
-    start_empty: "Start empty"
-    more_ways: "More ways to make a profile"
   card:
-    empty: "Empty profile"
-    empty_vanilla: "Empty profile (vanilla)"
     leave: "Left as is"
     hud_none: "TF2's own HUD"
     sounds: "Hit: %{hit}, kill: %{kill}"
@@ -682,11 +675,6 @@ profiles:
   empty:
     title: "No profiles yet"
     body: "Save your current setup as a profile to quickly switch between configurations."
-    no_match_title: "No profiles found"
-    no_match_body: "Try a different search term."
-  no_active:
-    title: "No active profile"
-    body: "Activate a profile to apply a saved collection of customizations."
   missing:
     title: "Missing Items"
     body: "Some items in \"%{name}\" are no longer in your library."
@@ -717,7 +705,6 @@ profiles:
       no_match: "No matches"
   toast:
     created_from_setup: "Profile created from your current setup"
-    created_empty: "Empty profile created"
     deleted: "Profile deleted"
     activated: "Profile \"%{name}\" activated"
     applied: "Profile \"%{name}\" applied"
@@ -730,7 +717,6 @@ profiles:
     missing: "Some items are missing"
   activity:
     saved_current: "Saved current setup as profile: %{name}"
-    created: "Created profile: %{name}"
     deleted: "Deleted profile: %{name}"
     failed: "Failed to activate profile: %{name}"
     activated: "Activated profile: %{name}"

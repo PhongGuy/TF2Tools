@@ -586,7 +586,7 @@ fn a_profile_asks_and_cancel_changes_nothing(cx: &mut TestAppContext) {
     let comp = hud_profile(&s, &hud);
     place(&env, "manual");
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
     wait_dialog(cx, &s);
     assert!(
         support::label_of(cx, s.win, ids::EXTERNAL_HUDS_DESCRIPTION)
@@ -610,7 +610,7 @@ fn a_profile_keeps_a_copy_then_applies(cx: &mut TestAppContext) {
     let comp = hud_profile(&s, &hud);
     place(&env, "manual");
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
     wait_dialog(cx, &s);
     support::click_id(cx, s.win, ids::EXTERNAL_HUDS_KEEP);
     let toast = wait_toast(cx, &s);
@@ -637,7 +637,7 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
     s.services.library.delete_hud(gone.id()).unwrap();
     place(&env, "manual");
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
     });

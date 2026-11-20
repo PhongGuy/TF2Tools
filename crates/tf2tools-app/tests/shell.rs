@@ -82,8 +82,8 @@ fn the_layout_matches_v5_sizes(cx: &mut TestAppContext) {
     assert_eq!(page.origin.y, HEADER_HEIGHT);
     assert_eq!(page.size.width, px(1200.) - SIDEBAR_WIDTH);
     assert_eq!(page.size.height, px(900.) - HEADER_HEIGHT);
-    let search = support::bounds_of(cx, s.win, ids::PROFILES_SEARCH).unwrap();
-    assert!(search.origin.x >= SIDEBAR_WIDTH + CONTENT_PADDING);
+    let lead = support::bounds_of(cx, s.win, ids::PROFILES_LEAD).unwrap();
+    assert!(lead.origin.x >= SIDEBAR_WIDTH + CONTENT_PADDING);
 }
 
 #[gpui_kit::test]

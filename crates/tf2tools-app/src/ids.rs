@@ -912,38 +912,16 @@ pub const GRAPHICS_RAIL: &str = "graphics-rail";
 pub const PROFILES_LEAD: &str = "profiles-lead";
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
-/// The Active Profile card.
-pub const PROFILES_ACTIVE: &str = "profiles-active";
-/// The active profile's name.
-pub const PROFILES_ACTIVE_NAME: &str = "profiles-active-name";
-/// The Active Profile card's "Active" badge.
-pub const PROFILES_ACTIVE_BADGE: &str = "profiles-active-badge";
-/// The active profile's HUD badge.
-pub const PROFILES_ACTIVE_HUD: &str = "profiles-active-hud";
-/// The active profile's hitsound badge.
-pub const PROFILES_ACTIVE_HITSOUND: &str = "profiles-active-hitsound";
-/// The active profile's killsound badge.
-pub const PROFILES_ACTIVE_KILLSOUND: &str = "profiles-active-killsound";
-/// The active profile's crosshair count badge.
-pub const PROFILES_ACTIVE_CROSSHAIRS: &str = "profiles-active-crosshairs";
-/// "Empty profile" on the Active Profile card.
-pub const PROFILES_ACTIVE_EMPTY: &str = "profiles-active-empty";
-/// The card shown when no profile is active.
-pub const PROFILES_NO_ACTIVE: &str = "profiles-no-active";
 /// The Profiles page's card grid.
 pub const PROFILES_GRID: &str = "profiles-grid";
-/// The box the Profiles page's grid fills, under the "Your Profiles" row.
+/// The box the Profiles page's grid fills, under the lead row.
 pub const PROFILES_LIBRARY: &str = "profiles-library";
 /// The scrolling list of missing items in the profile apply dialog.
 pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
 /// The scrollbar beside the Missing Items list.
 pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
-/// The profile search input.
-pub const PROFILES_SEARCH: &str = "profiles-search";
 /// The empty state shown when there are no profiles.
 pub const PROFILES_EMPTY: &str = "profiles-empty";
-/// Shown when the search matches no profile.
-pub const PROFILES_NO_MATCH: &str = "profiles-no-match";
 /// The Missing Items dialog.
 pub const PROFILES_MISSING_DIALOG: &str = "profiles-missing-dialog";
 /// The Missing Items dialog's title, "Missing Items".
@@ -956,16 +934,6 @@ pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
 pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
 /// The New profile main button, which saves the current setup as a new profile.
 pub const PROFILES_NEW: &str = "profiles-new";
-/// The New split button's wrapper; the caret inside it is the kit's fixed "popup" id.
-pub const PROFILES_NEW_MENU: &str = "profiles-new-menu";
-/// The New button and its caret, the kit's split button inside `PROFILES_NEW_MENU`.
-pub const PROFILES_NEW_SPLIT: &str = "profiles-new-split";
-/// The New menu's "Start empty" item.
-pub const PROFILES_NEW_EMPTY: &str = "profiles-new-empty";
-/// The empty page's New button.
-pub const PROFILES_EMPTY_NEW: &str = "profiles-empty-new";
-/// The empty page's "Start empty" button.
-pub const PROFILES_EMPTY_START_EMPTY: &str = "profiles-empty-start-empty";
 /// The profile editor's root.
 pub const PROFILE_EDITOR: &str = "profile-editor";
 /// The editor's Back button, which returns to the grid.
@@ -1340,15 +1308,6 @@ pub fn addon_busy(name: &AddonName) -> ElementId {
 // The kinds of the Profiles page's per-card ids, each keyed by the profile id, and of the
 // Missing Items dialog's per-row ids, keyed by the row's index.
 const PROFILE_CARD: &str = "profile-card";
-const PROFILE_ACTIVE_BADGE: &str = "profile-active-badge";
-const PROFILE_HUD: &str = "profile-hud";
-const PROFILE_HITSOUND: &str = "profile-hitsound";
-const PROFILE_KILLSOUND: &str = "profile-killsound";
-const PROFILE_CROSSHAIRS: &str = "profile-crosshairs";
-const PROFILE_EMPTY: &str = "profile-empty";
-const PROFILE_ACTIVATE: &str = "profile-activate";
-const PROFILE_EDIT: &str = "profile-edit";
-const PROFILE_DELETE: &str = "profile-delete";
 const MISSING_ITEM: &str = "missing-item";
 const MISSING_REDOWNLOAD: &str = "missing-redownload";
 const MISSING_LOCAL: &str = "missing-local";
@@ -1391,51 +1350,6 @@ pub fn profile_card_apply(id: &ProfileId) -> ElementId {
 /// A card's Edit button: "profile-card-edit:<id>".
 pub fn profile_card_edit(id: &ProfileId) -> ElementId {
     keyed("profile-card-edit", id.as_str())
-}
-
-/// A card's "Active" badge, keyed by the profile id: "profile-active-badge:<id>".
-pub fn profile_active_badge(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_ACTIVE_BADGE, id.as_str())
-}
-
-/// A card's HUD badge, keyed by the profile id: "profile-hud:<id>".
-pub fn profile_hud(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_HUD, id.as_str())
-}
-
-/// A card's hitsound badge, keyed by the profile id: "profile-hitsound:<id>".
-pub fn profile_hitsound(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_HITSOUND, id.as_str())
-}
-
-/// A card's killsound badge, keyed by the profile id: "profile-killsound:<id>".
-pub fn profile_killsound(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_KILLSOUND, id.as_str())
-}
-
-/// A card's crosshair count badge, keyed by the profile id: "profile-crosshairs:<id>".
-pub fn profile_crosshairs(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_CROSSHAIRS, id.as_str())
-}
-
-/// A card's "Empty profile" text, keyed by the profile id: "profile-empty:<id>".
-pub fn profile_empty(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_EMPTY, id.as_str())
-}
-
-/// A card's Activate button, keyed by the profile id: "profile-activate:<id>".
-pub fn profile_activate(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_ACTIVATE, id.as_str())
-}
-
-/// A card's Edit button, keyed by the profile id: "profile-edit:<id>".
-pub fn profile_edit(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_EDIT, id.as_str())
-}
-
-/// A card's Delete button, keyed by the profile id: "profile-delete:<id>".
-pub fn profile_delete(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_DELETE, id.as_str())
 }
 
 /// An editor slot row, keyed by the slot: "profile-slot:<slot>".

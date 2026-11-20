@@ -640,10 +640,9 @@ store_grid:
     filters: "Prueba a ajustar tu búsqueda o tus filtros."
 
 profiles:
-  crosshairs: { one: "%{count} mira", other: "%{count} miras" }
   weapons: { one: "%{count} arma", other: "%{count} armas" }
-  search: "Buscar perfiles..."
   not_applied: "Cambios aún sin aplicar"
+  lead: "Un perfil cambia toda tu configuración de una vez: HUD, sonidos, miras, gráficos y add-ons. Uno nuevo empieza como copia de lo que tienes ahora."
   default_name: "Perfil %{n}"
   no_tf2: "Indica la carpeta de TF2 en Ajustes para activar perfiles."
   part:
@@ -652,22 +651,16 @@ profiles:
     addons: "Add-ons"
     crosshairs: "Miras"
     item: "Objeto"
-  heading:
-    active: "Perfil activo"
-    library: "Tus perfiles"
   badge:
     active: "Activo"
   button:
     activate: "Activar"
     activating: "Activando..."
-    edit: "Editar perfil"
+    apply: "Aplicar"
+    edit: "Editar"
     delete: "Eliminar perfil"
     new: "Nuevo perfil"
-    start_empty: "Empezar vacío"
-    more_ways: "Más formas de crear un perfil"
   card:
-    empty: "Perfil vacío"
-    empty_vanilla: "Perfil vacío (vanilla)"
     leave: "Se queda como está"
     hud_none: "El HUD propio de TF2"
     sounds: "Impacto: %{hit}, baja: %{kill}"
@@ -705,11 +698,6 @@ profiles:
   empty:
     title: "Aún no hay perfiles"
     body: "Guarda tu configuración actual como perfil para cambiar rápido entre configuraciones."
-    no_match_title: "No se encontraron perfiles"
-    no_match_body: "Prueba con otro término de búsqueda."
-  no_active:
-    title: "Ningún perfil activo"
-    body: "Activa un perfil para aplicar una colección guardada de personalizaciones."
   missing:
     title: "Objetos que faltan"
     body: "Algunos objetos de \"%{name}\" ya no están en tu biblioteca."
@@ -740,7 +728,6 @@ profiles:
       no_match: "Sin resultados"
   toast:
     created_from_setup: "Perfil creado a partir de tu configuración actual"
-    created_empty: "Perfil vacío creado"
     deleted: "Perfil eliminado"
     activated: "Perfil \"%{name}\" activado"
     applied: "Perfil \"%{name}\" aplicado"
@@ -753,7 +740,6 @@ profiles:
     missing: "Faltan algunos objetos"
   activity:
     saved_current: "Configuración actual guardada como perfil: %{name}"
-    created: "Perfil creado: %{name}"
     deleted: "Perfil eliminado: %{name}"
     failed: "No se pudo activar el perfil: %{name}"
     activated: "Perfil activado: %{name}"

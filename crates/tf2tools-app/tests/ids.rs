@@ -185,38 +185,17 @@ fn addon_ids_are_keyed_by_asset() {
 #[test]
 fn profile_ids_are_keyed_by_profile_id() {
     let id = ProfileId::new("1700000000000-ab12");
-    for (el, kind) in [
-        (ids::profile_card(&id), "profile-card"),
-        (ids::profile_active_badge(&id), "profile-active-badge"),
-        (ids::profile_hud(&id), "profile-hud"),
-        (ids::profile_hitsound(&id), "profile-hitsound"),
-        (ids::profile_killsound(&id), "profile-killsound"),
-        (ids::profile_crosshairs(&id), "profile-crosshairs"),
-        (ids::profile_empty(&id), "profile-empty"),
-        (ids::profile_activate(&id), "profile-activate"),
-        (ids::profile_edit(&id), "profile-edit"),
-        (ids::profile_delete(&id), "profile-delete"),
-    ] {
-        assert_eq!(name(el), format!("{kind}:1700000000000-ab12"));
-    }
+    assert_eq!(
+        name(ids::profile_card(&id)),
+        "profile-card:1700000000000-ab12"
+    );
     assert_eq!(name(ids::missing_item(0)), "missing-item:0");
     assert_eq!(name(ids::missing_redownload(2)), "missing-redownload:2");
     assert_eq!(name(ids::missing_local(1)), "missing-local:1");
     assert_eq!(
         [
             ids::PROFILES_NO_TF2,
-            ids::PROFILES_ACTIVE,
-            ids::PROFILES_ACTIVE_NAME,
-            ids::PROFILES_ACTIVE_BADGE,
-            ids::PROFILES_ACTIVE_HUD,
-            ids::PROFILES_ACTIVE_HITSOUND,
-            ids::PROFILES_ACTIVE_KILLSOUND,
-            ids::PROFILES_ACTIVE_CROSSHAIRS,
-            ids::PROFILES_ACTIVE_EMPTY,
-            ids::PROFILES_NO_ACTIVE,
-            ids::PROFILES_SEARCH,
             ids::PROFILES_EMPTY,
-            ids::PROFILES_NO_MATCH,
             ids::PROFILES_MISSING_DIALOG,
             ids::PROFILES_MISSING_DESCRIPTION,
             ids::PROFILES_MISSING_CANCEL,
@@ -224,18 +203,7 @@ fn profile_ids_are_keyed_by_profile_id() {
         ],
         [
             "profiles-no-tf2",
-            "profiles-active",
-            "profiles-active-name",
-            "profiles-active-badge",
-            "profiles-active-hud",
-            "profiles-active-hitsound",
-            "profiles-active-killsound",
-            "profiles-active-crosshairs",
-            "profiles-active-empty",
-            "profiles-no-active",
-            "profiles-search",
             "profiles-empty",
-            "profiles-no-match",
             "profiles-missing-dialog",
             "profiles-missing-description",
             "profiles-missing-cancel",
@@ -705,11 +673,6 @@ fn profile_editor_ids_are_stable() {
     assert_eq!(
         [
             ids::PROFILES_NEW,
-            ids::PROFILES_NEW_MENU,
-            ids::PROFILES_NEW_SPLIT,
-            ids::PROFILES_NEW_EMPTY,
-            ids::PROFILES_EMPTY_NEW,
-            ids::PROFILES_EMPTY_START_EMPTY,
             ids::PROFILE_EDITOR,
             ids::PROFILE_EDITOR_BACK,
             ids::PROFILE_EDITOR_NAME,
@@ -726,11 +689,6 @@ fn profile_editor_ids_are_stable() {
         ],
         [
             "profiles-new",
-            "profiles-new-menu",
-            "profiles-new-split",
-            "profiles-new-empty",
-            "profiles-empty-new",
-            "profiles-empty-start-empty",
             "profile-editor",
             "profile-editor-back",
             "profile-editor-name",

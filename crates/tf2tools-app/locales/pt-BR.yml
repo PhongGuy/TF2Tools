@@ -641,10 +641,9 @@ store_grid:
     filters: "Tente ajustar a busca ou os filtros."
 
 profiles:
-  crosshairs: { one: "%{count} mira", other: "%{count} miras" }
   weapons: { one: "%{count} arma", other: "%{count} armas" }
-  search: "Buscar perfis..."
   not_applied: "Alterações ainda não aplicadas"
+  lead: "Um perfil troca toda a sua configuração de uma vez: HUD, sons, miras, gráficos e add-ons. Um novo começa como cópia do que você tem agora."
   default_name: "Perfil %{n}"
   no_tf2: "Defina a pasta do TF2 nas configurações para ativar perfis."
   part:
@@ -653,22 +652,16 @@ profiles:
     addons: "Add-ons"
     crosshairs: "Miras"
     item: "Item"
-  heading:
-    active: "Perfil ativo"
-    library: "Seus perfis"
   badge:
     active: "Ativo"
   button:
     activate: "Ativar"
     activating: "Ativando..."
-    edit: "Editar perfil"
+    apply: "Aplicar"
+    edit: "Editar"
     delete: "Excluir perfil"
     new: "Novo perfil"
-    start_empty: "Começar vazio"
-    more_ways: "Outras formas de criar um perfil"
   card:
-    empty: "Perfil vazio"
-    empty_vanilla: "Perfil vazio (vanilla)"
     leave: "Fica como está"
     hud_none: "O HUD próprio do TF2"
     sounds: "Acerto: %{hit}, abate: %{kill}"
@@ -706,11 +699,6 @@ profiles:
   empty:
     title: "Nenhum perfil ainda"
     body: "Salve sua configuração atual como perfil para alternar rapidamente entre configurações."
-    no_match_title: "Nenhum perfil encontrado"
-    no_match_body: "Tente outro termo de busca."
-  no_active:
-    title: "Nenhum perfil ativo"
-    body: "Ative um perfil para aplicar uma coleção salva de personalizações."
   missing:
     title: "Itens ausentes"
     body: "Alguns itens de \"%{name}\" não estão mais na sua biblioteca."
@@ -741,7 +729,6 @@ profiles:
       no_match: "Nenhum resultado"
   toast:
     created_from_setup: "Perfil criado a partir da sua configuração atual"
-    created_empty: "Perfil vazio criado"
     deleted: "Perfil excluído"
     activated: "Perfil \"%{name}\" ativado"
     applied: "Perfil \"%{name}\" aplicado"
@@ -754,7 +741,6 @@ profiles:
     missing: "Alguns itens estão ausentes"
   activity:
     saved_current: "Configuração atual salva como perfil: %{name}"
-    created: "Perfil criado: %{name}"
     deleted: "Perfil excluído: %{name}"
     failed: "Não foi possível ativar o perfil: %{name}"
     activated: "Perfil ativado: %{name}"

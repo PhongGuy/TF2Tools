@@ -639,10 +639,9 @@ store_grid:
     filters: "试试调整搜索或筛选条件。"
 
 profiles:
-  crosshairs: { other: "%{count} 个准星" }
   weapons: { other: "%{count} 件武器" }
-  search: "搜索配置文件…"
   not_applied: "更改尚未应用"
+  lead: "配置文件可一次切换整套设置：HUD、音效、准星、画面和插件。新建的配置文件会复制当前的设置。"
   default_name: "配置文件 %{n}"
   no_tf2: "请在设置中指定 TF2 文件夹以激活配置文件。"
   part:
@@ -651,22 +650,16 @@ profiles:
     addons: "插件"
     crosshairs: "准星"
     item: "物品"
-  heading:
-    active: "当前配置文件"
-    library: "我的配置文件"
   badge:
     active: "使用中"
   button:
     activate: "激活"
     activating: "正在激活…"
-    edit: "编辑配置文件"
+    apply: "应用"
+    edit: "编辑"
     delete: "删除配置文件"
     new: "新建配置文件"
-    start_empty: "从空白开始"
-    more_ways: "更多创建配置文件的方式"
   card:
-    empty: "空配置文件"
-    empty_vanilla: "空配置文件（原版）"
     leave: "保持不变"
     hud_none: "TF2 自带 HUD"
     sounds: "命中：%{hit}，击杀：%{kill}"
@@ -704,11 +697,6 @@ profiles:
   empty:
     title: "还没有配置文件"
     body: "将当前设置保存为配置文件，即可在不同配置之间快速切换。"
-    no_match_title: "未找到配置文件"
-    no_match_body: "试试其他搜索词。"
-  no_active:
-    title: "没有使用中的配置文件"
-    body: "激活一个配置文件，即可应用已保存的一组自定义内容。"
   missing:
     title: "缺失的物品"
     body: "“%{name}”中的部分物品已不在库中。"
@@ -739,7 +727,6 @@ profiles:
       no_match: "无匹配项"
   toast:
     created_from_setup: "已根据当前设置创建配置文件"
-    created_empty: "已创建空配置文件"
     deleted: "配置文件已删除"
     activated: "配置文件“%{name}”已激活"
     applied: "配置文件“%{name}”已应用"
@@ -752,7 +739,6 @@ profiles:
     missing: "部分物品缺失"
   activity:
     saved_current: "已将当前设置保存为配置文件：%{name}"
-    created: "已创建配置文件：%{name}"
     deleted: "已删除配置文件：%{name}"
     failed: "激活配置文件失败：%{name}"
     activated: "已激活配置文件：%{name}"

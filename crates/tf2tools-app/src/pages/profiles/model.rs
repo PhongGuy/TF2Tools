@@ -14,11 +14,6 @@ pub fn not_applied() -> SharedString {
     tr!("profiles.not_applied")
 }
 
-/// The crosshair badge: "1 crosshair", "N crosshairs".
-pub fn crosshair_count(n: usize) -> String {
-    crate::i18n::plural("profiles.crosshairs", u64::try_from(n).unwrap_or(u64::MAX)).to_string()
-}
-
 /// The HUD the profile sets, if its HUD slot is Set.
 pub(crate) fn hud_item(profile: &Profile) -> Option<&ProfileItem> {
     profile.hud().as_set()

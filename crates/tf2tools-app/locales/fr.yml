@@ -642,10 +642,9 @@ store_grid:
     filters: "Essayez de modifier votre recherche ou vos filtres."
 
 profiles:
-  crosshairs: { one: "%{count} viseur", other: "%{count} viseurs" }
   weapons: { one: "%{count} arme", other: "%{count} armes" }
-  search: "Rechercher des profils..."
   not_applied: "Modifications pas encore appliquées"
+  lead: "Un profil change toute votre configuration d'un coup\u00A0: HUD, sons, viseurs, graphismes et add-ons. Un nouveau profil part d'une copie de ce que vous avez maintenant."
   default_name: "Profil %{n}"
   no_tf2: "Indiquez le dossier de TF2 dans les Paramètres pour activer des profils."
   part:
@@ -654,22 +653,16 @@ profiles:
     addons: "Add-ons"
     crosshairs: "Viseurs"
     item: "Objet"
-  heading:
-    active: "Profil actif"
-    library: "Vos profils"
   badge:
     active: "Actif"
   button:
     activate: "Activer"
     activating: "Activation..."
-    edit: "Modifier le profil"
+    apply: "Appliquer"
+    edit: "Modifier"
     delete: "Supprimer le profil"
     new: "Nouveau profil"
-    start_empty: "Partir de zéro"
-    more_ways: "Autres façons de créer un profil"
   card:
-    empty: "Profil vide"
-    empty_vanilla: "Profil vide (jeu de base)"
     leave: "Laissé tel quel"
     hud_none: "Le HUD de TF2"
     sounds: "Touche\u00A0: %{hit}, élimination\u00A0: %{kill}"
@@ -707,11 +700,6 @@ profiles:
   empty:
     title: "Aucun profil pour l'instant"
     body: "Enregistrez votre configuration actuelle comme profil pour passer vite d'une configuration à l'autre."
-    no_match_title: "Aucun profil trouvé"
-    no_match_body: "Essayez un autre terme de recherche."
-  no_active:
-    title: "Aucun profil actif"
-    body: "Activez un profil pour appliquer un ensemble enregistré de personnalisations."
   missing:
     title: "Objets manquants"
     body: "Certains objets de «\u00A0%{name}\u00A0» ne sont plus dans votre bibliothèque."
@@ -742,7 +730,6 @@ profiles:
       no_match: "Aucun résultat"
   toast:
     created_from_setup: "Profil créé à partir de votre configuration actuelle"
-    created_empty: "Profil vide créé"
     deleted: "Profil supprimé"
     activated: "Profil «\u00A0%{name}\u00A0» activé"
     applied: "Profil «\u00A0%{name}\u00A0» appliqué"
@@ -755,7 +742,6 @@ profiles:
     missing: "Certains objets sont manquants"
   activity:
     saved_current: "Configuration actuelle enregistrée comme profil\u00A0: %{name}"
-    created: "Profil créé\u00A0: %{name}"
     deleted: "Profil supprimé\u00A0: %{name}"
     failed: "Échec de l'activation du profil\u00A0: %{name}"
     activated: "Profil activé\u00A0: %{name}"

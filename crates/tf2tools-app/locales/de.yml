@@ -640,10 +640,9 @@ store_grid:
     filters: "Versuche, deine Suche oder Filter anzupassen."
 
 profiles:
-  crosshairs: { one: "%{count} Fadenkreuz", other: "%{count} Fadenkreuze" }
   weapons: { one: "%{count} Waffe", other: "%{count} Waffen" }
-  search: "Profile suchen..."
   not_applied: "Änderungen noch nicht angewendet"
+  lead: "Ein Profil wechselt dein ganzes Setup auf einmal: HUD, Sounds, Fadenkreuze, Grafik und Add-ons. Ein neues startet als Kopie dessen, was du gerade hast."
   default_name: "Profil %{n}"
   no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um Profile zu aktivieren."
   part:
@@ -652,22 +651,16 @@ profiles:
     addons: "Add-ons"
     crosshairs: "Fadenkreuze"
     item: "Eintrag"
-  heading:
-    active: "Aktives Profil"
-    library: "Deine Profile"
   badge:
     active: "Aktiv"
   button:
     activate: "Aktivieren"
     activating: "Wird aktiviert..."
-    edit: "Profil bearbeiten"
+    apply: "Anwenden"
+    edit: "Bearbeiten"
     delete: "Profil löschen"
     new: "Neues Profil"
-    start_empty: "Leer beginnen"
-    more_ways: "Weitere Wege, ein Profil zu erstellen"
   card:
-    empty: "Leeres Profil"
-    empty_vanilla: "Leeres Profil (Vanilla)"
     leave: "Bleibt, wie es ist"
     hud_none: "Das HUD von TF2"
     sounds: "Treffer: %{hit}, Kill: %{kill}"
@@ -705,11 +698,6 @@ profiles:
   empty:
     title: "Noch keine Profile"
     body: "Speichere dein aktuelles Setup als Profil, um schnell zwischen Konfigurationen zu wechseln."
-    no_match_title: "Keine Profile gefunden"
-    no_match_body: "Probiere einen anderen Suchbegriff."
-  no_active:
-    title: "Kein aktives Profil"
-    body: "Aktiviere ein Profil, um eine gespeicherte Sammlung von Anpassungen anzuwenden."
   missing:
     title: "Fehlende Einträge"
     body: "Einige Einträge in „%{name}“ sind nicht mehr in deiner Bibliothek."
@@ -740,7 +728,6 @@ profiles:
       no_match: "Keine Treffer"
   toast:
     created_from_setup: "Profil aus deinem aktuellen Setup erstellt"
-    created_empty: "Leeres Profil erstellt"
     deleted: "Profil gelöscht"
     activated: "Profil „%{name}“ aktiviert"
     applied: "Profil „%{name}“ angewendet"
@@ -753,7 +740,6 @@ profiles:
     missing: "Einige Einträge fehlen"
   activity:
     saved_current: "Aktuelles Setup als Profil gespeichert: %{name}"
-    created: "Profil erstellt: %{name}"
     deleted: "Profil gelöscht: %{name}"
     failed: "Profil konnte nicht aktiviert werden: %{name}"
     activated: "Profil aktiviert: %{name}"

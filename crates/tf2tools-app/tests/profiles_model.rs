@@ -2,8 +2,8 @@ use crate::support;
 
 use gpui_kit::{SharedString, TestAppContext};
 use tf2tools_app::pages::profiles::model::{
-    activated_description, crosshair_count, failed_description, kept_parts, kind_label,
-    load_closes_editor, matches, redownload_target, report_details, step_label, success_title,
+    activated_description, failed_description, kept_parts, kind_label, load_closes_editor, matches,
+    redownload_target, report_details, step_label, success_title,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
@@ -17,12 +17,6 @@ fn gb(id: u64) -> Provenance {
         gb_id: GbId::new(id),
         author: String::new(),
     }
-}
-
-#[test]
-fn the_crosshair_badge_counts() {
-    assert_eq!(crosshair_count(1), "1 crosshair");
-    assert_eq!(crosshair_count(3), "3 crosshairs");
 }
 
 #[test]
