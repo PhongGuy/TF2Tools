@@ -98,12 +98,22 @@ fn picking_a_value_keeps_the_pictures_panel_steady(cx: &mut TestAppContext) {
             support::settle(cx, s.win);
             ready(cx);
         };
+        // A changed row shows the preset's value and compares behind the wipe slider.
+        let changed = |cx: &mut TestAppContext| {
+            [
+                ids::graphics_module_preset("lod"),
+                ids::graphics_compare_slider("lod"),
+            ]
+            .map(|id| support::present(cx, s.win, id))
+        };
         ready(cx);
         let unchanged = layout(cx, &s);
 
         pick(cx, "medium");
+        assert_eq!(changed(cx), [true, true], "{width} px: Medium landed");
         assert_same(&unchanged, &layout(cx, &s), &format!("{width} px, Medium"));
         pick(cx, "low");
+        assert_eq!(changed(cx), [false, false], "{width} px: Low landed");
         assert_same(
             &unchanged,
             &layout(cx, &s),
