@@ -832,3 +832,37 @@ fn the_storage_card_ids_carry_the_kind_slug() {
         ]
     );
 }
+
+#[test]
+fn profile_card_ids_are_keyed_by_profile_id_and_slot() {
+    let id = ProfileId::new("1700000000000-ab12");
+    assert_eq!(ids::PROFILES_LEAD, "profiles-lead");
+    assert_eq!(
+        name(ids::profile_card_picture(&id)),
+        "profile-card-picture:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_image(&id)),
+        "profile-card-image:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_active(&id)),
+        "profile-card-active:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_name(&id)),
+        "profile-card-name:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_line(&id, "graphics")),
+        "profile-card-line:1700000000000-ab12:graphics"
+    );
+    assert_eq!(
+        name(ids::profile_card_apply(&id)),
+        "profile-card-apply:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_edit(&id)),
+        "profile-card-edit:1700000000000-ab12"
+    );
+}

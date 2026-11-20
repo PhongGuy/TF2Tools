@@ -908,6 +908,8 @@ pub const GRAPHICS_SHOW_ALL: &str = "graphics-show-all";
 /// The category rail, a column beside the list or a chip row above it when narrow.
 pub const GRAPHICS_RAIL: &str = "graphics-rail";
 
+/// The Profiles page's lead line above the card grid.
+pub const PROFILES_LEAD: &str = "profiles-lead";
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
 /// The Active Profile card.
@@ -1354,6 +1356,41 @@ const MISSING_LOCAL: &str = "missing-local";
 /// A profile card, keyed by the profile id: "profile-card:<id>".
 pub fn profile_card(id: &ProfileId) -> ElementId {
     keyed(PROFILE_CARD, id.as_str())
+}
+
+/// A card's 16:9 picture area, keyed by the profile id: "profile-card-picture:<id>".
+pub fn profile_card_picture(id: &ProfileId) -> ElementId {
+    keyed("profile-card-picture", id.as_str())
+}
+
+/// The HUD image inside a card's picture: "profile-card-image:<id>".
+pub fn profile_card_image(id: &ProfileId) -> ElementId {
+    keyed("profile-card-image", id.as_str())
+}
+
+/// A card's "Active" pill over its picture: "profile-card-active:<id>".
+pub fn profile_card_active(id: &ProfileId) -> ElementId {
+    keyed("profile-card-active", id.as_str())
+}
+
+/// A card's name: "profile-card-name:<id>".
+pub fn profile_card_name(id: &ProfileId) -> ElementId {
+    keyed("profile-card-name", id.as_str())
+}
+
+/// One slot's line on a card: "profile-card-line:<id>:<slot>".
+pub fn profile_card_line(id: &ProfileId, slot: &str) -> ElementId {
+    keyed("profile-card-line", &format!("{}:{slot}", id.as_str()))
+}
+
+/// A card's Apply button: "profile-card-apply:<id>".
+pub fn profile_card_apply(id: &ProfileId) -> ElementId {
+    keyed("profile-card-apply", id.as_str())
+}
+
+/// A card's Edit button: "profile-card-edit:<id>".
+pub fn profile_card_edit(id: &ProfileId) -> ElementId {
+    keyed("profile-card-edit", id.as_str())
 }
 
 /// A card's "Active" badge, keyed by the profile id: "profile-active-badge:<id>".

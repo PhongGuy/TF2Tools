@@ -388,3 +388,14 @@ fn a_near_end_hook_set_after_it_fired_hears_the_current_count(cx: &mut TestAppCo
     support::settle(cx, win);
     assert_eq!(late.get(), 1);
 }
+
+#[test]
+fn a_minimum_card_width_sets_the_columns() {
+    use tf2tools_app::widgets::card_grid::columns_for_min;
+    let min = px(250.);
+    assert_eq!(columns_for_min(px(100.), min), 1);
+    assert_eq!(columns_for_min(px(496.), min), 1);
+    assert_eq!(columns_for_min(px(516.), min), 2);
+    assert_eq!(columns_for_min(px(976.), min), 3);
+    assert_eq!(columns_for_min(px(1100.), min), 4);
+}
