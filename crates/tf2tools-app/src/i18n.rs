@@ -1682,6 +1682,7 @@ mod tests {
         "pages/graphics/pill.rs",
         "pages/graphics/pictures.rs",
         "pages/graphics/presets.rs",
+        "pages/graphics/rows.rs",
         "pages/graphics/settings.rs",
         "pages/graphics/status.rs",
         "pages/graphics/view.rs",

@@ -1,20 +1,22 @@
-//! The Graphics choices editor: the presets card and the changes strip over choices its host
-//! owns. It only proposes edits as `ChoicesEdit` events; the host saves them and calls back
+//! The Graphics choices editor: the presets card, the changes strip and the settings rows
+//! over choices its host owns. It only proposes edits as `ChoicesEdit` events; the host saves them and calls back
 //! with `set_choices`, so it always shows what was saved.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
 use gpui_kit::{
-    AnyElement, Context, EventEmitter, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window,
-    div, px,
+    AnyElement, AppContext as _, Context, Entity, EventEmitter, FontWeight,
+    InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
+    Styled as _, Subscription, TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
-use super::model::preset_label;
+use super::model::{ValueOption, preset_label, scoped_value_options, shown_choice};
 use super::view;
 use crate::i18n::{counted_plural, tr};
 use crate::ids::{self, IdScope};
@@ -37,7 +39,14 @@ pub struct GraphicsChoicesEditor {
     pub(super) catalog: Option<Arc<ModuleCatalog>>,
     /// Every control draws disabled and proposes nothing.
     pub(super) disabled: bool,
+    /// One Select per Select row of the catalog, rebuilt with the catalog.
+    pub(super) selects: BTreeMap<String, ValueSelect>,
+    /// Each Select's pick handler, rebuilt with the Selects.
+    select_subscriptions: Vec<Subscription>,
 }
+
+/// A settings row's value picker.
+pub(super) type ValueSelect = Entity<SelectState<Vec<ValueOption>>>;
 
 impl EventEmitter<ChoicesEdit> for GraphicsChoicesEditor {}
 
@@ -54,6 +63,8 @@ impl GraphicsChoicesEditor {
             choices,
             catalog: None,
             disabled: false,
+            selects: BTreeMap::new(),
+            select_subscriptions: Vec::new(),
         }
     }
 
@@ -67,9 +78,11 @@ impl GraphicsChoicesEditor {
         &self.choices
     }
 
-    /// Shows `choices` and notifies.
-    pub fn set_choices(&mut self, choices: Choices, _window: &mut Window, cx: &mut Context<Self>) {
+    /// Shows `choices` and moves every Select to its shown value, even when the choices are
+    /// unchanged, so a pick the host refused moves back; notifies.
+    pub fn set_choices(&mut self, choices: Choices, window: &mut Window, cx: &mut Context<Self>) {
         self.choices = choices;
+        self.show_choices(window, cx);
         cx.notify();
     }
 
@@ -78,15 +91,76 @@ impl GraphicsChoicesEditor {
         self.catalog.as_ref()
     }
 
-    /// Call when the catalog changes; notifies.
+    /// Call when the catalog changes; rebuilds the Selects and notifies.
     pub fn set_catalog(
         &mut self,
         catalog: Option<Arc<ModuleCatalog>>,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self.catalog = catalog;
+        self.build_selects(window, cx);
         cx.notify();
+    }
+
+    /// `module`'s row as the list draws it; None without a catalog or for an unknown module.
+    pub fn row(&self, module: &str) -> Option<view::RowView> {
+        let catalog = self.catalog.as_ref()?;
+        let module = catalog.module(module)?;
+        Some(view::row(catalog, &self.choices, module))
+    }
+
+    /// The Select state of `module`'s row, while it is a Select row of the catalog.
+    pub fn module_select(&self, module: &str) -> Option<ValueSelect> {
+        self.selects.get(module).cloned()
+    }
+
+    // One Select per Select row of the held catalog, each on its shown value; a pick proposes
+    // it, and a cleared Select proposes nothing.
+    fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.selects.clear();
+        self.select_subscriptions.clear();
+        let Some(catalog) = self.catalog.clone() else {
+            return;
+        };
+        let select_rows = catalog
+            .categories()
+            .iter()
+            .flat_map(|c| c.modules())
+            .filter(|m| view::control_kind(m) == view::ControlKind::Select);
+        for module in select_rows {
+            let shown = shown_choice(&catalog, &self.choices, module.name());
+            let options = scoped_value_options(module, self.scope);
+            let select = cx.new(|cx| {
+                let mut select = SelectState::new(options, None, window, cx);
+                select.set_selected_value(&shown, window, cx);
+                select
+            });
+            let name = module.name().to_owned();
+            self.select_subscriptions.push(cx.subscribe(
+                &select,
+                move |editor, _, event: &SelectEvent<Vec<ValueOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(choice)) = event {
+                        let choice = choice.clone();
+                        editor.propose(|c, catalog| c.set(catalog, &name, choice), cx);
+                    }
+                },
+            ));
+            self.selects.insert(module.name().to_owned(), select);
+        }
+    }
+
+    // Moves each existing Select to its row's shown value.
+    fn show_choices(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(catalog) = &self.catalog else {
+            return;
+        };
+        for (name, select) in &self.selects {
+            let shown = shown_choice(catalog, &self.choices, name);
+            select.update(cx, |select, cx| {
+                select.set_selected_value(&shown, window, cx)
+            });
+        }
     }
 
     /// While disabled, every control is drawn disabled and proposes nothing; notifies.

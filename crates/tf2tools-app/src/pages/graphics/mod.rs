@@ -7,6 +7,7 @@ mod picture_panel;
 pub mod pictures;
 mod pill;
 mod presets;
+mod rows;
 mod settings;
 mod status;
 pub mod view;
@@ -15,7 +16,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::v_flex;
 use gpui_kit::{
@@ -40,11 +40,11 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
 use crate::widgets::scroll::scroll_area;
+use editor::ValueSelect;
 use jobs::{ModulesFailure, save_failed};
 use model::{
-    SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
-    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_label, shown_choice,
-    status_card, value_options,
+    SettingsNote, StatusCard, describe_apply, describe_remove, describe_take_over, dropped_note,
+    foreign_modules_cfg, own_modules_cfg_kept, preset_label, status_card,
 };
 use pictures::PictureIndex;
 use view::Filter;
@@ -56,9 +56,6 @@ type Done = (SharedString, SharedString);
 
 /// A finished action's toast, if it has one: (kind, title, description).
 type Outcome = Option<(ToastKind, SharedString, SharedString)>;
-
-/// A settings row's value picker.
-type ValueSelect = Entity<SelectState<Vec<ValueOption>>>;
 
 /// What one load read off the UI thread.
 struct Loaded {
@@ -96,10 +93,8 @@ pub struct GraphicsPage {
     choices: Option<Choices>,
     /// The settings list's catalog, always for the managed install's version.
     catalog: Option<Arc<ModuleCatalog>>,
-    /// One Select per Select row of the catalog, built when the catalog arrives.
+    /// The editor's Selects, mirrored on each of its notifies.
     selects: BTreeMap<String, ValueSelect>,
-    /// Each Select's pick handler, rebuilt with the Selects.
-    select_subscriptions: Vec<Subscription>,
     /// Why there is no catalog yet; None before a fetch is asked.
     note: Option<SettingsNote>,
     /// The version whose catalog this visit already asked GitHub for.
@@ -167,7 +162,12 @@ impl GraphicsPage {
                 ChoicesEdit::Modules { to, .. } => page.change_to(to.clone(), cx),
             },
         );
-        let mut subscriptions = vec![tf2, searched, wiped, edits];
+        // The page hands out the editor's live Selects, so it copies them on every change.
+        let mirrored = cx.observe(&editor, |page, editor, cx| {
+            page.selects = editor.read(cx).selects.clone();
+            cx.notify();
+        });
+        let mut subscriptions = vec![tf2, searched, wiped, edits, mirrored];
         // Pictures redraw the page as they land, and the page's wants go with it.
         let image_viewer = format!("graphics:{}", cx.entity_id());
         if let Some(images) = RemoteImages::global(cx) {
@@ -189,7 +189,6 @@ impl GraphicsPage {
             choices: None,
             catalog: None,
             selects: BTreeMap::new(),
-            select_subscriptions: Vec::new(),
             note: None,
             asked: None,
             search,
@@ -730,7 +729,6 @@ impl GraphicsPage {
                                 page.sync_list(loaded.catalog.clone(), window, cx);
                             } else {
                                 // A refused pick still shows on its Select; move it back.
-                                page.show_choices(window, cx);
                                 page.sync_editor(window, cx);
                             }
                             page.loaded = true;
@@ -756,8 +754,8 @@ impl GraphicsPage {
     }
 
     // Keeps the list on the managed version's catalog: a version change swaps the catalog
-    // (`fresh`, the cached one or None) and rebuilds the Selects; otherwise the Selects only
-    // move to the shown values, so focus stays put. A missing catalog is fetched once.
+    // (`fresh`, the cached one or None), which rebuilds the editor's Selects; otherwise they
+    // only move to the shown values, so focus stays put. A missing catalog is fetched once.
     fn sync_list(
         &mut self,
         fresh: Option<ModuleCatalog>,
@@ -767,9 +765,6 @@ impl GraphicsPage {
         let version = self.managed_version().map(str::to_owned);
         if self.catalog.as_ref().map(|c| c.tag()) != version.as_deref() {
             self.catalog = fresh.map(Arc::new);
-            self.build_selects(window, cx);
-        } else {
-            self.show_choices(window, cx);
         }
         self.sync_editor(window, cx);
         if let Some(tag) = version
@@ -797,7 +792,6 @@ impl GraphicsPage {
                         match fetched {
                             Ok(catalog) => {
                                 page.catalog = Some(Arc::new(catalog));
-                                page.build_selects(window, cx);
                                 page.sync_editor(window, cx);
                             }
                             Err(note) => page.note = Some(note),
@@ -810,53 +804,12 @@ impl GraphicsPage {
         .detach();
     }
 
-    // One Select per Select row of the held catalog, each on its shown value; a pick saves it,
-    // and a cleared Select changes nothing.
-    fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.selects.clear();
-        self.select_subscriptions.clear();
-        let Some(catalog) = self.catalog.clone() else {
-            return;
-        };
-        let choices = self.shown_against();
-        let select_rows = catalog
-            .categories()
-            .iter()
-            .flat_map(|c| c.modules())
-            .filter(|m| view::control_kind(m) == view::ControlKind::Select);
-        for module in select_rows {
-            let shown = shown_choice(&catalog, &choices, module.name());
-            let options = value_options(module);
-            let select = cx.new(|cx| {
-                let mut select = SelectState::new(options, None, window, cx);
-                select.set_selected_value(&shown, window, cx);
-                select
-            });
-            let name = module.name().to_owned();
-            self.select_subscriptions.push(cx.subscribe(
-                &select,
-                move |page, _, event: &SelectEvent<Vec<ValueOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(choice)) = event {
-                        let choice = choice.clone();
-                        page.change(|c, catalog| c.set(catalog, &name, choice), cx);
-                    }
-                },
-            ));
-            self.selects.insert(module.name().to_owned(), select);
-        }
-    }
-
     // Saves `value` for `module`, as the row's own control does.
     fn pick_value(&mut self, module: &str, value: &str, cx: &mut Context<Self>) {
         self.change(
             |c, catalog| c.set(catalog, module, ModuleChoice::Value(value.to_owned())),
             cx,
         );
-    }
-
-    // Drops `module`'s saved choice, so the preset's value applies.
-    fn reset_module(&mut self, module: &str, cx: &mut Context<Self>) {
-        self.change(|c, _| c.reset(module), cx);
     }
 
     // Reads the pictures' manifest and checks their files in the background, once per page.
@@ -921,20 +874,6 @@ impl GraphicsPage {
         };
         let viewer = self.image_viewer.clone();
         cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
-    }
-
-    // Moves each existing Select to its row's shown value.
-    fn show_choices(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(catalog) = &self.catalog else {
-            return;
-        };
-        let choices = self.shown_against();
-        for (name, select) in &self.selects {
-            let shown = shown_choice(catalog, &choices, name);
-            select.update(cx, |select, cx| {
-                select.set_selected_value(&shown, window, cx)
-            });
-        }
     }
 
     // The only writer of `busy`, so the editor's controls rest at the same moments.
