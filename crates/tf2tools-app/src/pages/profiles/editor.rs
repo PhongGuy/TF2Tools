@@ -25,14 +25,14 @@ use tf2tools_core::{
 use super::ProfilesPage;
 use super::editor_model::{Edit, Slot, SlotState, crosshair_labels, slot_state, slot_text};
 use super::model;
-use crate::audio::player::{NowPlaying, Player, sound_player};
+use crate::audio::player::{NowPlaying, PlayState, Player, sound_player};
 use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_profile};
 use crate::pages::common::{SM_ICON_PX, badge_of, card_frame};
 use crate::pages::huds::{card_images, hud_picture, hud_title};
-use crate::pages::sounds::{play_button, sound_key, sound_title};
+use crate::pages::sounds::{sound_key, sound_title, with_play_state};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::confirm::{Confirm, confirm};
@@ -504,11 +504,9 @@ impl ProfileEditor {
             .detach();
     }
 
-    fn is_playing(&self, folder: &str, cx: &App) -> bool {
-        self.player
-            .read(cx)
-            .now_playing()
-            .is_some_and(|now| now.key == sound_key(folder))
+    // The player's phase for `folder`'s sound, so a play button reads Play, Cancel or Stop.
+    fn play_state(&self, folder: &str, cx: &App) -> Option<PlayState> {
+        self.player.read(cx).state_of(&sound_key(folder))
     }
 
     // The saved HUD's picture URL, once the galleries have loaded.
@@ -978,12 +976,16 @@ impl ProfileEditor {
             .filter(|_| matches!(state, SlotState::Set(_)))
             .map(|item| {
                 let (folder, name) = (item.folder_name().to_owned(), item.name().to_owned());
-                play_button(ids::profile_slot_play(key), self.is_playing(&folder, cx)).on_click(
-                    cx.listener(move |editor, _, _, cx| {
-                        cx.stop_propagation();
-                        editor.preview(folder.clone(), name.clone(), cx);
-                    }),
+                with_play_state(
+                    Button::new(ids::profile_slot_play(key)).ghost(),
+                    ids::profile_slot_play_spinner(key),
+                    self.play_state(&folder, cx),
                 )
+                .size(px(32.))
+                .on_click(cx.listener(move |editor, _, _, cx| {
+                    cx.stop_propagation();
+                    editor.preview(folder.clone(), name.clone(), cx);
+                }))
             });
         // A set HUD shows its picture, or the HUDs page's muted placeholder until it loads.
         let picture = (slot == Slot::Hud && matches!(state, SlotState::Set(_))).then(|| {
@@ -1256,10 +1258,12 @@ impl ProfileEditor {
                 let picked = saved.as_deref() == Some(folder.as_str());
                 let id = sound.id().clone();
                 let (play_folder, name) = (folder.clone(), sound.name().to_owned());
-                let play = play_button(
-                    ids::profile_pick_play(&folder),
-                    self.is_playing(&folder, cx),
+                let play = with_play_state(
+                    Button::new(ids::profile_pick_play(&folder)).ghost(),
+                    ids::profile_pick_play_spinner(&folder),
+                    self.play_state(&folder, cx),
                 )
+                .size(px(32.))
                 .on_click(cx.listener(move |editor, _, _, cx| {
                     cx.stop_propagation();
                     editor.preview(play_folder.clone(), name.clone(), cx);

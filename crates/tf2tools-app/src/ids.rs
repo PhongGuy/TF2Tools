@@ -1390,6 +1390,11 @@ pub fn profile_slot_play(slot: &str) -> ElementId {
     keyed("profile-slot-play", slot)
 }
 
+/// The spinner inside a slot's play button while its sound loads.
+pub fn profile_slot_play_spinner(slot: &str) -> ElementId {
+    keyed("profile-slot-play-spinner", slot)
+}
+
 /// A slot's missing-item note: "profile-slot-missing:<slot>".
 pub fn profile_slot_missing(slot: &str) -> ElementId {
     keyed("profile-slot-missing", slot)
@@ -1433,6 +1438,11 @@ pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
 /// A picker sound row's play button: "profile-pick-play:<folder>".
 pub fn profile_pick_play(folder: &str) -> ElementId {
     keyed("profile-pick-play", folder)
+}
+
+/// The spinner inside a picker row's play button while its sound loads.
+pub fn profile_pick_play_spinner(folder: &str) -> ElementId {
+    keyed("profile-pick-play-spinner", folder)
 }
 
 /// A Missing Items row, keyed by its index: "missing-item:<ix>".

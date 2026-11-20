@@ -1822,3 +1822,148 @@ fn the_editor_fits_narrow_windows(cx: &mut TestAppContext) {
         }
     }
 }
+
+type Load = Result<Vec<u8>, tf2tools_app::services::OpError>;
+
+/// Toggles the shared player on `folder`'s sound with a load that resolves only when the test
+/// sends through the returned gate, as an editor play button would while its bytes are read.
+fn preview_gated(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    folder: &str,
+) -> async_channel::Sender<Load> {
+    let (tx, rx) = async_channel::bounded::<Load>(1);
+    let player = cx
+        .update_window(s.win, |_, w, cx| sound_player(w, cx))
+        .unwrap();
+    let now = NowPlaying {
+        key: format!("sound:{folder}").into(),
+        name: "Ding".into(),
+        subtitle: "test".into(),
+    };
+    cx.update(|cx| {
+        player.update(cx, |p, cx| {
+            p.toggle_with(
+                now,
+                move |cx| {
+                    cx.background_spawn(async move {
+                        rx.recv().await.unwrap_or_else(|_| {
+                            Err(tf2tools_app::services::OpError::core(
+                                "load".into(),
+                                "gate dropped",
+                            ))
+                        })
+                    })
+                },
+                cx,
+            )
+            .detach()
+        })
+    });
+    support::settle(cx, s.win);
+    tx
+}
+
+/// While its sound loads a play button shows a 16 px spinner reading "Cancel" at the size of
+/// Stop, and Stop once the sound plays.
+fn assert_spins_then_stops(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    gate: async_channel::Sender<Load>,
+    button: ElementId,
+    spinner: ElementId,
+) {
+    assert!(
+        support::present(cx, s.win, spinner.clone()),
+        "{button:?} spins while loading"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, button.clone()).as_deref(),
+        Some("Cancel"),
+        "{button:?} cancels while loading"
+    );
+    let loading = support::bounds_of(cx, s.win, button.clone()).unwrap();
+    let spun = support::bounds_of(cx, s.win, spinner.clone()).unwrap();
+    assert!(
+        loading.contains(&spun.origin) && loading.contains(&spun.bottom_right()),
+        "{spun:?} inside {loading:?}"
+    );
+    assert!(
+        spun.size.width <= gpui_kit::px(16.) && spun.size.height <= gpui_kit::px(16.),
+        "{:?}",
+        spun.size
+    );
+    gate.send_blocking(Ok(support::wav_bytes())).unwrap();
+    support::wait_real(cx, "the play", |_| s.audio.plays().len() == 1);
+    assert!(
+        !support::present(cx, s.win, spinner),
+        "{button:?} stops spinning once playing"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, button.clone()).as_deref(),
+        Some("Stop"),
+        "{button:?} stops once playing"
+    );
+    let playing = support::bounds_of(cx, s.win, button.clone()).unwrap();
+    assert_eq!(loading.size, playing.size, "{button:?} keeps its size");
+}
+
+#[gpui_kit::test]
+fn a_slot_play_button_spins_while_its_sound_loads(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    let hit = comp.sounds().as_set().and_then(|s| s.hit.clone()).unwrap();
+    let gate = preview_gated(cx, &s, hit.folder_name());
+    assert_spins_then_stops(
+        cx,
+        &s,
+        gate,
+        ids::profile_slot_play("hitsound"),
+        ids::profile_slot_play_spinner("hitsound"),
+    );
+}
+
+#[gpui_kit::test]
+fn a_picker_play_button_spins_while_its_sound_loads(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let bell = sound_named(&s, "Bell");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    let gate = preview_gated(cx, &s, bell.folder_name());
+    assert_spins_then_stops(
+        cx,
+        &s,
+        gate,
+        ids::profile_pick_play(bell.folder_name()),
+        ids::profile_pick_play_spinner(bell.folder_name()),
+    );
+}
+
+#[gpui_kit::test]
+fn clicking_a_loading_play_button_cancels(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    let hit = comp.sounds().as_set().and_then(|s| s.hit.clone()).unwrap();
+    let gate = preview_gated(cx, &s, hit.folder_name());
+    support::click_id(cx, s.win, ids::profile_slot_play_spinner("hitsound"));
+    let player = cx
+        .update_window(s.win, |_, w, cx| sound_player(w, cx))
+        .unwrap();
+    assert!(cx.update(|cx| player.read(cx).now_playing().is_none()));
+    gate.send_blocking(Ok(support::wav_bytes())).unwrap();
+    support::settle(cx, s.win);
+    assert!(s.audio.plays().is_empty());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot_play("hitsound")).as_deref(),
+        Some("Play")
+    );
+}

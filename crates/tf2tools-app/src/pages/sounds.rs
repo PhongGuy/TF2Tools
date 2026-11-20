@@ -817,23 +817,6 @@ pub(crate) fn sound_title(sound: &SoundEntry) -> Div {
         .children(vpk)
 }
 
-/// The ghost play button: Play, or Stop while `playing`, named for both.
-pub(crate) fn play_button(id: impl Into<ElementId>, playing: bool) -> Button {
-    Button::new(id)
-        .ghost()
-        .px(SM_ICON_PX)
-        .icon(if playing {
-            IconName::Square
-        } else {
-            IconName::Play
-        })
-        .named(if playing {
-            tr!("sounds.button.stop")
-        } else {
-            tr!("sounds.button.play")
-        })
-}
-
 /// Gives `button` its face for the player's `state` of its sound: Play, Stop while playing, and
 /// while loading a 16 px spinner (`spinner`) in the icon's place, named "Cancel". The click still
 /// toggles in every state, so it cancels a load. The caller sizes the button, since a button with

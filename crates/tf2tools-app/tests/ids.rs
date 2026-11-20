@@ -681,6 +681,14 @@ fn profile_editor_ids_are_stable() {
         ),
         (ids::profile_pick_play("bell"), "profile-pick-play:bell"),
         (
+            ids::profile_pick_play_spinner("bell"),
+            "profile-pick-play-spinner:bell",
+        ),
+        (
+            ids::profile_slot_play_spinner("hitsound"),
+            "profile-slot-play-spinner:hitsound",
+        ),
+        (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
         ),
