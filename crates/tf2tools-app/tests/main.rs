@@ -67,6 +67,7 @@ mod graphics;
 mod graphics_cards;
 mod graphics_changes;
 mod graphics_compare;
+mod graphics_editor;
 mod graphics_filter;
 mod graphics_ids;
 mod graphics_images;

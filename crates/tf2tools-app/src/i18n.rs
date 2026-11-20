@@ -1674,6 +1674,7 @@ mod tests {
         "pages/hud_maker/menu_art.rs",
         "pages/hud_maker/snapping.rs",
         "pages/hud_maker/tint.rs",
+        "pages/graphics/editor.rs",
         "pages/graphics/jobs.rs",
         "pages/graphics/mod.rs",
         "pages/graphics/model.rs",
