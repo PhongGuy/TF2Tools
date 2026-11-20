@@ -198,6 +198,7 @@ mod picker;
 mod play_tf2;
 mod player;
 mod previews;
+mod profile_draft;
 mod profile_editor_model;
 mod profiles;
 mod profiles_editor;

@@ -649,6 +649,9 @@ profiles:
   default_name: "Profil %{n}"
   no_tf2: "Indiquez le dossier de TF2 dans les Paramètres pour activer des profils."
   part:
+    sounds: "Sons"
+    graphics: "Graphismes"
+    addons: "Add-ons"
     crosshairs: "Viseurs"
     item: "Objet"
   heading:
@@ -687,6 +690,8 @@ profiles:
       crosshair: "VISEUR"
       item: "OBJET"
   editor:
+    name_blank: "Donne un nom à ce profil"
+    pick_hud: "Choisis un HUD, ou choisis Aucun"
     back: "Retour aux profils"
     clear: "Effacer"
     unknown: "Inconnu"

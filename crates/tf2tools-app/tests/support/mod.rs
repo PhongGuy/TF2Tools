@@ -47,6 +47,7 @@ pub mod logstf;
 pub mod maker_page;
 pub mod maps;
 pub mod packed;
+pub mod profiles;
 pub mod scroll;
 pub mod update_fake;
 pub mod update_feed;

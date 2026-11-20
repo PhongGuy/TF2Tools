@@ -646,6 +646,9 @@ profiles:
   default_name: "配置文件 %{n}"
   no_tf2: "请在设置中指定 TF2 文件夹以激活配置文件。"
   part:
+    sounds: "音效"
+    graphics: "图形"
+    addons: "插件"
     crosshairs: "准星"
     item: "物品"
   heading:
@@ -684,6 +687,8 @@ profiles:
       crosshair: "准星"
       item: "物品"
   editor:
+    name_blank: "给这个配置文件起个名字"
+    pick_hud: "选择一个 HUD，或选择“无”"
     back: "返回配置文件"
     clear: "清除"
     unknown: "未知"

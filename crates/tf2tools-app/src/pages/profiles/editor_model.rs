@@ -1,14 +1,15 @@
 //! The profile editor's pure rules: its slots, the draft each click saves and the name a new
-//! profile starts with.
+//! profile starts with; and the five-slot draft the whole-setup editor edits and saves.
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftItem, HudId, MissingItem,
-    MissingKind, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, SlotMode, SoundId,
-    SoundKind,
+    AddonEntry, AddonName, BuiltinCrosshairs, Choices, CrosshairEntry, CrosshairRef, CurrentSetup,
+    DraftCrosshair, DraftItem, HudEntry, HudId, MissingItem, MissingKind, Preset, Profile,
+    ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileItem, SlotMode, SoundEntry,
+    SoundId, SoundKind,
 };
 
-use super::model::{crosshair_list, hit, hud_item, kill, sounds_with};
+use super::model::{crosshair_list, hit, hud_item, kill, sounds_with, taken_message};
 use crate::i18n::{names, tr};
 
 /// One of the editor's four slots, in page order.
@@ -219,4 +220,410 @@ pub fn crosshair_labels(
             )
         })
         .collect()
+}
+
+/// One of a profile's five slots, in page order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SlotKind {
+    Hud,
+    Sounds,
+    Crosshairs,
+    Graphics,
+    Addons,
+}
+
+impl SlotKind {
+    pub const ALL: [SlotKind; 5] = [
+        Self::Hud,
+        Self::Sounds,
+        Self::Crosshairs,
+        Self::Graphics,
+        Self::Addons,
+    ];
+
+    /// "hud", "sounds", "crosshairs", "graphics", "addons": the id key.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Hud => "hud",
+            Self::Sounds => "sounds",
+            Self::Crosshairs => "crosshairs",
+            Self::Graphics => "graphics",
+            Self::Addons => "addons",
+        }
+    }
+
+    /// "HUD", "Sounds", "Crosshairs", "Graphics", "Add-ons".
+    pub fn label(self) -> SharedString {
+        match self {
+            Self::Hud => "HUD".into(),
+            Self::Sounds => tr!("profiles.part.sounds"),
+            Self::Crosshairs => tr!("profiles.part.crosshairs"),
+            Self::Graphics => tr!("profiles.part.graphics"),
+            Self::Addons => tr!("profiles.part.addons"),
+        }
+    }
+}
+
+/// What a slot does on Apply: set its content, take it out, or leave the game alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Mode {
+    Set,
+    None,
+    Leave,
+}
+
+impl Mode {
+    pub const ALL: [Mode; 3] = [Self::Set, Self::None, Self::Leave];
+
+    /// "set", "none", "leave": the id key.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Set => "set",
+            Self::None => "none",
+            Self::Leave => "leave",
+        }
+    }
+
+    /// The core slot's mode; a mode this app does not know reads as Leave, as core stores it.
+    pub fn of<T>(slot: &SlotMode<T>) -> Mode {
+        match slot {
+            SlotMode::Set(_) => Self::Set,
+            SlotMode::None => Self::None,
+            SlotMode::Leave | _ => Self::Leave,
+        }
+    }
+}
+
+/// A library item in the draft; two are equal when they name the same folder.
+#[derive(Debug, Clone)]
+pub struct Picked<T> {
+    pub folder: String,
+    pub name: String,
+    pub item: DraftItem<T>,
+}
+
+impl<T> PartialEq for Picked<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.folder == other.folder
+    }
+}
+
+impl<T> Picked<T> {
+    /// A saved reference, written back as it is.
+    pub fn kept(item: &ProfileItem) -> Self {
+        Self {
+            folder: item.folder_name().to_owned(),
+            name: item.name().to_owned(),
+            item: DraftItem::Keep(item.clone()),
+        }
+    }
+}
+
+impl Picked<HudId> {
+    /// A library HUD the player picked.
+    pub fn hud(entry: &HudEntry) -> Self {
+        Self {
+            folder: entry.folder_name().to_owned(),
+            name: entry.name().to_owned(),
+            item: DraftItem::Pick(entry.id().clone()),
+        }
+    }
+}
+
+impl Picked<SoundId> {
+    /// A library sound the player picked.
+    pub fn sound(entry: &SoundEntry) -> Self {
+        Self {
+            folder: entry.folder_name().to_owned(),
+            name: entry.name().to_owned(),
+            item: DraftItem::Pick(entry.id().clone()),
+        }
+    }
+}
+
+impl Picked<AddonName> {
+    /// A library add-on the player ticked, named by its display name.
+    pub fn addon(entry: &AddonEntry) -> Self {
+        Self {
+            folder: entry.name().as_str().to_owned(),
+            name: entry.display_name().to_owned(),
+            item: DraftItem::Pick(entry.name().clone()),
+        }
+    }
+
+    /// A saved or installed add-on, kept by its asset name and shown as `display`.
+    pub fn kept_addon(name: &AddonName, display: String) -> Self {
+        Self {
+            folder: name.as_str().to_owned(),
+            name: display,
+            item: DraftItem::keep_addon(name.clone()),
+        }
+    }
+}
+
+/// One weapon's crosshair; equal when script and what it shows match.
+#[derive(Debug, Clone)]
+pub struct WeaponPick {
+    pub script: String,
+    pub shows: ProfileCrosshairRef,
+    pub item: DraftCrosshair,
+}
+
+impl PartialEq for WeaponPick {
+    fn eq(&self, other: &Self) -> bool {
+        self.script == other.script && self.shows == other.shows
+    }
+}
+
+impl WeaponPick {
+    /// A saved assignment, written back as it is.
+    pub fn kept(saved: &ProfileCrosshair) -> Self {
+        Self {
+            script: saved.weapon_script().to_owned(),
+            shows: saved.crosshair().clone(),
+            item: DraftCrosshair::Keep(saved.clone()),
+        }
+    }
+}
+
+/// The editor's working copy of a profile. Every slot keeps its content whatever its mode, so
+/// switching back to Set restores it; only a Set slot's content is compared or saved.
+///
+/// No `PartialEq`: a draft is compared only through `differs_from`, which ignores content a
+/// slot's mode does not save.
+#[derive(Debug, Clone)]
+pub struct Draft {
+    pub name: String,
+    pub hud: Option<Picked<HudId>>,
+    /// None: TF2's default.
+    pub hit: Option<Picked<SoundId>>,
+    pub kill: Option<Picked<SoundId>>,
+    /// Sorted by script.
+    pub crosshairs: Vec<WeaponPick>,
+    pub graphics: Choices,
+    /// Sorted by folder.
+    pub addons: Vec<Picked<AddonName>>,
+    pub only_these: bool,
+    modes: [Mode; 5],
+}
+
+impl Draft {
+    // Every slot empty, as a slot that never had content starts when switched to Set.
+    fn empty(name: String, modes: [Mode; 5]) -> Self {
+        Self {
+            name,
+            hud: None,
+            hit: None,
+            kill: None,
+            crosshairs: Vec::new(),
+            graphics: Choices::new(Preset::Medium),
+            addons: Vec::new(),
+            only_these: false,
+            modes,
+        }
+    }
+
+    /// A saved profile: each slot in its saved mode, its Set content kept as saved.
+    pub fn from_profile(profile: &Profile, addon_name: &dyn Fn(&AddonName) -> String) -> Self {
+        let modes = [
+            Mode::of(profile.hud()),
+            Mode::of(profile.sounds()),
+            Mode::of(profile.crosshairs()),
+            Mode::of(profile.graphics()),
+            Mode::of(profile.addons()),
+        ];
+        let mut d = Self::empty(profile.name().to_owned(), modes);
+        d.hud = profile.hud().as_set().map(Picked::kept);
+        if let Some(sounds) = profile.sounds().as_set() {
+            d.hit = sounds.hit.as_ref().map(Picked::kept);
+            d.kill = sounds.kill.as_ref().map(Picked::kept);
+        }
+        if let Some(list) = profile.crosshairs().as_set() {
+            d.crosshairs = list.iter().map(WeaponPick::kept).collect();
+        }
+        if let Some(graphics) = profile.graphics().as_set() {
+            d.graphics = graphics.choices.clone();
+        }
+        if let Some(addons) = profile.addons().as_set() {
+            d.addons = kept_addons(&addons.on, addon_name);
+            d.only_these = addons.only_these;
+        }
+        d.sort();
+        d
+    }
+
+    /// The new-draft fill: name empty; HUD Set only for a managed HUD, else None; Sounds and
+    /// Crosshairs Set; Graphics copied (Set, None or Leave); Add-ons Set to the installed ones
+    /// with Only these, or Leave when Graphics is None.
+    pub fn from_current(setup: &CurrentSetup, addon_name: &dyn Fn(&AddonName) -> String) -> Self {
+        let graphics = Mode::of(&setup.graphics);
+        let addons = if graphics == Mode::None {
+            Mode::Leave
+        } else {
+            Mode::Set
+        };
+        let hud = setup.hud.as_set().map(Picked::kept);
+        let hud_mode = if hud.is_some() { Mode::Set } else { Mode::None };
+        let modes = [hud_mode, Mode::Set, Mode::Set, graphics, addons];
+        let mut d = Self::empty(String::new(), modes);
+        d.hud = hud;
+        d.hit = setup.sounds.hit.as_ref().map(Picked::kept);
+        d.kill = setup.sounds.kill.as_ref().map(Picked::kept);
+        d.crosshairs = setup.crosshairs.iter().map(WeaponPick::kept).collect();
+        if let Some(g) = setup.graphics.as_set() {
+            d.graphics = g.choices.clone();
+        }
+        if addons == Mode::Set {
+            d.addons = kept_addons(&setup.addons, addon_name);
+            d.only_these = true;
+        }
+        d.sort();
+        d
+    }
+
+    fn sort(&mut self) {
+        self.crosshairs.sort_by(|a, b| a.script.cmp(&b.script));
+        self.addons.sort_by(|a, b| a.folder.cmp(&b.folder));
+    }
+
+    pub fn mode(&self, slot: SlotKind) -> Mode {
+        self.modes[slot as usize]
+    }
+
+    /// Keeps the slot's content. Refuses (false) Add-ons Set while Graphics is None; Graphics
+    /// None moves a Set Add-ons slot to None.
+    pub fn set_mode(&mut self, slot: SlotKind, mode: Mode) -> bool {
+        if slot == SlotKind::Addons && mode == Mode::Set && self.addons_need_graphics() {
+            return false;
+        }
+        if slot == SlotKind::Graphics
+            && mode == Mode::None
+            && self.mode(SlotKind::Addons) == Mode::Set
+        {
+            self.modes[SlotKind::Addons as usize] = Mode::None;
+        }
+        self.modes[slot as usize] = mode;
+        true
+    }
+
+    /// True while Graphics is None, so Add-ons cannot be Set.
+    pub fn addons_need_graphics(&self) -> bool {
+        self.mode(SlotKind::Graphics) == Mode::None
+    }
+
+    /// Dirty: the trimmed names differ, a mode differs, or a Set slot's content differs.
+    pub fn differs_from(&self, baseline: &Draft) -> bool {
+        if self.name.trim() != baseline.name.trim() || self.modes != baseline.modes {
+            return true;
+        }
+        SlotKind::ALL
+            .into_iter()
+            .filter(|&slot| self.mode(slot) == Mode::Set)
+            .any(|slot| match slot {
+                SlotKind::Hud => self.hud != baseline.hud,
+                SlotKind::Sounds => self.hit != baseline.hit || self.kill != baseline.kill,
+                SlotKind::Crosshairs => sorted_crosshairs(self) != sorted_crosshairs(baseline),
+                SlotKind::Graphics => self.graphics != baseline.graphics,
+                SlotKind::Addons => {
+                    self.only_these != baseline.only_these
+                        || sorted_addons(self) != sorted_addons(baseline)
+                }
+            })
+    }
+
+    /// Name as typed; Set slots from their content (HUD Set without a pick saves as None).
+    pub fn to_profile_draft(&self) -> ProfileDraft {
+        // Each slot's core mode: its content when Set, else None or Leave as the mode says.
+        fn slot<T>(mode: Mode, content: impl FnOnce() -> T) -> SlotMode<T> {
+            match mode {
+                Mode::Set => SlotMode::Set(content()),
+                Mode::None => SlotMode::None,
+                Mode::Leave => SlotMode::Leave,
+            }
+        }
+        let item = |p: &Option<Picked<SoundId>>| p.as_ref().map(|p| p.item.clone());
+        let hud = match (self.mode(SlotKind::Hud), &self.hud) {
+            (Mode::Set, Some(h)) => SlotMode::Set(h.item.clone()),
+            (Mode::Leave, _) => SlotMode::Leave,
+            (Mode::Set | Mode::None, _) => SlotMode::None,
+        };
+        ProfileDraft::new(self.name.as_str())
+            .with_hud(hud)
+            .with_sounds(slot(self.mode(SlotKind::Sounds), || {
+                (item(&self.hit), item(&self.kill))
+            }))
+            .with_crosshairs(slot(self.mode(SlotKind::Crosshairs), || {
+                self.crosshairs.iter().map(|c| c.item.clone()).collect()
+            }))
+            .with_graphics(slot(self.mode(SlotKind::Graphics), || {
+                self.graphics.clone()
+            }))
+            .with_addons(slot(self.mode(SlotKind::Addons), || {
+                let on = self.addons.iter().map(|a| a.item.clone()).collect();
+                (on, self.only_these)
+            }))
+    }
+}
+
+fn kept_addons(
+    names: &[AddonName],
+    addon_name: &dyn Fn(&AddonName) -> String,
+) -> Vec<Picked<AddonName>> {
+    names
+        .iter()
+        .map(|n| Picked::kept_addon(n, addon_name(n)))
+        .collect()
+}
+
+fn sorted_crosshairs(d: &Draft) -> Vec<&WeaponPick> {
+    let mut list: Vec<&WeaponPick> = d.crosshairs.iter().collect();
+    list.sort_by(|a, b| a.script.cmp(&b.script));
+    list
+}
+
+fn sorted_addons(d: &Draft) -> Vec<&str> {
+    let mut list: Vec<&str> = d.addons.iter().map(|a| a.folder.as_str()).collect();
+    list.sort_unstable();
+    list
+}
+
+/// Why Save is off.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SaveBlock {
+    BlankName,
+    NameTaken(String),
+    NoHud,
+    Unchanged,
+}
+
+impl SaveBlock {
+    /// The line under Save; Unchanged says nothing.
+    pub fn message(&self) -> Option<SharedString> {
+        match self {
+            Self::BlankName => Some(tr!("profiles.editor.name_blank")),
+            Self::NameTaken(name) => Some(taken_message(name).into()),
+            Self::NoHud => Some(tr!("profiles.editor.pick_hud")),
+            Self::Unchanged => None,
+        }
+    }
+}
+
+/// First of BlankName, NameTaken(`taken`), NoHud, Unchanged (Unchanged only when `saved`).
+pub fn save_block(
+    draft: &Draft,
+    baseline: &Draft,
+    saved: bool,
+    taken: Option<String>,
+) -> Option<SaveBlock> {
+    if draft.name.trim().is_empty() {
+        Some(SaveBlock::BlankName)
+    } else if let Some(name) = taken {
+        Some(SaveBlock::NameTaken(name))
+    } else if draft.mode(SlotKind::Hud) == Mode::Set && draft.hud.is_none() {
+        Some(SaveBlock::NoHud)
+    } else if saved && !draft.differs_from(baseline) {
+        Some(SaveBlock::Unchanged)
+    } else {
+        None
+    }
 }

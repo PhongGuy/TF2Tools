@@ -648,6 +648,9 @@ profiles:
   default_name: "Perfil %{n}"
   no_tf2: "Defina a pasta do TF2 nas configurações para ativar perfis."
   part:
+    sounds: "Sons"
+    graphics: "Gráficos"
+    addons: "Add-ons"
     crosshairs: "Miras"
     item: "Item"
   heading:
@@ -686,6 +689,8 @@ profiles:
       crosshair: "MIRA"
       item: "ITEM"
   editor:
+    name_blank: "Dê um nome a este perfil"
+    pick_hud: "Escolha um HUD ou escolha Nenhum"
     back: "Voltar aos perfis"
     clear: "Limpar"
     unknown: "Desconhecido"

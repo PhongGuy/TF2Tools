@@ -622,6 +622,9 @@ profiles:
   default_name: "Профиль %{n}"
   no_tf2: "Укажите папку TF2 в настройках, чтобы включать профили."
   part:
+    sounds: "Звуки"
+    graphics: "Графика"
+    addons: "Дополнения"
     crosshairs: "Прицелы"
     item: "Элемент"
   heading:
@@ -660,6 +663,8 @@ profiles:
       crosshair: "ПРИЦЕЛ"
       item: "ЭЛЕМЕНТ"
   editor:
+    name_blank: "Дайте профилю имя"
+    pick_hud: "Выберите HUD или «Нет»"
     back: "Назад к профилям"
     clear: "Очистить"
     unknown: "Неизвестный"

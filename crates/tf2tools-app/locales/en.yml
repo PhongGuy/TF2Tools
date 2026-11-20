@@ -624,6 +624,9 @@ profiles:
   default_name: "Profile %{n}"
   no_tf2: "Set the TF2 folder in Settings to activate profiles."
   part:
+    sounds: "Sounds"
+    graphics: "Graphics"
+    addons: "Add-ons"
     crosshairs: "Crosshairs"
     item: "Item"
   heading:
@@ -662,6 +665,8 @@ profiles:
       crosshair: "CROSSHAIR"
       item: "ITEM"
   editor:
+    name_blank: "Give this profile a name"
+    pick_hud: "Pick a HUD, or choose None"
     back: "Back to profiles"
     clear: "Clear"
     unknown: "Unknown"

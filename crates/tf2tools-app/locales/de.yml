@@ -647,6 +647,9 @@ profiles:
   default_name: "Profil %{n}"
   no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um Profile zu aktivieren."
   part:
+    sounds: "Sounds"
+    graphics: "Grafik"
+    addons: "Add-ons"
     crosshairs: "Fadenkreuze"
     item: "Eintrag"
   heading:
@@ -685,6 +688,8 @@ profiles:
       crosshair: "FADENKREUZ"
       item: "EINTRAG"
   editor:
+    name_blank: "Gib diesem Profil einen Namen"
+    pick_hud: "Wähle ein HUD oder „Keine“"
     back: "Zurück zu den Profilen"
     clear: "Leeren"
     unknown: "Unbekannt"
