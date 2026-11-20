@@ -203,3 +203,18 @@ async fn choices_survive_a_preset_switch_even_when_they_now_match_it() {
     assert_eq!(saved.get("lod"), Some(&value("high")));
     assert_eq!(modules_cfg(&tf2), format!("{HEADER}lod=high\n"));
 }
+
+#[test]
+fn a_preset_switch_keeps_every_module_choice() {
+    let choices = medium_choices();
+    let high = choices.with_preset(Preset::High);
+    assert_eq!(high.preset(), Preset::High);
+    assert_eq!(high.modules(), choices.modules());
+    assert_eq!(
+        choices.preset(),
+        Preset::Medium,
+        "the original is untouched"
+    );
+    let back = high.with_preset(Preset::Medium);
+    assert_eq!(back, choices);
+}

@@ -254,6 +254,7 @@ mod profile_apply;
 mod profile_apply_modes;
 mod profile_current_setup;
 mod profile_edit;
+mod profile_graphics_apply;
 mod profile_resolve;
 mod profile_save_current;
 mod profile_slots;

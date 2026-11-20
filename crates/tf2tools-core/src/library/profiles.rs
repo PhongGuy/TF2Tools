@@ -11,6 +11,7 @@ use rusqlite::{Connection, OptionalExtension, Row};
 use super::crosshairs::{SOURCE_BUILTIN, SOURCE_LIBRARY, is_weapon_script};
 use super::profile_setup::CurrentSetup;
 use super::profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
+use super::profile_steps::ApplySkipReason;
 use super::{
     AddonName, Assignment, Choices, CrosshairRef, ExternalHud, GbId, HudId, Library, Preset,
     Provenance, SoundId, SoundKind, game_custom_dir, modules_json, new_id, now, parse_modules,
@@ -1270,6 +1271,8 @@ pub enum ApplyStep {
     Killsound,
     /// Replacing the weapon assignments and rebuilding the crosshair folder.
     Crosshairs,
+    /// Writing the mastercomfig preset, or removing a managed mastercomfig.
+    Graphics,
 }
 
 /// What applying a profile did: the steps that succeeded, the missing items it skipped
@@ -1281,6 +1284,9 @@ pub struct ApplyProfileReport {
     applied: Vec<ApplyStep>,
     skipped: Vec<MissingItem>,
     failed: Vec<(ApplyStep, String)>,
+    skipped_steps: Vec<(ApplyStep, ApplySkipReason)>,
+    pending_modules: Option<Choices>,
+    binds_restored: bool,
     hud_blocked_name: Option<String>,
 }
 
@@ -1310,6 +1316,23 @@ impl ApplyProfileReport {
     /// HUD went under its library folder name and parts of it may not show.
     pub fn hud_blocked_name(&self) -> Option<&str> {
         self.hud_blocked_name.as_deref()
+    }
+
+    /// The steps that did not run although their slot asked for a change, each with why.
+    pub fn skipped_steps(&self) -> &[(ApplyStep, ApplySkipReason)] {
+        &self.skipped_steps
+    }
+
+    /// The module choices the app still has to apply: Some under Graphics Set once the
+    /// preset step succeeded. The profile is marked active only after the app applies them.
+    pub fn pending_modules(&self) -> Option<&Choices> {
+        self.pending_modules.as_ref()
+    }
+
+    /// Whether removing mastercomfig put `config.cfg`'s movement binds back on the stock
+    /// commands.
+    pub fn binds_restored(&self) -> bool {
+        self.binds_restored
     }
 }
 
@@ -1417,8 +1440,9 @@ impl Library {
     /// alone, best effort. Missing items fail with `Missing` before any file is touched unless
     /// `skip_missing`, which leaves what is installed for those slots alone; unless the HUD is
     /// skipped or left, a HUD the library cannot put back then fails with `ExternalHuds` the
-    /// same way. The profile becomes active only when nothing was skipped and no step
-    /// failed, so Active means the game matches it.
+    /// same way. Graphics runs last; see `ApplySkipReason` and `pending_modules`. The profile
+    /// becomes active only when nothing was skipped, no step failed and no module choices are
+    /// pending, so Active means the game matches it.
     pub fn apply_profile(
         &self,
         id: &ProfileId,
@@ -1540,7 +1564,22 @@ impl Library {
             );
         }
 
-        if failed.is_empty() && resolved.missing.is_empty() {
+        let graphics = self.apply_profile_graphics(resolved.profile.graphics(), tf2);
+        if let Some(outcome) = graphics.outcome {
+            record(ApplyStep::Graphics, outcome);
+        }
+        let skipped_steps: Vec<_> = graphics
+            .skip
+            .map(|reason| (ApplyStep::Graphics, reason))
+            .into_iter()
+            .collect();
+
+        // Pending module choices still have to reach the game, so the app marks those later.
+        let matches_game = failed.is_empty()
+            && resolved.missing.is_empty()
+            && skipped_steps.is_empty()
+            && graphics.pending_modules.is_none();
+        if matches_game {
             self.db
                 .write(|conn| save_setting(conn, ACTIVE_PROFILE_KEY, id.as_str()))
                 .map_err(apply_db)?;
@@ -1550,6 +1589,9 @@ impl Library {
             applied,
             skipped: resolved.missing,
             failed,
+            skipped_steps,
+            pending_modules: graphics.pending_modules,
+            binds_restored: graphics.binds_restored,
             hud_blocked_name,
         })
     }

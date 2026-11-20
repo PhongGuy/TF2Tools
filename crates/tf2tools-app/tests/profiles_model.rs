@@ -40,6 +40,7 @@ fn steps_and_kinds_have_v5_s_labels() {
     assert_eq!(step_label(ApplyStep::Hitsound), "Hitsound");
     assert_eq!(step_label(ApplyStep::Killsound), "Killsound");
     assert_eq!(step_label(ApplyStep::Crosshairs), "Crosshairs");
+    assert_eq!(step_label(ApplyStep::Graphics), "Graphics");
     assert_eq!(kind_label(&MissingKind::Hud), "HUD");
     assert_eq!(kind_label(&MissingKind::Hitsound), "HITSOUND");
     assert_eq!(kind_label(&MissingKind::Killsound), "KILLSOUND");

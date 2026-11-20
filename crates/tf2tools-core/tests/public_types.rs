@@ -100,9 +100,10 @@ fn draft_types_are_send_sync_debug() {
 #[test]
 fn apply_types_are_send_sync_debug() {
     use tf2tools_core::{
-        ApplyProfileError, ApplyProfileReport, ApplyStep, MissingItem, MissingKind,
+        ApplyProfileError, ApplyProfileReport, ApplySkipReason, ApplyStep, MissingItem, MissingKind,
     };
     assert_send_sync::<ApplyStep>();
+    assert_send_sync::<ApplySkipReason>();
     assert_send_sync::<ApplyProfileReport>();
     assert_send_sync::<ApplyProfileError>();
     assert_send_sync::<MissingItem>();

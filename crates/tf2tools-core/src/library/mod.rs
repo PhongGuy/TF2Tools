@@ -80,6 +80,7 @@ pub use movement::{MoveDirection, MovementKeys};
 pub(crate) use packed::{HUD_ZIP, ItemSource, read_packed_entry};
 pub use profile_setup::CurrentSetup;
 pub use profile_slots::{DraftItem, ProfileAddons, ProfileGraphics, ProfileSounds, SlotMode};
+pub use profile_steps::ApplySkipReason;
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
@@ -260,6 +261,7 @@ macro_rules! text_id {
 // Declared below `text_id!`, which a module can only use after the macro's definition.
 mod profile_setup;
 mod profile_slots;
+mod profile_steps;
 mod profiles;
 
 text_id!(

@@ -108,13 +108,14 @@ pub fn taken_message(name: &str) -> String {
     crate::i18n::tr!("messages.profiles.name_taken", name = name).into()
 }
 
-/// "HUD", "Hitsound", "Killsound", "Crosshairs".
+/// "HUD", "Hitsound", "Killsound", "Crosshairs", "Graphics".
 pub fn step_label(step: ApplyStep) -> SharedString {
     match step {
         ApplyStep::Hud => "HUD".into(),
         ApplyStep::Hitsound => names::sound_kind_name(SoundKind::Hitsound),
         ApplyStep::Killsound => names::sound_kind_name(SoundKind::Killsound),
         ApplyStep::Crosshairs => tr!("profiles.part.crosshairs"),
+        ApplyStep::Graphics => tr!("nav.graphics"),
         _ => tr!("profiles.part.item"),
     }
 }
