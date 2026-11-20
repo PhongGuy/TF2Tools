@@ -7,6 +7,7 @@ pub mod crosshair_picker;
 pub mod detail_header;
 pub mod dialog_frame;
 pub mod label_option;
+pub mod loadout_board;
 pub mod profile_menu;
 pub mod scroll;
 pub mod store_error;
