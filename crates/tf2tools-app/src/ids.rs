@@ -742,6 +742,8 @@ pub const SYNC_BANNER: &str = "sync-banner";
 pub const SYNC_BANNER_COUNT: &str = "sync-banner-count";
 /// The Sound Store detail dialog's "Play Preview" / "Stop Preview" button.
 pub const STORE_PREVIEW: &str = "store-preview";
+/// The spinner inside `STORE_PREVIEW`; present only while its preview loads.
+pub const STORE_PREVIEW_SPINNER: &str = "store-preview-spinner";
 /// A store's sync button, labelled "Refresh", or "Syncing..." while that store syncs.
 pub const STORE_REFRESH: &str = "store-refresh";
 /// The Addon Store header badge, labelled with the store's release tag.
@@ -1836,6 +1838,12 @@ pub fn store_download(kind: StoreKind, id: &StoreItemId) -> ElementId {
 /// A store card's preview play button: "store-play:<slug>:<id>", keyed as `store_card`.
 pub fn store_play(kind: StoreKind, id: &StoreItemId) -> ElementId {
     keyed("store-play", &store_key(kind, id))
+}
+
+/// The spinner inside a card's play button while its preview loads:
+/// "store-play-spinner:<slug>:<id>", keyed as `store_card`.
+pub fn store_play_spinner(kind: StoreKind, id: &StoreItemId) -> ElementId {
+    keyed("store-play-spinner", &store_key(kind, id))
 }
 
 /// A card's state badge: "store-state:<slug>:<id>", keyed as `store_card`.

@@ -2,13 +2,17 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
-use gpui_kit::{App, IntoElement, ParentElement as _, Styled as _, WeakEntity, transparent_black};
+use gpui_kit::{
+    App, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
+    TestSupportExt as _, WeakEntity, div, transparent_black,
+};
 use tf2tools_core::{StoreItem, StoreItemId};
 
 use super::model::category_label;
-use crate::audio::player::Player;
+use crate::audio::player::{PlayState, Player};
 use crate::counts::count_stat;
 use crate::i18n::tr;
 use crate::ids;
@@ -66,38 +70,48 @@ pub fn sound_body(player: WeakEntity<Player>) -> DetailBody {
     })
 }
 
-// Toggles the page's player on this sound's preview; it reads "Stop" while that preview plays.
+// Toggles the page's player on this sound's preview; it reads "Stop" while that preview plays,
+// and shows a spinner reading "Cancel" while its bytes download.
 fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Option<Button> {
     let StoreItemId::GameBanana(id) = *item.id() else {
         return None;
     };
     item.preview_url().filter(|url| !url.is_empty())?;
-    let playing = player.upgrade().is_some_and(|p| {
-        p.read(cx)
-            .now_playing()
-            .is_some_and(|now| now.key == preview_key(id))
-    });
+    let state = player
+        .upgrade()
+        .and_then(|p| p.read(cx).state_of(&preview_key(id)));
     let (player, name, author) = (
         player.clone(),
         item.name().to_owned(),
         item.author().to_owned(),
     );
-    let button = Button::new(ids::STORE_PREVIEW)
-        .outline()
-        .icon(if playing {
-            IconName::Square
-        } else {
-            IconName::Play
-        })
-        .label(if playing {
-            tr!("sound_store.preview.stop")
-        } else {
-            tr!("sound_store.preview.play")
-        })
-        .on_click(move |_, _, cx| {
-            if let Some(player) = player.upgrade() {
-                play_preview(&player, id, &name, &author, cx);
-            }
-        });
+    let button = Button::new(ids::STORE_PREVIEW).outline();
+    // A button with children draws them after its label, so while loading the spinner and the
+    // text are both children, in the icon-then-label order.
+    let button = match state {
+        None => button
+            .icon(IconName::Play)
+            .label(tr!("sound_store.preview.play")),
+        Some(PlayState::Playing) => button
+            .icon(IconName::Square)
+            .label(tr!("sound_store.preview.stop")),
+        Some(PlayState::Loading) => {
+            let cancel = tr!("sounds.button.cancel_preview");
+            button
+                .child(
+                    div()
+                        .id(ids::STORE_PREVIEW_SPINNER)
+                        .test_support()
+                        .child(Spinner::new()),
+                )
+                .child(cancel.clone())
+                .accessibility_label(cancel)
+        }
+    };
+    let button = button.on_click(move |_, _, cx| {
+        if let Some(player) = player.upgrade() {
+            play_preview(&player, id, &name, &author, cx);
+        }
+    });
     Some(button)
 }

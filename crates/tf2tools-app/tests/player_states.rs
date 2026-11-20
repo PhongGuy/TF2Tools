@@ -147,3 +147,17 @@ fn clicking_the_loading_button_cancels(cx: &mut TestAppContext) {
     support::settle(cx, h.win);
     assert!(plays(&h).is_empty());
 }
+
+// The loading button swaps in for Stop, so it must take Stop's exact place and size.
+#[gpui_kit::test]
+fn the_loading_button_sits_where_stop_does(cx: &mut TestAppContext) {
+    let h = host(cx, 50);
+    let gate = toggle_gated(cx, &h, "Ding");
+    support::settle(cx, h.win);
+    let cancel =
+        support::bounds_of(cx, h.win, ids::SOUND_PLAYER_CANCEL).expect("the cancel button");
+    release(&gate, Ok(vec![1]));
+    support::wait_real(cx, "the play", |_| plays(&h).len() == 1);
+    let stop = support::bounds_of(cx, h.win, ids::SOUND_PLAYER_STOP).expect("the stop button");
+    assert_eq!(cancel, stop);
+}

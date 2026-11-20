@@ -320,7 +320,6 @@ impl Render for Player {
             PlayState::Loading => Button::new(ids::SOUND_PLAYER_CANCEL)
                 .w(px(32.))
                 .h(px(32.))
-                .p_0()
                 .child(
                     div()
                         .id(ids::SOUND_PLAYER_SPINNER)
