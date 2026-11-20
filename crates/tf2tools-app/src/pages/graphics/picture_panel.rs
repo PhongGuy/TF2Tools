@@ -33,6 +33,9 @@ const STRIP_WIDTH: f32 = 112.;
 const COMPARE_MAX_WIDTH: f32 = 720.;
 /// The compare view's corner radius.
 const COMPARE_RADIUS: f32 = 8.;
+/// The darkened band along a wipe's bottom edge, and the kit slider's height inside it.
+const SLIDER_BAND: f32 = 36.;
+const SLIDER_HEIGHT: f32 = 24.;
 /// The wipe line, centred on the clip's left edge.
 const WIPE_LINE_WIDTH: f32 = 2.;
 /// From this wipe on, the player's side is too thin to draw.
@@ -304,44 +307,44 @@ fn compare(
     let frame = div()
         .id(ids::graphics_compare(module))
         .test_support()
-        .relative()
-        .flex_1()
-        .max_w(px(COMPARE_MAX_WIDTH))
-        .aspect_ratio(16. / 9.)
+        .absolute()
+        .inset_0()
         .rounded(px(COMPARE_RADIUS))
         .overflow_hidden();
     let full = |child: AnyElement| div().absolute().inset_0().size_full().child(child);
-    // The bottom edge's bar: the slider when there is one, then Zoom in the corner.
-    let bar = |slider: Option<AnyElement>, zoom: Option<Button>| {
-        h_flex()
+    // Zoom in the bottom-right corner, lifted over the slider's band on a wipe.
+    let corner = |bottom: f32, zoom: Option<Button>| {
+        div()
             .absolute()
-            .left(px(10.))
             .right(px(10.))
-            .bottom(px(10.))
-            .gap_2()
-            .justify_end()
-            .children(slider)
+            .bottom(px(bottom))
             .children(zoom)
     };
-    let view = match compare {
+    let (view, slider) = match compare {
         Compare::None => return None,
         Compare::Same {
             picture,
             pill: text,
-        } => frame
-            .child(full(side("preset", picture, cx)))
-            .child(pill(module, "same", text, false))
-            .child(bar(None, zoom)),
+        } => (
+            frame
+                .child(full(side("preset", picture, cx)))
+                .child(pill(module, "same", text, false))
+                .child(corner(10., zoom)),
+            None,
+        ),
         Compare::Single {
             picture,
             pill: text,
             yours,
         } => {
             let name = if *yours { "yours" } else { "preset" };
-            frame
-                .child(full(side(name, picture, cx)))
-                .child(pill(module, name, text, *yours))
-                .child(bar(None, zoom))
+            (
+                frame
+                    .child(full(side(name, picture, cx)))
+                    .child(pill(module, name, text, *yours))
+                    .child(corner(10., zoom)),
+                None,
+            )
         }
         Compare::Wipe {
             preset,
@@ -354,6 +357,8 @@ fn compare(
             // and so the width yours takes from it.
             let line = (w < WIPE_ALL_PRESET).then(|| {
                 div()
+                    .id(ids::graphics_compare_line(module))
+                    .test_support()
                     .absolute()
                     .top_0()
                     .bottom_0()
@@ -384,34 +389,51 @@ fn compare(
                             .child(side("yours", yours, cx)),
                     )
             });
+            // The track spans the frame's full width, so the thumb's centre is the line's x.
             let slider = div()
                 .id(ids::graphics_compare_slider(module))
                 .aria_label(tr!("graphics.pictures.wipe"))
                 .test_support()
-                .flex_1()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom(px((SLIDER_BAND - SLIDER_HEIGHT) / 2.))
                 .flex()
-                .items_center()
-                .h(px(26.))
-                .px_3()
-                .rounded_full()
-                .bg(hsla(0., 0., 0., 0.6))
                 .child(
                     Slider::new(page.wipe_state())
                         .accessibility_label(tr!("graphics.pictures.wipe")),
-                )
-                .into_any_element();
-            frame
-                .child(full(side("preset", preset, cx)))
-                .children(clip)
-                .children(line)
-                .child(pill(module, "preset", preset_pill, false))
-                .child(pill(module, "yours", yours_pill, true))
-                .child(bar(Some(slider), zoom))
+                );
+            let band = div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .h(px(SLIDER_BAND))
+                .bg(hsla(0., 0., 0., 0.45));
+            (
+                frame
+                    .child(full(side("preset", preset, cx)))
+                    .children(clip)
+                    .children(line)
+                    .child(band)
+                    .child(pill(module, "preset", preset_pill, false))
+                    .child(pill(module, "yours", yours_pill, true))
+                    .child(corner(SLIDER_BAND + 6., zoom)),
+                Some(slider),
+            )
         }
     };
-    // In a row the frame's width settles on the main axis before its 16:9 height follows,
-    // so a frame capped below the panel's width takes no height for the width it lost.
-    Some(h_flex().w_full().mt_3().child(view).into_any_element())
+    // In a row the stage's width settles on the main axis before its 16:9 height follows,
+    // so a stage capped below the panel's width takes no height for the width it lost. The
+    // slider sits outside the frame's clip, so a thumb at either end is drawn whole.
+    let stage = div()
+        .relative()
+        .flex_1()
+        .max_w(px(COMPARE_MAX_WIDTH))
+        .aspect_ratio(16. / 9.)
+        .child(view)
+        .children(slider);
+    Some(h_flex().w_full().mt_3().child(stage).into_any_element())
 }
 
 // A label over a compare picture's top corner: left for the preset's side, right for yours.

@@ -223,3 +223,38 @@ fn the_compare_view_draws_the_pictures_it_asked_for_with_zoom_on_and_off(cx: &mu
         compare_drawn(cx, &s, "texture_filter", "preset")
     });
 }
+
+#[gpui_kit::test]
+fn the_slider_s_thumb_rides_the_wipe_line_and_zoom_keeps_clear(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = picture_page(cx, &env, "low", r#"{"lod":"medium"}"#);
+    toggle_pictures(cx, &s, "lod");
+    for width in [1800., 1280., 800.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(900.)));
+        support::settle(cx, s.win);
+        reveal(cx, &s, ids::graphics_compare_slider("lod"));
+        for wipe in [0., 50., 100.] {
+            slide(cx, &s, &page, wipe);
+            let frame = at(cx, &s, ids::graphics_compare("lod"));
+            // At either end the line is not drawn; it would sit on the frame's edge.
+            let line = match wipe {
+                0. => frame.left(),
+                100. => frame.right(),
+                _ => at(cx, &s, ids::graphics_compare_line("lod")).center().x,
+            };
+            let thumb = at(cx, &s, ElementId::from(("slider-thumb", 0u32)))
+                .center()
+                .x;
+            assert!(
+                near(thumb, line),
+                "{width} px at {wipe}%: thumb {thumb:?}, line {line:?}"
+            );
+            let track = at(cx, &s, ids::graphics_compare_slider("lod"));
+            let zoom = at(cx, &s, ids::graphics_zoom("lod"));
+            assert!(
+                !zoom.intersects(&track),
+                "{width} px: Zoom {zoom:?} overlaps the slider {track:?}"
+            );
+        }
+    }
+}
