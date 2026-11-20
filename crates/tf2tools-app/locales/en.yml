@@ -645,6 +645,40 @@ profiles:
   card:
     empty: "Empty profile"
     empty_vanilla: "Empty profile (vanilla)"
+    leave: "Left as is"
+    hud_none: "TF2's own HUD"
+    sounds: "Hit: %{hit}, kill: %{kill}"
+    tf2_default: "TF2 default"
+    sounds_none: "TF2 default sounds"
+    crosshairs: { one: "%{count} weapon crosshair", other: "%{count} weapon crosshairs" }
+    crosshairs_none: "TF2's default crosshairs"
+    graphics: { one: "%{preset}, %{count} change", other: "%{preset}, %{count} changes" }
+    graphics_as_is: "%{preset} as is"
+    graphics_none: "mastercomfig off"
+    addons_only_one: "Only %{list}"
+    addons_only: { one: "Only these %{count}: %{list}", other: "Only these %{count}: %{list}" }
+    addons_on: "Turns on %{list}"
+    addons_nothing: "Turns no add-ons on"
+    addons_none: "All add-ons off"
+  note:
+    sounds: "%{hit} and %{kill}"
+    graphics: { one: "%{preset} with %{count} change", other: "%{preset} with %{count} changes" }
+    addons: { one: "%{count} add-on", other: "%{count} add-ons" }
+    tail: "Name it and save, or change anything that should be different."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "A HUD TF2Tools didn't install"
+    crosshairs_default: "TF2's default"
+    no_mastercomfig: "No mastercomfig"
+    outside_mastercomfig: "A mastercomfig TF2Tools didn't install"
+    mastercomfig_removed: "mastercomfig removed"
+    addons_on: { one: "%{count} on", other: "%{count} on" }
+    turns_on: "Turns on %{list}"
+    turns_off: "turns off %{list}"
+    turns_off_only: "Turns off %{list}"
+    both: "%{on}; %{off}"
+    movement: "%{text}, changes your movement keys"
+    left: "Stays as it is: %{list}."
   empty:
     title: "No profiles yet"
     body: "Save your current setup as a profile to quickly switch between configurations."

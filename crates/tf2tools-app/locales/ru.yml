@@ -643,6 +643,40 @@ profiles:
   card:
     empty: "Пустой профиль"
     empty_vanilla: "Пустой профиль (стандартная игра)"
+    leave: "Остаётся как есть"
+    hud_none: "Стандартный HUD TF2"
+    sounds: "Попадание: %{hit}, убийство: %{kill}"
+    tf2_default: "Стандартный в TF2"
+    sounds_none: "Стандартные звуки TF2"
+    crosshairs: { one: "%{count} прицел для оружия", few: "%{count} прицела для оружия", many: "%{count} прицелов для оружия" }
+    crosshairs_none: "Стандартные прицелы TF2"
+    graphics: { one: "%{preset}, %{count} изменение", few: "%{preset}, %{count} изменения", many: "%{preset}, %{count} изменений" }
+    graphics_as_is: "%{preset} без изменений"
+    graphics_none: "mastercomfig выключен"
+    addons_only_one: "Только %{list}"
+    addons_only: { one: "Только эти %{count}: %{list}", few: "Только эти %{count}: %{list}", many: "Только эти %{count}: %{list}" }
+    addons_on: "Включает %{list}"
+    addons_nothing: "Не включает дополнения"
+    addons_none: "Все дополнения выключены"
+  note:
+    sounds: "%{hit} и %{kill}"
+    graphics: { one: "%{preset} с %{count} изменением", few: "%{preset} с %{count} изменениями", many: "%{preset} с %{count} изменениями" }
+    addons: { one: "%{count} дополнение", few: "%{count} дополнения", many: "%{count} дополнений" }
+    tail: "Дайте имя и сохраните или измените то, что должно быть иначе."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "HUD, установленный не через TF2Tools"
+    crosshairs_default: "Стандартные TF2"
+    no_mastercomfig: "Без mastercomfig"
+    outside_mastercomfig: "mastercomfig, установленный не через TF2Tools"
+    mastercomfig_removed: "mastercomfig удалён"
+    addons_on: { one: "%{count} включено", few: "%{count} включено", many: "%{count} включено" }
+    turns_on: "Включает %{list}"
+    turns_off: "выключает %{list}"
+    turns_off_only: "Выключает %{list}"
+    both: "%{on}; %{off}"
+    movement: "%{text}, меняет клавиши движения"
+    left: "Остаётся как есть: %{list}."
   empty:
     title: "Профилей пока нет"
     body: "Сохраните текущую сборку как профиль, чтобы быстро переключаться между настройками."

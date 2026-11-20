@@ -670,6 +670,40 @@ profiles:
   card:
     empty: "Profil vide"
     empty_vanilla: "Profil vide (jeu de base)"
+    leave: "Laissé tel quel"
+    hud_none: "Le HUD de TF2"
+    sounds: "Touche\u00A0: %{hit}, élimination\u00A0: %{kill}"
+    tf2_default: "Par défaut de TF2"
+    sounds_none: "Sons par défaut de TF2"
+    crosshairs: { one: "%{count} viseur d'arme", other: "%{count} viseurs d'arme" }
+    crosshairs_none: "Viseurs par défaut de TF2"
+    graphics: { one: "%{preset}, %{count} modification", other: "%{preset}, %{count} modifications" }
+    graphics_as_is: "%{preset} tel quel"
+    graphics_none: "mastercomfig désactivé"
+    addons_only_one: "Seulement %{list}"
+    addons_only: { one: "Seulement ces %{count}\u00A0: %{list}", other: "Seulement ces %{count}\u00A0: %{list}" }
+    addons_on: "Active %{list}"
+    addons_nothing: "N'active aucun add-on"
+    addons_none: "Tous les add-ons désactivés"
+  note:
+    sounds: "%{hit} et %{kill}"
+    graphics: { one: "%{preset} avec %{count} modification", other: "%{preset} avec %{count} modifications" }
+    addons: { one: "%{count} add-on activé", other: "%{count} add-ons activés" }
+    tail: "Donne-lui un nom et enregistre, ou change ce qui doit être différent."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "Un HUD que TF2Tools n'a pas installé"
+    crosshairs_default: "Ceux de TF2"
+    no_mastercomfig: "Pas de mastercomfig"
+    outside_mastercomfig: "Un mastercomfig que TF2Tools n'a pas installé"
+    mastercomfig_removed: "mastercomfig retiré"
+    addons_on: { one: "%{count} activé", other: "%{count} activés" }
+    turns_on: "Active %{list}"
+    turns_off: "désactive %{list}"
+    turns_off_only: "Désactive %{list}"
+    both: "%{on}\u00A0; %{off}"
+    movement: "%{text}, change tes touches de déplacement"
+    left: "Reste tel quel\u00A0: %{list}."
   empty:
     title: "Aucun profil pour l'instant"
     body: "Enregistrez votre configuration actuelle comme profil pour passer vite d'une configuration à l'autre."

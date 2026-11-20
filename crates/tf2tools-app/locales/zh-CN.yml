@@ -667,6 +667,40 @@ profiles:
   card:
     empty: "空配置文件"
     empty_vanilla: "空配置文件（原版）"
+    leave: "保持不变"
+    hud_none: "TF2 自带 HUD"
+    sounds: "命中：%{hit}，击杀：%{kill}"
+    tf2_default: "TF2 默认"
+    sounds_none: "TF2 默认音效"
+    crosshairs: { other: "%{count} 个武器准星" }
+    crosshairs_none: "TF2 默认准星"
+    graphics: { other: "%{preset}，%{count} 项改动" }
+    graphics_as_is: "%{preset}，未改动"
+    graphics_none: "关闭 mastercomfig"
+    addons_only_one: "仅 %{list}"
+    addons_only: { other: "仅这 %{count} 个：%{list}" }
+    addons_on: "开启 %{list}"
+    addons_nothing: "不开启任何插件"
+    addons_none: "关闭所有插件"
+  note:
+    sounds: "%{hit}和%{kill}"
+    graphics: { other: "%{preset}，%{count} 项改动" }
+    addons: { other: "%{count} 个插件" }
+    tail: "起个名字并保存，或修改需要不同的地方。"
+    copied: "%{parts}。%{tail}"
+  summary:
+    other_hud: "非 TF2Tools 安装的 HUD"
+    crosshairs_default: "TF2 默认"
+    no_mastercomfig: "未安装 mastercomfig"
+    outside_mastercomfig: "非 TF2Tools 安装的 mastercomfig"
+    mastercomfig_removed: "移除 mastercomfig"
+    addons_on: { other: "已开启 %{count} 个" }
+    turns_on: "开启 %{list}"
+    turns_off: "关闭 %{list}"
+    turns_off_only: "关闭 %{list}"
+    both: "%{on}；%{off}"
+    movement: "%{text}，会改变移动按键"
+    left: "保持不变：%{list}。"
   empty:
     title: "还没有配置文件"
     body: "将当前设置保存为配置文件，即可在不同配置之间快速切换。"

@@ -200,6 +200,7 @@ mod player;
 mod previews;
 mod profile_draft;
 mod profile_editor_model;
+mod profile_summary;
 mod profiles;
 mod profiles_editor;
 mod profiles_layout;

@@ -668,6 +668,40 @@ profiles:
   card:
     empty: "Leeres Profil"
     empty_vanilla: "Leeres Profil (Vanilla)"
+    leave: "Bleibt, wie es ist"
+    hud_none: "Das HUD von TF2"
+    sounds: "Treffer: %{hit}, Kill: %{kill}"
+    tf2_default: "TF2-Standard"
+    sounds_none: "TF2-Standardsounds"
+    crosshairs: { one: "%{count} Waffenfadenkreuz", other: "%{count} Waffenfadenkreuze" }
+    crosshairs_none: "TF2-Standardfadenkreuze"
+    graphics: { one: "%{preset}, %{count} Änderung", other: "%{preset}, %{count} Änderungen" }
+    graphics_as_is: "%{preset} unverändert"
+    graphics_none: "mastercomfig aus"
+    addons_only_one: "Nur %{list}"
+    addons_only: { one: "Nur diese %{count}: %{list}", other: "Nur diese %{count}: %{list}" }
+    addons_on: "Schaltet %{list} ein"
+    addons_nothing: "Schaltet keine Add-ons ein"
+    addons_none: "Alle Add-ons aus"
+  note:
+    sounds: "%{hit} und %{kill}"
+    graphics: { one: "%{preset} mit %{count} Änderung", other: "%{preset} mit %{count} Änderungen" }
+    addons: { one: "%{count} Add-on", other: "%{count} Add-ons" }
+    tail: "Gib ihm einen Namen und speichere, oder ändere, was anders sein soll."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "Ein HUD, das TF2Tools nicht installiert hat"
+    crosshairs_default: "TF2-Standard"
+    no_mastercomfig: "Kein mastercomfig"
+    outside_mastercomfig: "Ein mastercomfig, das TF2Tools nicht installiert hat"
+    mastercomfig_removed: "mastercomfig entfernt"
+    addons_on: { one: "%{count} an", other: "%{count} an" }
+    turns_on: "Schaltet %{list} ein"
+    turns_off: "schaltet %{list} aus"
+    turns_off_only: "Schaltet %{list} aus"
+    both: "%{on}; %{off}"
+    movement: "%{text}, ändert deine Bewegungstasten"
+    left: "Bleibt, wie es ist: %{list}."
   empty:
     title: "Noch keine Profile"
     body: "Speichere dein aktuelles Setup als Profil, um schnell zwischen Konfigurationen zu wechseln."
