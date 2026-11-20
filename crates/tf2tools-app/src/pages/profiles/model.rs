@@ -59,14 +59,6 @@ pub(crate) fn sounds_with(
     })
 }
 
-/// No HUD, no sounds and no crosshairs.
-pub fn is_empty(profile: &Profile) -> bool {
-    hud_item(profile).is_none()
-        && hit(profile).is_none()
-        && kill(profile).is_none()
-        && crosshair_list(profile).is_empty()
-}
-
 /// Whether a finished load closes the editor open on `open_now`: only when that editor was
 /// already open as the load started (`open_at_start`) and the loaded ids lack it.
 pub fn load_closes_editor<'a>(

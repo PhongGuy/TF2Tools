@@ -694,6 +694,11 @@ profiles:
     both: "%{on}；%{off}"
     movement: "%{text}，会改变移动按键"
     left: "保持不变：%{list}。"
+  apply:
+    title: "切换到 %{name}？"
+    intro: "以下内容会立即更改，其他保持不变。"
+    nothing: "这与你当前的设置一致。应用后会将其标记为当前配置。"
+    ok: "应用 %{name}"
   empty:
     title: "还没有配置文件"
     body: "将当前设置保存为配置文件，即可在不同配置之间快速切换。"
@@ -833,10 +838,6 @@ confirm:
     title: "清除准星"
     body: "要移除此配置文件中的所有准星吗？"
     ok: "全部清除"
-  activate_empty:
-    title: "激活空配置文件"
-    body: "此配置文件没有任何自定义内容。激活后将移除所有已安装的 HUD、音效和准星。"
-    ok: "仍然激活"
   tf2_running:
     title: "TF2 正在运行"
     body: "TF2 正在运行；更改将在重启游戏后生效。"

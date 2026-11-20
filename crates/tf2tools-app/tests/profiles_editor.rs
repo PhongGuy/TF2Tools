@@ -254,6 +254,7 @@ fn activate_in_the_editor_applies_the_profile(cx: &mut TestAppContext) {
     let page = open_profiles(cx, &s);
     let _editor = open_editor(cx, &s, &page, comp.id());
     support::click_id(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE);
+    support::confirm_apply_summary(cx, s.win);
     toast_is(
         cx,
         &s,
@@ -483,6 +484,7 @@ fn activate_saves_a_typed_name_first(cx: &mut TestAppContext) {
     let editor = open_editor(cx, &s, &page, comp.id());
     type_name(cx, &s, &editor, "Pubs");
     support::click_id(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE);
+    support::confirm_apply_summary(cx, s.win);
     support::wait_real(cx, "the Active badge", |cx| {
         support::present(cx, s.win, ids::PROFILE_EDITOR_ACTIVE_BADGE)
     });
@@ -1640,7 +1642,7 @@ fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let comp = full_profile(&s, &env, "Comp");
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
@@ -1668,6 +1670,7 @@ fn the_editor_is_read_only_while_its_profile_activates(cx: &mut TestAppContext) 
     })
     .unwrap();
     assert!(cx.update(|cx| page.read(cx).activating().is_some()));
+    support::confirm_apply_summary(cx, s.win);
     support::wait_real(cx, "the activate to end", |cx| {
         cx.update(|cx| page.read(cx).activating().is_none())
     });

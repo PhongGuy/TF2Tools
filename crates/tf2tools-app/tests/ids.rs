@@ -200,6 +200,14 @@ fn profile_ids_are_keyed_by_profile_id() {
             ids::PROFILES_MISSING_DESCRIPTION,
             ids::PROFILES_MISSING_CANCEL,
             ids::PROFILES_MISSING_INSTALL,
+            ids::PROFILE_APPLY_DIALOG,
+            ids::PROFILE_APPLY_TITLE,
+            ids::PROFILE_APPLY_INTRO,
+            ids::PROFILE_APPLY_ROWS,
+            ids::PROFILE_APPLY_NOTHING,
+            ids::PROFILE_APPLY_LEFT,
+            ids::PROFILE_APPLY_CANCEL,
+            ids::PROFILE_APPLY_OK,
         ],
         [
             "profiles-no-tf2",
@@ -208,8 +216,17 @@ fn profile_ids_are_keyed_by_profile_id() {
             "profiles-missing-description",
             "profiles-missing-cancel",
             "profiles-missing-install",
+            "profile-apply-dialog",
+            "profile-apply-title",
+            "profile-apply-intro",
+            "profile-apply-rows",
+            "profile-apply-nothing",
+            "profile-apply-left",
+            "profile-apply-cancel",
+            "profile-apply-ok",
         ]
     );
+    assert_eq!(name(ids::profile_apply_row("hud")), "profile-apply-row:hud");
 }
 
 #[test]

@@ -672,6 +672,11 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, changes your movement keys"
     left: "Stays as it is: %{list}."
+  apply:
+    title: "Switch to %{name}?"
+    intro: "These change now. Everything else stays how it is."
+    nothing: "This already matches what you have now. Applying marks it as your active profile."
+    ok: "Apply %{name}"
   empty:
     title: "No profiles yet"
     body: "Save your current setup as a profile to quickly switch between configurations."
@@ -811,10 +816,6 @@ confirm:
     title: "Clear Crosshairs"
     body: "Remove all crosshairs from this profile?"
     ok: "Clear all"
-  activate_empty:
-    title: "Activate Empty Profile"
-    body: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
-    ok: "Activate Anyway"
   tf2_running:
     title: "TF2 is running"
     body: "TF2 is running; changes take effect after a restart."

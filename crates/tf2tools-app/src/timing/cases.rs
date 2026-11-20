@@ -389,19 +389,19 @@ impl Runner {
                     self.scroll = Some(handle);
                 }
                 self.passed = (0, Instant::now());
-                self.step(window, cx)
+                self.step(cx)
             }
             Phase::Warming(left) => {
                 self.phase = Phase::Warming(left - 1);
                 None
             }
-            Phase::Recording => self.step(window, cx),
+            Phase::Recording => self.step(cx),
         }
     }
 
-    fn step(&mut self, window: &mut Window, cx: &mut App) -> Option<Result<CaseReport, String>> {
+    fn step(&mut self, cx: &mut App) -> Option<Result<CaseReport, String>> {
         match self.case {
-            Case::ProfileApply => self.apply(window, cx),
+            Case::ProfileApply => self.apply(cx),
             Case::SoundStoreNav
             | Case::SoundStoreSearch
             | Case::ProfilesNav
@@ -669,7 +669,7 @@ impl Runner {
 
     // One frame of the apply case: between applies, start the next on the other profile; while
     // one is in flight, count each frame's interval; once it ends, note how long it took.
-    fn apply(&mut self, window: &mut Window, cx: &mut App) -> Option<Result<CaseReport, String>> {
+    fn apply(&mut self, cx: &mut App) -> Option<Result<CaseReport, String>> {
         let now = Instant::now();
         let last = self.last.replace(now);
         self.apply.frames_total += 1;
@@ -712,7 +712,7 @@ impl Runner {
             [a, b, ..] => [a, b][self.actions % 2].id().clone(),
             _ => return Some(Err("profile-apply needs two profiles".into())),
         };
-        page.update(cx, |page, cx| page.activate(id.clone(), window, cx));
+        page.update(cx, |page, cx| page.activate_confirmed(id.clone(), cx));
         // `activate` returns silently when it cannot start; looping would only hit the timeout.
         if page.read(cx).activating().is_none() {
             return Some(Err("profile-apply: activate did not start".into()));

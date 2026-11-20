@@ -525,7 +525,7 @@ fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
     let comp = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });

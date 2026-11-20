@@ -695,6 +695,11 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, cambia tus teclas de movimiento"
     left: "Se queda como está: %{list}."
+  apply:
+    title: "¿Cambiar a %{name}?"
+    intro: "Esto cambia ahora. Todo lo demás se queda como está."
+    nothing: "Esto ya coincide con lo que tienes ahora. Aplicarlo lo marca como tu perfil activo."
+    ok: "Aplicar %{name}"
   empty:
     title: "Aún no hay perfiles"
     body: "Guarda tu configuración actual como perfil para cambiar rápido entre configuraciones."
@@ -834,10 +839,6 @@ confirm:
     title: "Quitar miras"
     body: "¿Quitar todas las miras de este perfil?"
     ok: "Quitar todas"
-  activate_empty:
-    title: "Activar perfil vacío"
-    body: "Este perfil no tiene personalizaciones. Al activarlo se quitarán todos los HUDs, sonidos y miras instalados."
-    ok: "Activar igualmente"
   tf2_running:
     title: "TF2 está abierto"
     body: "TF2 está abierto; los cambios se aplican tras reiniciarlo."

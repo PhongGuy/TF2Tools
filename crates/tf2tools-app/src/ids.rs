@@ -932,6 +932,16 @@ pub const PROFILES_MISSING_DESCRIPTION: &str = "profiles-missing-description";
 pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
 /// The Missing Items dialog's "Install Anyway (skip missing)" button.
 pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
+/// The Apply summary dialog's root, title, intro, bordered rows box, "nothing changes" note,
+/// "Stays as it is" line and its two buttons.
+pub const PROFILE_APPLY_DIALOG: &str = "profile-apply-dialog";
+pub const PROFILE_APPLY_TITLE: &str = "profile-apply-title";
+pub const PROFILE_APPLY_INTRO: &str = "profile-apply-intro";
+pub const PROFILE_APPLY_ROWS: &str = "profile-apply-rows";
+pub const PROFILE_APPLY_NOTHING: &str = "profile-apply-nothing";
+pub const PROFILE_APPLY_LEFT: &str = "profile-apply-left";
+pub const PROFILE_APPLY_CANCEL: &str = "profile-apply-cancel";
+pub const PROFILE_APPLY_OK: &str = "profile-apply-ok";
 /// The New profile main button, which saves the current setup as a new profile.
 pub const PROFILES_NEW: &str = "profiles-new";
 /// The profile editor's root.
@@ -1345,6 +1355,11 @@ pub fn profile_card_line(id: &ProfileId, slot: &str) -> ElementId {
 /// A card's Apply button: "profile-card-apply:<id>".
 pub fn profile_card_apply(id: &ProfileId) -> ElementId {
     keyed("profile-card-apply", id.as_str())
+}
+
+/// A summary row, labelled "<label>: <from> → <to>": "profile-apply-row:<key>".
+pub fn profile_apply_row(key: &str) -> ElementId {
+    keyed("profile-apply-row", key)
 }
 
 /// A card's Edit button: "profile-card-edit:<id>".

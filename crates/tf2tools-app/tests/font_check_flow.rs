@@ -248,7 +248,7 @@ fn a_profile_with_a_hud_checks_its_fonts(cx: &mut TestAppContext) {
         ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     wait_dialog(cx, &s);
     let description = support::label_of(cx, s.win, ids::HUD_FONTS_DESCRIPTION).unwrap();
     assert!(
@@ -271,8 +271,7 @@ fn a_profile_without_a_hud_checks_nothing(cx: &mut TestAppContext) {
         .create_profile(&ProfileDraft::new("Vanilla"))
         .unwrap();
     open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
-    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_apply(cx, s.win, vanilla.id());
     support::wait_real(cx, "the activate toast", |cx| {
         support::toast_labels(cx, s.win)
             .iter()

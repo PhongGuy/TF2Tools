@@ -221,16 +221,6 @@ impl Confirm {
         }
     }
 
-    /// v5's prompt before activating a profile with no HUD, sounds or crosshairs.
-    pub fn activate_empty() -> Self {
-        Self {
-            title: tr!("confirm.activate_empty.title"),
-            description: tr!("confirm.activate_empty.body"),
-            confirm_label: tr!("confirm.activate_empty.ok"),
-            cancel_label: tr!("confirm.cancel"),
-        }
-    }
-
     /// The prompt before removing mastercomfig from TF2.
     pub fn remove_mastercomfig() -> Self {
         Self {

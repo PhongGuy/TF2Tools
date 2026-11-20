@@ -473,7 +473,7 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
@@ -508,33 +508,117 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     );
 }
 
+fn row_label(cx: &mut TestAppContext, s: &support::ShellWindow, key: &str) -> Option<String> {
+    support::label_of(cx, s.win, ids::profile_apply_row(key))
+}
+
 #[gpui_kit::test]
-fn an_empty_profile_confirms_first(cx: &mut TestAppContext) {
+fn apply_first_shows_what_changes_and_cancel_applies_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_TITLE).as_deref(),
+        Some("Switch to Comp?")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_INTRO).as_deref(),
+        Some("These change now. Everything else stays how it is.")
+    );
+    assert_eq!(
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: TF2's own HUD → rayshud")
+    );
+    assert_eq!(
+        row_label(cx, &s, "hitsound").as_deref(),
+        Some("Hitsound: TF2 default → Classic Ding")
+    );
+    assert_eq!(
+        row_label(cx, &s, "killsound").as_deref(),
+        Some("Killsound: TF2 default → Bell")
+    );
+    assert_eq!(
+        row_label(cx, &s, "crosshairs").as_deref(),
+        Some("Crosshairs: TF2's default → 1 weapon")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_LEFT).as_deref(),
+        Some("Stays as it is: Graphics, Add-ons.")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_OK).as_deref(),
+        Some("Apply Comp")
+    );
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
+    support::settle(cx, s.win);
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+    assert!(!env.game.join("tf/custom/rayshud").exists());
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert!(support::log_rows(&s.services).is_empty());
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+}
+
+#[gpui_kit::test]
+fn cancel_in_the_summary_applies_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let vanilla = empty_profile(&s, "Vanilla");
     let page = open_profiles(cx, &s);
     support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+    support::press(cx, s.win, "escape");
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_card_apply(vanilla.id())
+    ));
+}
+
+#[gpui_kit::test]
+fn a_profile_that_matches_says_nothing_changes_and_still_becomes_active(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let _page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
     assert_eq!(
-        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
-        Some("Activate Empty Profile")
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_NOTHING).as_deref(),
+        Some("This already matches what you have now. Applying marks it as your active profile.")
     );
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_ROWS));
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    support::wait_real(cx, "the mark", |_| {
+        s.services.library.active_profile().unwrap() == Some(vanilla.id().clone())
+    });
+}
+
+#[gpui_kit::test]
+fn a_running_tf2_still_asks_after_the_summary(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let _page = open_profiles(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the running confirm", |cx| {
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref() == Some("TF2 is running")
+    });
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     support::settle(cx, s.win);
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
-    assert!(support::log_rows(&s.services).is_empty());
-    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
-    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
-    support::click_id(cx, s.win, ids::CONFIRM_OK);
-    toast_is(
-        cx,
-        &s,
-        "Profile \"Vanilla\" activated. All customizations cleared",
-    );
-    assert_eq!(
-        s.services.library.active_profile().unwrap(),
-        Some(vanilla.id().clone())
-    );
+    assert!(!env.game.join("tf/custom/rayshud").exists());
 }
 
 #[gpui_kit::test]
@@ -544,7 +628,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let page = open_profiles(cx, &s);
     cx.update(|cx| Tf2Probe::install(cx, || true));
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the TF2 warning", |cx| {
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref()
             == Some("TF2 is running; changes take effect after a restart.")
@@ -553,7 +637,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     assert!(!env.game.join("tf/custom/rayshud").exists());
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the TF2 warning", |cx| {
         support::present(cx, s.win, ids::CONFIRM_OK)
     });
@@ -582,7 +666,7 @@ fn the_tf2_probe_runs_off_the_ui_thread(cx: &mut TestAppContext) {
             false
         })
     });
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
@@ -622,6 +706,7 @@ fn a_second_activate_while_one_runs_does_nothing(cx: &mut TestAppContext) {
         cx.update(|cx| page.read(cx).activating().cloned()),
         Some(a.clone())
     );
+    support::confirm_apply_summary(cx, s.win);
     toast_is(
         cx,
         &s,
@@ -657,7 +742,7 @@ fn a_failed_step_toasts_the_steps_and_leaves_nothing_active(cx: &mut TestAppCont
         return;
     }
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the failure toast", |cx| {
         support::label_of(cx, s.win, ids::TOAST).is_some_and(|t| {
             t.starts_with("Failed to activate profile. Couldn't put these in place: HUD")
@@ -717,7 +802,7 @@ fn a_missing_item_opens_the_dialog_and_touches_nothing(cx: &mut TestAppContext) 
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -747,7 +832,7 @@ fn the_missing_items_header_sits_together_like_v5s(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -772,7 +857,7 @@ fn cancel_in_missing_items_changes_nothing(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -791,7 +876,7 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
     });
@@ -845,7 +930,7 @@ fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
         .unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
         support::present(cx, s.win, ids::missing_redownload(0))
     });
@@ -893,11 +978,16 @@ fn nothing_else_starts_while_an_activate_runs(cx: &mut TestAppContext) {
         })
     })
     .unwrap();
+    // Only the first activate's summary opens: no delete confirm, no new profile.
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
     assert!(
-        !has_dialog(cx, &s),
+        !support::present(cx, s.win, ids::CONFIRM_TITLE),
         "no confirm or new profile while activating"
     );
     assert!(cx.update(|cx| page.read(cx).editor().is_none()));
+    support::confirm_apply_summary(cx, s.win);
     toast_is(
         cx,
         &s,
@@ -925,7 +1015,7 @@ fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestApp
         support::disabled_ids(cx, s.win, &buttons),
         Vec::<ElementId>::new()
     );
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -945,7 +1035,7 @@ fn escape_on_missing_items_answers_cancel(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -983,7 +1073,7 @@ fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppCon
         .unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
         support::present(cx, s.win, ids::missing_redownload(0))
     });
@@ -1003,7 +1093,7 @@ fn missing_items_is_padded_like_v5(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });
@@ -1036,7 +1126,7 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
     std::fs::create_dir_all(&mine).unwrap();
     std::fs::write(mine.join("notes.txt"), "mine").unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
@@ -1069,7 +1159,7 @@ fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext
         .create_profile(&ProfileDraft::new("Comp").with_crosshairs(SlotMode::Set(crosshairs)))
         .unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the Missing Items dialog", |cx| {
         support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
     });

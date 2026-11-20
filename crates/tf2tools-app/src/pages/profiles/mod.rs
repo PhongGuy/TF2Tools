@@ -30,7 +30,9 @@ use tf2tools_core::{
 };
 
 use self::editor::ProfileEditor;
-use self::editor_model::{Mode, Slot, SlotKind, card_lines, next_profile_name};
+use self::editor_model::{
+    Mode, Slot, SlotKind, Summary, SummaryRow, card_lines, left_line, next_profile_name, summary,
+};
 use self::probe::Tf2Probe;
 use super::common::{ORANGE_500, SM_ICON_PX, card_frame, no_tf2_warning};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
@@ -62,6 +64,9 @@ const MIN_CARD_WIDTH: Pixels = px(250.);
 // The lead line's flex basis; narrower than this beside New profile, the button wraps under it.
 const LEAD_BASIS: Pixels = px(280.);
 const SLOT_ICON: Pixels = px(14.);
+// The Apply summary dialog and its rows' label column.
+const SUMMARY_WIDTH: Pixels = px(520.);
+const SUMMARY_LABEL_WIDTH: Pixels = px(96.);
 // How much of the next card row the grid's floor shows, so a one-column window reads as a list.
 const NEXT_ROW_PEEK: Pixels = px(48.);
 
@@ -256,30 +261,59 @@ impl ProfilesPage {
 
     /// Starts the activate flow for `id` unless a save, delete or activate runs; does nothing
     /// without TF2.
-    // One future per click chains v5's empty confirm, the TF2-running confirm and the apply;
+    pub fn activate(&mut self, id: ProfileId, _window: &mut Window, cx: &mut Context<Self>) {
+        self.start_activate(id, true, cx);
+    }
+
+    /// `activate` with its Apply summary already answered yes; the timing harness drives
+    /// applies this way, since no one is there to confirm.
+    pub fn activate_confirmed(&mut self, id: ProfileId, cx: &mut Context<Self>) {
+        self.start_activate(id, false, cx);
+    }
+
+    // One future per click chains the Apply summary, the TF2-running confirm and the apply;
     // `activating` is cleared once the chain ends, at whichever step it stopped.
-    pub fn activate(&mut self, id: ProfileId, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_activate(&mut self, id: ProfileId, ask: bool, cx: &mut Context<Self>) {
         if self.is_busy() {
             return;
         }
         let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
             return;
         };
-        let Some(profile) = self.profiles.iter().find(|p| p.id() == &id) else {
+        if !self.profiles.iter().any(|p| p.id() == &id) {
             return;
-        };
-        let empty_answer =
-            model::is_empty(profile).then(|| confirm(Confirm::activate_empty(), window, cx));
+        }
         self.activating = Some(id.clone());
         cx.notify();
+        let reading = ask.then(|| {
+            let (id, tf2) = (id.clone(), tf2.clone());
+            run_blocking(cx, move |s| summary_job(s, &id, &tf2))
+        });
         let probe = Tf2Probe::get(cx);
         let win = self.win;
         cx.spawn(async move |page, cx| {
             let flow = async {
-                if let Some(answer) = empty_answer
-                    && !answer.recv().await.unwrap_or(false)
-                {
-                    return;
+                // The summary asks before the TF2 probe, so a cancelled summary never probes.
+                if let Some(reading) = reading {
+                    let answer = match reading.await {
+                        Ok((name, summary)) => cx.update(|cx| {
+                            win.update(cx, |_, window, cx| {
+                                apply_summary_dialog(&name, &summary, window, cx)
+                            })
+                        }),
+                        Err(err) => {
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| toast_error(window, cx, &err))
+                            });
+                            return;
+                        }
+                    };
+                    let Ok(answer) = answer else {
+                        return;
+                    };
+                    if !answer.recv().await.unwrap_or(false) {
+                        return;
+                    }
                 }
                 if cx.background_spawn(async move { probe() }).await {
                     let Ok(answer) = cx.update(|cx| {
@@ -586,6 +620,188 @@ enum Activation {
 // Reads the profile, carries out `plan`, applies it and writes the activate row for an applied
 // report; a missing item or an unnamed HUD in the way touches nothing, so it becomes a value
 // with no row.
+// Reads the profile, what is installed now and the add-on display names, and words the
+// summary; add-on names only dress the rows, so a failed list falls back to asset names.
+fn summary_job(
+    s: &Services,
+    id: &ProfileId,
+    tf2: &Tf2Install,
+) -> Result<(String, Summary), OpError> {
+    let failed =
+        |e: ProfileError| describe_profile(&e).into_op(tr!("messages.action.activate_profile"));
+    let profile = s.library.profile(id).map_err(failed)?;
+    let current = s.library.current_setup(tf2).map_err(failed)?;
+    let names: HashMap<AddonName, String> = s
+        .library
+        .list_addons(None)
+        .map(|addons| {
+            addons
+                .iter()
+                .map(|a| (a.name().clone(), a.display_name().to_owned()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let addon_name = |name: &AddonName| {
+        names
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| name.as_str().to_owned())
+    };
+    let summary = summary(&profile, &current, &addon_name);
+    Ok((profile.name().to_owned(), summary))
+}
+
+// Opens the Apply summary over the page: what changes, or that nothing does, and the slots left
+// alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and closing answer false.
+fn apply_summary_dialog(
+    name: &str,
+    summary: &Summary,
+    window: &mut Window,
+    cx: &mut App,
+) -> async_channel::Receiver<bool> {
+    let (tx, rx) = async_channel::bounded(1);
+    let title: SharedString = tr!("profiles.apply.title", name = name);
+    let ok_label: SharedString = tr!("profiles.apply.ok", name = name);
+    let left: Option<SharedString> = left_line(&summary.left).map(Into::into);
+    let rows: Rc<[SummaryRow]> = summary.rows.as_slice().into();
+    window.defer(cx, move |window, cx| {
+        let frame = DialogFrame::new(SUMMARY_WIDTH);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            // The builder runs every frame, so each handler clones what it captures.
+            let answer = |said: bool| {
+                let tx = tx.clone();
+                move |_: &_, _: &mut Window, _: &mut App| {
+                    let _ = tx.try_send(said);
+                    true
+                }
+            };
+            let button = |id: &'static str, said: bool| {
+                let tx = tx.clone();
+                Button::new(id).on_click(move |_, window, cx| {
+                    let _ = tx.try_send(said);
+                    window.close_dialog(cx);
+                })
+            };
+            let theme = cx.theme();
+            let (muted, border) = (theme.muted_foreground, theme.border);
+            let changes = if rows.is_empty() {
+                let nothing: SharedString = tr!("profiles.apply.nothing");
+                div()
+                    .id(ids::PROFILE_APPLY_NOTHING)
+                    .aria_label(nothing.clone())
+                    .test_support()
+                    .text_sm()
+                    .child(nothing)
+                    .into_any_element()
+            } else {
+                let last = rows.len() - 1;
+                v_flex()
+                    .id(ids::PROFILE_APPLY_ROWS)
+                    .test_support()
+                    .border_1()
+                    .border_color(border)
+                    .rounded_md()
+                    .children(
+                        rows.iter()
+                            .enumerate()
+                            .map(|(ix, row)| summary_row(row, ix < last, muted, border)),
+                    )
+                    .into_any_element()
+            };
+            let left = left.clone().map(|line| {
+                div()
+                    .id(ids::PROFILE_APPLY_LEFT)
+                    .aria_label(line.clone())
+                    .test_support()
+                    .text_sm()
+                    .text_color(muted)
+                    .child(line)
+            });
+            frame
+                .apply(dialog, &*window, &*cx)
+                .on_ok(answer(false))
+                .on_cancel(answer(false))
+                .child(
+                    frame.measure(
+                        v_flex()
+                            .id(ids::PROFILE_APPLY_DIALOG)
+                            .test_support()
+                            .gap_4()
+                            .child(
+                                v_flex()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .id(ids::PROFILE_APPLY_TITLE)
+                                            .aria_label(title.clone())
+                                            .test_support()
+                                            .text_lg()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(title.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .id(ids::PROFILE_APPLY_INTRO)
+                                            .aria_label(tr!("profiles.apply.intro"))
+                                            .test_support()
+                                            .text_sm()
+                                            .text_color(muted)
+                                            .child(tr!("profiles.apply.intro")),
+                                    ),
+                            )
+                            .child(changes)
+                            .children(left)
+                            .child(
+                                h_flex()
+                                    .justify_end()
+                                    .gap_2()
+                                    .child(
+                                        button(ids::PROFILE_APPLY_CANCEL, false)
+                                            .ghost()
+                                            .label(tr!("confirm.cancel")),
+                                    )
+                                    .child(
+                                        button(ids::PROFILE_APPLY_OK, true)
+                                            .primary()
+                                            .label(ok_label.clone()),
+                                    ),
+                            ),
+                    ),
+                )
+        });
+    });
+    rx
+}
+
+// One summary row: the slot label in a fixed column, then "from → to"; a rule under all but the
+// last row.
+fn summary_row(
+    row: &SummaryRow,
+    rule: bool,
+    muted: gpui_kit::Hsla,
+    border: gpui_kit::Hsla,
+) -> AnyElement {
+    let change = format!("{} → {}", row.from, row.to);
+    h_flex()
+        .id(ids::profile_apply_row(row.key))
+        .aria_label(format!("{}: {change}", row.label))
+        .test_support()
+        .gap_3()
+        .px_3()
+        .py_2()
+        .text_sm()
+        .when(rule, |r| r.border_b_1().border_color(border))
+        .child(
+            div()
+                .w(SUMMARY_LABEL_WIDTH)
+                .flex_none()
+                .text_color(muted)
+                .child(row.label.clone()),
+        )
+        .child(div().flex_1().min_w_0().child(change))
+        .into_any_element()
+}
+
 fn apply_job(
     s: &Services,
     id: &ProfileId,

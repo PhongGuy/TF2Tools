@@ -124,13 +124,6 @@ fn the_profile_confirms_read_like_v5() {
         "Are you sure you want to delete \"Competitive\"? This cannot be undone."
     );
     assert_eq!(delete.confirm_label.as_ref(), "Delete");
-    let empty = Confirm::activate_empty();
-    assert_eq!(empty.title.as_ref(), "Activate Empty Profile");
-    assert_eq!(
-        empty.description.as_ref(),
-        "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
-    );
-    assert_eq!(empty.confirm_label.as_ref(), "Activate Anyway");
     let running = Confirm::tf2_running();
     assert_eq!(running.title.as_ref(), "TF2 is running");
     assert_eq!(

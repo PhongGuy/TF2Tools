@@ -695,6 +695,11 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, ändert deine Bewegungstasten"
     left: "Bleibt, wie es ist: %{list}."
+  apply:
+    title: "Zu %{name} wechseln?"
+    intro: "Das ändert sich jetzt. Alles andere bleibt, wie es ist."
+    nothing: "Das passt schon zu dem, was du jetzt hast. Anwenden macht es zu deinem aktiven Profil."
+    ok: "%{name} anwenden"
   empty:
     title: "Noch keine Profile"
     body: "Speichere dein aktuelles Setup als Profil, um schnell zwischen Konfigurationen zu wechseln."
@@ -834,10 +839,6 @@ confirm:
     title: "Fadenkreuze entfernen"
     body: "Alle Fadenkreuze aus diesem Profil entfernen?"
     ok: "Alle entfernen"
-  activate_empty:
-    title: "Leeres Profil aktivieren"
-    body: "Dieses Profil hat keine Anpassungen. Wenn du es aktivierst, werden alle installierten HUDs, Sounds und Fadenkreuze entfernt."
-    ok: "Trotzdem aktivieren"
   tf2_running:
     title: "TF2 läuft"
     body: "TF2 läuft; Änderungen werden nach einem Neustart wirksam."
