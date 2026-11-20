@@ -1633,6 +1633,11 @@ pub fn sound_play(folder: &str) -> ElementId {
     keyed("sound-play", folder)
 }
 
+/// The spinner inside a library card's play button while its sound loads.
+pub fn sound_play_spinner(folder: &str) -> ElementId {
+    keyed("sound-play-spinner", folder)
+}
+
 /// A library sound card's "VPK" badge; present only for VPK sounds.
 pub fn sound_vpk(folder: &str) -> ElementId {
     keyed("sound-vpk", folder)
@@ -1691,6 +1696,11 @@ pub fn sound_slot_name(kind: SoundKind) -> ElementId {
 /// A slot's play button; present only when installed.
 pub fn sound_slot_play(kind: SoundKind) -> ElementId {
     keyed("sound-slot-play", kind.name())
+}
+
+/// The spinner inside a slot's play button while its installed sound loads.
+pub fn sound_slot_play_spinner(kind: SoundKind) -> ElementId {
+    keyed("sound-slot-play-spinner", kind.name())
 }
 
 /// A slot's Uninstall button; present only when installed.
