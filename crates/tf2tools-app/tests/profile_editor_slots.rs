@@ -18,8 +18,8 @@ use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_app::services::OpError;
 use tf2tools_app::widgets::loadout_board::BoardEvent;
 use tf2tools_core::{
-    Choices, CrosshairRef, DraftCrosshair, DraftItem, Preset, ProfileCrosshairRef, ProfileDraft,
-    SlotMode, SoundKind, TfClass, WeaponSlot,
+    Choices, CrosshairRef, DraftCrosshair, DraftItem, ModuleChoice, Preset, ProfileCrosshairRef,
+    ProfileDraft, SlotMode, SoundKind, TfClass, WeaponSlot,
 };
 
 const SLOTS: [&str; 5] = ["hud", "sounds", "crosshairs", "graphics", "addons"];
@@ -908,6 +908,42 @@ fn graphics_shows_the_presets_rows_and_changes_under_profile_ids(cx: &mut TestAp
         choices.modules().contains_key("fpscap"),
         "the change survives a preset switch"
     );
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn a_choice_the_new_preset_matches_keeps_its_reset(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    let mut choices = Choices::new(Preset::Low);
+    let high = ModuleChoice::Value("high".into());
+    choices.set(&support::module_catalog(), "lod", high.clone());
+    let p = (s.services.library)
+        .create_profile(&ProfileDraft::new("Sharp").with_graphics(SlotMode::Set(choices)))
+        .unwrap();
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    let reset = gfx.id(ids::graphics_module_reset("lod"));
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, reset.clone())
+    });
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
+    support::click_id(cx, s.win, gfx.id(ids::graphics_preset(Preset::High)));
+    support::settle(cx, s.win);
+    // High gives lod=high too, yet the choice still pins it, so its row keeps Reset.
+    let draft = cx.update(|cx| e.read(cx).draft().graphics.clone());
+    assert_eq!(draft.preset(), Preset::High);
+    assert_eq!(draft.get("lod"), Some(&high));
+    assert!(support::present(cx, s.win, reset.clone()));
+    support::click_id(cx, s.win, reset.clone());
+    support::settle(cx, s.win);
+    let draft = cx.update(|cx| e.read(cx).draft().graphics.clone());
+    assert_eq!(draft.get("lod"), None, "Reset clears the choice");
+    assert!(!support::present(cx, s.win, reset));
     assert_eq!(game_files(&env), before);
 }
 
