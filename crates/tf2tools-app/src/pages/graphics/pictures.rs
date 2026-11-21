@@ -23,6 +23,8 @@ pub struct ValuePicture {
 pub struct PictureIndex {
     version: String,
     modules: HashMap<String, HashMap<String, ValuePicture>>,
+    /// Each pictureless setting's reason key, by module.
+    no_picture: HashMap<String, String>,
 }
 
 impl PictureIndex {
@@ -38,8 +40,13 @@ impl PictureIndex {
         };
         let manifest = pictures.manifest();
         let mut modules: HashMap<String, HashMap<String, ValuePicture>> = HashMap::new();
-        // Only real files count: a placeholder or a performance-only setting has no picture.
+        let mut no_picture = HashMap::new();
+        // A no-picture setting keeps only its reason; otherwise only real files count.
         for setting in &manifest.settings {
+            if let Some(reason) = &setting.no_picture {
+                no_picture.insert(setting.module.clone(), reason.clone());
+                continue;
+            }
             for shot in &setting.values {
                 let full = match pictures.picture(&setting.module, &shot.value) {
                     SettingPicture::Picture { path } | SettingPicture::SameAs { path, .. } => path,
@@ -57,12 +64,19 @@ impl PictureIndex {
         Self {
             version: manifest.version.to_string(),
             modules,
+            no_picture,
         }
     }
 
     /// Picture or SameAs only; NoPicture, Placeholder and unknown ids are None.
     pub fn get(&self, module: &str, value: &str) -> Option<&ValuePicture> {
         self.modules.get(module)?.get(value)
+    }
+
+    /// Why `module` has no pictures, as a core reason key; None for a module with pictures
+    /// or outside the manifest.
+    pub fn no_picture(&self, module: &str) -> Option<&str> {
+        self.no_picture.get(module).map(String::as_str)
     }
 
     pub fn has_pictures(&self, module: &str) -> bool {
@@ -73,6 +87,18 @@ impl PictureIndex {
     pub fn url(&self, path: &Path) -> String {
         local_image_url(path, &self.version)
     }
+}
+
+/// The player-facing line for a no-picture reason key; None for a key the app doesn't know.
+pub fn no_picture_note(reason: &str) -> Option<SharedString> {
+    Some(match reason {
+        "performance-only" => tr!("graphics.pictures.no_picture.performance_only"),
+        "same-in-still" => tr!("graphics.pictures.no_picture.same_in_still"),
+        "needs-item" => tr!("graphics.pictures.no_picture.needs_item"),
+        "not-on-local-server" => tr!("graphics.pictures.no_picture.not_on_local_server"),
+        "needs-motion" => tr!("graphics.pictures.no_picture.needs_motion"),
+        _ => return None,
+    })
 }
 
 /// What the open row's compare view shows.

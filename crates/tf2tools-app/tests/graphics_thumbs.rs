@@ -154,3 +154,23 @@ fn a_decoded_thumbnail_is_drawn(cx: &mut TestAppContext) {
         support::present(cx, s.win, ids::graphics_thumb_image("lod"))
     });
 }
+
+#[gpui_kit::test]
+fn a_row_without_pictures_says_why(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", "{}");
+    // lod sits above motion_blur, and reveal only scrolls down.
+    reveal(cx, &s, ids::graphics_thumb("lod"));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::graphics_no_picture("lod")
+    ));
+    reveal(cx, &s, ids::graphics_no_picture("motion_blur"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_no_picture("motion_blur")).as_deref(),
+        Some(
+            "No picture: it looks the same in a still picture. The difference only shows while you move."
+        )
+    );
+}

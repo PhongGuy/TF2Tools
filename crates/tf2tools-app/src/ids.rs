@@ -1149,6 +1149,11 @@ pub fn graphics_pictures_toggle(module: &str) -> ElementId {
     keyed("graphics-pictures-toggle", module)
 }
 
+/// The muted line saying why a row's setting has no pictures.
+pub fn graphics_no_picture(module: &str) -> ElementId {
+    keyed("graphics-no-picture", module)
+}
+
 /// A row's "Learn more" link to the mastercomfig docs: "graphics-learn-more:<module>".
 pub fn graphics_learn_more(module: &str) -> ElementId {
     keyed("graphics-learn-more", module)

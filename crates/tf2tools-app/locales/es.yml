@@ -3066,6 +3066,12 @@ graphics:
     full: "Imagen completa"
     wipe: "Desliza entre la imagen del preajuste y la tuya"
     caption: "Haz clic en una imagen para usar ese ajuste."
+    no_picture:
+      performance_only: "Sin imagen: este ajuste cambia el rendimiento, no el aspecto del juego."
+      same_in_still: "Sin imagen: en una imagen fija se ve igual. La diferencia solo se nota en movimiento."
+      needs_item: "Sin imagen: solo se ve con cierto objeto, cosmético o spray."
+      not_on_local_server: "Sin imagen: no se ve en la partida local usada para las imágenes."
+      needs_motion: "Sin imagen: la diferencia solo se nota en movimiento."
   changes:
     title: { one: "%{count} cambio respecto a %{preset}", other: "%{count} cambios respecto a %{preset}" }
     as_is: "Usando %{preset} tal cual. Cambia cualquier ajuste de abajo y aparecerá aquí."

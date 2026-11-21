@@ -5,11 +5,11 @@ use crate::support;
 use std::path::PathBuf;
 
 use tf2tools_app::pages::graphics::pictures::{
-    Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, row_pictures,
+    Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, no_picture_note, row_pictures,
 };
 use tf2tools_app::pages::graphics::view::row;
 use tf2tools_app::remote_images::local_image_url;
-use tf2tools_core::{Choices, ModuleChoice, Preset};
+use tf2tools_core::{Choices, ModuleChoice, Preset, REASON_KEYS};
 
 const MANIFEST: &str = r#"{
   "version": 3, "mastercomfig": "9.100.1", "size": [960, 540], "map": "itemtest", "base": {},
@@ -308,4 +308,32 @@ fn the_zoom_toggle_shows_only_when_every_compared_side_has_a_crop() {
         "a lone whole picture"
     );
     assert!(!has_zoom(Preset::Custom, None), "nothing to compare");
+}
+
+#[test]
+fn the_index_keeps_why_a_setting_has_no_picture() {
+    let tmp = folder();
+    let index = PictureIndex::open(tmp.path());
+    assert_eq!(index.no_picture("vsync"), Some("performance-only"));
+    assert_eq!(index.no_picture("lod"), None, "it has pictures");
+    assert_eq!(index.no_picture("shadows"), None, "outside the manifest");
+    let bundled = PictureIndex::open(&bundled());
+    assert_eq!(bundled.no_picture("motion_blur"), Some("same-in-still"));
+    assert_eq!(bundled.no_picture("tracers"), Some("same-in-still"));
+}
+
+#[test]
+fn every_no_picture_reason_has_a_note() {
+    let _lock = tf2tools_app::i18n::test_lock();
+    for reason in REASON_KEYS {
+        let note = no_picture_note(reason).unwrap_or_else(|| panic!("{reason}"));
+        assert!(!note.contains("graphics."), "{reason}: {note}");
+    }
+    assert_eq!(
+        no_picture_note("same-in-still").as_deref(),
+        Some(
+            "No picture: it looks the same in a still picture. The difference only shows while you move."
+        )
+    );
+    assert_eq!(no_picture_note("made-up"), None);
 }
