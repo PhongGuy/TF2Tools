@@ -366,3 +366,61 @@ fn at_800x600_the_crumb_fits_the_header(cx: &mut TestAppContext) {
         "the name truncates before Cancel"
     );
 }
+
+// Windows draws the kit's three 34 px window controls in the title bar, leaving the slot 190 px
+// at 800x600. The test platform draws none, so a window 102 px narrower gives Linux that slot.
+#[gpui_kit::test]
+fn in_a_header_narrowed_by_window_controls_cancel_and_save_still_fit(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let comp = hud_profile(
+        &s,
+        "A rather long profile name for the header",
+        &seeded.rayshud,
+    );
+    cx.simulate_window_resize(s.win, size(px(800. - 3. * 34.), px(600.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, comp.id());
+    let header = support::bounds_of(cx, s.win, ids::HEADER_SLOT).unwrap();
+    assert!(
+        (header.size.width - px(190.)).abs() <= px(2.),
+        "the slot is Windows' at 800x600: {header:?}"
+    );
+    for id in [
+        ids::PROFILE_EDITOR_CRUMB_NAME,
+        ids::PROFILE_EDITOR_CANCEL,
+        ids::PROFILE_EDITOR_SAVE,
+    ] {
+        let b = support::bounds_of(cx, s.win, id).unwrap();
+        assert!(
+            b.right() <= header.right() + px(1.) && b.left() >= header.left() - px(1.),
+            "{id} {b:?} leaves {header:?}"
+        );
+    }
+    let cancel = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CANCEL).unwrap();
+    let name = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CRUMB_NAME).unwrap();
+    assert!(
+        name.right() <= cancel.left(),
+        "the name truncates before Cancel"
+    );
+    assert!(
+        !support::present(cx, s.win, ids::PROFILE_EDITOR_CRUMB),
+        "\"Profiles /\" gives way once the name has none left to give"
+    );
+}
+
+#[gpui_kit::test]
+fn a_short_name_in_a_wide_header_keeps_the_profiles_link(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let comp = hud_profile(&s, "Comp", &seeded.rayshud);
+    let page = page(cx, &s);
+    edit(cx, &s, &page, comp.id());
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_CRUMB));
+    assert_eq!(
+        label(cx, &s, ids::PROFILE_EDITOR_CRUMB_NAME).as_deref(),
+        Some("Comp")
+    );
+}

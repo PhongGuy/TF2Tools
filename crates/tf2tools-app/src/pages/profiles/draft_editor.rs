@@ -13,8 +13,10 @@ use gpui_kit::{
     AnyElement, AnyView, App, AppContext as _, Context, Div, Entity, EventEmitter, FocusHandle,
     FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, Role,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, deferred, div, point, px, transparent_black,
+    TestSupportExt as _, WeakEntity, Window, canvas, deferred, div, point, px, transparent_black,
 };
+use std::cell::Cell;
+use std::rc::Rc;
 use tf2tools_core::{
     Choices, CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId,
     SoundKind,
@@ -166,6 +168,7 @@ impl ProfileDraftEditor {
         let editor = cx.entity();
         let crumb = cx.new(|cx| EditorCrumb {
             editor: editor.downgrade(),
+            fit: Rc::default(),
             _observe: cx.observe(&editor, |_, _, cx| cx.notify()),
         });
         // Focus starts inside the editor, so Esc reaches its key context.
@@ -827,7 +830,48 @@ impl Render for ProfileDraftEditor {
 // with the editor it reads.
 struct EditorCrumb {
     editor: WeakEntity<ProfileDraftEditor>,
+    fit: Rc<CrumbFit>,
     _observe: Subscription,
+}
+
+// The painted widths that decide whether "Profiles /" fits. The link keeps its last width
+// while hidden, so it comes back once the row has room for it again.
+#[derive(Default)]
+struct CrumbFit {
+    row: Cell<Pixels>,
+    nav: Cell<Pixels>,
+    actions: Cell<Pixels>,
+}
+
+// The space between the crumb's parts.
+const CRUMB_GAP: Pixels = px(8.);
+
+impl CrumbFit {
+    // The name shrinks to nothing first; only then does the link give way to Cancel and Save.
+    fn shows_nav(&self) -> bool {
+        self.nav.get() + self.actions.get() + CRUMB_GAP * 2. <= self.row.get()
+    }
+}
+
+// Records its parent's painted width in `cell`; a change asks for another frame, since a
+// refresh requested while drawing is dropped.
+fn width_watch(
+    cell: impl Fn(&CrumbFit) -> &Cell<Pixels> + 'static,
+    fit: &Rc<CrumbFit>,
+) -> impl IntoElement {
+    let fit = Rc::clone(fit);
+    canvas(
+        move |bounds, window, _| {
+            let cell = cell(&fit);
+            if cell.get() != bounds.size.width {
+                cell.set(bounds.size.width);
+                window.request_animation_frame();
+            }
+        },
+        |_, _, _, _| {},
+    )
+    .absolute()
+    .size_full()
 }
 
 impl Render for EditorCrumb {
@@ -850,28 +894,39 @@ impl Render for EditorCrumb {
                 editor.update(cx, |_, cx| cx.emit(EditorEvent::Close));
             }
         };
+        let fit = &self.fit;
+        let nav = fit.shows_nav().then(|| {
+            h_flex()
+                .relative()
+                .flex_none()
+                .gap(CRUMB_GAP)
+                .child(width_watch(|f| &f.nav, fit))
+                .child(
+                    div()
+                        .id(ids::PROFILE_EDITOR_CRUMB)
+                        .aria_label(nav.clone())
+                        .test_support()
+                        .flex_none()
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .hover(move |link| link.text_color(foreground))
+                        .child(nav)
+                        .on_click(close.clone()),
+                )
+                .child(div().flex_none().text_color(muted).child("/"))
+        });
         h_flex()
             .id(ids::PROFILE_EDITOR_HEADER)
             .aria_label(tr!("profiles.editor.header_label"))
             .test_support()
+            .relative()
             .w_full()
             .min_w_0()
             .items_center()
-            .gap_2()
+            .gap(CRUMB_GAP)
             .text_lg()
-            .child(
-                div()
-                    .id(ids::PROFILE_EDITOR_CRUMB)
-                    .aria_label(nav.clone())
-                    .test_support()
-                    .flex_none()
-                    .cursor_pointer()
-                    .text_color(muted)
-                    .hover(move |link| link.text_color(foreground))
-                    .child(nav)
-                    .on_click(close.clone()),
-            )
-            .child(div().flex_none().text_color(muted).child("/"))
+            .child(width_watch(|f| &f.row, fit))
+            .children(nav)
             .child(
                 div()
                     .id(ids::PROFILE_EDITOR_CRUMB_NAME)
@@ -884,22 +939,29 @@ impl Render for EditorCrumb {
                     .child(name),
             )
             .child(
-                Button::new(ids::PROFILE_EDITOR_CANCEL)
-                    .ghost()
+                h_flex()
+                    .relative()
                     .flex_none()
-                    .label(tr!("confirm.cancel"))
-                    .on_click(close),
-            )
-            .child(
-                Button::new(ids::PROFILE_EDITOR_SAVE)
-                    .primary()
-                    .flex_none()
-                    .label(tr!("profiles.editor.save"))
-                    .loading(busy)
-                    .disabled(busy || blocked)
-                    .on_click(move |_, window, cx| {
-                        editor.update(cx, |e, cx| e.save(window, cx));
-                    }),
+                    .gap(CRUMB_GAP)
+                    .child(width_watch(|f| &f.actions, fit))
+                    .child(
+                        Button::new(ids::PROFILE_EDITOR_CANCEL)
+                            .ghost()
+                            .flex_none()
+                            .label(tr!("confirm.cancel"))
+                            .on_click(close),
+                    )
+                    .child(
+                        Button::new(ids::PROFILE_EDITOR_SAVE)
+                            .primary()
+                            .flex_none()
+                            .label(tr!("profiles.editor.save"))
+                            .loading(busy)
+                            .disabled(busy || blocked)
+                            .on_click(move |_, window, cx| {
+                                editor.update(cx, |e, cx| e.save(window, cx));
+                            }),
+                    ),
             )
             .into_any_element()
     }
