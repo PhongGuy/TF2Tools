@@ -89,7 +89,6 @@ fn only_real_pictures_count_and_a_shared_look_borrows_the_other_file() {
     assert_eq!(index.get("shadows", "low"), None, "outside the manifest");
     assert!(index.has_pictures("lod") && index.has_pictures("decals"));
     assert!(!index.has_pictures("vsync") && !index.has_pictures("shadows"));
-    assert!(index.has_zoom("lod") && !index.has_zoom("decals"));
     let path = dir.join("lod/low.webp");
     assert_eq!(index.url(&path), local_image_url(&path, "3"));
 }

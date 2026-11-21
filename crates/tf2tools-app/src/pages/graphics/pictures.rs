@@ -69,13 +69,6 @@ impl PictureIndex {
         self.modules.contains_key(module)
     }
 
-    /// Any value of `module` has a zoom file.
-    pub fn has_zoom(&self, module: &str) -> bool {
-        self.modules
-            .get(module)
-            .is_some_and(|values| values.values().any(|p| p.zoom.is_some()))
-    }
-
     /// The image key URL for a bundled picture, versioned by the manifest.
     pub fn url(&self, path: &Path) -> String {
         local_image_url(path, &self.version)
