@@ -13,6 +13,7 @@ mod status;
 pub mod view;
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -45,7 +46,7 @@ use model::{
     foreign_modules_cfg, own_modules_cfg_kept, preset_label, status_card,
 };
 use pictures::PictureIndex;
-use view::Filter;
+use view::{Filter, SectionView};
 
 pub use editor::{ChoicesEdit, GraphicsChoicesEditor};
 
@@ -103,6 +104,9 @@ pub struct GraphicsPage {
     language: &'static str,
     /// "Changed only" is on: the list shows only rows that differ from the preset.
     changed_only: bool,
+    /// The filtered sections the last frame drew, with the rows generation and filter they
+    /// were cut from; a frame with neither changed reuses them.
+    listed: Option<(u64, Filter, Rc<[SectionView]>)>,
     /// Each shown section's child index in the scroll column, from the last render.
     section_items: BTreeMap<String, usize>,
     /// The search toolbar's child index in the scroll column, from the last render.
@@ -180,6 +184,7 @@ impl GraphicsPage {
             search,
             language: i18n::current(),
             changed_only: false,
+            listed: None,
             section_items: BTreeMap::new(),
             toolbar_item: None,
             scroll: ScrollHandle::new(),
@@ -831,11 +836,23 @@ impl Render for GraphicsPage {
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
         let filter = self.filter(cx);
+        let generation = self.editor.update(cx, |e, _| {
+            e.follow_language();
+            e.rows_generation()
+        });
+        if self
+            .listed
+            .as_ref()
+            .is_none_or(|(g, f, _)| *g != generation || *f != filter)
+        {
+            let sections = self.editor.read(cx).sections(&filter);
+            self.listed = Some((generation, filter, sections.into()));
+        }
         let sections = self
-            .catalog
-            .as_deref()
-            .filter(|_| self.preset().is_some())
-            .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
+            .listed
+            .as_ref()
+            .filter(|_| self.catalog.is_some() && self.preset().is_some())
+            .map(|(_, _, sections)| Rc::clone(sections));
         // A row the search or "Changed only" hides takes its open pictures with it, before
         // this frame's image wants are gathered, so it never reopens when it shows again.
         if let (Some(sections), Some(open)) = (&sections, self.open_row.as_deref()) {

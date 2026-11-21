@@ -64,6 +64,7 @@ mod gb_addon_log;
 mod gb_map_installs;
 mod global_player;
 mod graphics;
+mod graphics_built_rows;
 mod graphics_cards;
 mod graphics_changes;
 mod graphics_compare;

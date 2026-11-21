@@ -20,9 +20,9 @@ use gpui_kit::{
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
 use super::model::{ValueOption, preset_label, scoped_value_options, shown_choice};
-use super::pictures::{self, PictureIndex};
-use super::view;
-use crate::i18n::{counted_plural, tr};
+use super::pictures::{self, PictureIndex, RowPictures};
+use super::view::{self, BuiltRows};
+use crate::i18n::{self, counted_plural, tr};
 use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
 use crate::remote_images::{ImageKey, RemoteImages};
@@ -62,6 +62,16 @@ pub struct GraphicsChoicesEditor {
     zoom: bool,
     /// The image keys the last frame asked for.
     wanted: Vec<ImageKey>,
+    /// The open row, zoom or rows changed since `wanted` was gathered.
+    wants_stale: bool,
+    /// Every row under the shown choices, rebuilt by `rebuild` and read by every frame.
+    built: BuiltRows,
+    /// Each row's full-picture set, for the modules with pictures; rebuilt with the rows.
+    thumbs: BTreeMap<String, RowPictures>,
+    /// The language the rows were worded in.
+    language: &'static str,
+    /// Bumped by each rebuild of the rows.
+    generation: u64,
     /// This editor's own `RemoteImages` viewer, so two editors never clear each other's wants.
     image_viewer: String,
     _subscriptions: Vec<Subscription>,
@@ -97,7 +107,7 @@ impl GraphicsChoicesEditor {
                 images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
             }));
         }
-        Self {
+        let mut editor = Self {
             scope,
             choices,
             catalog: None,
@@ -109,9 +119,55 @@ impl GraphicsChoicesEditor {
             wipe,
             zoom: false,
             wanted: Vec::new(),
+            wants_stale: true,
+            built: BuiltRows::default(),
+            thumbs: BTreeMap::new(),
+            language: i18n::current(),
+            generation: 0,
             image_viewer,
             _subscriptions: subscriptions,
+        };
+        editor.rebuild();
+        editor
+    }
+
+    // Builds the rows and their pictures from the catalog, choices, pictures and language,
+    // so the frames until the next change only read them.
+    fn rebuild(&mut self) {
+        self.language = i18n::current();
+        self.built = BuiltRows::build(self.catalog.as_deref(), &self.choices);
+        self.thumbs = self
+            .pictures
+            .as_deref()
+            .map_or_else(BTreeMap::new, |index| {
+                self.built
+                    .rows()
+                    .filter_map(|row| {
+                        let pictures = pictures::row_pictures(index, row, false)?;
+                        Some((row.module.clone(), pictures))
+                    })
+                    .collect()
+            });
+        self.generation += 1;
+        self.wants_stale = true;
+    }
+
+    /// Rewords the rows when the app's language changed since they were built; a host calls
+    /// it before reading them each frame.
+    pub fn follow_language(&mut self) {
+        if self.language != i18n::current() {
+            self.rebuild();
         }
+    }
+
+    /// How many times the rows were built; it moves only when what they show changes.
+    pub fn rows_generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// The sections under the shown choices, cut down to what `filter` admits.
+    pub fn sections(&self, filter: &view::Filter) -> Vec<view::SectionView> {
+        self.built.sections(filter)
     }
 
     /// The id scope the editor draws under.
@@ -127,7 +183,10 @@ impl GraphicsChoicesEditor {
     /// Shows `choices` and moves every Select to its shown value, even when the choices are
     /// unchanged, so a pick the host refused moves back; notifies.
     pub fn set_choices(&mut self, choices: Choices, window: &mut Window, cx: &mut Context<Self>) {
-        self.choices = choices;
+        if self.choices != choices {
+            self.choices = choices;
+            self.rebuild();
+        }
         self.show_choices(window, cx);
         cx.notify();
     }
@@ -145,15 +204,19 @@ impl GraphicsChoicesEditor {
         cx: &mut Context<Self>,
     ) {
         self.catalog = catalog;
+        self.rebuild();
         self.build_selects(window, cx);
         cx.notify();
     }
 
     /// `module`'s row as the list draws it; None without a catalog or for an unknown module.
     pub fn row(&self, module: &str) -> Option<view::RowView> {
-        let catalog = self.catalog.as_ref()?;
-        let module = catalog.module(module)?;
-        Some(view::row(catalog, &self.choices, module))
+        self.built.row(module).cloned()
+    }
+
+    // `module`'s built row and its full-picture set, for drawing.
+    pub(super) fn built_row(&self, module: &str) -> Option<(&view::RowView, Option<&RowPictures>)> {
+        Some((self.built.row(module)?, self.thumbs.get(module)))
     }
 
     /// The Select state of `module`'s row, while it is a Select row of the catalog.
@@ -212,6 +275,7 @@ impl GraphicsChoicesEditor {
     /// Takes the bundled setting pictures the rows draw from; notifies.
     pub fn set_pictures(&mut self, pictures: Option<Arc<PictureIndex>>, cx: &mut Context<Self>) {
         self.pictures = pictures;
+        self.rebuild();
         cx.notify();
     }
 
@@ -260,18 +324,21 @@ impl GraphicsChoicesEditor {
                 .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
             Some(module.to_owned())
         };
+        self.wants_stale = true;
         cx.notify();
     }
 
     // Closes the open row's pictures, if any; notifies only when one was open.
     pub(super) fn close_pictures(&mut self, cx: &mut Context<Self>) {
         if self.open_row.take().is_some() {
+            self.wants_stale = true;
             cx.notify();
         }
     }
 
     pub(super) fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
         self.zoom = !self.zoom;
+        self.wants_stale = true;
         cx.notify();
     }
 
@@ -279,28 +346,22 @@ impl GraphicsChoicesEditor {
     // current thumbnail of every row with pictures; every thumbnail is wanted, not only the
     // visible ones.
     fn image_keys(&self) -> Vec<ImageKey> {
-        let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
-        else {
+        let Some(index) = self.pictures.as_deref() else {
             return Vec::new();
         };
         let open = self
             .open_row
             .as_deref()
-            .and_then(|module| self.row(module))
-            .and_then(|row| pictures::row_pictures(index, &row, self.zoom));
+            .and_then(|module| self.built.row(module))
+            .and_then(|row| pictures::row_pictures(index, row, self.zoom));
         let (compared, strip) = open
             .map(|p| (p.compare.pictures(), p.strip))
             .unwrap_or_default();
-        let thumbs = catalog
-            .categories()
-            .iter()
-            .flat_map(|category| category.modules())
-            .filter(|module| index.has_pictures(module.name()))
-            .filter_map(|module| {
-                let row = view::row(catalog, &self.choices, module);
-                pictures::row_pictures(index, &row, false)?.thumb
-            })
-            .map(|thumb| ImageKey::card(&index.url(&thumb)));
+        let thumbs = self
+            .built
+            .rows()
+            .filter_map(|row| self.thumbs.get(&row.module)?.thumb.as_ref())
+            .map(|thumb| ImageKey::card(&index.url(thumb)));
         compared
             .into_iter()
             .map(|picture| ImageKey::carousel(&index.url(&picture)))
@@ -312,6 +373,10 @@ impl GraphicsChoicesEditor {
     /// Hands the image cache this frame's picture wants; a host calls it once per frame it
     /// draws rows. The cache hears of a change after the draw, so no entity updates mid-render.
     pub fn want_images(&mut self, cx: &mut Context<Self>) {
+        self.follow_language();
+        if !std::mem::take(&mut self.wants_stale) {
+            return;
+        }
         let keys = self.image_keys();
         if keys == self.wanted {
             return;
@@ -362,7 +427,7 @@ impl GraphicsChoicesEditor {
         let (accent, fill) = (theme.sidebar_primary, theme.background);
         let preset = preset_label(self.choices.preset());
         let catalog = self.catalog.as_deref();
-        let list = view::changes(catalog, &self.choices);
+        let list = self.built.changes();
         if list.is_empty() {
             return labelled(
                 div()
@@ -391,7 +456,7 @@ impl GraphicsChoicesEditor {
         );
         let editable = catalog.is_some();
         let chips: Vec<AnyElement> = list
-            .into_iter()
+            .iter()
             .map(|change| {
                 // A saved value the preset now matches names itself once, not "High → High".
                 let was = change.was.clone().filter(|_| !change.same);
@@ -453,11 +518,15 @@ impl GraphicsChoicesEditor {
                     .border_color(accent)
                     .bg(fill)
                     .rounded_full()
-                    .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
+                    .child(
+                        div()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(change.label.clone()),
+                    )
                     .children(
                         was.map(|was| h_flex().gap(px(6.)).text_color(muted).child(was).child("→")),
                     )
-                    .child(change.now)
+                    .child(change.now.clone())
                     .children(undo)
                     .into_any_element()
             })
