@@ -700,6 +700,9 @@ profiles:
     loading: "Reading what you have now…"
     note_title: "Filled in from what you have now"
     hud_empty: "No HUDs in your library yet."
+    xh_everywhere: "Put on every weapon"
+    xh_on: { one: "On %{count} weapon", other: "On %{count} weapons" }
+    xh_pick_first: "Pick a crosshair, then click a weapon"
   toast:
     saved: "%{name} saved."
     saved_active: "%{name} saved. Apply it to use the changes."

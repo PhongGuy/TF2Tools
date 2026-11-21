@@ -5,13 +5,19 @@ use crate::support;
 use gpui_kit::component::select::SelectEvent;
 use gpui_kit::{AppContext as _, TestAppContext, px, size};
 use support::graphics::found;
-use support::profiles::{edit, game_files, page, seed};
+use support::profiles::{edit, game_files, page, seed, type_name};
 use tf2tools_app::audio::player::{NowPlaying, sound_player};
 use tf2tools_app::ids;
+use tf2tools_app::loadout::BoardTarget;
+use tf2tools_app::pages::profiles::draft_editor::BoardRef;
 use tf2tools_app::pages::profiles::draft_editor::SoundOption;
 use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_app::services::OpError;
-use tf2tools_core::{DraftItem, ProfileDraft, SlotMode, SoundKind};
+use tf2tools_app::widgets::loadout_board::BoardEvent;
+use tf2tools_core::{
+    CrosshairRef, DraftCrosshair, DraftItem, ProfileCrosshairRef, ProfileDraft, SlotMode,
+    SoundKind, TfClass, WeaponSlot,
+};
 
 const SLOTS: [&str; 5] = ["hud", "sounds", "crosshairs", "graphics", "addons"];
 
@@ -478,4 +484,288 @@ fn a_playing_sound_reads_stop(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::PROFILE_SOUND_HIT_PLAY).as_deref(),
         Some("Play")
     );
+}
+
+fn xh_profile(s: &support::ShellWindow) -> tf2tools_core::Profile {
+    let draft = ProfileDraft::new("Aim").with_crosshairs(SlotMode::Set(Vec::new()));
+    s.services.library.create_profile(&draft).unwrap()
+}
+
+#[gpui_kit::test]
+fn a_board_click_puts_the_picked_crosshair_on_that_weapon(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    assert!(support::present(cx, s.win, xh.id(ids::CROSSHAIRS_BOARD)));
+    assert!(support::disabled_of(cx, s.win, ids::PROFILE_XH_EVERYWHERE));
+    let dot = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
+    let picker = cx.update(|cx| e.read(cx).picker().clone());
+    cx.update(|cx| picker.update(cx, |p, cx| p.select(Some(dot.clone()), cx)));
+    support::settle(cx, s.win);
+    // The board sits below the fold at the test window's size, so jump to its card first.
+    support::click_id(cx, s.win, ids::profile_rail("crosshairs"));
+    support::click_id(
+        cx,
+        s.win,
+        xh.id(ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary)),
+    );
+    let shown = cx.update(|cx| e.read(cx).draft().crosshairs.clone());
+    assert!(!shown.is_empty(), "the scout's primaries took it");
+    let label = support::label_of(cx, s.win, ids::PROFILE_XH_SELECTION).unwrap();
+    assert!(
+        label.contains(&format!("On {} weapon", shown.len())),
+        "{label}"
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    assert_eq!(saved.crosshairs().as_set().map(Vec::len), Some(shown.len()));
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn put_on_every_weapon_covers_the_whole_board(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    let dot = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
+    let picker = cx.update(|cx| e.read(cx).picker().clone());
+    cx.update(|cx| picker.update(cx, |p, cx| p.select(Some(dot), cx)));
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::PROFILE_XH_EVERYWHERE);
+    let every = BoardTarget::Everything.scripts().len();
+    assert_eq!(cx.update(|cx| e.read(cx).draft().crosshairs.len()), every);
+}
+
+#[gpui_kit::test]
+fn other_board_events_change_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    for event in [
+        BoardEvent::Open(TfClass::Pyro, WeaponSlot::Secondary),
+        BoardEvent::Close,
+    ] {
+        cx.update_window(s.win, |_, window, cx| {
+            e.update(cx, |e, cx| e.board_event(event, window, cx))
+        })
+        .unwrap();
+    }
+    assert!(!cx.update(|cx| e.read(cx).is_dirty()));
+}
+
+#[gpui_kit::test]
+fn add_to_profile_from_crosshairs_sets_the_slot(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Bare"))
+        .unwrap();
+    let page = page(cx, &s);
+    let dot = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
+    let id = p.id().clone();
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |pg, cx| {
+            pg.open_with_crosshair(id, dot.clone(), window, cx)
+        })
+    })
+    .unwrap();
+    support::wait_real(cx, "the editor", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_some())
+    });
+    support::settle(cx, s.win);
+    let e = cx.update(|cx| page.read(cx).editor()).unwrap();
+    assert_eq!(
+        cx.update(|cx| e.read(cx).draft().mode(SlotKind::Crosshairs)),
+        Mode::Set
+    );
+    assert!(cx.update(|cx| e.read(cx).is_dirty()));
+    assert_eq!(
+        cx.update(|cx| e.read(cx).picker().read(cx).selected().cloned()),
+        Some(dot)
+    );
+}
+
+fn library_xh_profile(
+    s: &support::ShellWindow,
+    env: &support::Env,
+) -> (tf2tools_core::Profile, tf2tools_core::CrosshairEntry) {
+    let entry = support::seed_crosshair(&s.services, env, "mine");
+    let set = DraftCrosshair::Set {
+        weapon_script: "tf_weapon_scattergun".into(),
+        crosshair: CrosshairRef::Library(entry.id().clone()),
+    };
+    let p = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Mine").with_crosshairs(SlotMode::Set(vec![set])))
+        .unwrap();
+    (p, entry)
+}
+
+#[gpui_kit::test]
+fn a_saved_library_crosshair_shows_on_the_board(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let (p, entry) = library_xh_profile(&s, &env);
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    let early = cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun"));
+    assert!(
+        !matches!(early, Some(BoardRef::Waiting(_))),
+        "never waiting before the library loads: {early:?}"
+    );
+    support::wait_real(cx, "the mapping", |cx| {
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun").is_some())
+    });
+    assert_eq!(
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun")),
+        Some(BoardRef::Shown(CrosshairRef::Library(entry.id().clone())))
+    );
+    assert_eq!(
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_pistol")),
+        None
+    );
+}
+
+#[gpui_kit::test]
+fn a_deleted_library_crosshair_waits_and_survives_save(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let (p, entry) = library_xh_profile(&s, &env);
+    s.services.library.delete_crosshair(entry.id()).unwrap();
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the mapping", |cx| {
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun").is_some())
+    });
+    assert_eq!(
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun")),
+        Some(BoardRef::Waiting(entry.folder_name().to_owned()))
+    );
+    type_name(cx, &s, &e, "Mine 2");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    let kept = saved.crosshairs().as_set().unwrap();
+    assert_eq!(
+        kept[0].crosshair(),
+        &ProfileCrosshairRef::Library {
+            folder_name: entry.folder_name().to_owned()
+        },
+        "the kept entry is saved unchanged"
+    );
+}
+
+#[gpui_kit::test]
+fn assigning_a_library_crosshair_saves_its_folder(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let entry = support::seed_crosshair(&s.services, &env, "mine");
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    let picker = cx.update(|cx| e.read(cx).picker().clone());
+    cx.update(|cx| {
+        picker.update(cx, |p, cx| {
+            p.select(Some(CrosshairRef::Library(entry.id().clone())), cx)
+        })
+    });
+    support::settle(cx, s.win);
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    // The board sits below the fold at the test window's size, so jump to its card first.
+    support::click_id(cx, s.win, ids::profile_rail("crosshairs"));
+    support::click_id(
+        cx,
+        s.win,
+        xh.id(ids::loadout_cell(TfClass::Sniper, WeaponSlot::Melee)),
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    let set = saved.crosshairs().as_set().unwrap();
+    assert!(!set.is_empty());
+    assert!(set.iter().all(|c| c.crosshair()
+        == &ProfileCrosshairRef::Library {
+            folder_name: entry.folder_name().to_owned()
+        }));
+}
+
+#[gpui_kit::test]
+fn at_1280x800_the_crosshairs_card_holds_its_strip_and_board(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = xh_profile(&s);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(800.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    let card = support::bounds_of(cx, s.win, ids::profile_slot("crosshairs")).unwrap();
+    for id in [
+        xh.id(ids::CROSSHAIRS_BOARD),
+        ids::PROFILE_XH_SELECTION.into(),
+        ids::PROFILE_XH_EVERYWHERE.into(),
+    ] {
+        let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        assert!(
+            b.left() >= card.left() && b.right() <= card.right() + px(1.),
+            "{id:?} {b:?} leaves {card:?}"
+        );
+    }
+    let board = support::bounds_of(cx, s.win, xh.id(ids::CROSSHAIRS_BOARD)).unwrap();
+    assert!(
+        board.size.width >= card.size.width * 0.8,
+        "the board fills the card: {board:?} in {card:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_strips_import_adds_the_crosshair_and_picks_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let path = env.tmp.path().join("Ring.png");
+    std::fs::write(&path, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let files = std::sync::Arc::new(tf2tools_app::picker::ScriptedPicker::new([path]));
+    let s = support::shell_window_with(cx, &env, found(&env), files, support::no_steam());
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    support::click_id(cx, s.win, xh.id(ids::CROSSHAIRS_IMPORT));
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let entries = s.services.library.list_crosshairs().unwrap();
+    assert_eq!(entries.len(), 1);
+    let ring = CrosshairRef::Library(entries[0].id().clone());
+    assert_eq!(
+        cx.update(|cx| e.read(cx).picker().read(cx).selected().cloned()),
+        Some(ring.clone())
+    );
+    support::wait_real(cx, "the library to list it", |cx| {
+        cx.update(|cx| e.read(cx).picker().read(cx).name_of(&ring).is_some())
+    });
+    // The success toast sits over the button, so assign as Put on every weapon does.
+    cx.update(|cx| e.update(cx, |e, cx| e.assign(BoardTarget::Everything, cx)));
+    assert_eq!(
+        cx.update(|cx| e.read(cx).board_ref("tf_weapon_scattergun")),
+        Some(BoardRef::Shown(ring))
+    );
+    assert_eq!(game_files(&env), before);
 }

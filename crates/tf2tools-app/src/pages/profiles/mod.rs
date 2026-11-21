@@ -249,13 +249,13 @@ impl ProfilesPage {
         self.show_editor(profile, window, cx);
     }
 
-    /// Opens the editor for `id` with its Crosshairs slot Set, saving nothing; a profile that
-    /// can't be read toasts its error and leaves the grid.
+    /// Opens `id` with `crosshair` selected; a None or Leave Crosshairs slot becomes Set. Saves
+    /// nothing; a profile that can't be read toasts its error and leaves the grid.
     // Reads the one profile at once rather than waiting for the page's first load.
     pub fn open_with_crosshair(
         &mut self,
         id: ProfileId,
-        _crosshair: CrosshairRef,
+        crosshair: CrosshairRef,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -268,7 +268,10 @@ impl ProfilesPage {
         };
         self.show_editor(profile, window, cx);
         if let Some(editor) = self.editor() {
-            editor.update(cx, |e, cx| e.set_mode(SlotKind::Crosshairs, Mode::Set, cx));
+            editor.update(cx, |e, cx| {
+                e.set_mode(SlotKind::Crosshairs, Mode::Set, cx);
+                (e.picker.clone()).update(cx, |picker, cx| picker.select(Some(crosshair), cx));
+            });
         }
     }
 

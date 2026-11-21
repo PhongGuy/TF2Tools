@@ -1,4 +1,4 @@
-//! The draft editor's HUD and Sounds Set bodies, and the library they pick from.
+//! The draft editor's HUD, Sounds and Crosshairs Set bodies, and the library they pick from.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -12,32 +12,41 @@ use gpui_kit::{
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
     px,
 };
-use tf2tools_core::{DraftItem, HudEntry, HudId, LibraryError, SoundEntry, SoundId, SoundKind};
+use tf2tools_core::{
+    CrosshairEntry, CrosshairId, CrosshairRef, DraftCrosshair, DraftItem, HudEntry, HudId,
+    LibraryError, ProfileCrosshairRef, SoundEntry, SoundId, SoundKind,
+};
 
-use super::draft_editor::{ProfileDraftEditor, SoundOption};
-use super::editor_model::{Picked, SlotKind};
+use super::draft_editor::{BoardRef, ProfileDraftEditor, SoundOption};
+use super::editor_model::{Picked, SlotKind, WeaponPick};
 use crate::audio::player::NowPlaying;
 use crate::i18n::names::sound_kind_name;
-use crate::i18n::tr;
-use crate::ids;
+use crate::i18n::{plural, tr};
+use crate::ids::{self, IdScope};
+use crate::library_events::LibraryEvents;
+use crate::loadout::{BoardTarget, Loadout};
 use crate::local_messages::describe_library;
 use crate::pages::common::card_frame;
+use crate::pages::crosshairs::{added_message, import_job};
 use crate::pages::huds::{card_images, hud_picture};
 use crate::pages::sounds::{sound_key, with_play_state};
+use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::services::{OpError, run_blocking};
+use crate::services::{OpError, Services, run_blocking};
 use crate::shell::route::{NavigateTo, Page};
-use crate::shell::toast::toast_error;
+use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
+use crate::widgets::loadout_board::{BOARD_COLUMNS, BoardBusy, BoardEvent, LoadoutBoard, OnBoard};
 
 /// A HUD tile's width in the wrapping grid.
 const HUD_TILE_WIDTH: f32 = 200.;
 
-/// What the HUD and Sounds bodies pick from: the library HUDs with their card pictures by
-/// folder, and the library sounds by name.
+/// What the Set bodies pick from: the library HUDs with their card pictures by folder, the
+/// library sounds by name, and the library crosshairs.
 pub(super) struct Library {
     huds: Rc<[HudEntry]>,
     sounds: Rc<[SoundEntry]>,
+    crosshairs: Rc<[CrosshairEntry]>,
     images: Rc<HashMap<String, String>>,
 }
 
@@ -53,8 +62,9 @@ impl ProfileDraftEditor {
             let huds = s.library.list_huds().map_err(failed)?;
             let mut sounds = s.library.list_sounds().map_err(failed)?;
             sounds.sort_by_key(|sound| sound.name().to_lowercase());
+            let crosshairs = s.library.list_crosshairs().map_err(failed)?;
             let images = card_images(s, &huds);
-            Ok((huds, sounds, images))
+            Ok((huds, sounds, crosshairs, images))
         });
         let win = window.window_handle();
         cx.spawn(async move |editor, cx| {
@@ -66,10 +76,15 @@ impl ProfileDraftEditor {
                             return;
                         }
                         match loaded {
-                            Ok((huds, sounds, images)) => {
+                            Ok((huds, sounds, crosshairs, images)) => {
+                                let crosshairs: Rc<[CrosshairEntry]> = crosshairs.into();
+                                let listed = Rc::clone(&crosshairs);
+                                e.picker
+                                    .update(cx, |picker, cx| picker.set_library(listed, cx));
                                 e.library = Some(Library {
                                     huds: huds.into(),
                                     sounds: sounds.into(),
+                                    crosshairs,
                                     images: Rc::new(images),
                                 });
                                 e.sync_sound_selects(window, cx);
@@ -202,9 +217,8 @@ impl ProfileDraftEditor {
         match slot {
             SlotKind::Hud => self.hud_body(cx),
             SlotKind::Sounds => self.sounds_body(cx),
-            SlotKind::Crosshairs | SlotKind::Graphics | SlotKind::Addons => {
-                div().into_any_element()
-            }
+            SlotKind::Crosshairs => self.crosshairs_body(cx),
+            SlotKind::Graphics | SlotKind::Addons => div().into_any_element(),
         }
     }
 
@@ -363,6 +377,229 @@ impl ProfileDraftEditor {
                     editor.preview(folder, name, cx);
                 }
             }))
+    }
+}
+
+impl ProfileDraftEditor {
+    /// What the board shows for `script`: None for an unassigned weapon and, for a library
+    /// crosshair, until the library list has loaded.
+    pub fn board_ref(&self, script: &str) -> Option<BoardRef> {
+        let pick = self.draft.crosshairs.iter().find(|p| p.script == script)?;
+        match &pick.shows {
+            ProfileCrosshairRef::Builtin(name) => {
+                Some(BoardRef::Shown(CrosshairRef::Builtin(name.clone())))
+            }
+            ProfileCrosshairRef::Library { folder_name } => {
+                let library = self.library.as_ref()?;
+                let entry = (library.crosshairs.iter()).find(|c| c.folder_name() == folder_name);
+                Some(match entry {
+                    Some(entry) => BoardRef::Shown(CrosshairRef::Library(entry.id().clone())),
+                    None => BoardRef::Waiting(folder_name.clone()),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Writes the picked crosshair onto every weapon `target` covers, in the draft only.
+    pub fn assign(&mut self, target: BoardTarget, cx: &mut Context<Self>) {
+        let Some(crosshair) = self.picker.read(cx).selected().cloned() else {
+            return;
+        };
+        let shows = match &crosshair {
+            CrosshairRef::Builtin(name) => ProfileCrosshairRef::Builtin(name.clone()),
+            CrosshairRef::Library(id) => {
+                let entry = (self.library.iter())
+                    .flat_map(|l| l.crosshairs.iter())
+                    .find(|c| c.id() == id);
+                let Some(entry) = entry else {
+                    return;
+                };
+                ProfileCrosshairRef::Library {
+                    folder_name: entry.folder_name().to_owned(),
+                }
+            }
+            _ => return,
+        };
+        let scripts = target.scripts();
+        self.edit(
+            |d| {
+                d.crosshairs
+                    .retain(|p| !scripts.contains(&p.script.as_str()));
+                d.crosshairs.extend(scripts.iter().map(|script| WeaponPick {
+                    script: (*script).to_owned(),
+                    shows: shows.clone(),
+                    item: DraftCrosshair::Set {
+                        weapon_script: (*script).to_owned(),
+                        crosshair: crosshair.clone(),
+                    },
+                }));
+                d.crosshairs.sort_by(|a, b| a.script.cmp(&b.script));
+            },
+            cx,
+        );
+    }
+
+    /// The board's OnBoard target: Assign calls `assign`, every other event is ignored.
+    pub fn board_event(&mut self, event: BoardEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if let BoardEvent::Assign(target) = event {
+            self.assign(target, cx);
+        }
+    }
+
+    // Picks an image, imports it as the Crosshairs page does, then reloads the library and
+    // selects the new crosshair; a cancel only stops the spinner.
+    pub(super) fn import_crosshair(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let picking = (cx.global::<Services>().picker).pick(PickKind::CrosshairImage, cx);
+        self.picker
+            .update(cx, |picker, cx| picker.set_importing(true, cx));
+        let win = window.window_handle();
+        cx.spawn(async move |editor, cx| {
+            let imported = match picking.await {
+                Some(path) => {
+                    let importing = cx.update(|cx| run_blocking(cx, move |s| import_job(s, &path)));
+                    Some(importing.await)
+                }
+                None => None,
+            };
+            let _ = cx.update(|cx| {
+                win.update(cx, |_, window, cx| {
+                    let _ = editor.update(cx, |e, cx| e.imported(imported, window, cx));
+                })
+            });
+        })
+        .detach();
+    }
+
+    // The import's answer: a new crosshair toasts, is selected and joins the library lists.
+    fn imported(
+        &mut self,
+        imported: Option<Result<CrosshairEntry, OpError>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.picker
+            .update(cx, |picker, cx| picker.set_importing(false, cx));
+        match imported {
+            Some(Ok(entry)) => {
+                let title = tr!("crosshairs_page.toast.imported");
+                toast(
+                    window,
+                    cx,
+                    ToastKind::Success,
+                    title,
+                    SharedString::from(added_message(&entry)),
+                );
+                LibraryEvents::changed(cx);
+                let picked = Some(CrosshairRef::Library(entry.id().clone()));
+                self.picker
+                    .update(cx, |picker, cx| picker.select(picked, cx));
+                self.load_library(window, cx);
+            }
+            Some(Err(err)) => toast_error(window, cx, &err),
+            None => {}
+        }
+    }
+
+    // The strip, the selection line with Put on every weapon, then the board over the draft.
+    fn crosshairs_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        let picker = self.picker.read(cx);
+        let selected = picker.selected().cloned();
+        // A weapon waiting on a deleted library crosshair is drawn as an unknown one, by folder.
+        let shown: Vec<(String, CrosshairRef)> = (self.draft.crosshairs.iter())
+            .filter_map(|p| {
+                let crosshair = match self.board_ref(&p.script)? {
+                    BoardRef::Shown(crosshair) => crosshair,
+                    BoardRef::Waiting(folder) => CrosshairRef::Library(CrosshairId::new(folder)),
+                };
+                Some((p.script.clone(), crosshair))
+            })
+            .collect();
+        let on_selected = (shown.iter())
+            .filter(|(_, c)| Some(c) == selected.as_ref())
+            .count();
+        let name_of = |crosshair: &CrosshairRef| {
+            picker
+                .name_of(crosshair)
+                .unwrap_or_else(|| match crosshair {
+                    CrosshairRef::Builtin(name) => name.clone(),
+                    CrosshairRef::Library(id) => id.to_string(),
+                    _ => String::new(),
+                })
+        };
+        let theme = cx.theme();
+        let (label, line) = match &selected {
+            Some(crosshair) => {
+                let count = plural("profiles.editor.xh_on", on_selected as u64);
+                let name = name_of(crosshair);
+                let line = h_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                            .child(name.clone()),
+                    )
+                    .child(
+                        div()
+                            .text_color(theme.muted_foreground)
+                            .child(count.clone()),
+                    );
+                (SharedString::from(format!("{name}. {count}")), line)
+            }
+            None => {
+                let pick_first = tr!("profiles.editor.xh_pick_first");
+                let line = (h_flex().text_color(theme.muted_foreground)).child(pick_first.clone());
+                (pick_first, line)
+            }
+        };
+        let editor = cx.entity().downgrade();
+        let everywhere = Button::new(ids::PROFILE_XH_EVERYWHERE)
+            .outline()
+            .small()
+            .label(tr!("profiles.editor.xh_everywhere"))
+            .disabled(selected.is_none() || self.busy)
+            .on_click(move |_, _, cx| {
+                let _ = editor.update(cx, |e, cx| e.assign(BoardTarget::Everything, cx));
+            });
+        let selection = h_flex()
+            .id(ids::PROFILE_XH_SELECTION)
+            .aria_label(label)
+            .test_support()
+            .flex_wrap()
+            .items_center()
+            .justify_between()
+            .gap_3()
+            .text_sm()
+            .child(line)
+            .child(everywhere);
+        let editor = cx.entity().downgrade();
+        let on: OnBoard = Rc::new(move |event, window, cx| {
+            let _ = editor.update(cx, |e, cx| e.board_event(event, window, cx));
+        });
+        let loadout = Loadout::new(shown, Vec::new());
+        let turned = self.card_width < BOARD_COLUMNS;
+        let board = LoadoutBoard {
+            loadout: &loadout,
+            scope: IdScope::PROFILE_CROSSHAIRS,
+            turned,
+            short_names: !turned && self.card_width < px(1100.),
+            selected: selected.as_ref(),
+            focus: None,
+            busy: if self.busy {
+                BoardBusy::Other
+            } else {
+                BoardBusy::Idle
+            },
+            previews: &self.previews,
+            name_of: &name_of,
+        }
+        .board(on, cx);
+        v_flex()
+            .gap_4()
+            .child(self.picker.clone())
+            .child(selection)
+            .child(board)
+            .into_any_element()
     }
 }
 

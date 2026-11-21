@@ -15,7 +15,9 @@ use gpui_kit::{
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
 };
-use tf2tools_core::{LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId, SoundKind};
+use tf2tools_core::{
+    CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId, SoundKind,
+};
 
 use super::ProfilesPage;
 use super::draft_slots::{Library, on_sound_confirm};
@@ -23,17 +25,19 @@ use super::editor_model::{self, Draft, Mode, SaveBlock, SlotKind};
 use crate::activity;
 use crate::audio::player::{Player, sound_player};
 use crate::i18n::tr;
-use crate::ids;
+use crate::ids::{self, IdScope};
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
 use crate::pages::graphics::pill;
+use crate::previews::CrosshairPreviews;
 use crate::remote_images::RemoteImages;
 use crate::services::{OpError, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
 use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
+use crate::widgets::crosshair_picker::{CrosshairPicker, ImportCrosshair};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 
@@ -48,6 +52,9 @@ pub const RAIL_ROW_BELOW: Pixels = px(900.);
 
 /// The space between the rail and the cards beside it.
 const RAIL_GUTTER: Pixels = px(24.);
+
+/// A slot card's padding plus its border, each side.
+const CARD_INSET: Pixels = px(17.);
 
 /// What the editor asks of the page that hosts it.
 #[derive(Debug, Clone)]
@@ -71,6 +78,14 @@ impl EventEmitter<EditorEvent> for ProfileDraftEditor {}
 pub struct SoundOption {
     pub id: Option<SoundId>,
     pub label: SharedString,
+}
+
+/// What the Crosshairs board shows for one weapon of the draft.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoardRef {
+    Shown(CrosshairRef),
+    /// A library crosshair, by folder, that the library no longer has.
+    Waiting(String),
 }
 
 impl SelectItem for SoundOption {
@@ -111,6 +126,11 @@ pub struct ProfileDraftEditor {
     pub(super) library_generation: u64,
     /// The app's floating player, which plays the previews.
     pub(super) player: Entity<Player>,
+    /// The Crosshairs body's gallery strip, whose selection the board assigns.
+    pub(super) picker: Entity<CrosshairPicker>,
+    pub(super) previews: Entity<CrosshairPreviews>,
+    /// The slot cards' inner width last frame, which turns and shortens the board.
+    pub(super) card_width: Pixels,
     /// This editor's own `RemoteImages` viewer, handed back on release.
     pub(super) image_viewer: String,
     _subscriptions: Vec<Subscription>,
@@ -147,6 +167,16 @@ impl ProfileDraftEditor {
         // editor's picture wants go when it does.
         let player = sound_player(window, cx);
         subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
+        // The strip's selection and the board's pictures both redraw the Crosshairs body.
+        let picker = cx.new(|cx| CrosshairPicker::strip(IdScope::PROFILE_CROSSHAIRS, window, cx));
+        subscriptions.push(cx.observe(&picker, |_, _, cx| cx.notify()));
+        subscriptions.push(cx.subscribe_in(
+            &picker,
+            window,
+            |editor, _, _: &ImportCrosshair, window, cx| editor.import_crosshair(window, cx),
+        ));
+        let previews = CrosshairPreviews::global(cx);
+        subscriptions.push(cx.observe(&previews, |_, _, cx| cx.notify()));
         let image_viewer = format!("profile-draft-editor:{}", cx.entity_id());
         if let Some(images) = RemoteImages::global(cx) {
             subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
@@ -160,6 +190,9 @@ impl ProfileDraftEditor {
             library: None,
             library_generation: 0,
             player,
+            picker,
+            previews,
+            card_width: px(0.),
             image_viewer,
             hit_select,
             kill_select,
@@ -191,6 +224,11 @@ impl ProfileDraftEditor {
         } else {
             &self.kill_select
         }
+    }
+
+    /// The Crosshairs body's gallery strip.
+    pub fn picker(&self) -> &Entity<CrosshairPicker> {
+        &self.picker
     }
 
     pub fn draft(&self) -> &Draft {
@@ -617,7 +655,16 @@ fn slot_text(slot: SlotKind, mode: Mode) -> SharedString {
 
 impl Render for ProfileDraftEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < RAIL_ROW_BELOW;
+        let content = window.viewport_size().width - SHELL_CHROME_WIDTH;
+        let narrow = content < RAIL_ROW_BELOW;
+        // A card's lane less the side rail when it stands beside, then the card's own padding.
+        let lane_width = (content - CONTENT_PADDING * 2.).min(px(BODY_MAX_WIDTH));
+        let beside = if narrow {
+            px(0.)
+        } else {
+            RAIL_WIDTH + RAIL_GUTTER
+        };
+        self.card_width = lane_width - beside - CARD_INSET * 2.;
         // Each card is a direct child of the scroll column so the rail can scroll to it by
         // index; the narrow rail row comes first, the wide rail hangs off the first card.
         self.cards_from = if narrow { 2 } else { 1 };

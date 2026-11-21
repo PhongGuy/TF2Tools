@@ -725,6 +725,9 @@ profiles:
     loading: "Lecture de ce que vous avez en ce moment…"
     note_title: "Rempli avec ce que vous avez en ce moment"
     hud_empty: "Aucun HUD dans votre bibliothèque pour l'instant."
+    xh_everywhere: "Mettre sur toutes les armes"
+    xh_on: { one: "Sur %{count} arme", other: "Sur %{count} armes" }
+    xh_pick_first: "Choisissez un viseur, puis cliquez sur une arme"
   toast:
     saved: "%{name} enregistré."
     saved_active: "%{name} enregistré. Applique-le pour utiliser les changements."

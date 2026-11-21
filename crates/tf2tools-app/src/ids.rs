@@ -1009,6 +1009,10 @@ pub const PROFILE_SOUND_KILL_PLAY: &str = "profile-sound-kill-play";
 pub const PROFILE_SOUND_HIT_PLAY_SPINNER: &str = "profile-sound-hit-play-spinner";
 /// The spinner in the Killsound play button while its sound loads.
 pub const PROFILE_SOUND_KILL_PLAY_SPINNER: &str = "profile-sound-kill-play-spinner";
+/// The Crosshairs Set body's "Put on every weapon" button.
+pub const PROFILE_XH_EVERYWHERE: &str = "profile-xh-everywhere";
+/// The Crosshairs Set body's line naming the picked crosshair and how many weapons show it.
+pub const PROFILE_XH_SELECTION: &str = "profile-xh-selection";
 
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {

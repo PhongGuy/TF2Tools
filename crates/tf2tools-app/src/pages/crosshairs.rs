@@ -3,6 +3,7 @@
 //! saves into TF2 on its own through `CrosshairSync`; each cell opens its per-weapon list.
 
 use std::cell::Cell;
+use std::path::Path;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -509,25 +510,7 @@ impl CrosshairsPage {
                 Some(path) => page.run(
                     Busy::Import,
                     move |s| {
-                        let name = path
-                            .file_stem()
-                            .map_or_else(|| "crosshair".into(), |stem| stem.to_string_lossy());
-                        let crosshair = s
-                            .library
-                            .import_crosshair(&path, &name, Provenance::Local)
-                            .map_err(|e| {
-                                describe_import(&e).into_op(tr!("messages.action.import_crosshair"))
-                            })?;
-                        // The source path is developer detail, so it goes to tracing only.
-                        tracing::info!(source = %path.display(), "imported a crosshair");
-                        let entry = NewLogEntry::new(
-                            LogLevel::Info,
-                            "crosshair",
-                            "import",
-                            tr!("crosshairs_page.activity.imported", name = crosshair.name()),
-                        );
-                        activity::write(s, &entry);
-                        let added = added_message(&crosshair);
+                        let added = added_message(&import_job(s, &path)?);
                         Ok(Some((
                             ToastKind::Success,
                             tr!("crosshairs_page.toast.imported"),
@@ -1083,6 +1066,28 @@ impl CrosshairsPage {
             }
         }
     }
+}
+
+/// Imports the PNG or VTF at `path` into the library under the file's stem and logs it, as
+/// the Crosshairs page's Import does; core rejects any other file.
+pub(crate) fn import_job(s: &Services, path: &Path) -> Result<CrosshairEntry, OpError> {
+    let name = path
+        .file_stem()
+        .map_or_else(|| "crosshair".into(), |stem| stem.to_string_lossy());
+    let crosshair = s
+        .library
+        .import_crosshair(path, &name, Provenance::Local)
+        .map_err(|e| describe_import(&e).into_op(tr!("messages.action.import_crosshair")))?;
+    // The source path is developer detail, so it goes to tracing only.
+    tracing::info!(source = %path.display(), "imported a crosshair");
+    let entry = NewLogEntry::new(
+        LogLevel::Info,
+        "crosshair",
+        "import",
+        tr!("crosshairs_page.activity.imported", name = crosshair.name()),
+    );
+    activity::write(s, &entry);
+    Ok(crosshair)
 }
 
 /// The toast line for a crosshair just added to the library, naming the numbered name it

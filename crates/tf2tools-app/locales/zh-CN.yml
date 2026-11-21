@@ -722,6 +722,9 @@ profiles:
     loading: "正在读取你当前的设置…"
     note_title: "已按你当前的设置填好"
     hud_empty: "你的库里还没有 HUD。"
+    xh_everywhere: "用于所有武器"
+    xh_on: { other: "用于 %{count} 把武器" }
+    xh_pick_first: "先选一个准星，再点击一把武器"
   toast:
     saved: "%{name} 已保存。"
     saved_active: "%{name} 已保存。应用它以使用这些更改。"

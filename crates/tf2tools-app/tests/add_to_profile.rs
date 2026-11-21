@@ -323,12 +323,12 @@ fn open_crosshairs(cx: &mut TestAppContext, s: &support::ShellWindow) {
 }
 
 /// Picks profile `p` from the selection panel's menu and checks the Profiles page opened `p`'s
-/// editor with its Crosshairs slot Set and nothing saved.
+/// editor with its Crosshairs slot Set, `crosshair` picked on its board and nothing saved.
 fn pick_opens_editor(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
     p: &Profile,
-    _crosshair: CrosshairRef,
+    crosshair: CrosshairRef,
 ) {
     support::click_id(cx, s.win, ids::CROSSHAIRS_ADD_TO_PROFILE);
     support::click_id(cx, s.win, ids::crosshair_profile_pick(p.id()));
@@ -346,15 +346,19 @@ fn pick_opens_editor(
     });
     support::settle(cx, s.win);
     let editor = cx.update(|cx| page.read(cx).editor()).expect("the editor");
-    let (id, mode) = cx.update(|cx| {
+    let (id, mode, picked) = cx.update(|cx| {
         let e = editor.read(cx);
         (
             e.profile_id().cloned(),
             e.draft().mode(SlotKind::Crosshairs),
+            e.picker().read(cx).selected().cloned(),
         )
     });
     assert_eq!(id.as_ref(), Some(p.id()), "the picked profile's editor");
     assert_eq!(mode, Mode::Set, "its Crosshairs slot Set");
+    assert_eq!(picked, Some(crosshair), "with the crosshair picked");
+    let board = ids::IdScope::PROFILE_CROSSHAIRS.id(ids::CROSSHAIRS_BOARD);
+    assert!(support::present(cx, s.win, board), "on the board");
     assert_eq!(
         reload(s, p)
             .crosshairs()

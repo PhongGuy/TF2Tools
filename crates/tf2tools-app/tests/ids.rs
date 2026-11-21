@@ -677,6 +677,8 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_SOUND_KILL_PLAY,
             ids::PROFILE_SOUND_HIT_PLAY_SPINNER,
             ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
+            ids::PROFILE_XH_EVERYWHERE,
+            ids::PROFILE_XH_SELECTION,
         ],
         [
             "profiles-new",
@@ -700,6 +702,8 @@ fn profile_editor_ids_are_stable() {
             "profile-sound-kill-play",
             "profile-sound-hit-play-spinner",
             "profile-sound-kill-play-spinner",
+            "profile-xh-everywhere",
+            "profile-xh-selection",
         ]
     );
 }
