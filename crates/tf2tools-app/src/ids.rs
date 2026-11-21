@@ -1028,6 +1028,8 @@ pub const PROFILE_GFX_SETTINGS: &str = "profile-gfx-settings";
 pub const PROFILE_GFX_NO_CATALOG: &str = "profile-gfx-no-catalog";
 /// The Add-ons Set body's "Only these" switch.
 pub const PROFILE_ADDONS_ONLY: &str = "profile-addons-only";
+/// The "Only these" row's title, which flips its switch.
+pub const PROFILE_ADDONS_ONLY_NAME: &str = "profile-addons-only-name";
 /// The Add-ons card's line while Graphics is None.
 pub const PROFILE_ADDONS_NEED_GRAPHICS: &str = "profile-addons-need-graphics";
 /// The Add-ons Set body's line when the library has no add-ons.
@@ -1446,6 +1448,11 @@ pub fn profile_hud_shot(folder: &str) -> ElementId {
 /// A HUD tile's picture, keyed by folder: "profile-hud-image:<folder>".
 pub fn profile_hud_image(folder: &str) -> ElementId {
     keyed("profile-hud-image", folder)
+}
+
+/// An add-on row's name, which flips its switch: "profile-addon-name:<asset>".
+pub fn profile_addon_name(name: &str) -> ElementId {
+    keyed("profile-addon-name", name)
 }
 
 /// An add-on's switch in the Add-ons Set body, keyed by asset name: "profile-addon:<asset>".

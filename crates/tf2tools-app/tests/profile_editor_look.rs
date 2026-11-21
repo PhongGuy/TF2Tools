@@ -261,3 +261,117 @@ fn the_name_is_read_only_while_saving(cx: &mut TestAppContext) {
     );
     assert_eq!(game_files(&env), before);
 }
+
+fn many_addons(s: &support::ShellWindow, env: &support::Env) -> tf2tools_core::Profile {
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    for i in 0..22 {
+        let name = format!("mastercomfig-addon-test-{i:02}.vpk");
+        support::seed_library_addon(&s.services, env, &name, "9.100.1", &vpk, false);
+    }
+    let draft = ProfileDraft::new("Many")
+        .with_graphics(SlotMode::Set(low_fps60()))
+        .with_addons(SlotMode::Set((Vec::new(), true)));
+    s.services.library.create_profile(&draft).unwrap()
+}
+
+#[gpui_kit::test]
+fn the_narrow_rail_never_rises_over_the_header(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = many_addons(&s, &env);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the add-on rows", |cx| {
+        support::present(
+            cx,
+            s.win,
+            ids::profile_addon("mastercomfig-addon-test-21.vpk"),
+        )
+    });
+    let down = ScrollDelta::Lines(point(0., -1000.));
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(ids::PROFILE_EDITOR_BODY, down, cx)
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let body = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_BODY).unwrap();
+    let rail = support::bounds_of(cx, s.win, ids::PROFILE_RAIL).unwrap();
+    let addons = support::bounds_of(cx, s.win, ids::profile_slot("addons")).unwrap();
+    assert!(
+        addons.top() < body.top(),
+        "the last card scrolled past: {addons:?}"
+    );
+    assert!(
+        rail.top() >= body.top() - px(1.),
+        "{rail:?} stays inside {body:?}"
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_CANCEL);
+    assert!(
+        cx.update(|cx| page.read(cx).editor().is_none()),
+        "Cancel answers past the rail"
+    );
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn a_narrow_rail_jump_shows_the_card_title_below_the_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = many_addons(&s, &env);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the add-on rows", |cx| {
+        support::present(
+            cx,
+            s.win,
+            ids::profile_addon("mastercomfig-addon-test-21.vpk"),
+        )
+    });
+    for slot in ["graphics", "addons"] {
+        support::click_id(cx, s.win, ids::profile_rail(slot));
+        let rail = support::bounds_of(cx, s.win, ids::PROFILE_RAIL).unwrap();
+        let card = support::bounds_of(cx, s.win, ids::profile_slot(slot)).unwrap();
+        let help = support::bounds_of(cx, s.win, ids::profile_slot_help(slot)).unwrap();
+        assert!(
+            card.top() >= rail.bottom() - px(1.) && card.top() <= rail.bottom() + px(24.),
+            "{slot}: {card:?} just below {rail:?}"
+        );
+        assert!(help.top() >= rail.bottom(), "{slot}: the help line shows");
+    }
+}
+
+#[gpui_kit::test]
+fn clicking_an_addon_name_flips_its_switch(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(4000.)));
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the switches", |cx| {
+        support::present(cx, s.win, ids::profile_addon(FLAT))
+    });
+    support::click_id(cx, s.win, ids::profile_addon_name(FLAT));
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_addon(FLAT)),
+        Some(true)
+    );
+    support::click_id(cx, s.win, ids::profile_addon_name(PYRO));
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_addon(PYRO)),
+        Some(false)
+    );
+    support::click_id(cx, s.win, ids::PROFILE_ADDONS_ONLY_NAME);
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::PROFILE_ADDONS_ONLY),
+        Some(false)
+    );
+    let draft = cx.update(|cx| e.read(cx).draft().clone());
+    assert_eq!(draft.addons.len(), 1);
+    assert!(!draft.only_these);
+    assert_eq!(game_files(&env), before);
+}

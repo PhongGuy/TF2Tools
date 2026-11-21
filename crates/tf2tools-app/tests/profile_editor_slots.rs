@@ -880,8 +880,6 @@ fn graphics_shows_the_presets_rows_and_changes_under_profile_ids(cx: &mut TestAp
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     support::seed_mastercomfig_catalog(&env, "9.100.1");
     let p = gfx_profile(&s, &env);
-    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
-    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());
@@ -902,6 +900,7 @@ fn graphics_shows_the_presets_rows_and_changes_under_profile_ids(cx: &mut TestAp
         !support::present(cx, s.win, ids::graphics_row("fpscap")),
         "no Graphics page ids"
     );
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
     support::click_id(cx, s.win, gfx.id(ids::graphics_preset(Preset::High)));
     let choices = cx.update(|cx| e.read(cx).draft().graphics.clone());
     assert_eq!(choices.preset(), Preset::High);
@@ -989,12 +988,11 @@ fn a_preset_switch_without_a_catalog_keeps_the_module_changes(cx: &mut TestAppCo
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let p = gfx_profile(&s, &env);
-    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
-    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());
     let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
     support::click_id(cx, s.win, gfx.id(ids::graphics_preset(Preset::High)));
     let choices = cx.update(|cx| e.read(cx).draft().graphics.clone());
     assert_eq!(choices.preset(), Preset::High);
@@ -1053,11 +1051,10 @@ fn addons_set_is_disabled_while_graphics_is_none(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let p = gfx_profile(&s, &env);
-    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
-    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
     support::click_id(cx, s.win, ids::profile_slot_mode("graphics", "none"));
     assert_eq!(
         cx.update(|cx| e.read(cx).draft().mode(SlotKind::Addons)),
@@ -1072,11 +1069,13 @@ fn addons_set_is_disabled_while_graphics_is_none(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::PROFILE_ADDONS_NEED_GRAPHICS).as_deref(),
         Some("Add-ons need mastercomfig, and Graphics is set to None")
     );
+    support::click_id(cx, s.win, ids::profile_rail("addons"));
     support::click_id(cx, s.win, ids::profile_slot_mode("addons", "set"));
     assert_eq!(
         cx.update(|cx| e.read(cx).draft().mode(SlotKind::Addons)),
         Mode::None
     );
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
     support::click_id(cx, s.win, ids::profile_slot_mode("graphics", "leave"));
     assert!(!support::disabled_of(
         cx,

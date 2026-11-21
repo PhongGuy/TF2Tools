@@ -653,6 +653,7 @@ fn profile_editor_ids_are_stable() {
             "profile-hud-image:rayshud",
         ),
         (ids::profile_slot_modes("hud"), "profile-slot-modes:hud"),
+        (ids::profile_addon_name("a.vpk"), "profile-addon-name:a.vpk"),
         (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
@@ -687,6 +688,7 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_XH_EVERYWHERE,
             ids::PROFILE_XH_SELECTION,
             ids::PROFILE_GFX_SETTINGS,
+            ids::PROFILE_ADDONS_ONLY_NAME,
         ],
         [
             "profiles-new",
@@ -714,6 +716,7 @@ fn profile_editor_ids_are_stable() {
             "profile-xh-everywhere",
             "profile-xh-selection",
             "profile-gfx-settings",
+            "profile-addons-only-name",
         ]
     );
 }

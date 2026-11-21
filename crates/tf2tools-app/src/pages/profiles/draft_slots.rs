@@ -911,7 +911,22 @@ impl ProfileDraftEditor {
                 .py_2()
                 .border_b_1()
                 .border_color(border)
-                .child(div().flex_1().min_w_0().truncate().child(name.clone()))
+                .child(
+                    div()
+                        .id(ids::profile_addon_name(&pick.folder))
+                        .test_support()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .cursor_pointer()
+                        .child(name.clone())
+                        .on_click({
+                            let pick = pick.clone();
+                            cx.listener(move |editor, _, _, cx| {
+                                editor.toggle_addon(pick.clone(), !on, cx)
+                            })
+                        }),
+                )
                 .child(
                     Switch::new(ids::profile_addon(&pick.folder))
                         .checked(on)
@@ -943,8 +958,14 @@ impl ProfileDraftEditor {
                             .gap_1()
                             .child(
                                 div()
+                                    .id(ids::PROFILE_ADDONS_ONLY_NAME)
+                                    .test_support()
+                                    .cursor_pointer()
                                     .font_weight(gpui_kit::FontWeight::MEDIUM)
-                                    .child(title.clone()),
+                                    .child(title.clone())
+                                    .on_click(cx.listener(move |editor, _, _, cx| {
+                                        editor.edit(|d| d.only_these = !only, cx)
+                                    })),
                             )
                             .child(div().text_sm().text_color(muted).child(help)),
                     )

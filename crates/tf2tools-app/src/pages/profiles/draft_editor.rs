@@ -13,7 +13,7 @@ use gpui_kit::{
     AnyElement, AnyView, App, AppContext as _, Context, Div, Entity, EventEmitter, FocusHandle,
     FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, Role,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, deferred, div, px, transparent_black,
+    TestSupportExt as _, WeakEntity, Window, deferred, div, point, px, transparent_black,
 };
 use tf2tools_core::{
     Choices, CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId,
@@ -503,16 +503,27 @@ impl ProfileDraftEditor {
             }))
     }
 
-    // Scrolls the body so `slot`'s card is at the top.
+    // Scrolls the body so `slot`'s card is at the top; when narrow, just under the stuck rail
+    // row (child 1), so its title shows.
     fn jump(&mut self, slot: SlotKind, cx: &mut Context<Self>) {
-        self.scroll
-            .scroll_to_top_of_item(self.cards_from + slot as usize);
+        let item = self.cards_from + slot as usize;
+        let measured = (self.scroll.bounds_for_item(item)).zip(self.scroll.bounds_for_item(1));
+        match measured {
+            Some((card, rail)) if self.narrow => {
+                let top = card.top() - self.scroll.bounds().top() - rail.size.height;
+                let y = top.max(px(0.)).min(self.scroll.max_offset().y);
+                let x = self.scroll.offset().x;
+                self.scroll.set_offset(point(x, -y));
+            }
+            _ => self.scroll.scroll_to_top_of_item(item),
+        }
         cx.notify();
     }
 
     // How far down its own spot in the scroll column (child `item`) the rail sits, so it stays
-    // `inset` below the body's top while the cards scroll, and stops at the last card's top.
-    fn rail_pin(&self, item: usize, inset: Pixels) -> Pixels {
+    // `inset` below the body's top while the cards scroll. The wide rail stops at the last
+    // card's top; the narrow row, drawn unclipped, never stops, so it never leaves the body.
+    fn rail_pin(&self, item: usize, inset: Pixels, stop_at_last: bool) -> Pixels {
         let last_card = self.cards_from + SlotKind::ALL.len() - 1;
         let first = self.scroll.bounds_for_item(item);
         let last = self.scroll.bounds_for_item(last_card);
@@ -521,7 +532,11 @@ impl ProfileDraftEditor {
         };
         let top = first.top() + self.scroll.offset().y;
         let pin = (self.scroll.bounds().top() + inset - top).max(px(0.));
-        pin.min(last.top() - first.top())
+        if stop_at_last {
+            pin.min(last.top() - first.top())
+        } else {
+            pin
+        }
     }
 
     /// The slot rail: a link per slot with its mode's badge, in a column, or a wrapping row
@@ -744,7 +759,7 @@ impl Render for ProfileDraftEditor {
         // Each card is a direct child of the scroll column so the rail can scroll to it by
         // index; the narrow rail row comes first, the wide rail hangs off the first card.
         self.cards_from = if narrow { 2 } else { 1 };
-        let pin = self.rail_pin(self.cards_from, CONTENT_PADDING);
+        let pin = self.rail_pin(self.cards_from, CONTENT_PADDING, true);
         let mut children: Vec<AnyElement> = vec![
             lane()
                 .flex()
@@ -759,7 +774,7 @@ impl Render for ProfileDraftEditor {
         if narrow {
             let stuck = div()
                 .relative()
-                .top(self.rail_pin(1, px(0.)))
+                .top(self.rail_pin(1, px(0.), false))
                 .child(deferred(self.rail(true, cx)));
             children.push(lane().child(stuck).into_any_element());
         }
