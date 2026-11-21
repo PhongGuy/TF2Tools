@@ -181,7 +181,7 @@ async fn remove_deletes_a_packed_copy() {
     s.env.lib.convert_library();
     s.env
         .lib
-        .remove_gb_addon(GbId::new(7), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(7), &s.tf2, &no)
         .unwrap();
     assert!(!s.env.dir.gb_addon_dir().join("7").exists());
     assert!(custom_files(&s).is_empty());

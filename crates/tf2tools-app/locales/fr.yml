@@ -880,9 +880,6 @@ confirm:
   remove_map:
     title: "Retirer la carte\u00A0?"
     body: "La carte %{name} sera supprimée de TF2. Vous pourrez la télécharger de nouveau plus tard."
-  remove_gb_addon:
-    title: "Retirer l'add-on"
-    body: "Voulez-vous vraiment retirer l'add-on %{name}\u00A0? Il sera retiré de TF2 et de votre bibliothèque."
   addon_needs_mastercomfig:
     title: "mastercomfig requis"
     body: "Cet add-on nécessite mastercomfig. Installer les deux\u00A0?"
@@ -1105,10 +1102,8 @@ addons:
     browse: "Parcourir le Magasin d'add-ons"
     update: "Mettre à jour"
     install: "Installer"
-    install_again: "Réinstaller"
     uninstall: "Désinstaller"
     delete: "Retirer de la bibliothèque"
-    remove: "Retirer"
     open_gamebanana: "Ouvrir sur GameBanana"
     installing: "Installation..."
     removing: "Retrait..."
@@ -2812,6 +2807,8 @@ messages:
     addon_update_failed: "Impossible de mettre à jour l'add-on"
     addon_removed: "Add-on retiré"
     addon_remove_failed: "Impossible de retirer l'add-on"
+    addon_uninstalled: "Add-on désinstallé"
+    addon_uninstall_failed: "Impossible de désinstaller l'add-on"
     map_installed: "Carte installée"
     map_install_failed: "Impossible d'installer la carte"
     map_updated: "Carte mise à jour"
