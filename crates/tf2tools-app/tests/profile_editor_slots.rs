@@ -6,7 +6,9 @@ use gpui_kit::component::select::SelectEvent;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext, px, size};
 use support::graphics::found;
-use support::profiles::{FLAT, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name};
+use support::profiles::{
+    FLAT, NULL, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name,
+};
 use tf2tools_app::audio::player::{NowPlaying, sound_player};
 use tf2tools_app::ids;
 use tf2tools_app::loadout::BoardTarget;
@@ -1240,5 +1242,50 @@ fn an_edit_while_saving_is_refused_and_the_save_holds_the_draft(cx: &mut TestApp
         Some(seeded.rayshud.folder_name())
     );
     assert_eq!(saved.addons().as_set().map(|a| a.on.len()), Some(1));
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn a_kept_addon_missing_from_the_library_still_shows_and_saves(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    for name in [PYRO, FLAT] {
+        support::seed_library_addon(&s.services, &env, name, "9.100.1", &vpk, false);
+    }
+    let draft = ProfileDraft::new("Kept")
+        .with_graphics(SlotMode::Set(low_fps60()))
+        .with_addons(SlotMode::Set((
+            vec![DraftItem::keep_addon(addon(NULL))],
+            false,
+        )));
+    let kept = s.services.library.create_profile(&draft).unwrap();
+    cx.simulate_window_resize(s.win, size(px(1280.), px(4000.)));
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, kept.id());
+    support::wait_real(cx, "the kept switch", |cx| {
+        support::present(cx, s.win, ids::profile_addon(NULL))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_addon(NULL)).as_deref(),
+        Some("Null-Canceling Movement")
+    );
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_addon(NULL)),
+        Some(true)
+    );
+    assert!(
+        !cx.update(|cx| e.read(cx).is_dirty()),
+        "a kept add-on is not an edit"
+    );
+    support::click_id(cx, s.win, ids::profile_addon(FLAT));
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(kept.id()).unwrap();
+    let addons = saved.addons().as_set().expect("Set");
+    assert_eq!(addons.on, [addon(FLAT), addon(NULL)]);
     assert_eq!(game_files(&env), before);
 }

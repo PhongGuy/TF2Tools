@@ -282,7 +282,7 @@ impl ProfilesPage {
             names
                 .get(name.as_str())
                 .cloned()
-                .unwrap_or_else(|| name.as_str().to_owned())
+                .unwrap_or_else(|| model::missing_addon_name(name))
         };
         let draft = Draft::from_profile(&profile, &addon_name);
         self.show_draft(Some(profile), draft, window, cx);
@@ -649,7 +649,7 @@ impl ProfilesPage {
                 names
                     .get(name)
                     .cloned()
-                    .unwrap_or_else(|| name.as_str().to_owned())
+                    .unwrap_or_else(|| model::missing_addon_name(name))
             };
             Ok(Draft::from_current(&setup, &addon_name))
         });
@@ -785,7 +785,7 @@ fn summary_job(
         names
             .get(name)
             .cloned()
-            .unwrap_or_else(|| name.as_str().to_owned())
+            .unwrap_or_else(|| model::missing_addon_name(name))
     };
     let missing = s
         .library
@@ -1445,7 +1445,7 @@ fn profile_card(
         names
             .get(name.as_str())
             .cloned()
-            .unwrap_or_else(|| name.as_str().to_owned())
+            .unwrap_or_else(|| model::missing_addon_name(name))
     };
     let lines = card_lines(profile, &addon_name)
         .into_iter()

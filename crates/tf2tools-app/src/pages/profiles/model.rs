@@ -3,8 +3,8 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    ApplySkipReason, ApplyStep, DraftItem, MissingKind, Profile, ProfileCrosshair, ProfileId,
-    ProfileItem, Provenance, SlotMode, SoundId, SoundKind, StoreItemId, StoreKind,
+    AddonName, ApplySkipReason, ApplyStep, DraftItem, MissingKind, Profile, ProfileCrosshair,
+    ProfileId, ProfileItem, Provenance, SlotMode, SoundId, SoundKind, StoreItemId, StoreKind,
 };
 
 use crate::i18n::{names, tr};
@@ -281,5 +281,15 @@ pub fn redownload_target(
             Some((store, StoreItemId::GameBanana(*gb_id)))
         }
         Provenance::Local | Provenance::Curated { .. } | _ => None,
+    }
+}
+
+/// The name an add-on the library no longer has shows: core's display name for its asset
+/// name, never the raw file name.
+pub(crate) fn missing_addon_name(name: &AddonName) -> String {
+    if let DraftItem::Keep(item) = DraftItem::keep_addon(name.clone()) {
+        item.name().to_owned()
+    } else {
+        name.as_str().to_owned()
     }
 }
