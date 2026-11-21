@@ -1,12 +1,15 @@
 //! The demos.tf client: finds a log's demo and reads one demo, every request through one gate.
 
 use std::cell::Cell;
+use std::path::Path;
 use std::time::Duration;
+
+use tokio::io::AsyncWriteExt as _;
 
 use crate::error::DemosError;
 use crate::logstf::LOGS_SPACING;
 use crate::store::StoreConfig;
-use crate::store::http::{API_BODY_LIMIT, Http, NetFailure, RATE_LIMITS, Redirects};
+use crate::store::http::{API_BODY_LIMIT, Http, NetFailure, RATE_LIMITS, Redirects, under_prefix};
 use crate::store::pacer::{Pacer, Priority};
 
 use super::demo::{parse_detail, parse_list};
@@ -79,7 +82,6 @@ pub struct DemosClient {
     endpoints: DemosEndpoints,
     pacer: Pacer,
     loopback_only: bool,
-    #[expect(dead_code, reason = "the demo download reads it")]
     limit: u64,
 }
 
@@ -160,6 +162,85 @@ impl DemosClient {
         }
     }
 
+    /// Streams `demo`'s file into a part file beside `dest`, reporting (bytes so far,
+    /// Content-Length) after each chunk, then replaces `dest`. ForeignUrl when the url is not
+    /// under the files base; TooLarge past the limit; 404 Gone; I/O failures Write. On any
+    /// failure the part file is gone and an existing `dest` is untouched.
+    pub async fn download_demo(
+        &self,
+        demo: &DemoSummary,
+        dest: &Path,
+        progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
+    ) -> Result<(), DemosError> {
+        let url = demo.url();
+        if !under_prefix(url, &self.endpoints.files) {
+            return Err(DemosError::ForeignUrl {
+                url: url.to_owned(),
+            });
+        }
+        // The part file sits beside `dest` so the final rename never crosses a filesystem,
+        // and it is created before asking so an unwritable folder costs no request.
+        let dir = match dest.parent() {
+            Some(dir) if !dir.as_os_str().is_empty() => dir,
+            _ => Path::new("."),
+        };
+        let name = dest.file_name().unwrap_or_default().to_string_lossy();
+        let part = tempfile::Builder::new()
+            .prefix(&format!(".{name}."))
+            .suffix(".part")
+            .tempfile_in(dir)
+            .map_err(write_failure)?;
+
+        self.pacer.slot(Priority::Interactive).await;
+        let mut body = match self
+            .http
+            .open_retrying(url, || self.pacer.rate_limited())
+            .await
+        {
+            Ok(body) => body,
+            Err(NetFailure::Status { status: 404, .. }) => return Err(DemosError::Gone),
+            Err(failure) => return Err(failure.into()),
+        };
+        let too_large = || DemosError::TooLarge {
+            url: url.to_owned(),
+            limit: self.limit,
+        };
+        let total = body.total();
+        if total.is_some_and(|total| total > self.limit) {
+            return Err(too_large());
+        }
+        let mut out = tokio::fs::File::from_std(part.reopen().map_err(write_failure)?);
+        let mut downloaded = 0u64;
+        while let Some(chunk) = body.chunk().await? {
+            downloaded += chunk.len() as u64;
+            if downloaded > self.limit {
+                return Err(too_large());
+            }
+            out.write_all(&chunk).await.map_err(write_failure)?;
+            progress(downloaded, total);
+        }
+        out.flush().await.map_err(write_failure)?;
+        out.sync_all().await.map_err(write_failure)?;
+        drop(out);
+
+        part.persist(dest).map_err(|e| write_failure(e.error))?;
+        // The part file was private to its owner; a saved demo is readable like any download.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(dest, std::fs::Permissions::from_mode(0o644))
+                .map_err(write_failure)?;
+        }
+        Ok(())
+    }
+
+    /// This client with a download cap of `bytes` instead of `DEMO_LIMIT`.
+    #[cfg(test)]
+    pub(crate) fn with_limit(mut self, bytes: u64) -> Self {
+        self.limit = bytes;
+        self
+    }
+
     /// One API GET through the gate. Each 429 it met widens the gate and a clean answer
     /// helps ease it back, so demos.tf is asked less often while it pushes back.
     async fn get(&self, url: &str) -> Result<Vec<u8>, NetFailure> {
@@ -186,6 +267,13 @@ fn unpaced_http(config: &StoreConfig, endpoints: &DemosEndpoints) -> Http {
     crate::store::http_for(&config, &endpoints.redirects())
 }
 
+/// A filesystem failure while saving a demo.
+fn write_failure(error: std::io::Error) -> DemosError {
+    DemosError::Write {
+        message: error.to_string(),
+    }
+}
+
 /// A refused redirect left demos.tf's hosts; a 404 is mapped to Gone before it gets here.
 impl From<NetFailure> for DemosError {
     fn from(failure: NetFailure) -> Self {
@@ -202,3 +290,7 @@ impl From<NetFailure> for DemosError {
 #[cfg(test)]
 #[path = "client_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "download_tests.rs"]
+mod download_tests;
