@@ -1,15 +1,17 @@
-//! The draft editor laid out as the mock draws it: labelled groups, a sticky narrow rail and a
-//! name held still while saving.
+//! The draft editor laid out as the mock draws it: labelled groups, a sticky narrow rail, the
+//! HUD tile grid, the Sounds, Graphics and Add-ons rows, and a name held still while saving.
 
 use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Keystroke, ScrollDelta, TestAppContext, point, px, size};
 use support::graphics::found;
-use support::profiles::{edit, game_files, page, seed, type_name};
+use support::profiles::{FLAT, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name};
 use tf2tools_app::ids;
 use tf2tools_core::{DraftItem, ProfileDraft, SlotMode};
 
+/// A slot card's padding plus its border, each side.
+const CARD_INSET: f32 = 17.;
 
 fn full(s: &support::ShellWindow, seeded: &support::profiles::Seeded) -> tf2tools_core::Profile {
     let draft = ProfileDraft::new("Comp")
@@ -19,6 +21,17 @@ fn full(s: &support::ShellWindow, seeded: &support::profiles::Seeded) -> tf2tool
             None,
         )))
         .with_crosshairs(SlotMode::Set(Vec::new()));
+    s.services.library.create_profile(&draft).unwrap()
+}
+
+fn gfx_profile(s: &support::ShellWindow, env: &support::Env) -> tf2tools_core::Profile {
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    for name in [PYRO, FLAT] {
+        support::seed_library_addon(&s.services, env, name, "9.100.1", &vpk, false);
+    }
+    let draft = ProfileDraft::new("Potato")
+        .with_graphics(SlotMode::Set(low_fps60()))
+        .with_addons(SlotMode::Set((vec![DraftItem::Pick(addon(PYRO))], true)));
     s.services.library.create_profile(&draft).unwrap()
 }
 
@@ -80,6 +93,135 @@ fn the_narrow_rail_sticks_above_the_cards_while_the_body_scrolls(cx: &mut TestAp
     let moved = support::bounds_of(cx, s.win, ids::profile_slot("addons")).unwrap();
     assert!(moved.top() < far.top(), "{moved:?} came up from {far:?}");
     assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn the_hud_tiles_fill_each_row_at_170_px_or_wider(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let p = full(&s, &seeded);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    edit(cx, &s, &page, p.id());
+    let (rayshud, budhud) = (seeded.rayshud.folder_name(), seeded.budhud.folder_name());
+    for (w, h) in [(1280., 800.), (800., 600.)] {
+        cx.simulate_window_resize(s.win, size(px(w), px(h)));
+        support::wait_real(cx, "the HUD tiles", |cx| {
+            support::present(cx, s.win, ids::profile_pick_hud(budhud))
+        });
+        let card = support::bounds_of(cx, s.win, ids::profile_slot("hud")).unwrap();
+        let inner = card.size.width - px(CARD_INSET * 2.);
+        let first = support::bounds_of(cx, s.win, ids::profile_pick_hud(rayshud)).unwrap();
+        let second = support::bounds_of(cx, s.win, ids::profile_pick_hud(budhud)).unwrap();
+        assert!(first.size.width >= px(170.), "{w}: {first:?}");
+        assert!((first.size.width - second.size.width).abs() <= px(1.));
+        // The columns of at least 170 px that fit, sharing the row with 16 px gaps.
+        let gap = px(16.);
+        let columns = ((inner + gap) / (px(170.) + gap)).floor().max(1.);
+        let cell = (inner - gap * (columns - 1.)) / columns;
+        assert!(
+            (first.size.width - cell).abs() <= px(1.5),
+            "{w}: {first:?} is one of {columns} cells in {inner:?}"
+        );
+        assert!(
+            (first.left().min(second.left()) - (card.left() + px(CARD_INSET))).abs() <= px(1.),
+            "{w}: the grid starts at the card's padding"
+        );
+        assert!(support::present(cx, s.win, ids::profile_hud_shot(rayshud)));
+        assert!(
+            !support::present(cx, s.win, ids::hud_shot(rayshud)),
+            "no HUDs page ids in the editor"
+        );
+    }
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn a_sound_row_puts_play_before_its_select(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let p = full(&s, &seeded);
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the sound rows", |cx| {
+        support::present(cx, s.win, ids::PROFILE_SOUND_HIT_PLAY)
+    });
+    for (play, select) in [
+        (ids::PROFILE_SOUND_HIT_PLAY, ids::PROFILE_SOUND_HIT),
+        (ids::PROFILE_SOUND_KILL_PLAY, ids::PROFILE_SOUND_KILL),
+    ] {
+        let play = support::bounds_of(cx, s.win, play).unwrap();
+        let select = support::bounds_of(cx, s.win, select).unwrap();
+        assert!(play.right() <= select.left(), "{play:?} before {select:?}");
+    }
+}
+
+#[gpui_kit::test]
+fn copy_heads_the_graphics_settings_card(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    let p = gfx_profile(&s, &env);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(4000.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let gfx = ids::IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_row("fpscap")))
+    });
+    let card = support::bounds_of(cx, s.win, ids::PROFILE_GFX_SETTINGS).unwrap();
+    let copy = support::bounds_of(cx, s.win, ids::PROFILE_GFX_COPY).unwrap();
+    let row = support::bounds_of(cx, s.win, gfx.id(ids::graphics_row("fpscap"))).unwrap();
+    let presets = support::bounds_of(
+        cx,
+        s.win,
+        gfx.id(ids::graphics_preset(tf2tools_core::Preset::Low)),
+    )
+    .unwrap();
+    assert!(
+        card.top() > presets.bottom(),
+        "the card comes after the presets"
+    );
+    assert!(card.contains(&copy.center()), "{copy:?} in {card:?}");
+    assert!(card.contains(&row.center()), "{row:?} in {card:?}");
+    assert!(copy.bottom() <= row.top(), "Copy heads the rows");
+    assert!(
+        copy.right() >= card.right() - px(32.),
+        "Copy sits at the header's right: {copy:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn an_addon_row_puts_its_switch_at_the_right(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(4000.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the switches", |cx| {
+        support::present(cx, s.win, ids::profile_addon(FLAT))
+    });
+    let card = support::bounds_of(cx, s.win, ids::profile_slot("addons")).unwrap();
+    for id in [
+        ids::profile_addon(FLAT),
+        ids::profile_addon(PYRO),
+        ids::PROFILE_ADDONS_ONLY.into(),
+    ] {
+        let switch = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        assert!(
+            (card.right() - px(CARD_INSET) - switch.right()).abs() <= px(1.),
+            "{id:?} {switch:?} at the right of {card:?}"
+        );
+        assert!(switch.size.width < px(80.), "{id:?} is the switch alone");
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_addon(FLAT)).as_deref(),
+        Some("Flat Mouse")
+    );
 }
 
 #[gpui_kit::test]

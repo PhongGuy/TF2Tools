@@ -10,7 +10,7 @@ use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
+    AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
     px,
 };
@@ -29,24 +29,24 @@ use crate::ids::{self, IdScope};
 use crate::library_events::LibraryEvents;
 use crate::loadout::{BoardTarget, Loadout};
 use crate::local_messages::describe_library;
-use crate::pages::common::card_frame;
 use crate::pages::crosshairs::{added_message, import_job};
 use crate::pages::graphics::ChoicesEdit;
 use crate::pages::graphics::model::{describe_status, version_parts};
 use crate::pages::graphics::pictures::PictureIndex;
 use crate::pages::graphics::view::{self, Filter};
-use crate::pages::huds::{card_images, hud_picture};
+use crate::pages::huds::{card_images, rounded_picture};
 use crate::pages::sounds::{sound_key, with_play_state};
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::card_grid::{GRID_GAP, columns_for_min};
 use crate::widgets::labelled;
 use crate::widgets::loadout_board::{BOARD_COLUMNS, BoardBusy, BoardEvent, LoadoutBoard, OnBoard};
 
-/// A HUD tile's width in the wrapping grid.
-const HUD_TILE_WIDTH: f32 = 200.;
+/// A HUD tile's narrowest width: the grid fits as many columns of at least this as it can.
+const HUD_TILE_MIN: Pixels = px(170.);
 
 /// What the Set bodies pick from: the library HUDs with their card pictures by folder, the
 /// library sounds by name, the library crosshairs and the library add-ons.
@@ -267,14 +267,17 @@ impl ProfileDraftEditor {
             tiles.push(self.hud_tile(Picked::hud(hud), key, cx));
         }
         tiles.extend(kept.map(|kept| self.hud_tile(kept.clone(), None, cx)));
-        h_flex()
-            .flex_wrap()
-            .gap_3()
+        let columns = columns_for_min(self.card_width, HUD_TILE_MIN);
+        div()
+            .grid()
+            .grid_cols(columns as u16)
+            .gap(GRID_GAP)
             .children(tiles)
             .into_any_element()
     }
 
-    // One HUD tile: its 16:9 picture over its name, bordered when picked; a click picks it.
+    // One HUD tile: its 16:9 picture over its name in a padded frame, lit and filled when
+    // picked; a click picks it.
     fn hud_tile(
         &self,
         pick: Picked<HudId>,
@@ -284,29 +287,33 @@ impl ProfileDraftEditor {
         let selected = self.draft.hud.as_ref() == Some(&pick);
         let folder = pick.folder.clone();
         let name = SharedString::from(pick.name.clone());
-        let primary = cx.theme().primary;
-        card_frame(cx)
+        let theme = cx.theme();
+        let (primary, border, fill) = (theme.primary, theme.border, theme.secondary);
+        v_flex()
             .id(ids::profile_pick_hud(&folder))
             .aria_label(name.clone())
             .aria_selected(selected)
             .test_support()
-            .w(px(HUD_TILE_WIDTH))
-            .overflow_hidden()
+            .min_w_0()
+            .gap(px(6.))
+            .p(px(6.))
+            .rounded(px(8.))
+            .border_1()
+            .border_color(border)
             .when(self.busy, |tile| tile.opacity(0.5))
             .when(!self.busy, |tile| tile.cursor_pointer())
-            .when(selected, |tile| tile.border_color(primary))
-            .child(hud_picture(
-                ids::hud_shot(&folder),
-                ids::hud_image(&folder),
+            .when(selected, |tile| tile.border_color(primary).bg(fill))
+            .child(rounded_picture(
+                ids::profile_hud_shot(&folder),
+                ids::profile_hud_image(&folder),
                 key.as_ref(),
+                Some(px(6.)),
                 cx,
             ))
             .child(
                 div()
-                    .px_3()
-                    .py_2()
                     .truncate()
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::MEDIUM)
                     .child(name),
             )
             .on_click(cx.listener(move |editor, _, _, cx| {
@@ -343,7 +350,7 @@ impl ProfileDraftEditor {
             .into_any_element()
     }
 
-    // The Hitsound and Killsound rows: label, select and play button.
+    // The Hitsound and Killsound rows: label, play button and select.
     fn sounds_body(&self, cx: &mut Context<Self>) -> AnyElement {
         if self.library.is_none() {
             return div().into_any_element();
@@ -369,6 +376,7 @@ impl ProfileDraftEditor {
                 .items_center()
                 .gap_3()
                 .child(div().w(px(96.)).text_sm().child(label.clone()))
+                .child(self.play_button(kind, play_id, spinner_id, cx))
                 .child(
                     div().id(select_id).test_support().w(px(260.)).child(
                         Select::new(self.sound_select(kind))
@@ -377,7 +385,6 @@ impl ProfileDraftEditor {
                             .accessibility_label(label),
                     ),
                 )
-                .child(self.play_button(kind, play_id, spinner_id, cx))
         });
         v_flex().gap_3().children(rows).into_any_element()
     }
@@ -736,11 +743,13 @@ impl ProfileDraftEditor {
         }
     }
 
-    // The presets card, the changes strip, Copy, then each category's heading over its rows;
-    // without a catalogue only the presets, Copy and a line saying where to get one.
+    // The presets card, the changes strip, then one Settings card headed by Copy over each
+    // category's heading and rows; without a catalogue the card holds a line saying where to
+    // get one.
     fn graphics_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let narrow = self.narrow;
-        let muted = cx.theme().muted_foreground;
+        let theme = cx.theme();
+        let (muted, border, background) = (theme.muted_foreground, theme.border, theme.background);
         let no_tf2 = tf2_state(cx).read(cx).install().is_none();
         let not_managed = matches!(self.page_choices, Some(Ok(None)));
         let copy = Button::new(ids::PROFILE_GFX_COPY)
@@ -752,26 +761,56 @@ impl ProfileDraftEditor {
                 b.tooltip(tr!("profiles.editor.gfx_copy_none"))
             })
             .on_click(cx.listener(|editor, _, window, cx| editor.copy_graphics(window, cx)));
-        let copy = h_flex().child(copy);
+        let header = h_flex()
+            .flex_wrap()
+            .items_center()
+            .gap_3()
+            .px(px(14.))
+            .py(px(10.))
+            .border_b_1()
+            .border_color(border)
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .child(tr!("profiles.editor.gfx_settings")),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(200.))
+                    .text_sm()
+                    .text_color(muted)
+                    .child(tr!("profiles.editor.gfx_settings_help")),
+            )
+            .child(copy);
+        // Clipping drops a flex item's content height as its floor, so the card keeps it.
+        let card = v_flex()
+            .id(ids::PROFILE_GFX_SETTINGS)
+            .test_support()
+            .flex_none()
+            .overflow_hidden()
+            .rounded(px(10.))
+            .border_1()
+            .border_color(border)
+            .bg(background)
+            .child(header);
         self.graphics.update(cx, |g, cx| {
             g.want_images(cx);
             let presets = g.presets_card(narrow, cx);
             let Some(catalog) = g.catalog().cloned() else {
                 let line = labelled(
-                    div().text_sm().text_color(muted),
+                    div().p_4().text_sm().text_color(muted),
                     ids::PROFILE_GFX_NO_CATALOG,
                     tr!("profiles.editor.gfx_no_catalog"),
                 );
-                return (v_flex().gap_4().child(presets).child(copy).child(line))
+                return (v_flex().gap_4().child(presets).child(card.child(line)))
                     .into_any_element();
             };
             let scope = g.scope();
-            let mut body = v_flex()
-                .gap_4()
-                .child(presets)
-                .child(g.changes_strip(cx))
-                .child(copy);
-            for section in view::sections(&catalog, g.choices(), &Filter::default()) {
+            let mut card = card;
+            let sections = view::sections(&catalog, g.choices(), &Filter::default());
+            for (n, section) in sections.iter().enumerate() {
                 let rows = (section.rows.iter().enumerate())
                     .filter_map(|(i, r)| g.settings_row(&r.module, i == 0, narrow, cx));
                 let rows: Vec<AnyElement> = rows.collect();
@@ -780,16 +819,24 @@ impl ProfileDraftEditor {
                 }
                 let heading = labelled(
                     div()
-                        .pt_2()
-                        .text_sm()
+                        .px_4()
+                        .py_3()
+                        .text_size(px(13.))
                         .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                        .text_color(muted),
+                        .text_color(muted)
+                        .border_b_1()
+                        .border_color(border)
+                        .when(n > 0, |heading| heading.border_t_1()),
                     scope.id(ids::graphics_category(&section.key)),
                     section.label.clone(),
                 );
-                body = body.child(heading).child(v_flex().children(rows));
+                card = card.child(heading).children(rows);
             }
-            body.into_any_element()
+            (v_flex().gap_4())
+                .child(presets)
+                .child(g.changes_strip(cx))
+                .child(card)
+                .into_any_element()
         })
     }
 
@@ -821,8 +868,8 @@ impl ProfileDraftEditor {
         );
     }
 
-    // A switch per add-on, then Only these with what it means; or, with nothing to list, the
-    // empty line and a link to the Addon Store.
+    // A row per add-on, its name left and its switch right over a divider, then Only these
+    // with what it means; or, with nothing to list, the empty line and a link to the Store.
     fn addons_body(&self, cx: &mut Context<Self>) -> AnyElement {
         if self.library.is_none() {
             return div().into_any_element();
@@ -854,15 +901,26 @@ impl ProfileDraftEditor {
                 )
                 .into_any_element();
         }
+        let border = cx.theme().border;
         let switches = rows.into_iter().map(|pick| {
             let on = self.draft.addons.contains(&pick);
-            Switch::new(ids::profile_addon(&pick.folder))
-                .checked(on)
-                .label(pick.name.clone())
-                .disabled(self.busy)
-                .on_click(cx.listener(move |editor, &on: &bool, _, cx| {
-                    editor.toggle_addon(pick.clone(), on, cx)
-                }))
+            let name = SharedString::from(pick.name.clone());
+            h_flex()
+                .items_center()
+                .gap_3()
+                .py_2()
+                .border_b_1()
+                .border_color(border)
+                .child(div().flex_1().min_w_0().truncate().child(name.clone()))
+                .child(
+                    Switch::new(ids::profile_addon(&pick.folder))
+                        .checked(on)
+                        .accessibility_label(name)
+                        .disabled(self.busy)
+                        .on_click(cx.listener(move |editor, &on: &bool, _, cx| {
+                            editor.toggle_addon(pick.clone(), on, cx)
+                        })),
+                )
         });
         let only = self.draft.only_these;
         let help = if only {
@@ -870,23 +928,35 @@ impl ProfileDraftEditor {
         } else {
             tr!("profiles.editor.addons_only_off")
         };
+        let title = tr!("profiles.editor.addons_only");
         v_flex()
-            .gap_3()
             .children(switches)
             .child(
-                v_flex()
-                    .pt_2()
-                    .gap_1()
+                h_flex()
+                    .items_center()
+                    .gap_3()
+                    .pt_3()
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .font_weight(gpui_kit::FontWeight::MEDIUM)
+                                    .child(title.clone()),
+                            )
+                            .child(div().text_sm().text_color(muted).child(help)),
+                    )
                     .child(
                         Switch::new(ids::PROFILE_ADDONS_ONLY)
                             .checked(only)
-                            .label(tr!("profiles.editor.addons_only"))
+                            .accessibility_label(title)
                             .disabled(self.busy)
                             .on_click(cx.listener(|editor, &on: &bool, _, cx| {
                                 editor.edit(|d| d.only_these = on, cx)
                             })),
-                    )
-                    .child(div().text_sm().text_color(muted).child(help)),
+                    ),
             )
             .into_any_element()
     }
