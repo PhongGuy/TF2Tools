@@ -208,8 +208,8 @@ pub fn offline_config() -> tf2tools_core::StoreConfig {
     tf2tools_core::StoreConfig::default().with_loopback_only(true)
 }
 
-/// The file in the data dir a finished Graphics seed leaves; while it is there, a rerun keeps
-/// whatever the player changed since.
+/// The file in the data dir a finished Graphics seed leaves, holding the game dir it seeded;
+/// while it names the same game, a rerun keeps whatever the player changed since.
 pub const GRAPHICS_DONE: &str = ".pilot-graphics-seeded";
 
 /// The first line of a modules.cfg the app wrote; it must match core's own header.
@@ -230,15 +230,18 @@ const MC_PRESETS: &[u8] = include_bytes!(
 /// modules.cfg with vsync=on (switch), motion_blur=high (segments), fpscap=144 (select) and
 /// decals left to TF2 (select); and profiles Potato (Low with shadows=off and fpscap=60, only
 /// no-pyroland, the rest left) and Screenshots (Ultra, no HUD, sounds or crosshairs, add-ons
-/// left). Offline. Does nothing once a run finished (`GRAPHICS_DONE`); until then every step
-/// rewrites its result, so a rerun after a run that failed midway leaves what a clean run does.
+/// left). Offline. Does nothing once a run finished for this game (`GRAPHICS_DONE` names it);
+/// until then every step rewrites its result, so a rerun after a run that failed midway, or one
+/// pointed at another game, leaves what a clean run does.
 pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     use tf2tools_core::{
         Choices, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
     };
 
+    // The marker holds the game dir's raw bytes, so an older empty one or another game reseeds.
     let done = data.join(GRAPHICS_DONE);
-    if done.exists() {
+    let marker = game.as_os_str().as_encoded_bytes();
+    if fs::read(&done).is_ok_and(|seeded| seeded == marker) {
         return Ok(());
     }
     let dir = DataDir::at(data);
@@ -310,7 +313,7 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     put_profile(&lib, "Screenshots", |draft| {
         draft.with_graphics(SlotMode::Set(Choices::new(Preset::Ultra)))
     })?;
-    fs::write(&done, b"").with_context(|| format!("cannot write {}", done.display()))
+    fs::write(&done, marker).with_context(|| format!("cannot write {}", done.display()))
 }
 
 // Rewrites the profile `name` in place when an earlier run made it, else creates it from

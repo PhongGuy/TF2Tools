@@ -108,6 +108,21 @@ pub fn label_of(
     .unwrap()
 }
 
+/// The element's label after exactly one drawn frame, so a view that needs a second frame
+/// to catch up shows its stale text.
+pub fn label_after_one_frame(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    id: impl Into<ElementId>,
+) -> Option<String> {
+    let id = id.into();
+    cx.update_window(win, |_, w, cx| {
+        w.render_frame(cx);
+        w.try_find(id).and_then(|e| e.label().map(str::to_owned))
+    })
+    .unwrap()
+}
+
 /// The element's a11y selected state, `None` when it exposes none.
 pub fn selected_of(
     cx: &mut TestAppContext,

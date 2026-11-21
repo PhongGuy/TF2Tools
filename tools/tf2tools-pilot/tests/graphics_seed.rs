@@ -85,6 +85,53 @@ fn seeding_graphics_twice_changes_nothing() {
     assert_seeded_eq(&seeded_state(tmp.path()), &before);
 }
 
+// The marker names the game it seeded, so the same data dir pointed at another game seeds
+// that game in full, and once more changes nothing.
+#[test]
+fn a_graphics_seed_into_another_game_reseeds_it() {
+    let clean = tempfile::tempdir().unwrap();
+    let (clean_data, clean_game) = dirs(clean.path());
+    seed(&clean_data, &clean_game, &assets()).unwrap();
+    let before = raw_tree(&clean_game);
+    seed_graphics(&clean_data, &clean_game).unwrap();
+    let mut graphics = raw_tree(&clean_game);
+    graphics.retain(|rel, bytes| before.get(rel) != Some(bytes));
+    assert!(!graphics.is_empty());
+
+    let tmp = tempfile::tempdir().unwrap();
+    let (data, game) = dirs(tmp.path());
+    seed(&data, &game, &assets()).unwrap();
+    seed_graphics(&data, &game).unwrap();
+    let other = tmp.path().join("other-tf2/Team Fortress 2");
+    std::fs::create_dir_all(other.join("tf")).unwrap();
+    seed(&data, &other, &assets()).unwrap();
+    seed_graphics(&data, &other).unwrap();
+
+    let got = raw_tree(&other);
+    for (rel, bytes) in &graphics {
+        assert!(got.get(rel) == Some(bytes), "{} differs", rel.display());
+    }
+    let dir = DataDir::at(&data);
+    let lib = Library::new(Database::open(&dir).unwrap(), dir);
+    let tf2 = Tf2Install::from_path(&other).unwrap();
+    assert!(matches!(
+        lib.mastercomfig_status(&tf2).unwrap(),
+        MastercomfigStatus::Managed {
+            preset: Preset::High,
+            ..
+        }
+    ));
+    let names: Vec<String> = (lib.profiles().unwrap().iter())
+        .map(|p| p.name().to_owned())
+        .filter(|n| n == "Potato" || n == "Screenshots")
+        .collect();
+    assert_eq!(names.len(), 2, "{names:?}");
+
+    let seeded = seeded_state(tmp.path());
+    seed_graphics(&data, &other).unwrap();
+    assert_seeded_eq(&seeded_state(tmp.path()), &seeded);
+}
+
 // A run that stopped at any step, or left a file half-written, heals on the next run into
 // exactly what a clean run leaves.
 #[test]
