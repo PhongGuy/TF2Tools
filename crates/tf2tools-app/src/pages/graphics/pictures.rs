@@ -133,21 +133,24 @@ pub struct RowPictures {
     pub thumb: Option<PathBuf>,
     pub compare: Compare,
     pub strip: Vec<StripPicture>,
+    /// The zoom toggle shows: the compared pair can crop (see `pair_has_zoom`).
     pub has_zoom: bool,
 }
 
-/// The preset's and the player's compare pictures. Under `zoom` the sides with a picture
-/// show crops only when every one of them has a crop, so a crop never wipes against a whole shot.
+/// Whether the compare view can zoom: there is a side with a picture and every such side
+/// has a crop, so a crop never wipes against a whole shot.
+pub fn pair_has_zoom(preset: Option<&ValuePicture>, yours: Option<&ValuePicture>) -> bool {
+    let mut sides = [preset, yours].into_iter().flatten().peekable();
+    sides.peek().is_some() && sides.all(|p| p.zoom.is_some())
+}
+
+/// The preset's and the player's compare pictures, cropped under `zoom` when `pair_has_zoom`.
 pub fn compared_pair(
     preset: Option<&ValuePicture>,
     yours: Option<&ValuePicture>,
     zoom: bool,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
-    let cropped = zoom
-        && [preset, yours]
-            .into_iter()
-            .flatten()
-            .all(|p| p.zoom.is_some());
+    let cropped = zoom && pair_has_zoom(preset, yours);
     let pick = |p: &ValuePicture| match (&p.zoom, cropped) {
         (Some(crop), true) => crop.clone(),
         _ => p.full.clone(),
@@ -175,7 +178,8 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
     let yours_pill = || tr!("graphics.pictures.yours", value = label(&row.shown));
     // The same value on both sides shows once; otherwise the player's pick wipes over the
     // preset's, or whichever side has a picture stands alone.
-    let compare = match compared_pair(picture(&row.preset_value), picture(&row.shown), zoom) {
+    let (preset, yours) = (picture(&row.preset_value), picture(&row.shown));
+    let compare = match compared_pair(preset, yours, zoom) {
         (Some(picture), Some(_)) if row.shown == row.preset_value => Compare::Same {
             picture,
             pill: tr!(
@@ -222,6 +226,6 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
         thumb: picture(&row.shown).map(|p| p.full.clone()),
         compare,
         strip,
-        has_zoom: index.has_zoom(&row.module),
+        has_zoom: pair_has_zoom(preset, yours),
     })
 }
