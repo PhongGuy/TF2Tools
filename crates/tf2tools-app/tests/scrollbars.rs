@@ -463,6 +463,28 @@ fn at_800x600_the_profiles_page_and_its_grid_each_show_a_bar(cx: &mut TestAppCon
 }
 
 #[gpui_kit::test]
+fn the_profile_editor_scrolls_at_800x600(cx: &mut TestAppContext) {
+    use support::profiles::{edit, page};
+    let env = support::env();
+    let s = support::shell_window(cx, &env, support::graphics::found(&env));
+    let p = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Tall"))
+        .unwrap();
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let body = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_BODY).unwrap();
+    let foot = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    assert!(
+        foot.is_none_or(|f| f.top() > body.bottom()),
+        "the foot starts below the fold at 800x600"
+    );
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_SCROLLBAR));
+}
+
+#[gpui_kit::test]
 fn a_long_log_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
     let env = support::env();
     support::seed_log_rows(&env, 60);

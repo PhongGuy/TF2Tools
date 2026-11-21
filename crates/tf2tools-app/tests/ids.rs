@@ -226,6 +226,28 @@ fn profile_ids_are_keyed_by_profile_id() {
         ]
     );
     assert_eq!(name(ids::profile_apply_row("hud")), "profile-apply-row:hud");
+    for (el, want) in [
+        (ids::profile_card_picture(&id), "profile-card-picture:"),
+        (ids::profile_card_image(&id), "profile-card-image:"),
+        (ids::profile_card_active(&id), "profile-card-active:"),
+        (ids::profile_card_name(&id), "profile-card-name:"),
+        (ids::profile_card_apply(&id), "profile-card-apply:"),
+        (ids::profile_card_edit(&id), "profile-card-edit:"),
+    ] {
+        assert_eq!(name(el), format!("{want}1700000000000-ab12"));
+    }
+    assert_eq!(
+        name(ids::profile_card_line(&id, "hud")),
+        "profile-card-line:1700000000000-ab12:hud"
+    );
+    assert_eq!(
+        [
+            ids::PROFILES_LEAD,
+            ids::PROFILES_LIBRARY,
+            ids::PROFILES_GRID
+        ],
+        ["profiles-lead", "profiles-library", "profiles-grid"]
+    );
 }
 
 #[test]
@@ -361,12 +383,13 @@ fn the_grid_and_list_ids_are_stable() {
 
 // ids.rs is the one place element ids are spelt, so pilot QA and tests read them from there.
 fn literal_ids_in(dir: &std::path::Path, hits: &mut Vec<String>) {
-    const LITERALS: [&str; 7] = [
+    const LITERALS: [&str; 8] = [
         "\"sound-card\"",
         "\"huds-grid\"",
         "\"sounds-grid\"",
         "\"profiles-grid\"",
         "\"profile-apply-rows-scrollbar\"",
+        "\"profile-editor-scrollbar\"",
         "\"addon-store-info-text\"",
         "\"payload-check\"",
     ];
@@ -644,81 +667,97 @@ fn situation_switch_ids_name_each_switch() {
 
 #[test]
 fn profile_editor_ids_are_stable() {
+    use tf2tools_app::ids::IdScope;
+    let consts = [
+        (ids::PROFILES_NEW, "profiles-new"),
+        (ids::PROFILE_EDITOR, "profile-editor"),
+        (ids::PROFILE_EDITOR_LOADING, "profile-editor-loading"),
+        (ids::PROFILE_EDITOR_HEADER, "profile-editor-header"),
+        (ids::PROFILE_EDITOR_CRUMB, "profile-editor-crumb"),
+        (ids::PROFILE_EDITOR_CRUMB_NAME, "profile-editor-crumb-name"),
+        (ids::PROFILE_EDITOR_CANCEL, "profile-editor-cancel"),
+        (ids::PROFILE_EDITOR_SAVE, "profile-editor-save"),
+        (ids::PROFILE_EDITOR_NAME, "profile-editor-name"),
+        (ids::PROFILE_EDITOR_NAME_ERROR, "profile-editor-name-error"),
+        (ids::PROFILE_EDITOR_NOTE, "profile-editor-note"),
+        (ids::PROFILE_EDITOR_BODY, "profile-editor-body"),
+        (ids::PROFILE_EDITOR_SCROLLBAR, "profile-editor-scrollbar"),
+        (ids::PROFILE_EDITOR_DELETE, "profile-editor-delete"),
+        (ids::PROFILE_RAIL, "profile-rail"),
+        (ids::PROFILE_HUD_EMPTY, "profile-hud-empty"),
+        (ids::PROFILE_HUDS_LINK, "profile-huds-link"),
+        (ids::PROFILE_SOUND_HIT, "profile-sound-hit"),
+        (ids::PROFILE_SOUND_KILL, "profile-sound-kill"),
+        (ids::PROFILE_SOUND_HIT_PLAY, "profile-sound-hit-play"),
+        (ids::PROFILE_SOUND_KILL_PLAY, "profile-sound-kill-play"),
+        (
+            ids::PROFILE_SOUND_HIT_PLAY_SPINNER,
+            "profile-sound-hit-play-spinner",
+        ),
+        (
+            ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
+            "profile-sound-kill-play-spinner",
+        ),
+        (ids::PROFILE_XH_EVERYWHERE, "profile-xh-everywhere"),
+        (ids::PROFILE_XH_SELECTION, "profile-xh-selection"),
+        (ids::PROFILE_GFX_COPY, "profile-gfx-copy"),
+        (ids::PROFILE_GFX_SETTINGS, "profile-gfx-settings"),
+        (ids::PROFILE_GFX_NO_CATALOG, "profile-gfx-no-catalog"),
+        (ids::PROFILE_ADDONS_ONLY, "profile-addons-only"),
+        (ids::PROFILE_ADDONS_ONLY_NAME, "profile-addons-only-name"),
+        (
+            ids::PROFILE_ADDONS_NEED_GRAPHICS,
+            "profile-addons-need-graphics",
+        ),
+        (ids::PROFILE_ADDONS_EMPTY, "profile-addons-empty"),
+        (ids::PROFILE_ADDONS_STORE, "profile-addons-store"),
+    ];
+    for (id, want) in consts {
+        assert_eq!(id, want);
+    }
     for (el, want) in [
-        (ids::profile_slot("hud"), "profile-slot:hud"),
+        (ids::profile_rail("hud"), "profile-rail:hud"),
+        (
+            ids::profile_rail_badge("addons"),
+            "profile-rail-badge:addons",
+        ),
+        (ids::profile_slot("sounds"), "profile-slot:sounds"),
+        (
+            ids::profile_slot_help("graphics"),
+            "profile-slot-help:graphics",
+        ),
+        (ids::profile_slot_modes("hud"), "profile-slot-modes:hud"),
+        (
+            ids::profile_slot_mode("crosshairs", "leave"),
+            "profile-slot-mode:crosshairs:leave",
+        ),
+        (ids::profile_slot_text("hud"), "profile-slot-text:hud"),
         (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
         (ids::profile_hud_shot("rayshud"), "profile-hud-shot:rayshud"),
         (
             ids::profile_hud_image("rayshud"),
             "profile-hud-image:rayshud",
         ),
-        (ids::profile_slot_modes("hud"), "profile-slot-modes:hud"),
+        (
+            ids::profile_addon("mastercomfig-addon-flat-mouse.vpk"),
+            "profile-addon:mastercomfig-addon-flat-mouse.vpk",
+        ),
         (ids::profile_addon_name("a.vpk"), "profile-addon-name:a.vpk"),
         (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
         ),
+        (
+            IdScope::PROFILE_CROSSHAIRS.id(ids::CROSSHAIRS_BOARD_EVERYTHING),
+            "profile-xh-board-everything",
+        ),
+        (
+            IdScope::PROFILE_GRAPHICS.id(ids::graphics_change("fpscap")),
+            "profile-gfx-change:fpscap",
+        ),
     ] {
         assert_eq!(name(el), want);
     }
-    assert_eq!(
-        [
-            ids::PROFILES_NEW,
-            ids::PROFILE_EDITOR,
-            ids::PROFILE_EDITOR_LOADING,
-            ids::PROFILE_EDITOR_HEADER,
-            ids::PROFILE_EDITOR_CRUMB,
-            ids::PROFILE_EDITOR_CRUMB_NAME,
-            ids::PROFILE_EDITOR_CANCEL,
-            ids::PROFILE_EDITOR_SAVE,
-            ids::PROFILE_EDITOR_NAME,
-            ids::PROFILE_EDITOR_NAME_ERROR,
-            ids::PROFILE_EDITOR_NOTE,
-            ids::PROFILE_EDITOR_BODY,
-            ids::PROFILE_EDITOR_SCROLLBAR,
-            ids::PROFILE_EDITOR_DELETE,
-            ids::PROFILE_HUD_EMPTY,
-            ids::PROFILE_HUDS_LINK,
-            ids::PROFILE_SOUND_HIT,
-            ids::PROFILE_SOUND_KILL,
-            ids::PROFILE_SOUND_HIT_PLAY,
-            ids::PROFILE_SOUND_KILL_PLAY,
-            ids::PROFILE_SOUND_HIT_PLAY_SPINNER,
-            ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
-            ids::PROFILE_XH_EVERYWHERE,
-            ids::PROFILE_XH_SELECTION,
-            ids::PROFILE_GFX_SETTINGS,
-            ids::PROFILE_ADDONS_ONLY_NAME,
-        ],
-        [
-            "profiles-new",
-            "profile-editor",
-            "profile-editor-loading",
-            "profile-editor-header",
-            "profile-editor-crumb",
-            "profile-editor-crumb-name",
-            "profile-editor-cancel",
-            "profile-editor-save",
-            "profile-editor-name",
-            "profile-editor-name-error",
-            "profile-editor-note",
-            "profile-editor-body",
-            "profile-editor-scrollbar",
-            "profile-editor-delete",
-            "profile-hud-empty",
-            "profile-huds-link",
-            "profile-sound-hit",
-            "profile-sound-kill",
-            "profile-sound-hit-play",
-            "profile-sound-kill-play",
-            "profile-sound-hit-play-spinner",
-            "profile-sound-kill-play-spinner",
-            "profile-xh-everywhere",
-            "profile-xh-selection",
-            "profile-gfx-settings",
-            "profile-addons-only-name",
-        ]
-    );
 }
 
 #[test]
