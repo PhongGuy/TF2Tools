@@ -1219,6 +1219,38 @@ fn a_store_addon_offers_re_download_and_a_local_one_does_not(cx: &mut TestAppCon
     ));
 }
 
+// While the add-on's download runs, its Re-download shows it can't start another, as the
+// Addon Store's buttons do.
+#[gpui_kit::test]
+fn an_addon_s_re_download_is_disabled_while_a_download_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_addon(FLAT_ADDON, addon_vpk(), Duration::from_secs(3));
+    let s = support::shell_window(cx, &env, found(&env));
+    support::store_ready(cx, &server);
+    support::seed_addons(
+        &env,
+        &server.uri(),
+        &[(FLAT_ADDON, "Flat Mouse", "9.100.1")],
+    );
+    let mods = profile_missing_its_addons(&s, &env, &[FLAT_ADDON]);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, mods.id());
+    let key = format!("addon:{FLAT_ADDON}");
+    support::wait_real(cx, "the Re-download button", |cx| {
+        support::present(cx, s.win, ids::profile_apply_redownload(&key))
+    });
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_apply_redownload(&key)
+    ));
+    support::click_id(cx, s.win, ids::profile_apply_redownload(&key));
+    support::wait_real(cx, "the disabled Re-download", |cx| {
+        support::disabled_of(cx, s.win, ids::profile_apply_redownload(&key))
+    });
+}
+
 // Re-download fetches the add-on into the library only; the library change refreshes the
 // summary, and confirming Apply then puts it in tf/custom.
 #[gpui_kit::test]

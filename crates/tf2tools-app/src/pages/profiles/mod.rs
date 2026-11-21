@@ -62,6 +62,7 @@ use crate::shell::leave;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
+use crate::store_download::StoreDownloads;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::DialogFrame;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
@@ -805,7 +806,8 @@ fn summary_job(
 // Opens the Apply summary over the page: what changes, what is missing and stays, or that nothing
 // does, and the slots left alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and
 // closing answer false. A library change while it is open (a finished Re-download) reads the
-// summary again, so a downloaded item's row turns into its change.
+// summary again, so a downloaded item's row turns into its change; a download starting or
+// ending redraws it, so an add-on's Re-download shows whether it can start.
 fn apply_summary_dialog(
     name: &str,
     summary: Summary,
@@ -835,13 +837,23 @@ fn apply_summary_dialog(
         })
         .detach();
     });
+    let redraw = move |cx: &mut App| {
+        let _ = win.update(cx, |_, window, _| window.refresh());
+    };
+    let updates = AddonUpdates::global(cx);
+    let downloads = StoreDownloads::install(cx);
+    let busy = [
+        cx.observe(&updates, move |_, cx| redraw(cx)),
+        cx.observe(&downloads, move |_, cx| redraw(cx)),
+    ];
     // The rows' scroll position outlives the builder, which runs every frame.
     let rows_scroll = ScrollHandle::new();
     window.defer(cx, move |window, cx| {
         let frame = DialogFrame::new(SUMMARY_WIDTH);
         window.open_dialog(cx, move |dialog, window, cx| {
-            let _ = &refresh;
+            let _ = (&refresh, &busy);
             let summary = shown.read(cx).clone();
+            let blocked = any_busy(cx);
             // The builder runs every frame, so each handler clones what it captures.
             let answer = |said: bool| {
                 let tx = tx.clone();
@@ -888,7 +900,7 @@ fn apply_summary_dialog(
                                 .rows
                                 .iter()
                                 .enumerate()
-                                .map(|(ix, row)| summary_row(row, ix < last, cx)),
+                                .map(|(ix, row)| summary_row(row, ix < last, blocked, cx)),
                         ),
                 )
                 .into_any_element()
@@ -962,7 +974,7 @@ fn apply_summary_dialog(
 // One summary row: the slot label in a fixed column, then "from → to"; a rule under all but the
 // last row. A missing item's row reads its sentence beside a warning, then offers Re-download
 // for a store item (the store detail stacks over the summary) or says a local import can't.
-fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
+fn summary_row(row: &SummaryRow, rule: bool, blocked: bool, cx: &App) -> AnyElement {
     let theme = cx.theme();
     let (muted, border) = (theme.muted_foreground, theme.border);
     let text = row.text();
@@ -988,7 +1000,7 @@ fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
                     )
                     .child(div().min_w_0().child(text.clone())),
             )
-            .child(missing_action(&row.key, item, muted))
+            .child(missing_action(&row.key, item, muted, blocked))
             .into_any_element(),
     };
     h_flex()
@@ -1012,8 +1024,14 @@ fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
 }
 
 // A missing row's Re-download, which opens the item's store detail (or, for an add-on, which
-// has none, starts its library download), or v5's local-import note.
-fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyElement {
+// has none, starts its library download, disabled while `blocked` by any download), or v5's
+// local-import note.
+fn missing_action(
+    key: &str,
+    item: &MissingItem,
+    muted: gpui_kit::Hsla,
+    blocked: bool,
+) -> AnyElement {
     let Some((kind, id)) = model::redownload_target(item.kind(), item.provenance()) else {
         let local = tr!("profiles.missing.local");
         return div()
@@ -1036,6 +1054,7 @@ fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyEl
         // refreshes the summary and Apply then installs it.
         let display = item.name().to_owned();
         return button
+            .disabled(blocked)
             .on_click(move |_, window, cx| {
                 if any_busy(cx) {
                     return;
