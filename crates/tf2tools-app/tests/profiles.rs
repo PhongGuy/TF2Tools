@@ -368,6 +368,30 @@ fn at_800x600_the_list_fits_and_cards_keep_250_px(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn at_800x600_the_first_card_fits_under_a_capped_picture(cx: &mut TestAppContext) {
+    use gpui_kit::size;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let _pub = empty_profile(&s, "Pub");
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let _page = open_profiles(cx, &s);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::Profiles)).unwrap();
+    let card = support::bounds_of(cx, s.win, ids::profile_card(comp.id())).unwrap();
+    let picture = support::bounds_of(cx, s.win, ids::profile_card_picture(comp.id())).unwrap();
+    assert!(
+        picture.size.height <= px(180.),
+        "the picture is {picture:?}"
+    );
+    assert!(
+        card.top() >= page.top() && card.bottom() <= page.bottom(),
+        "{card:?} leaves {page:?}"
+    );
+    let edit = support::bounds_of(cx, s.win, ids::profile_card_edit(comp.id())).unwrap();
+    assert!(edit.bottom() <= card.bottom(), "{edit:?} leaves {card:?}");
+}
+
+#[gpui_kit::test]
 fn at_1280_three_cards_share_a_row(cx: &mut TestAppContext) {
     use gpui_kit::size;
     let env = support::env();

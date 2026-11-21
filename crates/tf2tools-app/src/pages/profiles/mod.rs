@@ -80,9 +80,22 @@ const SUMMARY_ROWS_MAX: Pixels = px(320.);
 // How much of the next card row the grid's floor shows, so a one-column window reads as a list.
 const NEXT_ROW_PEEK: Pixels = px(48.);
 
+// A lone column's picture stops here, so at 800x600 the first card fits whole under the lead.
+const SINGLE_COLUMN_PICTURE_MAX: Pixels = px(124.);
+
+// The card picture's height at cell width `w`: 16:9, capped when the grid is one column.
+fn picture_height(w: Pixels, columns: usize) -> Pixels {
+    let height = w * (9. / 16.);
+    if columns == 1 && height > SINGLE_COLUMN_PICTURE_MAX {
+        SINGLE_COLUMN_PICTURE_MAX
+    } else {
+        height
+    }
+}
+
 // A card's height at cell width `w`: the picture plus the fixed body.
-fn card_height(w: Pixels) -> Pixels {
-    w * (9. / 16.) + CARD_BODY_HEIGHT
+fn card_height(w: Pixels, columns: usize) -> Pixels {
+    picture_height(w, columns) + CARD_BODY_HEIGHT
 }
 
 /// The editor's empty pickers ask for a store page by event.
@@ -1176,9 +1189,16 @@ struct CardContext {
     page: WeakEntity<ProfilesPage>,
 }
 
-// The card's 16:9 picture: the HUD's own for a Set HUD, "TF2's own HUD" for None, and the
-// bare fill for Leave or a HUD without a picture. The active card wears its pill on top.
-fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) -> AnyElement {
+// The card's picture, `height` tall and cropped to it: the HUD's own for a Set HUD, "TF2's own
+// HUD" for None, and the bare fill for Leave or a HUD without a picture. The active card wears
+// its pill on top.
+fn card_picture(
+    profile: &Profile,
+    active: bool,
+    height: Pixels,
+    ctx: &CardContext,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let id = profile.id();
     let picture = match profile.hud().as_set() {
@@ -1187,14 +1207,16 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
                 .hud_images
                 .get(hud.folder_name())
                 .map(|url| ImageKey::card(url));
-            top_rounded_picture(
+            let mut area = top_rounded_picture(
                 ids::profile_card_picture(id),
                 ids::profile_card_image(id),
                 key.as_ref(),
                 CARD_RADIUS,
                 cx,
-            )
-            .into_any_element()
+            );
+            // The shared area's 16:9 ratio outranks a height in layout, so it gives way here.
+            area.style().aspect_ratio = None;
+            area.h(height).into_any_element()
         }
         None => {
             let area = div()
@@ -1204,7 +1226,7 @@ fn card_picture(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
                 .items_center()
                 .justify_center()
                 .w_full()
-                .aspect_ratio(16. / 9.)
+                .h(height)
                 .rounded_t(CARD_RADIUS)
                 .bg(theme.muted);
             match Mode::of(profile.hud()) {
@@ -1288,7 +1310,13 @@ fn card_line(id: &ProfileId, slot: SlotKind, text: String, left: bool, cx: &App)
 
 // The mock's profile card: the picture, the name, a line per slot, then Apply (inactive cards
 // only) and Edit. A click on the body opens the editor; the buttons stop their clicks first.
-fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) -> AnyElement {
+fn profile_card(
+    profile: &Profile,
+    active: bool,
+    picture: Pixels,
+    ctx: &CardContext,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let id = profile.id();
     let Gates { has_tf2, busy } = ctx.gates;
@@ -1340,7 +1368,7 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
         } else {
             theme.border
         })
-        .child(card_picture(profile, active, ctx, cx))
+        .child(card_picture(profile, active, picture, ctx, cx))
         .child(
             v_flex()
                 .flex_1()
@@ -1376,6 +1404,7 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
 impl ProfilesPage {
     // The lead line beside New profile, then the library box: the empty state or the grid.
     fn library(&self, has_tf2: bool, busy: bool, cx: &mut Context<Self>) -> impl IntoElement {
+        let columns = self.grid.columns();
         let body = if !self.loaded {
             None
         } else if self.profiles.is_empty() {
@@ -1396,14 +1425,15 @@ impl ProfilesPage {
                 applying: self.applying().cloned(),
                 page: cx.entity().downgrade(),
             };
-            Some(
-                self.grid
-                    .render_sized(profiles.len(), card_height, move |ix, _, cx| {
-                        let profile = &profiles[ix];
-                        let is_active = active.as_ref() == Some(profile.id());
-                        profile_card(profile, is_active, &ctx, cx)
-                    }),
-            )
+            Some(self.grid.render_cells(
+                profiles.len(),
+                move |w| card_height(w, columns),
+                move |ix, w, _, cx| {
+                    let profile = &profiles[ix];
+                    let is_active = active.as_ref() == Some(profile.id());
+                    profile_card(profile, is_active, picture_height(w, columns), &ctx, cx)
+                },
+            ))
         };
         let lead = tr!("profiles.lead");
         v_flex()
@@ -1448,7 +1478,7 @@ impl ProfilesPage {
                     .test_support()
                     .flex_1()
                     // One card row and the top of the next at least; a short window scrolls the page.
-                    .min_h(self.grid.row_height_for(card_height) + NEXT_ROW_PEEK)
+                    .min_h(self.grid.row_height_for(|w| card_height(w, columns)) + NEXT_ROW_PEEK)
                     .children(body),
             )
     }
