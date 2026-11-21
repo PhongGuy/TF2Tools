@@ -127,7 +127,7 @@ fn missing_items_stop_the_apply_and_touch_nothing() {
 }
 
 #[test]
-fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
+fn skip_missing_leaves_the_installed_hud_and_still_activates() {
     let (env, p) = full_profile();
     let hud_id = env.lib.list_huds().unwrap()[0].id().clone();
     env.lib.delete_hud(&hud_id).unwrap();
@@ -152,8 +152,7 @@ fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
     assert!(report.failed().is_empty());
     assert!(custom.join("otherhud/info.vdf").is_file());
     assert!(custom.join(UI).join("hitsound.wav").is_file());
-    assert_eq!(setting(&env.dir, "active_profile_id").as_deref(), Some(""));
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 #[test]
@@ -218,7 +217,7 @@ fn skip_missing_keeps_a_missing_sound_and_still_clears_a_none_slot() {
     assert_eq!(std::fs::read(&hitsound).unwrap(), kept);
     assert!(!custom.join(UI).join("killsound.wav").exists());
     assert!(!custom.join("rayshud").exists());
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 #[test]
@@ -261,7 +260,7 @@ fn a_skipped_crosshair_keeps_that_weapons_assignment_and_others_follow_the_profi
         assigned(&env),
         ["tf_weapon_rocketlauncher", "tf_weapon_scattergun"]
     );
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 // Needs a read-only directory, which `chmod` only makes on unix.

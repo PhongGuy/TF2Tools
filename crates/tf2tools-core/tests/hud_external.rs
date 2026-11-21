@@ -654,7 +654,10 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking() 
         .unwrap();
     assert!(!report.applied().contains(&ApplyStep::Hud));
     assert!(env.tf2.custom_dir().join("manual/info.vdf").is_file());
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(
+        env.lib.active_profile().unwrap().as_ref(),
+        Some(profile.id())
+    );
 }
 
 #[test]

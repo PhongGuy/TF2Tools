@@ -646,7 +646,10 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
     wait_toast(cx, &s);
     assert!(!support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG));
     assert!(intact(&env, "manual"));
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
 }
 
 /// Real `ExternalHud`s can only come from a scan, so the words are checked on a scratch tree.

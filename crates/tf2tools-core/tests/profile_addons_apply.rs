@@ -165,7 +165,7 @@ fn a_deleted_addon_is_a_missing_item() {
         .unwrap();
     assert_eq!(report.skipped(), missing.as_slice());
     assert!(installed(&env, &pyro));
-    assert_eq!(active(&env), None);
+    assert_eq!(active(&env).as_ref(), Some(p.id()));
 }
 
 #[test]

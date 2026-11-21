@@ -125,7 +125,7 @@ fn graphics_over_no_mastercomfig_is_left_as_it_is(cx: &mut gpui_kit::TestAppCont
 }
 
 #[gpui_kit::test]
-fn a_skipped_item_keeps_the_profile_inactive_after_the_modules_phase(
+fn a_skipped_item_still_marks_the_profile_active_after_the_modules_phase(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     let env = support::env();
@@ -163,7 +163,7 @@ fn a_skipped_item_keeps_the_profile_inactive_after_the_modules_phase(
         modules_cfg(&env).as_deref(),
         Some(format!("{HEADER}fpscap=60\n").as_str())
     );
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert_eq!(s.services.library.active_profile().unwrap(), Some(potato));
 }
 
 #[gpui_kit::test]

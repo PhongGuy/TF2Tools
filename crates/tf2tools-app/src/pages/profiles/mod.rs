@@ -886,8 +886,8 @@ async fn finish_apply(
     {
         failed.push((ApplyStep::Graphics, reason));
     }
-    let clean =
-        failed.is_empty() && report.skipped().is_empty() && report.skipped_steps().is_empty();
+    // Missing items the player chose to skip still leave the applied profile Active.
+    let clean = failed.is_empty() && report.skipped_steps().is_empty();
     let active = if modules.is_some() && clean {
         // An edit saved meanwhile moves `updated_at`, and then core leaves it inactive.
         let profile = report.profile().clone();

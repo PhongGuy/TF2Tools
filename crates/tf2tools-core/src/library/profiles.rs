@@ -1489,8 +1489,8 @@ impl Library {
     /// `skip_missing`, which leaves what is installed for those slots alone; unless the HUD is
     /// skipped or left, a HUD the library cannot put back then fails with `ExternalHuds` the
     /// same way. Graphics runs next, then Add-ons last; see `ApplySkipReason` and `pending_modules`.
-    /// The profile becomes active only when nothing was skipped, no step failed and no module
-    /// choices are pending, so Active means the game matches it.
+    /// The profile becomes active when no step failed, no step was skipped for a reason and no
+    /// module choices are pending; missing items skipped by `skip_missing` do not prevent it.
     pub fn apply_profile(
         &self,
         id: &ProfileId,
@@ -1632,11 +1632,10 @@ impl Library {
         .flatten()
         .collect();
 
+        // Missing items the caller chose to skip do not block the mark; the report names them.
         // Pending module choices still have to reach the game, so the app marks those later.
-        let matches_game = failed.is_empty()
-            && resolved.missing.is_empty()
-            && skipped_steps.is_empty()
-            && graphics.pending_modules.is_none();
+        let matches_game =
+            failed.is_empty() && skipped_steps.is_empty() && graphics.pending_modules.is_none();
         if matches_game {
             self.db
                 .write(|conn| save_setting(conn, ACTIVE_PROFILE_KEY, id.as_str()))
@@ -1750,7 +1749,7 @@ impl Library {
         marked.ok_or_else(|| not_found(&profile.id))
     }
 
-    /// The profile last applied in full with nothing skipped, when its row still exists.
+    /// The profile last applied with no failed or skipped step, when its row still exists.
     pub fn active_profile(&self) -> Result<Option<ProfileId>, ProfileError> {
         self.db
             .read(|conn| {

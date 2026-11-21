@@ -886,20 +886,54 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
         "Comp applied. TF2 picks it up the next time it starts. Kept what you had for: HUD (missing from your library).",
     );
     assert!(!has_dialog(cx, &s));
-    // The game does not match the profile, so it is not marked Active.
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    // Skipping a missing item was the player's choice, so the applied profile is Active.
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
     support::wait_real(cx, "LibraryChanged", |_| changes.get() >= 1);
     assert_eq!(changes.get(), 1);
     let rows = support::log_rows(&s.services);
     assert_eq!(rows.len(), 1);
     assert_eq!(
         row(&rows[0]),
-        ("profile", "activate", "Applied profile: Comp")
+        ("profile", "activate", "Activated profile: Comp")
     );
     assert!(
         rows[0]
             .details()
             .is_some_and(|d| d.contains("Skipped: rayshud"))
+    );
+}
+
+#[gpui_kit::test]
+fn install_anyway_moves_the_active_pill_to_the_applied_profile(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let pub_ = empty_profile(&s, "Pub");
+    s.services
+        .library
+        .apply_profile(pub_.id(), &tf2(&env), &s.services.builtins, false)
+        .unwrap();
+    let comp = profile_missing_its_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the Missing Items dialog", |cx| {
+        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
+    });
+    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
+    support::wait_real(cx, "the active pill on Comp", |cx| {
+        support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref()
+            == Some("Active")
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_card_active(pub_.id())
+    ));
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
     );
 }
 
