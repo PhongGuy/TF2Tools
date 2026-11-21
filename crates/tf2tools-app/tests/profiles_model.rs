@@ -8,7 +8,7 @@ use tf2tools_app::pages::profiles::model::{
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::shell::toast::ToastKind;
 use tf2tools_core::ApplySkipReason;
-use tf2tools_core::{ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
+use tf2tools_core::{AddonName, ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
 
 fn parts(names: &[&'static str]) -> Vec<SharedString> {
     names.iter().map(|&n| n.into()).collect()
@@ -118,6 +118,24 @@ fn store_items_can_be_downloaded_again() {
         redownload_target(&MissingKind::Hitsound, &Provenance::Local),
         None
     );
+}
+
+#[test]
+fn a_store_addon_can_be_downloaded_again_and_a_local_one_cannot() {
+    let name = AddonName::new("mastercomfig-addon-flat-mouse.vpk").unwrap();
+    let store = MissingKind::Addon {
+        name: name.clone(),
+        in_store: true,
+    };
+    assert_eq!(
+        redownload_target(&store, &Provenance::Local),
+        Some((StoreKind::Addons, StoreItemId::Addon(name.clone())))
+    );
+    let local = MissingKind::Addon {
+        name,
+        in_store: false,
+    };
+    assert_eq!(redownload_target(&local, &Provenance::Local), None);
 }
 
 // The default probe scans a temp proc tree here, never the machine's /proc.

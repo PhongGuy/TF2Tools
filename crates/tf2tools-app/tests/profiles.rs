@@ -14,11 +14,11 @@ use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
+use tf2tools_core::{AddonName, GbId, LibraryKind};
 use tf2tools_core::{
     CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, ProfileId,
     Provenance, SlotMode, SoundEntry, Tf2Install,
 };
-use tf2tools_core::{GbId, LibraryKind};
 use tf2tools_core::{LogEntry, LogLevel};
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -1153,6 +1153,118 @@ fn a_finished_re_download_refreshes_the_row_and_apply_installs_it(cx: &mut TestA
         "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(env.game.join("tf/custom/flawhud").is_dir());
+}
+
+const FLAT_ADDON: &str = "mastercomfig-addon-flat-mouse.vpk";
+const PYRO_ADDON: &str = "mastercomfig-addon-no-pyroland.vpk";
+
+fn addon_vpk() -> Vec<u8> {
+    support::vpk_bytes(&[("cfg/addons/x.cfg", b"x".as_slice())])
+}
+
+/// "Mods" ticking `assets` with every other add-on left alone, each then deleted from the
+/// library so Apply finds it missing.
+fn profile_missing_its_addons(
+    s: &support::ShellWindow,
+    env: &support::Env,
+    assets: &[&str],
+) -> Profile {
+    let names: Vec<AddonName> = assets
+        .iter()
+        .map(|asset| {
+            support::seed_library_addon(&s.services, env, asset, "9.100.1", &addon_vpk(), false);
+            AddonName::new(*asset).unwrap()
+        })
+        .collect();
+    let picks = names.iter().cloned().map(DraftItem::Pick).collect();
+    let mods = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Mods").with_addons(SlotMode::Set((picks, false))))
+        .unwrap();
+    for name in &names {
+        s.services.library.delete_addon(name, None).unwrap();
+    }
+    mods
+}
+
+#[gpui_kit::test]
+fn a_store_addon_offers_re_download_and_a_local_one_does_not(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::store_ready(cx, &server);
+    support::seed_addons(
+        &env,
+        &server.uri(),
+        &[(FLAT_ADDON, "Flat Mouse", "9.100.1")],
+    );
+    let mods = profile_missing_its_addons(&s, &env, &[FLAT_ADDON, PYRO_ADDON]);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, mods.id());
+    let (flat, pyro) = (format!("addon:{FLAT_ADDON}"), format!("addon:{PYRO_ADDON}"));
+    support::wait_real(cx, "the Re-download button", |cx| {
+        support::present(cx, s.win, ids::profile_apply_redownload(&flat))
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_local(&flat)
+    ));
+    assert!(support::present(cx, s.win, ids::profile_apply_local(&pyro)));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_redownload(&pyro)
+    ));
+}
+
+// Re-download fetches the add-on into the library only; the library change refreshes the
+// summary, and confirming Apply then puts it in tf/custom.
+#[gpui_kit::test]
+fn a_re_downloaded_addon_refreshes_the_row_and_apply_installs_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_addon(FLAT_ADDON, addon_vpk(), Duration::ZERO);
+    let s = support::shell_window(cx, &env, found(&env));
+    support::store_ready(cx, &server);
+    support::seed_addons(
+        &env,
+        &server.uri(),
+        &[(FLAT_ADDON, "Flat Mouse", "9.100.1")],
+    );
+    // The Add-ons step installs only beside a managed mastercomfig.
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    let mods = profile_missing_its_addons(&s, &env, &[FLAT_ADDON]);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, mods.id());
+    let key = format!("addon:{FLAT_ADDON}");
+    support::wait_real(cx, "the Re-download button", |cx| {
+        support::present(cx, s.win, ids::profile_apply_redownload(&key))
+    });
+    support::click_id(cx, s.win, ids::profile_apply_redownload(&key));
+    support::wait_real(cx, "the missing row to go", |cx| {
+        !support::present(cx, s.win, ids::profile_apply_row(&key))
+    });
+    assert!(!support::present(cx, s.win, ids::STORE_DETAIL));
+    let library = s.services.library.list_addons(Some(&tf2(&env))).unwrap();
+    let flat = library
+        .iter()
+        .find(|e| e.name().as_str() == FLAT_ADDON)
+        .expect("the add-on is back in the library");
+    assert!(!flat.is_installed(), "the download alone installs nothing");
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    // The download's own toast may still show beside the Apply one.
+    let applied = "Mods applied. TF2 picks it up the next time it starts.";
+    support::wait_real(cx, applied, |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|l| l == applied)
+    });
+    assert_eq!(
+        std::fs::read(env.game.join("tf/custom").join(FLAT_ADDON)).unwrap(),
+        addon_vpk()
+    );
 }
 
 #[gpui_kit::test]

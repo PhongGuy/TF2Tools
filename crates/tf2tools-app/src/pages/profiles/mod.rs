@@ -29,7 +29,7 @@ use gpui_kit::{
 use tf2tools_core::{
     AddonName, ApplyProfileError, ApplyProfileReport, ApplyStep, Choices, CrosshairRef,
     ExternalHud, LogLevel, MastercomfigStatus, MissingItem, MissingKind, NewLogEntry, Profile,
-    ProfileError, ProfileId, StoreKind, Tf2Install,
+    ProfileError, ProfileId, StoreItemId, StoreKind, Tf2Install,
 };
 
 use self::draft_editor::{EditorEvent, ProfileDraftEditor};
@@ -38,11 +38,13 @@ use self::editor_model::{
 };
 use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
+use super::addon_store::any_busy;
 use super::addons;
 use super::common::{ORANGE_500, SM_ICON_PX, card_frame, no_tf2_warning};
 use super::graphics::jobs::{self, ModulesFailure};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
+use crate::addon_updates::AddonUpdates;
 use crate::font_check::active_hud;
 use crate::i18n::tr;
 use crate::ids;
@@ -1009,7 +1011,8 @@ fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// A missing row's Re-download, which opens the item's store detail, or v5's local-import note.
+// A missing row's Re-download, which opens the item's store detail (or, for an add-on, which
+// has none, starts its library download), or v5's local-import note.
 fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyElement {
     let Some((kind, id)) = model::redownload_target(item.kind(), item.provenance()) else {
         let local = tr!("profiles.missing.local");
@@ -1023,6 +1026,26 @@ fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyEl
             .child(local)
             .into_any_element();
     };
+    let button = Button::new(ids::profile_apply_redownload(key))
+        .outline()
+        .small()
+        .icon(IconName::Download)
+        .label(tr!("profiles.missing.redownload"));
+    if let StoreItemId::Addon(name) = id {
+        // A library download only, gated as the Addon Store gates it; the library change
+        // refreshes the summary and Apply then installs it.
+        let display = item.name().to_owned();
+        return button
+            .on_click(move |_, window, cx| {
+                if any_busy(cx) {
+                    return;
+                }
+                let win = window.window_handle();
+                let (name, display) = (name.clone(), display.clone());
+                AddonUpdates::global(cx).update(cx, |u, cx| u.start(name, display, false, win, cx));
+            })
+            .into_any_element();
+    }
     let body = if kind == StoreKind::CuratedHuds {
         curated_body
     } else {
@@ -1034,11 +1057,7 @@ fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyEl
         name: item.name().to_owned(),
         in_library: false,
     };
-    Button::new(ids::profile_apply_redownload(key))
-        .outline()
-        .small()
-        .icon(IconName::Download)
-        .label(tr!("profiles.missing.redownload"))
+    button
         .on_click(move |_, window, cx| {
             open_detail(detail.clone(), body(), window, cx);
         })

@@ -262,11 +262,15 @@ pub fn report_details(
 }
 
 /// Where a missing item can be downloaded again: a curated HUD, a GameBanana HUD, sound or
-/// crosshair; `None` for a local import.
+/// crosshair, or an add-on the Addon Store lists; `None` for a local import.
 pub fn redownload_target(
     kind: &MissingKind,
     provenance: &Provenance,
 ) -> Option<(StoreKind, StoreItemId)> {
+    // An add-on records no provenance; the store's catalog listing it is what makes it a store item.
+    if let MissingKind::Addon { name, in_store } = kind {
+        return in_store.then(|| (StoreKind::Addons, StoreItemId::Addon(name.clone())));
+    }
     match provenance {
         Provenance::Curated { hud_id } if *kind == MissingKind::Hud => {
             Some((StoreKind::CuratedHuds, StoreItemId::Curated(hud_id.clone())))
