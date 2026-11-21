@@ -571,12 +571,16 @@ fn open_shell(
     )
     .unwrap()
     .with_font_host(font_host);
-    // No shell test may reach logs.tf or Steam; tests that need them swap in their own client.
+    // No shell test may reach logs.tf, demos.tf or Steam; tests that need them swap in their own client.
     let dead = tf2tools_core::LogsClient::new(
         tf2tools_core::LogsCache::new(services.db.clone()),
         tf2tools_core::LogsEndpoints::loopback("http://127.0.0.1:9"),
     );
-    services = services.with_logs(dead);
+    services = services
+        .with_logs(dead)
+        .with_demos(tf2tools_core::DemosClient::new(
+            tf2tools_core::DemosEndpoints::loopback("http://127.0.0.1:9"),
+        ));
     tweak(&mut services);
     install_services(cx, services.clone());
     // A test that pins no probe reads an empty proc tree, never the machine's processes.

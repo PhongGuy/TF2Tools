@@ -15,8 +15,8 @@ use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::weapon_names::LoadedWeaponNames;
 use tf2tools_core::{
-    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TrackedPlayer,
-    WeaponNames,
+    DemosClient, DemosEndpoints, LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId,
+    StoreConfig, TrackedPlayer, WeaponNames,
 };
 
 use crate::support;
@@ -72,8 +72,43 @@ pub fn shell_with_picker(
     players: &[(u64, &'static str)],
     picker: Arc<ScriptedPicker>,
 ) -> support::ShellWindow {
+    open_logs_shell(cx, env, base, None, players, picker)
+}
+
+/// A demos client on `base` with no request spacing and a 1 ms retry backoff.
+pub fn demos_client(base: &str) -> DemosClient {
+    DemosClient::new(DemosEndpoints::loopback(base)).with_config(
+        DemosClient::default_config()
+            .with_request_spacing(Duration::ZERO)
+            .with_retry_backoff(Duration::from_millis(1)),
+    )
+}
+
+/// Like `shell_with_picker`, with demos.tf served at `demos_base`.
+pub fn shell_with_demos(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    demos_base: &str,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> support::ShellWindow {
+    open_logs_shell(cx, env, base, Some(demos_base), players, picker)
+}
+
+// The one shell both helpers open: logs.tf at `base`, `players` tracked, and demos.tf at
+// `demos_base` when given, else the shell's dead demos client.
+fn open_logs_shell(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    demos_base: Option<&str>,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> support::ShellWindow {
     cx.executor().allow_parking();
     let base = base.to_owned();
+    let demos_base = demos_base.map(str::to_owned);
     let players = players.to_vec();
     super::open_shell(
         cx,
@@ -89,7 +124,11 @@ pub fn shell_with_picker(
                     .add_player(&TrackedPlayer::new(sid(*account), *name))
                     .unwrap();
             }
-            *services = services.clone().with_logs(logs);
+            let mut tweaked = services.clone().with_logs(logs);
+            if let Some(demos_base) = &demos_base {
+                tweaked = tweaked.with_demos(demos_client(demos_base));
+            }
+            *services = tweaked;
         },
     )
 }
