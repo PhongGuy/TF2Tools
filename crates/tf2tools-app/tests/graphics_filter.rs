@@ -3,7 +3,10 @@
 use crate::support;
 
 use gpui_kit::{ElementId, Entity, TestAppContext, px, size};
-use support::graphics::{found, idle, open, reveal, saved, search, wait_for_list};
+use support::graphics::{
+    found, idle, open, picture_page, reveal, saved, scroll_to_top, search, toggle_pictures,
+    wait_for_list,
+};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::shell::route::Page;
@@ -221,4 +224,44 @@ fn every_settings_list_control_has_a_stable_id(cx: &mut TestAppContext) {
     });
     idle(cx, &page);
     assert!(support::present(cx, s.win, ids::GRAPHICS_NO_CHANGES));
+}
+
+#[gpui_kit::test]
+fn a_search_that_hides_the_open_row_closes_its_pictures(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = picture_page(cx, &env, "medium", r#"{"lod":"high"}"#);
+    toggle_pictures(cx, &s, "lod");
+    assert_eq!(
+        cx.update(|cx| page.read(cx).open_row().map(str::to_owned))
+            .as_deref(),
+        Some("lod")
+    );
+    search(cx, &s, &page, "zzz");
+    search(cx, &s, &page, "");
+    assert_eq!(
+        cx.update(|cx| page.read(cx).open_row().map(str::to_owned)),
+        None
+    );
+    assert!(!support::present(cx, s.win, ids::graphics_compare("lod")));
+}
+
+#[gpui_kit::test]
+fn changed_only_hiding_the_open_row_closes_its_pictures(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = picture_page(cx, &env, "medium", r#"{"lod":"high"}"#);
+    toggle_pictures(cx, &s, "water");
+    assert_eq!(
+        cx.update(|cx| page.read(cx).open_row().map(str::to_owned))
+            .as_deref(),
+        Some("water")
+    );
+    scroll_to_top(cx, &s);
+    reveal(cx, &s, ids::GRAPHICS_CHANGED_ONLY.into());
+    support::click_id(cx, s.win, ids::GRAPHICS_CHANGED_ONLY);
+    support::click_id(cx, s.win, ids::GRAPHICS_CHANGED_ONLY);
+    assert_eq!(
+        cx.update(|cx| page.read(cx).open_row().map(str::to_owned)),
+        None
+    );
+    assert!(!support::present(cx, s.win, ids::graphics_compare("water")));
 }
