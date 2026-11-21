@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext, px, size};
 use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::draft_editor::ProfileDraftEditor;
@@ -286,4 +286,40 @@ pub fn click_delete(cx: &mut TestAppContext, s: &super::ShellWindow) {
     .unwrap();
     super::settle(cx, s.win);
     super::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+}
+
+/// Sizes the window so the header slot is Windows' at 800x600. Windows draws the kit's three
+/// 34 px window controls; a platform drawing fewer gets a narrower window to make up the rest.
+pub fn at_windows_800x600(cx: &mut TestAppContext, s: &super::ShellWindow) {
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let drawn = super::bounds_of(cx, s.win, "window-controls").map_or(px(0.), |b| b.size.width);
+    cx.simulate_window_resize(s.win, size(px(800.) - (px(3. * 34.) - drawn), px(600.)));
+    super::settle(cx, s.win);
+}
+
+/// Asserts the open editor's name, Cancel and Save, and "Profiles /" while it shows, all lie
+/// inside the header slot, with the name ending before Cancel.
+pub fn assert_crumb_fits(cx: &mut TestAppContext, s: &super::ShellWindow) {
+    let slot = super::bounds_of(cx, s.win, ids::HEADER_SLOT).unwrap();
+    for id in [
+        ids::PROFILE_EDITOR_CRUMB,
+        ids::PROFILE_EDITOR_CRUMB_NAME,
+        ids::PROFILE_EDITOR_CANCEL,
+        ids::PROFILE_EDITOR_SAVE,
+    ] {
+        let Some(b) = super::bounds_of(cx, s.win, id) else {
+            assert_eq!(id, ids::PROFILE_EDITOR_CRUMB, "{id} is drawn");
+            continue;
+        };
+        assert!(
+            b.right() <= slot.right() + px(1.) && b.left() >= slot.left() - px(1.),
+            "{id} {b:?} leaves {slot:?}"
+        );
+    }
+    let cancel = super::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CANCEL).unwrap();
+    let name = super::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CRUMB_NAME).unwrap();
+    assert!(
+        name.right() <= cancel.left(),
+        "the name truncates before Cancel"
+    );
 }

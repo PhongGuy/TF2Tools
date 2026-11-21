@@ -5,7 +5,9 @@ use crate::support;
 
 use gpui_kit::{TestAppContext, px, size};
 use support::graphics::found;
-use support::profiles::{edit, game_files, page, seed, type_name};
+use support::profiles::{
+    assert_crumb_fits, at_windows_800x600, edit, game_files, page, seed, type_name,
+};
 use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_core::{DraftItem, ProfileDraft, SlotMode};
@@ -346,29 +348,11 @@ fn at_800x600_the_crumb_fits_the_header(cx: &mut TestAppContext) {
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     let page = page(cx, &s);
     edit(cx, &s, &page, comp.id());
-    let header = support::bounds_of(cx, s.win, ids::HEADER_SLOT).unwrap();
-    for id in [
-        ids::PROFILE_EDITOR_CRUMB,
-        ids::PROFILE_EDITOR_CRUMB_NAME,
-        ids::PROFILE_EDITOR_CANCEL,
-        ids::PROFILE_EDITOR_SAVE,
-    ] {
-        let b = support::bounds_of(cx, s.win, id).unwrap();
-        assert!(
-            b.right() <= header.right() + px(1.) && b.left() >= header.left() - px(1.),
-            "{id} {b:?} leaves {header:?}"
-        );
-    }
-    let cancel = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CANCEL).unwrap();
-    let name = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CRUMB_NAME).unwrap();
-    assert!(
-        name.right() <= cancel.left(),
-        "the name truncates before Cancel"
-    );
+    assert_crumb_fits(cx, &s);
 }
 
-// Windows draws the kit's three 34 px window controls in the title bar, leaving the slot 190 px
-// at 800x600. The test platform draws none, so a window 102 px narrower gives Linux that slot.
+// Windows' title bar holds the window controls, which leave the slot 190 px at 800x600; there
+// the name gives way first and then "Profiles /".
 #[gpui_kit::test]
 fn in_a_header_narrowed_by_window_controls_cancel_and_save_still_fit(cx: &mut TestAppContext) {
     let env = support::env();
@@ -379,37 +363,20 @@ fn in_a_header_narrowed_by_window_controls_cancel_and_save_still_fit(cx: &mut Te
         "A rather long profile name for the header",
         &seeded.rayshud,
     );
-    cx.simulate_window_resize(s.win, size(px(800. - 3. * 34.), px(600.)));
+    at_windows_800x600(cx, &s);
     let page = page(cx, &s);
     edit(cx, &s, &page, comp.id());
-    let header = support::bounds_of(cx, s.win, ids::HEADER_SLOT).unwrap();
+    let slot = support::bounds_of(cx, s.win, ids::HEADER_SLOT).unwrap();
     assert!(
-        (header.size.width - px(190.)).abs() <= px(2.),
-        "the slot is Windows' at 800x600: {header:?}"
+        (slot.size.width - px(190.)).abs() <= px(2.),
+        "the slot is Windows' at 800x600: {slot:?}"
     );
-    for id in [
-        ids::PROFILE_EDITOR_CRUMB_NAME,
-        ids::PROFILE_EDITOR_CANCEL,
-        ids::PROFILE_EDITOR_SAVE,
-    ] {
-        let b = support::bounds_of(cx, s.win, id).unwrap();
-        assert!(
-            b.right() <= header.right() + px(1.) && b.left() >= header.left() - px(1.),
-            "{id} {b:?} leaves {header:?}"
-        );
-    }
-    let cancel = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CANCEL).unwrap();
-    let name = support::bounds_of(cx, s.win, ids::PROFILE_EDITOR_CRUMB_NAME).unwrap();
-    assert!(
-        name.right() <= cancel.left(),
-        "the name truncates before Cancel"
-    );
+    assert_crumb_fits(cx, &s);
     assert!(
         !support::present(cx, s.win, ids::PROFILE_EDITOR_CRUMB),
         "\"Profiles /\" gives way once the name has none left to give"
     );
 }
-
 #[gpui_kit::test]
 fn a_short_name_in_a_wide_header_keeps_the_profiles_link(cx: &mut TestAppContext) {
     let env = support::env();

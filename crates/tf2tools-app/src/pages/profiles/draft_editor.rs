@@ -2,6 +2,7 @@
 //! one Set / None / Leave card per slot, and the Delete foot. Every change stays in the draft
 //! until Save writes it to the library.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::base::Radio;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
@@ -834,22 +835,32 @@ struct EditorCrumb {
     _observe: Subscription,
 }
 
-// The painted widths that decide whether "Profiles /" fits. The link keeps its last width
-// while hidden, so it comes back once the row has room for it again.
+// The painted widths that decide how much of the crumb fits. The link and the full-size buttons
+// keep their last widths while hidden, so each comes back once the row has room for it again.
 #[derive(Default)]
 struct CrumbFit {
     row: Cell<Pixels>,
     nav: Cell<Pixels>,
     actions: Cell<Pixels>,
+    small: Cell<Pixels>,
 }
 
 // The space between the crumb's parts.
 const CRUMB_GAP: Pixels = px(8.);
 
 impl CrumbFit {
-    // The name shrinks to nothing first; only then does the link give way to Cancel and Save.
+    // The name shrinks to nothing first, then the link gives way, then Cancel and Save drop to
+    // their small size, and last Cancel keeps only its icon.
+    fn compact(&self) -> bool {
+        self.actions.get() + CRUMB_GAP > self.row.get()
+    }
+
+    fn icon_cancel(&self) -> bool {
+        self.compact() && self.small.get() + CRUMB_GAP > self.row.get()
+    }
+
     fn shows_nav(&self) -> bool {
-        self.nav.get() + self.actions.get() + CRUMB_GAP * 2. <= self.row.get()
+        !self.compact() && self.nav.get() + self.actions.get() + CRUMB_GAP * 2. <= self.row.get()
     }
 }
 
@@ -895,6 +906,8 @@ impl Render for EditorCrumb {
             }
         };
         let fit = &self.fit;
+        let (compact, icon_cancel) = (fit.compact(), fit.icon_cancel());
+        let cancel = tr!("confirm.cancel");
         let nav = fit.shows_nav().then(|| {
             h_flex()
                 .relative()
@@ -943,18 +956,34 @@ impl Render for EditorCrumb {
                     .relative()
                     .flex_none()
                     .gap(CRUMB_GAP)
-                    .child(width_watch(|f| &f.actions, fit))
+                    // Each size measures itself, so a wider row can bring the larger one back.
+                    .when(!compact, |actions| {
+                        actions.child(width_watch(|f| &f.actions, fit))
+                    })
+                    .when(compact && !icon_cancel, |actions| {
+                        actions.child(width_watch(|f| &f.small, fit))
+                    })
                     .child(
                         Button::new(ids::PROFILE_EDITOR_CANCEL)
                             .ghost()
                             .flex_none()
-                            .label(tr!("confirm.cancel"))
+                            .when(compact, |b| b.small())
+                            .map(|b| {
+                                if icon_cancel {
+                                    b.icon(IconName::X)
+                                        .accessibility_label(cancel.clone())
+                                        .tooltip(cancel.clone())
+                                } else {
+                                    b.label(cancel.clone())
+                                }
+                            })
                             .on_click(close),
                     )
                     .child(
                         Button::new(ids::PROFILE_EDITOR_SAVE)
                             .primary()
                             .flex_none()
+                            .when(compact, |b| b.small())
                             .label(tr!("profiles.editor.save"))
                             .loading(busy)
                             .disabled(busy || blocked)
