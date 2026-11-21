@@ -208,6 +208,13 @@ pub fn offline_config() -> tf2tools_core::StoreConfig {
     tf2tools_core::StoreConfig::default().with_loopback_only(true)
 }
 
+/// The file in the data dir a finished Graphics seed leaves; while it is there, a rerun keeps
+/// whatever the player changed since.
+pub const GRAPHICS_DONE: &str = ".pilot-graphics-seeded";
+
+/// The first line of a modules.cfg the app wrote; it must match core's own header.
+pub const MODULES_HEADER: &str = "// Written by TF2Tools; changes here are replaced";
+
 /// The mastercomfig release the Graphics seed installs; its full catalogue and preset data
 /// are core fixtures.
 const MC_TAG: &str = "9.100.1";
@@ -223,13 +230,17 @@ const MC_PRESETS: &[u8] = include_bytes!(
 /// modules.cfg with vsync=on (switch), motion_blur=high (segments), fpscap=144 (select) and
 /// decals left to TF2 (select); and profiles Potato (Low with shadows=off and fpscap=60, only
 /// no-pyroland, the rest left) and Screenshots (Ultra, no HUD, sounds or crosshairs, add-ons
-/// left). Offline. Every step rewrites its result, so a rerun after a run that failed midway
-/// leaves what a clean run does.
+/// left). Offline. Does nothing once a run finished (`GRAPHICS_DONE`); until then every step
+/// rewrites its result, so a rerun after a run that failed midway leaves what a clean run does.
 pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     use tf2tools_core::{
         Choices, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
     };
 
+    let done = data.join(GRAPHICS_DONE);
+    if done.exists() {
+        return Ok(());
+    }
     let dir = DataDir::at(data);
     let db = Database::open(&dir)?;
     let lib = Library::new(db.clone(), dir.clone());
@@ -258,8 +269,8 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     fs::write(cached.join("preset_modules.json"), MC_PRESETS)?;
     let catalog = ModuleCatalog::parse(MC_TAG, MC_MODULES, MC_PRESETS)?;
 
-    // None of these needs an override VPK, so the apply stays offline. The seed owns the fake
-    // game, so a modules.cfg a failed run half-wrote is dropped rather than backed up.
+    // None of these needs an override VPK, so the apply stays offline. A modules.cfg a failed
+    // run cut off inside the header is dropped; any other foreign one still refuses the apply.
     let mut choices = Choices::new(Preset::High);
     for (module, value) in [
         ("vsync", Some("on")),
@@ -271,7 +282,9 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
         choices.set(&catalog, module, choice);
     }
     let modules_cfg = tf2.tf_dir().join("cfg/overrides/modules.cfg");
-    if modules_cfg.exists() {
+    if let Ok(bytes) = fs::read(&modules_cfg)
+        && MODULES_HEADER.as_bytes().starts_with(&bytes)
+    {
         fs::remove_file(&modules_cfg)
             .with_context(|| format!("cannot remove {}", modules_cfg.display()))?;
     }
@@ -297,7 +310,7 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     put_profile(&lib, "Screenshots", |draft| {
         draft.with_graphics(SlotMode::Set(Choices::new(Preset::Ultra)))
     })?;
-    Ok(())
+    fs::write(&done, b"").with_context(|| format!("cannot write {}", done.display()))
 }
 
 // Rewrites the profile `name` in place when an earlier run made it, else creates it from
