@@ -5,8 +5,8 @@ use crate::support;
 use gpui_kit::ElementId;
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::{
-    SettingsNote, catalog_note, describe_apply_modules, dropped_note, settings_note_text,
-    shown_choice, value_options,
+    SettingsNote, catalog_note, describe_apply_modules, dropped_note, preset_choice,
+    select_choices, settings_note_text, shown_choice, value_options,
 };
 use tf2tools_core::{ApplyModulesError, Choices, ModuleCatalogError, ModuleChoice, Preset};
 
@@ -57,6 +57,31 @@ fn a_row_shows_the_saved_choice_else_the_preset_s_value() {
     let custom = Choices::new(Preset::Custom);
     assert_eq!(
         shown_choice(&catalog, &custom, "sound"),
+        ModuleChoice::NotSet
+    );
+}
+
+#[test]
+fn a_select_s_entries_and_choices_share_one_order() {
+    let catalog = support::module_catalog();
+    let decals = catalog.module("decals").unwrap();
+    let from_options: Vec<ModuleChoice> = value_options(decals)
+        .iter()
+        .map(|o| o.choice().clone())
+        .collect();
+    assert_eq!(select_choices(decals), from_options);
+    assert_eq!(select_choices(decals)[0], ModuleChoice::NotSet);
+}
+
+#[test]
+fn the_preset_s_value_ignores_a_saved_choice() {
+    let catalog = support::module_catalog();
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&catalog, "decals", value("ultra"));
+    assert_eq!(preset_choice(&catalog, &choices, "decals"), value("low"));
+    let custom = Choices::new(Preset::Custom);
+    assert_eq!(
+        preset_choice(&catalog, &custom, "sound"),
         ModuleChoice::NotSet
     );
 }
