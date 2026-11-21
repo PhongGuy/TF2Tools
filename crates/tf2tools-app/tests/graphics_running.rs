@@ -3,7 +3,7 @@
 use crate::support;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use gpui_kit::TestAppContext;
 use support::graphics::{
@@ -57,12 +57,28 @@ fn the_banner_follows_the_header_and_only_warns(cx: &mut TestAppContext) {
     assert!(!support::disabled_of(cx, s.win, ids::PLAY_TF2));
 }
 
+// The probe counts its questions, so the test waits for the answer the visit asked for
+// before it looks for the banner; a check made earlier would pass whatever the answer.
 #[gpui_kit::test]
 fn no_banner_while_tf2_is_closed(cx: &mut TestAppContext) {
     let env = support::env();
+    let asked = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&asked);
+    cx.update(|cx| {
+        Tf2Probe::install(cx, move || {
+            count.fetch_add(1, Ordering::SeqCst);
+            false
+        })
+    });
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::settle(cx, s.win);
+    let before = asked.load(Ordering::SeqCst);
     let page = open(cx, &s);
+    support::wait_real(cx, "the visit's running answer", |_| {
+        asked.load(Ordering::SeqCst) > before
+    });
+    support::settle(cx, s.win);
     assert!(!cx.update(|cx| page.read(cx).tf2_running()));
     assert!(!support::present(cx, s.win, ids::GRAPHICS_RUNNING));
 }
