@@ -678,6 +678,7 @@ impl Render for Shell {
                             shell.navigate(nav.0, cx)
                         })
                         .detach();
+                        leave::register_profiles(page.downgrade(), cx);
                         page
                     })
                     .clone()

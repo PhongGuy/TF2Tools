@@ -1,11 +1,12 @@
-//! The one unsaved-changes check every way out of a maker (crosshair or HUD) goes through: the
-//! sidebar, closing the window and the update's Restart buttons.
+//! The one unsaved-changes check every way out of a maker (crosshair or HUD) or a profile draft
+//! goes through: the sidebar, closing the window and the update's Restart buttons.
 
 use gpui_kit::{App, Global, SharedString, WeakEntity, Window};
 
 use crate::i18n::tr;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::hud_maker::HudMakerPage;
+use crate::pages::profiles::ProfilesPage;
 use crate::shell::confirm::{Choice, Confirm, confirm, confirm_or};
 
 // Cleared on navigation rather than trusted to die with the page, since anything holding the
@@ -16,6 +17,7 @@ enum OpenMaker {
     None,
     Crosshair(WeakEntity<CrosshairMakerPage>),
     Hud(WeakEntity<HudMakerPage>),
+    Profiles(WeakEntity<ProfilesPage>),
 }
 impl Global for OpenMaker {}
 
@@ -35,18 +37,26 @@ pub fn register_hud_maker(page: WeakEntity<HudMakerPage>, cx: &mut App) {
     cx.set_global(OpenMaker::Hud(page));
 }
 
+/// Registers the Profiles page, whose open editor may hold an unsaved draft.
+pub fn register_profiles(page: WeakEntity<ProfilesPage>, cx: &mut App) {
+    cx.set_global(OpenMaker::Profiles(page));
+}
+
 /// Forgets the registered maker, so leaving no longer asks about it.
 pub fn forget_maker(cx: &mut App) {
     cx.set_global(OpenMaker::None);
 }
 
-/// True unless a registered maker holds unsaved changes.
+/// True unless a registered maker or profile draft holds unsaved changes.
 pub fn can_leave(cx: &App) -> bool {
     match cx.try_global::<OpenMaker>() {
         Some(OpenMaker::Crosshair(page)) => {
             page.upgrade().is_none_or(|page| page.read(cx).can_leave())
         }
         Some(OpenMaker::Hud(page)) => page.upgrade().is_none_or(|page| page.read(cx).can_leave()),
+        Some(OpenMaker::Profiles(page)) => page
+            .upgrade()
+            .is_none_or(|page| page.read(cx).can_leave(cx)),
         Some(OpenMaker::None) | None => true,
     }
 }
@@ -123,6 +133,11 @@ fn reclaim_maker_focus(window: &mut Window, cx: &mut App) {
                 .update(cx, |page, cx| page.reclaim_focus(window, cx));
         }
         Some(OpenMaker::Hud(page)) => {
+            let _ = page
+                .clone()
+                .update(cx, |page, cx| page.reclaim_focus(window, cx));
+        }
+        Some(OpenMaker::Profiles(page)) => {
             let _ = page
                 .clone()
                 .update(cx, |page, cx| page.reclaim_focus(window, cx));

@@ -620,7 +620,6 @@ profiles:
   weapons: { one: "%{count} weapon", other: "%{count} weapons" }
   not_applied: "Changes not applied yet"
   lead: "A profile switches your whole setup at once: HUD, sounds, crosshairs, graphics and add-ons. A new one starts as a copy of what you have now."
-  default_name: "Profile %{n}"
   no_tf2: "Set the TF2 folder in Settings to activate profiles."
   part:
     sounds: "Sounds"
@@ -691,10 +690,11 @@ profiles:
     delete: "Delete profile"
     name_blank: "Give this profile a name"
     pick_hud: "Pick a HUD, or choose None"
+    loading: "Reading what you have now…"
+    note_title: "Filled in from what you have now"
   toast:
     saved: "%{name} saved."
     saved_active: "%{name} saved. Apply it to use the changes."
-    created_from_setup: "Profile created from your current setup"
     deleted: "Profile deleted"
     failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
     missing: "Some items are missing"
@@ -711,7 +711,6 @@ profiles:
     foreign: "Your modules.cfg was not written by TF2Tools; open the Graphics page to replace it"
   activity:
     saved: "Saved profile: %{name}"
-    saved_current: "Saved current setup as profile: %{name}"
     deleted: "Deleted profile: %{name}"
     failed: "Failed to activate profile: %{name}"
     activated: "Activated profile: %{name}"
@@ -802,6 +801,7 @@ confirm:
   delete_profile:
     title: "Delete Profile"
     body: "Are you sure you want to delete \"%{name}\"?"
+    active: "It's your active profile. Your game stays as it is."
   clear_profile_crosshairs:
     title: "Clear Crosshairs"
     body: "Remove all crosshairs from this profile?"

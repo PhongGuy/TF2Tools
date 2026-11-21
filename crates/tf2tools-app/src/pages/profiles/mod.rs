@@ -32,8 +32,7 @@ use tf2tools_core::{
 
 use self::draft_editor::{EditorEvent, ProfileDraftEditor};
 use self::editor_model::{
-    Draft, Mode, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing,
-    next_profile_name, summary,
+    Draft, Mode, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing, summary,
 };
 use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
@@ -55,6 +54,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, ask_external};
 use crate::shell::font_check::ask_about_fonts;
 use crate::shell::header_slot::HeaderSlot;
+use crate::shell::leave;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
@@ -128,6 +128,8 @@ pub struct ProfilesPage {
     visible: Range<usize>,
     image_viewer: String,
     busy: bool,
+    /// New profile is reading the current setup for its draft.
+    opening: bool,
     activating: Option<ProfileId>,
     /// The part of `activating` that does work; idle while one of its dialogs waits.
     applying: Option<ProfileId>,
@@ -177,6 +179,7 @@ impl ProfilesPage {
             visible: 0..0,
             image_viewer,
             busy: false,
+            opening: false,
             activating: None,
             applying: None,
             view: View::Grid,
@@ -218,9 +221,9 @@ impl ProfilesPage {
         model::taken_by(&self.profiles, name, except).map(|p| p.name().to_owned())
     }
 
-    /// True while a create, Delete or an activate runs.
+    /// True while New profile reads the setup, a Delete or an activate runs.
     pub fn is_busy(&self) -> bool {
-        self.busy || self.activating.is_some()
+        self.busy || self.opening || self.activating.is_some()
     }
 
     /// The profile whose activate flow is running, from the click until it ends.
@@ -278,9 +281,22 @@ impl ProfilesPage {
                 .unwrap_or_else(|| name.as_str().to_owned())
         };
         let draft = Draft::from_profile(&profile, &addon_name);
+        self.show_draft(Some(profile), draft, window, cx);
+    }
+
+    // Opens the editor on `draft`, of `saved` or of a new profile, its crumb in the header; the
+    // leave guard asks about it until it closes.
+    fn show_draft(
+        &mut self,
+        saved: Option<Profile>,
+        draft: Draft,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let page = cx.entity().downgrade();
+        leave::register_profiles(page.clone(), cx);
         let editor = cx.new(|cx| {
-            let mut editor = ProfileDraftEditor::new(Some(profile), draft, window, cx);
+            let mut editor = ProfileDraftEditor::new(saved, draft, window, cx);
             editor.set_page(page);
             editor
         });
@@ -333,6 +349,14 @@ impl ProfilesPage {
         self.editor().is_none_or(|e| !e.read(cx).is_dirty())
     }
 
+    /// Hands focus back to the open editor, so Esc reaches it after the leave prompt's
+    /// Keep editing.
+    pub fn reclaim_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(editor) = self.editor() {
+            editor.update(cx, |e, cx| e.reclaim_focus(window, cx));
+        }
+    }
+
     /// Cancel, Esc and the crumb: closes at once when clean, else asks Confirm::discard_changes.
     pub fn request_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(editor) = self.editor() else {
@@ -358,6 +382,7 @@ impl ProfilesPage {
     // Drops the editor and its crumb without a reload.
     fn drop_editor(&mut self, cx: &mut Context<Self>) {
         self.view = View::Grid;
+        leave::forget_maker(cx);
         HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::Profiles, cx));
         cx.notify();
     }
@@ -588,9 +613,9 @@ impl ProfilesPage {
         .detach();
     }
 
-    /// Saves what is installed as "Profile N", writes the create row, toasts, and opens the
-    /// editor on it with the name focused and selected. A NameTaken from a race retries once
-    /// with the next free name. Does nothing while busy or without TF2.
+    /// Reads current_setup and list_addons off the UI thread, then opens an unsaved draft from
+    /// Draft::from_current; a failure toasts and opens nothing. Does nothing while busy or
+    /// without TF2.
     pub fn new_profile(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if self.is_busy() {
             return;
@@ -598,67 +623,69 @@ impl ProfilesPage {
         let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
             return;
         };
-        let name = next_profile_name(&self.profiles);
-        self.busy = true;
+        self.opening = true;
         cx.notify();
-        let creating = run_blocking(cx, move |s| {
-            let create = |name: &str| s.library.save_current_profile(name, &tf2);
-            let failed = |e: ProfileError| {
-                describe_profile(&e).into_op(tr!("messages.action.create_profile"))
+        let reading = run_blocking(cx, move |s| {
+            let setup = s
+                .library
+                .current_setup(&tf2)
+                .map_err(|e| describe_profile(&e).into_op(tr!("messages.action.create_profile")))?;
+            // Display names only dress the add-on rows, so a failed read falls back to asset names.
+            let names: HashMap<AddonName, String> = s
+                .library
+                .list_addons(None)
+                .map(|addons| {
+                    addons
+                        .iter()
+                        .map(|a| (a.name().clone(), a.display_name().to_owned()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let addon_name = |name: &AddonName| {
+                names
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| name.as_str().to_owned())
             };
-            let profile = match create(&name) {
-                Err(ProfileError::NameTaken { .. }) => {
-                    let all = s.library.profiles().map_err(failed)?;
-                    create(&next_profile_name(&all))
-                }
-                made => made,
-            }
-            .map_err(failed)?;
-            let message = tr!("profiles.activity.saved_current", name = profile.name());
-            let entry = NewLogEntry::new(LogLevel::Info, "profile", "save_current", message);
-            activity::write(s, &entry);
-            Ok(profile)
+            Ok(Draft::from_current(&setup, &addon_name))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
-            let done = creating.await;
+            let done = reading.await;
             let _ = cx.update(|cx| {
                 win.update(cx, |_, window, cx| {
-                    let profile = match done {
-                        Ok(profile) => profile,
-                        Err(err) => return toast_error(window, cx, &err),
-                    };
-                    toast(
-                        window,
-                        cx,
-                        ToastKind::Success,
-                        tr!("profiles.toast.created_from_setup"),
-                        SharedString::default(),
-                    );
-                    // The reload follows the editor in this same update, so no load that
-                    // started before the create can land after it as the newest.
                     let _ = page.update(cx, |page, cx| {
-                        page.busy = false;
-                        page.show_editor(profile, window, cx);
-                        page.reload(cx);
-                        // Deferred so the click that started the create cannot take focus back.
-                        if let Some(editor) = page.editor() {
-                            window.defer(cx, move |window, cx| {
-                                editor.update(cx, |e, cx| e.focus_name(window, cx));
-                            });
+                        page.opening = false;
+                        cx.notify();
+                        match done {
+                            Ok(draft) => {
+                                page.show_draft(None, draft, window, cx);
+                                // Deferred so the click on New profile cannot take focus back.
+                                if let Some(editor) = page.editor() {
+                                    window.defer(cx, move |window, cx| {
+                                        editor.update(cx, |e, cx| e.focus_name(window, cx));
+                                    });
+                                }
+                            }
+                            Err(err) => toast_error(window, cx, &err),
                         }
                     });
                 })
             });
-            // A failed create, or a window gone meanwhile, still frees the page.
+            // A window gone meanwhile still frees the page.
             let _ = page.update(cx, |page, cx| {
-                if page.busy {
-                    page.busy = false;
-                    page.reload(cx);
+                if page.opening {
+                    page.opening = false;
+                    cx.notify();
                 }
             });
         })
         .detach();
+    }
+
+    /// True while New profile reads the current setup, with `PROFILE_EDITOR_LOADING` shown.
+    pub fn is_opening(&self) -> bool {
+        self.opening
     }
 
     /// Opens v5's delete confirm for `id`, then removes it on yes; does nothing while `is_busy()`.
@@ -672,7 +699,8 @@ impl ProfilesPage {
         if self.is_busy() {
             return;
         }
-        let answer = confirm(Confirm::delete_profile(name), window, cx);
+        let active = self.active.as_ref() == Some(&id);
+        let answer = confirm(Confirm::delete_profile(name, active), window, cx);
         let message = tr!("profiles.activity.deleted", name = name).to_string();
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
@@ -1562,6 +1590,26 @@ impl Render for ProfilesPage {
                 .test_support()
                 .size_full()
                 .child(editor.clone())
+                .into_any_element();
+        }
+        if self.opening {
+            let reading = tr!("profiles.editor.loading");
+            return div()
+                .id(ids::page(Page::Profiles))
+                .test_support()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(
+                    div()
+                        .id(ids::PROFILE_EDITOR_LOADING)
+                        .aria_label(reading.clone())
+                        .test_support()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(reading),
+                )
                 .into_any_element();
         }
         let state = tf2_state(cx).read(cx);

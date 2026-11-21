@@ -1,5 +1,5 @@
 //! The profile editor's pure rules: the five-slot draft it edits and saves, why Save is off,
-//! the card lines, the Apply summary, and the name a new profile starts with.
+//! the card lines, the Apply summary and the new draft's note.
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
@@ -11,16 +11,6 @@ use tf2tools_core::{
 use super::model::{crosshair_list, hit, hud_item, kill, taken_message};
 use crate::i18n::{counted_plural, names, plural, separated, tr};
 use crate::pages::graphics::model::preset_label;
-
-/// "Profile N" in the player's language for the lowest N >= 1 that no profile's name equals,
-/// ignoring case.
-pub fn next_profile_name(profiles: &[Profile]) -> String {
-    let taken: Vec<String> = profiles.iter().map(|p| p.name().to_lowercase()).collect();
-    (1..)
-        .map(|n: u64| tr!("profiles.default_name", n = n).to_string())
-        .find(|name| !taken.contains(&name.to_lowercase()))
-        .unwrap_or_default()
-}
 
 /// "1 weapon", "N weapons".
 pub fn weapon_count(n: usize) -> String {

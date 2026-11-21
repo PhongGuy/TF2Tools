@@ -658,6 +658,7 @@ fn profile_editor_ids_are_stable() {
         [
             ids::PROFILES_NEW,
             ids::PROFILE_EDITOR,
+            ids::PROFILE_EDITOR_LOADING,
             ids::PROFILE_EDITOR_CRUMB,
             ids::PROFILE_EDITOR_CRUMB_NAME,
             ids::PROFILE_EDITOR_CANCEL,
@@ -672,6 +673,7 @@ fn profile_editor_ids_are_stable() {
         [
             "profiles-new",
             "profile-editor",
+            "profile-editor-loading",
             "profile-editor-crumb",
             "profile-editor-crumb-name",
             "profile-editor-cancel",

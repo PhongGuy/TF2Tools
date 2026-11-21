@@ -645,7 +645,6 @@ profiles:
   weapons: { one: "%{count} arme", other: "%{count} armes" }
   not_applied: "Modifications pas encore appliquées"
   lead: "Un profil change toute votre configuration d'un coup\u00A0: HUD, sons, viseurs, graphismes et add-ons. Un nouveau profil part d'une copie de ce que vous avez maintenant."
-  default_name: "Profil %{n}"
   no_tf2: "Indiquez le dossier de TF2 dans les Paramètres pour activer des profils."
   part:
     sounds: "Sons"
@@ -716,10 +715,11 @@ profiles:
     delete: "Supprimer le profil"
     name_blank: "Donne un nom à ce profil"
     pick_hud: "Choisis un HUD, ou choisis Aucun"
+    loading: "Lecture de ce que vous avez en ce moment…"
+    note_title: "Rempli avec ce que vous avez en ce moment"
   toast:
     saved: "%{name} enregistré."
     saved_active: "%{name} enregistré. Applique-le pour utiliser les changements."
-    created_from_setup: "Profil créé à partir de votre configuration actuelle"
     deleted: "Profil supprimé"
     failed_steps: "Impossible de mettre en place\u00A0: %{steps}. Vérifiez que TF2 est fermé et que TF2Tools peut écrire dans votre dossier TF2, puis réessayez."
     missing: "Certains objets sont manquants"
@@ -736,7 +736,6 @@ profiles:
     foreign: "Votre modules.cfg n'a pas été écrit par TF2Tools\u00A0; ouvrez la page Graphismes pour le remplacer"
   activity:
     saved: "Profil enregistré\u00A0: %{name}"
-    saved_current: "Configuration actuelle enregistrée comme profil\u00A0: %{name}"
     deleted: "Profil supprimé\u00A0: %{name}"
     failed: "Échec de l'activation du profil\u00A0: %{name}"
     activated: "Profil activé\u00A0: %{name}"
@@ -827,6 +826,7 @@ confirm:
   delete_profile:
     title: "Supprimer le profil"
     body: "Voulez-vous vraiment supprimer «\u00A0%{name}\u00A0»\u00A0?"
+    active: "C'est votre profil actif. Votre jeu reste tel quel."
   clear_profile_crosshairs:
     title: "Retirer les viseurs"
     body: "Retirer tous les viseurs de ce profil\u00A0?"

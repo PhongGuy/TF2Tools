@@ -196,16 +196,20 @@ impl Confirm {
         }
     }
 
-    /// v5's ProfileCard delete prompt for the profile called `name`.
-    pub fn delete_profile(name: &str) -> Self {
+    /// v5's ProfileCard delete prompt for the profile called `name`; `active` adds that the
+    /// game stays as it is.
+    pub fn delete_profile(name: &str, active: bool) -> Self {
+        let mut description = format!(
+            "{} {}",
+            tr!("confirm.delete_profile.body", name = name),
+            tr!("confirm.cannot_undo")
+        );
+        if active {
+            description = format!("{description} {}", tr!("confirm.delete_profile.active"));
+        }
         Self {
             title: tr!("confirm.delete_profile.title"),
-            description: format!(
-                "{} {}",
-                tr!("confirm.delete_profile.body", name = name),
-                tr!("confirm.cannot_undo")
-            )
-            .into(),
+            description: description.into(),
             confirm_label: tr!("confirm.delete"),
             cancel_label: tr!("confirm.cancel"),
         }

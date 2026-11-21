@@ -643,7 +643,6 @@ profiles:
   weapons: { one: "%{count} Waffe", other: "%{count} Waffen" }
   not_applied: "Änderungen noch nicht angewendet"
   lead: "Ein Profil wechselt dein ganzes Setup auf einmal: HUD, Sounds, Fadenkreuze, Grafik und Add-ons. Ein neues startet als Kopie dessen, was du gerade hast."
-  default_name: "Profil %{n}"
   no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um Profile zu aktivieren."
   part:
     sounds: "Sounds"
@@ -714,10 +713,11 @@ profiles:
     delete: "Profil löschen"
     name_blank: "Gib diesem Profil einen Namen"
     pick_hud: "Wähle ein HUD oder „Keine“"
+    loading: "Lese, was du gerade hast…"
+    note_title: "Ausgefüllt mit dem, was du gerade hast"
   toast:
     saved: "%{name} gespeichert."
     saved_active: "%{name} gespeichert. Wende es an, um die Änderungen zu nutzen."
-    created_from_setup: "Profil aus deinem aktuellen Setup erstellt"
     deleted: "Profil gelöscht"
     failed_steps: "Konnte nicht eingerichtet werden: %{steps}. Stell sicher, dass TF2 geschlossen ist und TF2Tools in deinen TF2-Ordner schreiben darf, und versuch es dann erneut."
     missing: "Einige Einträge fehlen"
@@ -734,7 +734,6 @@ profiles:
     foreign: "Deine modules.cfg stammt nicht von TF2Tools; öffne die Grafik-Seite, um sie zu ersetzen"
   activity:
     saved: "Profil gespeichert: %{name}"
-    saved_current: "Aktuelles Setup als Profil gespeichert: %{name}"
     deleted: "Profil gelöscht: %{name}"
     failed: "Profil konnte nicht aktiviert werden: %{name}"
     activated: "Profil aktiviert: %{name}"
@@ -825,6 +824,7 @@ confirm:
   delete_profile:
     title: "Profil löschen"
     body: "Möchtest du „%{name}“ wirklich löschen?"
+    active: "Es ist dein aktives Profil. Dein Spiel bleibt, wie es ist."
   clear_profile_crosshairs:
     title: "Fadenkreuze entfernen"
     body: "Alle Fadenkreuze aus diesem Profil entfernen?"

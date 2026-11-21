@@ -146,6 +146,13 @@ impl ProfileDraftEditor {
         });
     }
 
+    /// Takes focus back to the editor unless it already holds it, so Esc answers again.
+    pub fn reclaim_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.focus.contains_focused(window, cx) {
+            self.focus.focus(window, cx);
+        }
+    }
+
     /// Switches `slot` to `mode` in the draft; false when the draft refuses it.
     pub fn set_mode(&mut self, slot: SlotKind, mode: Mode, cx: &mut Context<Self>) -> bool {
         let done = self.draft.set_mode(slot, mode);
@@ -262,6 +269,34 @@ impl ProfileDraftEditor {
         let _ = page.update(cx, |page, cx| page.delete(id, &name, window, cx));
     }
 
+    // A new draft's note under the name: where it was filled in from, and what it copied.
+    fn new_draft_note(&self, cx: &App) -> Option<impl IntoElement> {
+        if self.saved.is_some() {
+            return None;
+        }
+        let (title, body) = (
+            tr!("profiles.editor.note_title"),
+            editor_model::new_draft_note(&self.baseline),
+        );
+        let theme = cx.theme();
+        Some(
+            v_flex()
+                .id(ids::PROFILE_EDITOR_NOTE)
+                .aria_label(SharedString::from(format!("{title}. {body}")))
+                .test_support()
+                .max_w(px(480.))
+                .gap_1()
+                .p_3()
+                .rounded_md()
+                .border_1()
+                .border_color(theme.border)
+                .bg(theme.muted)
+                .text_sm()
+                .child(div().font_weight(FontWeight::MEDIUM).child(title))
+                .child(div().text_color(theme.muted_foreground).child(body)),
+        )
+    }
+
     // The Name label, field and the line saying why Save is off.
     fn name_field(&self, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
@@ -315,6 +350,7 @@ impl Render for ProfileDraftEditor {
                     .mx_auto()
                     .gap_6()
                     .child(self.name_field(cx))
+                    .children(self.new_draft_note(cx))
                     .children(delete.map(|b| h_flex().child(b))),
             );
         v_flex()

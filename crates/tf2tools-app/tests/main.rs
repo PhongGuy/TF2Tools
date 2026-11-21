@@ -201,6 +201,7 @@ mod player_states;
 mod previews;
 mod profile_draft;
 mod profile_editor;
+mod profile_editor_open;
 mod profile_summary;
 mod profiles;
 mod profiles_apply;

@@ -644,7 +644,6 @@ profiles:
   weapons: { one: "%{count} arma", other: "%{count} armas" }
   not_applied: "Alterações ainda não aplicadas"
   lead: "Um perfil troca toda a sua configuração de uma vez: HUD, sons, miras, gráficos e add-ons. Um novo começa como cópia do que você tem agora."
-  default_name: "Perfil %{n}"
   no_tf2: "Defina a pasta do TF2 nas configurações para ativar perfis."
   part:
     sounds: "Sons"
@@ -715,10 +714,11 @@ profiles:
     delete: "Excluir perfil"
     name_blank: "Dê um nome a este perfil"
     pick_hud: "Escolha um HUD ou escolha Nenhum"
+    loading: "Lendo o que você tem agora…"
+    note_title: "Preenchido com o que você tem agora"
   toast:
     saved: "%{name} salvo."
     saved_active: "%{name} salvo. Aplique-o para usar as mudanças."
-    created_from_setup: "Perfil criado a partir da sua configuração atual"
     deleted: "Perfil excluído"
     failed_steps: "Não foi possível colocar estes itens no lugar: %{steps}. Verifique se o TF2 está fechado e se o TF2Tools pode gravar na sua pasta do TF2, e tente de novo."
     missing: "Alguns itens estão ausentes"
@@ -735,7 +735,6 @@ profiles:
     foreign: "Seu modules.cfg não foi gravado pelo TF2Tools; abra a página Gráficos para substituí-lo"
   activity:
     saved: "Perfil salvo: %{name}"
-    saved_current: "Configuração atual salva como perfil: %{name}"
     deleted: "Perfil excluído: %{name}"
     failed: "Não foi possível ativar o perfil: %{name}"
     activated: "Perfil ativado: %{name}"
@@ -826,6 +825,7 @@ confirm:
   delete_profile:
     title: "Excluir perfil"
     body: "Tem certeza de que deseja excluir \"%{name}\"?"
+    active: "É o seu perfil ativo. Seu jogo continua como está."
   clear_profile_crosshairs:
     title: "Limpar miras"
     body: "Remover todas as miras deste perfil?"

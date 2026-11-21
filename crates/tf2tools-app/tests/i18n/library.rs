@@ -19,7 +19,6 @@ use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::pages::huds::copy_name;
 use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
-use tf2tools_app::pages::profiles::editor_model::next_profile_name;
 use tf2tools_app::pages::profiles::editor_model::weapon_crosshairs;
 use tf2tools_app::pages::profiles::model::not_applied;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
@@ -1182,18 +1181,10 @@ fn profile_texts_read_in_russian() {
             "Продолжить"
         ]
     );
-    let env = support::env();
-    let services = support::services(&env, support::no_steam());
-    assert_eq!(next_profile_name(&[]), "Профиль 1");
-    for name in ["профиль 1", "Profile 2"] {
-        services
-            .library
-            .create_profile(&ProfileDraft::new(name))
-            .unwrap();
-    }
-    assert_eq!(
-        next_profile_name(&services.library.profiles().unwrap()),
-        "Профиль 2"
+    assert!(
+        Confirm::delete_profile("Comp", true)
+            .description
+            .ends_with("Это ваш активный профиль. Игра останется как есть.")
     );
     assert_eq!(
         texts(&Confirm::clear_profile_crosshairs())[..3],

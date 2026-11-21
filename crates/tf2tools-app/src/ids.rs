@@ -938,10 +938,12 @@ pub const PROFILE_APPLY_NOTHING: &str = "profile-apply-nothing";
 pub const PROFILE_APPLY_LEFT: &str = "profile-apply-left";
 pub const PROFILE_APPLY_CANCEL: &str = "profile-apply-cancel";
 pub const PROFILE_APPLY_OK: &str = "profile-apply-ok";
-/// The New profile main button, which saves the current setup as a new profile.
+/// The New profile main button, which opens an unsaved draft of the current setup.
 pub const PROFILES_NEW: &str = "profiles-new";
 /// The profile editor's root.
 pub const PROFILE_EDITOR: &str = "profile-editor";
+/// The line New profile shows while it reads the current setup for its draft.
+pub const PROFILE_EDITOR_LOADING: &str = "profile-editor-loading";
 /// The header crumb's "Profiles" link, which asks to close the editor.
 pub const PROFILE_EDITOR_CRUMB: &str = "profile-editor-crumb";
 /// The header crumb's profile name, or "New profile" while the name is blank.
