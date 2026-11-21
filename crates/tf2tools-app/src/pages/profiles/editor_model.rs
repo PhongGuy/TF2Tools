@@ -288,7 +288,7 @@ impl Draft {
     /// Keeps the slot's content. Refuses (false) Add-ons Set while Graphics is None; Graphics
     /// None moves a Set Add-ons slot to None.
     pub fn set_mode(&mut self, slot: SlotKind, mode: Mode) -> bool {
-        if slot == SlotKind::Addons && mode == Mode::Set && self.addons_need_graphics() {
+        if !self.can_set(slot, mode) {
             return false;
         }
         if slot == SlotKind::Graphics
@@ -299,6 +299,11 @@ impl Draft {
         }
         self.modes[slot as usize] = mode;
         true
+    }
+
+    /// Whether `slot` may switch to `mode`: everything but Add-ons Set while Graphics is None.
+    pub fn can_set(&self, slot: SlotKind, mode: Mode) -> bool {
+        !(slot == SlotKind::Addons && mode == Mode::Set && self.addons_need_graphics())
     }
 
     /// The draft's `kind` sound; None for TF2's default.
@@ -322,7 +327,8 @@ impl Draft {
     /// Moves a Set Add-ons slot to None while Graphics is None, the combination the editor
     /// never saves; true when it moved.
     pub fn drop_forbidden_addons(&mut self) -> bool {
-        let forbidden = self.addons_need_graphics() && self.mode(SlotKind::Addons) == Mode::Set;
+        let forbidden =
+            self.mode(SlotKind::Addons) == Mode::Set && !self.can_set(SlotKind::Addons, Mode::Set);
         if forbidden {
             self.modes[SlotKind::Addons as usize] = Mode::None;
         }

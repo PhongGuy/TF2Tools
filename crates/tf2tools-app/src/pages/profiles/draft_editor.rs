@@ -564,9 +564,7 @@ impl ProfileDraftEditor {
         let foreground = cx.theme().foreground;
         let segments = Mode::ALL.into_iter().enumerate().map(|(ix, mode)| {
             let checked = current == mode;
-            let refused =
-                slot == SlotKind::Addons && mode == Mode::Set && self.draft.addons_need_graphics();
-            let disabled = refused || self.busy;
+            let disabled = !self.draft.can_set(slot, mode) || self.busy;
             let editor = cx.entity().downgrade();
             let label = mode_label(mode);
             let segment = Radio::new(ids::profile_slot_mode(slot.key(), mode.key()))
