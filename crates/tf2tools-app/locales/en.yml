@@ -3043,6 +3043,12 @@ graphics:
     full: "Full picture"
     wipe: "Slide between the preset's picture and yours"
     caption: "Click a picture to use that setting."
+    no_picture:
+      performance_only: "No picture: this setting changes how the game runs, not how it looks."
+      same_in_still: "No picture: it looks the same in a still picture. The difference only shows while you move."
+      needs_item: "No picture: it only shows with a certain item, cosmetic or spray."
+      not_on_local_server: "No picture: it only shows when other players get hit in a real match."
+      needs_motion: "No picture: the difference only shows in motion."
   changes:
     title: { one: "%{count} change from %{preset}", other: "%{count} changes from %{preset}" }
     as_is: "Using %{preset} as is. Change any setting below and it shows up here."

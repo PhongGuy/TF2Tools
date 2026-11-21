@@ -92,6 +92,18 @@ impl GraphicsChoicesEditor {
                 .ml(px(-8.))
                 .child(picture_panel::toggle(self, name, cx))
         });
+        // A setting the manifest says has no pictures says why, in the Show pictures slot.
+        let no_picture = index
+            .filter(|_| pictures.is_none())
+            .and_then(|index| index.no_picture(name))
+            .and_then(pictures::no_picture_note)
+            .map(|note| {
+                labelled(
+                    div().text_xs().line_height(px(16.)).text_color(muted),
+                    scope.id(ids::graphics_no_picture(name)),
+                    note,
+                )
+            });
         let panel = index
             .filter(|_| self.open_row() == Some(name))
             .and_then(|index| pictures::row_pictures(index, row, self.zoom()))
@@ -110,7 +122,8 @@ impl GraphicsChoicesEditor {
             ))
             .children(description)
             .child(learn_more)
-            .children(toggle);
+            .children(toggle)
+            .children(no_picture);
         let controls = h_flex().flex_none().gap_2().children(reset).child(control);
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
         // the control drops under them, since a segmented control beside a wrapped description
