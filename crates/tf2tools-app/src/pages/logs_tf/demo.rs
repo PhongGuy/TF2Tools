@@ -1,10 +1,15 @@
-//! An open log's demo on demos.tf: one lookup per log id, kept while the page lives.
+//! An open log's demo on demos.tf: one lookup per log id, kept while the page lives, and the
+//! download its footer button starts.
 
-use gpui_kit::Context;
+use gpui_kit::{Context, Window};
 use tf2tools_core::{DemoQuery, DemoSummary};
 
 use super::LogsTfPage;
+use super::text::demo_reason;
+use super::text::{demo_down, demo_download_failed, demo_downloaded, demo_file_name, demo_percent};
+use crate::picker::PickKind;
 use crate::services::Services;
+use crate::shell::toast::{ToastKind, toast};
 use crate::tokio_bridge;
 
 /// How far log `id`'s demo lookup got.
@@ -15,7 +20,31 @@ pub enum DemoLookup {
     Missing,
 }
 
+/// What the open log's footer shows of its found demo: which one, and `Some` while it
+/// downloads, with the whole percent once its size is known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DemoButton {
+    pub(super) demo_id: u64,
+    pub(super) downloading: Option<Option<u8>>,
+}
+
 impl LogsTfPage {
+    /// Log `log_id`'s demo buttons, only once its lookup found a demo.
+    pub(super) fn demo_button(&self, log_id: u64) -> Option<DemoButton> {
+        match self.demos.get(&log_id)? {
+            DemoLookup::Found(demo) => Some(DemoButton {
+                demo_id: demo.id(),
+                downloading: self.demo_progress(log_id),
+            }),
+            DemoLookup::Looking | DemoLookup::Missing => None,
+        }
+    }
+
+    /// `Some` while log `log_id`'s demo downloads, holding its whole percent once known.
+    pub fn demo_progress(&self, log_id: u64) -> Option<Option<u8>> {
+        self.demo_downloads.get(&log_id).copied()
+    }
+
     /// Log `log_id`'s demo lookup, if one has started.
     pub fn demo_lookup(&self, log_id: u64) -> Option<&DemoLookup> {
         self.demos.get(&log_id)
@@ -62,6 +91,93 @@ impl LogsTfPage {
             let _ = page.update(cx, |page, cx| {
                 page.demos.insert(log_id, lookup);
                 cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    // Asks where to save log `log_id`'s found demo, then streams it there on tokio. Only a
+    // changed whole percent crosses to the page, so a fast download wakes the UI at most a
+    // hundred times. A cancel ends it quietly; success or failure ends in a toast.
+    pub(super) fn download_demo(
+        &mut self,
+        log_id: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.demo_downloads.contains_key(&log_id) {
+            return;
+        }
+        let Some(DemoLookup::Found(demo)) = self.demos.get(&log_id) else {
+            return;
+        };
+        let demo = demo.clone();
+        let suggested = demo_file_name(demo.name(), demo.id());
+        let picking = cx
+            .global::<Services>()
+            .picker
+            .save_to(PickKind::Demo, &suggested, cx);
+        cx.spawn_in(window, async move |page, cx| {
+            let Some(path) = picking.await else {
+                return;
+            };
+            let dest = path.clone();
+            // A second click while the dialog was up may already have started this demo.
+            let started = page.update(cx, |page, cx| {
+                if page.demo_downloads.contains_key(&log_id) {
+                    return None;
+                }
+                page.demo_downloads.insert(log_id, None);
+                cx.notify();
+                if !tokio_bridge::is_running(cx) {
+                    tokio_bridge::init(cx);
+                }
+                let (tx, rx) = tokio::sync::watch::channel(None::<u8>);
+                let client = cx.global::<Services>().demos.clone();
+                let job = tokio_bridge::spawn(cx, async move {
+                    let report = move |done, total| {
+                        tx.send_if_modified(|shown| {
+                            let percent = demo_percent(done, total);
+                            let changed = *shown != percent;
+                            *shown = percent;
+                            changed
+                        });
+                    };
+                    client.download_demo(&demo, &dest, &report).await
+                });
+                Some((rx, job))
+            });
+            let Ok(Some((mut rx, job))) = started else {
+                return;
+            };
+            while rx.changed().await.is_ok() {
+                let percent = *rx.borrow_and_update();
+                let _ = page.update(cx, |page, cx| {
+                    page.demo_downloads.insert(log_id, percent);
+                    cx.notify();
+                });
+            }
+            let joined = job.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.demo_downloads.remove(&log_id);
+                cx.notify();
+                let why = match joined {
+                    Ok(Ok(())) => {
+                        let name = path.file_name().unwrap_or_default().to_string_lossy();
+                        let name = name.into_owned();
+                        toast(window, cx, ToastKind::Success, demo_downloaded(), name);
+                        return;
+                    }
+                    Ok(Err(error)) => {
+                        tracing::warn!(%error, log_id, "downloading a demo failed");
+                        demo_reason(&error)
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, log_id, "the demo download stopped");
+                        demo_down()
+                    }
+                };
+                toast(window, cx, ToastKind::Error, demo_download_failed(), why);
             });
         })
         .detach();

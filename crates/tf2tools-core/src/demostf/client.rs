@@ -2,6 +2,7 @@
 
 use std::cell::Cell;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use tokio::io::AsyncWriteExt as _;
@@ -193,15 +194,16 @@ impl DemosClient {
 
         // As in `get`: each 429 widens the gate, and an answer with none helps ease it back.
         self.pacer.slot(Priority::Interactive).await;
-        let rate_limits = Cell::new(0u32);
+        // An atomic, not a Cell, so the future stays Send for the app's tokio runtime.
+        let rate_limited = AtomicBool::new(false);
         let opened = self
             .http
             .open_retrying(url, || {
-                rate_limits.set(rate_limits.get() + 1);
+                rate_limited.store(true, Ordering::Relaxed);
                 self.pacer.rate_limited();
             })
             .await;
-        if rate_limits.get() == 0 && opened.is_ok() {
+        if !rate_limited.load(Ordering::Relaxed) && opened.is_ok() {
             self.pacer.answered();
         }
         let mut body = match opened {

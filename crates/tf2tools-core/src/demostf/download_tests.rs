@@ -51,6 +51,22 @@ async fn serving(reply: ResponseTemplate) -> (MockServer, DemosClient, String) {
 
 fn no_progress(_: u64, _: Option<u64>) {}
 
+// The app runs every download on its tokio runtime, so the future must be Send.
+#[tokio::test]
+async fn a_demo_downloads_on_a_spawned_task() {
+    let (_server, client, url) = serving(ResponseTemplate::new(200).set_body_bytes(bytes())).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("m.dem");
+    let target = dest.clone();
+    let job = tokio::spawn(async move {
+        client
+            .download_demo(&summary(&url), &target, &no_progress)
+            .await
+    });
+    job.await.unwrap().unwrap();
+    assert_eq!(std::fs::read(&dest).unwrap(), bytes());
+}
+
 #[tokio::test]
 async fn a_demo_streams_into_place_reporting_progress() {
     let (_server, client, url) = serving(ResponseTemplate::new(200).set_body_bytes(bytes())).await;

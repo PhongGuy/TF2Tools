@@ -112,6 +112,8 @@ pub struct LogsTfPage {
     fetching: HashSet<u64>,
     // Each opened log's demo lookup by log id; an entry means demos.tf was asked once already.
     demos: HashMap<u64, DemoLookup>,
+    // Demo downloads running by log id, each with its whole percent once the size is known.
+    demo_downloads: HashMap<u64, Option<u8>>,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
     // The kill matrix tab and its sort, kept the same way.
@@ -244,6 +246,7 @@ impl LogsTfPage {
             open: None,
             fetching: HashSet::new(),
             demos: HashMap::new(),
+            demo_downloads: HashMap::new(),
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
             matrix_sort: None,

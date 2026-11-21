@@ -22,6 +22,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TrackedPlayer};
 
+use super::demo::DemoButton;
 use super::sort::{MatrixSort, PlayerSort};
 use super::text::{log_loading, nickname_note, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
@@ -125,12 +126,14 @@ pub(super) fn nick_marker(id: ElementId, log_name: &str) -> impl IntoElement {
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading
 /// or why it failed. A failed fetch of a pending log offers Retry, which asks `page` to fetch
 /// it again.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn panel(
     row: &LogRow,
     open: &OpenLog,
     tracked: &Tracked,
     sort: PlayerSort,
     matrix: (MatrixKind, Option<MatrixSort>),
+    demo: Option<DemoButton>,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
@@ -146,7 +149,7 @@ pub(super) fn panel(
     };
     let body = match opened {
         OpenState::Ready(log) => {
-            log_body(open, log, tracked, sort, matrix, page, cx).into_any_element()
+            log_body(open, log, tracked, sort, matrix, demo, page, cx).into_any_element()
         }
         OpenState::Loading => status(log_loading()),
         OpenState::Failed(why) if matches!(row.state(), LogState::Pending | LogState::Trimmed) => {
@@ -174,12 +177,14 @@ pub(super) fn panel(
 }
 
 // Everything the parsed body adds, in logs.tf's order.
+#[allow(clippy::too_many_arguments)]
 fn log_body(
     open: &OpenLog,
     log: &LogDetail,
     tracked: &Tracked,
     sort: PlayerSort,
     matrix: (MatrixKind, Option<MatrixSort>),
+    demo: Option<DemoButton>,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> impl IntoElement {
@@ -219,7 +224,7 @@ fn log_body(
             .id(ids::LOGSTF_MATRIX)
             .test_support(),
         )
-        .child(footer::footer(open.id, log, page))
+        .child(footer::footer(open.id, log, demo, page))
 }
 
 // A row of any player table: a tracked player's is tinted and bold, and says so in words for

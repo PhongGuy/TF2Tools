@@ -27,6 +27,8 @@ pub enum PickKind {
     HudPicture,
     /// Where to save a logs.tf log's raw zip.
     LogZip,
+    /// Where to save a demos.tf demo.
+    Demo,
 }
 
 /// Asks the user for one path; `None` means cancelled or unavailable.

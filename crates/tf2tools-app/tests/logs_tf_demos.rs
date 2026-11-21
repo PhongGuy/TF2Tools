@@ -7,12 +7,12 @@ use gpui_kit::{Entity, ListOffset, TestAppContext, px};
 use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::{DemoLookup, LogsTfPage};
-use tf2tools_app::picker::ScriptedPicker;
+use tf2tools_app::picker::{PickKind, ScriptedPicker};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, Gate, expanded, mount_held, open_log, open_page, requests_to, serve_two_logs,
-    shell_with_demos,
+    ARIE, Gate, expanded, mount_held, open_log, open_page, requests_to, scroll_to_in_log,
+    serve_two_logs, shell_with_demos,
 };
 
 // Log 3 is the 6v6 fixture: cp_gullywash_f9, uploaded 1792201829, 1714 s long. Log 2 is
@@ -43,7 +43,6 @@ struct Demos {
     server: support::StoreServer,
     s: support::ShellWindow,
     page: Entity<LogsTfPage>,
-    #[expect(dead_code, reason = "the footer's download tests read it")]
     picker: Arc<ScriptedPicker>,
 }
 
@@ -176,9 +175,147 @@ fn a_lookup_lands_on_its_own_log_and_is_never_repeated(cx: &mut TestAppContext) 
     assert!(matches!(settled(cx, &page, 3), DemoLookup::Found(_)));
     assert_eq!(expanded(cx, &page), Some(2), "log 2 stays open");
     reopen_above(cx, &s, &page, 3);
+    assert!(
+        matches!(lookup(cx, &page, 3), Some(DemoLookup::Found(_))),
+        "reopening keeps the found demo rather than looking again"
+    );
     assert_eq!(
         requests_to(&server, "/demos/"),
         2,
         "reopening log 3 asks demos.tf nothing more"
     );
+}
+
+/// `demos` with log 3 open, its lookup finished, scrolled to its footer.
+fn at_footer(
+    cx: &mut TestAppContext,
+    list: Option<fn(&str) -> Vec<u8>>,
+    picks: Vec<PathBuf>,
+) -> Demos {
+    let d = demos(cx, list, picks);
+    open_log(cx, &d.s, &d.page, 3);
+    settled(cx, &d.page, 3);
+    scroll_to_in_log(cx, &d.s, &d.page, 3, ids::logstf_download(3));
+    d
+}
+
+fn toast(cx: &mut TestAppContext, d: &Demos) -> String {
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, d.s.win, ids::TOAST)
+    });
+    support::label_of(cx, d.s.win, ids::TOAST).unwrap()
+}
+
+#[gpui_kit::test]
+fn a_found_demo_offers_its_download_and_its_page(cx: &mut TestAppContext) {
+    let d = at_footer(cx, Some(sixes_list), Vec::new());
+    let download = support::label_of(cx, d.s.win, ids::logstf_demo_download(3));
+    assert_eq!(download.as_deref(), Some("Download demo"));
+    assert!(!support::disabled_of(
+        cx,
+        d.s.win,
+        ids::logstf_demo_download(3)
+    ));
+    let link = support::label_of(cx, d.s.win, ids::logstf_demo_link(3));
+    assert_eq!(link.as_deref(), Some("demos.tf"));
+}
+
+#[gpui_kit::test]
+fn no_demo_shows_neither_button(cx: &mut TestAppContext) {
+    let d = at_footer(cx, Some(empty_list), Vec::new());
+    assert!(
+        support::present(cx, d.s.win, ids::logstf_download(3)),
+        "Download log stays"
+    );
+    assert!(!support::present(cx, d.s.win, ids::logstf_demo_download(3)));
+    assert!(!support::present(cx, d.s.win, ids::logstf_demo_link(3)));
+}
+
+#[gpui_kit::test]
+fn another_logs_demo_never_shows_on_this_one(cx: &mut TestAppContext) {
+    let d = demos(cx, Some(sixes_list), Vec::new());
+    open_log(cx, &d.s, &d.page, 3);
+    assert!(matches!(settled(cx, &d.page, 3), DemoLookup::Found(_)));
+    open_log(cx, &d.s, &d.page, 2);
+    assert_eq!(settled(cx, &d.page, 2), DemoLookup::Missing);
+    scroll_to_in_log(cx, &d.s, &d.page, 2, ids::logstf_download(2));
+    assert!(!support::present(cx, d.s.win, ids::logstf_demo_download(2)));
+    assert!(
+        !support::present(cx, d.s.win, ids::logstf_demo_download(3)),
+        "log 3 is closed"
+    );
+}
+
+#[gpui_kit::test]
+fn download_demo_saves_it_where_the_player_chose(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("my demo.dem");
+    let d = at_footer(cx, Some(sixes_list), vec![path.clone()]);
+    let demo: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
+    d.server.mount_bytes(DEMO_ROUTE, demo.clone());
+    support::click_id(cx, d.s.win, ids::logstf_demo_download(3));
+    let said = toast(cx, &d);
+    assert!(said.starts_with("Demo downloaded"), "{said}");
+    assert_eq!(std::fs::read(&path).unwrap(), demo);
+    assert_eq!(d.picker.suggested(), [DEMO_NAME]);
+    assert_eq!(d.picker.asked(), [PickKind::Demo]);
+    support::wait_real(cx, "the download to end", |cx| {
+        cx.update(|cx| d.page.read(cx).demo_progress(3).is_none())
+    });
+    let label = support::label_of(cx, d.s.win, ids::logstf_demo_download(3));
+    assert_eq!(label.as_deref(), Some("Download demo"));
+}
+
+#[gpui_kit::test]
+fn a_running_download_disables_the_button_and_says_so(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("m.dem");
+    let d = at_footer(cx, Some(sixes_list), vec![path.clone()]);
+    let gate = Gate::default();
+    mount_held(&d.server, &gate, DEMO_ROUTE, None, b"demo".to_vec());
+    support::click_id(cx, d.s.win, ids::logstf_demo_download(3));
+    support::wait_real(cx, "the demo request", |_| gate.arrived() == 1);
+    let label = support::label_of(cx, d.s.win, ids::logstf_demo_download(3));
+    assert_eq!(
+        label.as_deref(),
+        Some("Downloading demo"),
+        "no size known yet, so no percent"
+    );
+    assert!(support::disabled_of(
+        cx,
+        d.s.win,
+        ids::logstf_demo_download(3)
+    ));
+    gate.open();
+    let said = toast(cx, &d);
+    assert!(said.starts_with("Demo downloaded"), "{said}");
+    assert_eq!(std::fs::read(&path).unwrap(), b"demo");
+}
+
+#[gpui_kit::test]
+fn a_failed_download_says_why_and_writes_nothing(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("m.dem");
+    let d = at_footer(cx, Some(sixes_list), vec![path.clone()]);
+    d.server.mount_status(DEMO_ROUTE, 404);
+    support::click_id(cx, d.s.win, ids::logstf_demo_download(3));
+    let said = toast(cx, &d);
+    assert!(said.starts_with("Couldn't download this demo."), "{said}");
+    assert!(said.contains("demos.tf no longer has this demo."), "{said}");
+    support::assert_plain(&said);
+    assert!(!path.exists(), "nothing is written");
+    assert_eq!(cx.update(|cx| d.page.read(cx).demo_progress(3)), None);
+}
+
+#[gpui_kit::test]
+fn a_cancelled_save_downloads_nothing(cx: &mut TestAppContext) {
+    let d = at_footer(cx, Some(sixes_list), Vec::new());
+    d.server.mount_bytes(DEMO_ROUTE, b"demo".to_vec());
+    support::click_id(cx, d.s.win, ids::logstf_demo_download(3));
+    support::wait_real(cx, "the save picker is asked", |_| {
+        !d.picker.suggested().is_empty()
+    });
+    support::settle(cx, d.s.win);
+    assert!(!support::present(cx, d.s.win, ids::TOAST), "no toast");
+    assert_eq!(requests_to(&d.server, DEMO_ROUTE), 0, "nothing downloaded");
 }
