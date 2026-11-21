@@ -725,7 +725,7 @@ fn installed_gamebanana_addons_list_by_section(cx: &mut TestAppContext) {
     assert!(support::present(cx, s.win, ids::addons_gb_group("skins")));
     assert!(support::present(cx, s.win, ids::addons_gb_group("effects")));
     let one = tf2tools_core::GbId::new(1);
-    assert!(support::present(cx, s.win, ids::addons_gb_remove(one)));
+    assert!(support::present(cx, s.win, ids::addons_gb_delete(one)));
     assert!(support::present(cx, s.win, ids::addons_gb_open(one)));
     assert!(!support::present(cx, s.win, ids::addons_gb_update(one)));
     assert!(!support::present(cx, s.win, ids::addons_gb_tag(one)));
@@ -747,18 +747,18 @@ fn gamebanana_addons_alone_do_not_show_the_empty_library(cx: &mut TestAppContext
 }
 
 #[gpui_kit::test]
-fn remove_asks_then_deletes_the_files(cx: &mut TestAppContext) {
+fn delete_asks_then_deletes_the_files(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(4, "Gone Soon", &[("a.vpk", gb_vpk(), 100)]);
     let s = store_shell(cx, &env, &server);
     install_gb(cx, &s, 4, "skins");
     let _page = open_addons(cx, &s);
     let id = tf2tools_core::GbId::new(4);
-    support::click_id(cx, s.win, ids::addons_gb_remove(id));
+    support::click_id(cx, s.win, ids::addons_gb_delete(id));
     let asked = support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).unwrap();
     assert_eq!(
         asked,
-        "Are you sure you want to remove Gone Soon? It will be removed from TF2 and from your library."
+        "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
     );
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     crate::gb_addon_installs::toast_is(cx, s.win, "Add-on removed. Gone Soon");
@@ -767,13 +767,14 @@ fn remove_asks_then_deletes_the_files(cx: &mut TestAppContext) {
             .join("tf/custom/tf2tools-gb-4-gone-soon.vpk")
             .exists()
     );
+    assert!(!env.data.gb_addon_dir().join("4").exists());
     support::wait_real(cx, "the card gone", |cx| {
         !support::present(cx, s.win, ids::addons_gb_card(id))
     });
 }
 
 #[gpui_kit::test]
-fn remove_while_tf2_runs_says_close_tf2_first_without_asking(cx: &mut TestAppContext) {
+fn delete_while_tf2_runs_says_close_tf2_first_without_asking(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(40, "Kept", &[("a.vpk", gb_vpk(), 100)]);
     let s = store_shell(cx, &env, &server);
@@ -781,7 +782,7 @@ fn remove_while_tf2_runs_says_close_tf2_first_without_asking(cx: &mut TestAppCon
     let _page = open_addons(cx, &s);
     cx.update(|cx| Tf2Probe::install(cx, || true));
     let id = tf2tools_core::GbId::new(40);
-    support::click_id(cx, s.win, ids::addons_gb_remove(id));
+    support::click_id(cx, s.win, ids::addons_gb_delete(id));
     crate::gb_addon_installs::toast_is(
         cx,
         s.win,
@@ -789,6 +790,73 @@ fn remove_while_tf2_runs_says_close_tf2_first_without_asking(cx: &mut TestAppCon
     );
     assert!(!support::present(cx, s.win, ids::CONFIRM_DESCRIPTION));
     assert!(env.game.join("tf/custom/tf2tools-gb-40-kept.vpk").is_file());
+}
+
+#[gpui_kit::test]
+fn uninstall_keeps_the_card_and_install_puts_it_back_without_a_download(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(16, "Unplugged", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 16, "skins");
+    let _page = open_addons(cx, &s);
+    let id = tf2tools_core::GbId::new(16);
+    let file = env.game.join("tf/custom/tf2tools-gb-16-unplugged.vpk");
+    assert!(file.is_file());
+    support::click_id(cx, s.win, ids::addons_gb_uninstall(id));
+    crate::gb_addon_installs::toast_is(cx, s.win, "Add-on uninstalled. Unplugged");
+    assert!(!support::present(cx, s.win, ids::CONFIRM_DESCRIPTION));
+    support::wait_real(cx, "the not installed tag", |cx| {
+        support::label_of(cx, s.win, ids::addons_gb_tag(id)).as_deref() == Some("Not installed")
+    });
+    assert!(support::present(cx, s.win, ids::addons_gb_card(id)));
+    assert!(!file.exists());
+    assert!(env.data.gb_addon_dir().join("16").is_dir());
+    // Install again from the library copy: the file returns and GameBanana is not asked.
+    let before = server.requests_where(|_| true);
+    support::click_id(cx, s.win, ids::addons_gb_install(id));
+    crate::gb_addon_installs::toast_is(cx, s.win, "Add-on installed. Unplugged");
+    support::wait_real(cx, "the file back", |_| file.is_file());
+    assert_eq!(server.requests_where(|_| true), before);
+}
+
+#[gpui_kit::test]
+fn uninstall_while_tf2_runs_says_close_tf2_first(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(17, "Held", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 17, "skins");
+    let _page = open_addons(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    let id = tf2tools_core::GbId::new(17);
+    support::click_id(cx, s.win, ids::addons_gb_uninstall(id));
+    crate::gb_addon_installs::toast_is(
+        cx,
+        s.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    assert!(env.game.join("tf/custom/tf2tools-gb-17-held.vpk").is_file());
+}
+
+#[gpui_kit::test]
+fn the_gamebanana_footer_matches_mastercomfig(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(18, "Footer", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 18, "skins");
+    let _page = open_addons(cx, &s);
+    let id = tf2tools_core::GbId::new(18);
+    let present = |cx: &mut TestAppContext, part| support::present(cx, s.win, part);
+    assert!(present(cx, ids::addons_gb_uninstall(id)));
+    assert!(present(cx, ids::addons_gb_delete(id)));
+    assert!(present(cx, ids::addons_gb_open(id)));
+    assert!(!present(cx, ids::addons_gb_install(id)));
+    support::click_id(cx, s.win, ids::addons_gb_uninstall(id));
+    support::wait_real(cx, "install offered", |cx| {
+        support::present(cx, s.win, ids::addons_gb_install(id))
+    });
+    assert!(present(cx, ids::addons_gb_delete(id)));
+    assert!(present(cx, ids::addons_gb_open(id)));
+    assert!(!present(cx, ids::addons_gb_uninstall(id)));
 }
 
 #[gpui_kit::test]
@@ -807,7 +875,7 @@ fn a_hand_deleted_addon_offers_install_again(cx: &mut TestAppContext) {
     support::wait_real(cx, "the not installed tag", |cx| {
         support::label_of(cx, s.win, ids::addons_gb_tag(id)).as_deref() == Some("Not installed")
     });
-    support::click_id(cx, s.win, ids::addons_gb_reinstall(id));
+    support::click_id(cx, s.win, ids::addons_gb_install(id));
     crate::gb_addon_installs::toast_is(cx, s.win, "Add-on installed. Back");
     assert!(env.game.join("tf/custom/tf2tools-gb-5-back.vpk").is_file());
 }
@@ -826,7 +894,7 @@ fn install_again_without_a_library_copy_downloads_it(cx: &mut TestAppContext) {
     support::wait_real(cx, "the not installed tag", |cx| {
         support::label_of(cx, s.win, ids::addons_gb_tag(id)).as_deref() == Some("Not installed")
     });
-    support::click_id(cx, s.win, ids::addons_gb_reinstall(id));
+    support::click_id(cx, s.win, ids::addons_gb_install(id));
     support::wait_real(cx, "the installed card", |cx| {
         !support::present(cx, s.win, ids::addons_gb_tag(id))
     });
@@ -862,7 +930,7 @@ fn opening_the_page_checks_for_updates_and_update_installs_the_newer_file(cx: &m
 }
 
 #[gpui_kit::test]
-fn an_item_gone_from_gamebanana_keeps_remove(cx: &mut TestAppContext) {
+fn an_item_gone_from_gamebanana_keeps_uninstall_and_delete(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(7, "Trashed", &[("a.vpk", gb_vpk(), 100)]);
     let s = store_shell(cx, &env, &server);
@@ -881,7 +949,8 @@ fn an_item_gone_from_gamebanana_keeps_remove(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::addons_gb_tag(id)).as_deref()
             == Some("No longer on GameBanana")
     });
-    assert!(support::present(cx, s.win, ids::addons_gb_remove(id)));
+    assert!(support::present(cx, s.win, ids::addons_gb_uninstall(id)));
+    assert!(support::present(cx, s.win, ids::addons_gb_delete(id)));
     assert!(!support::present(cx, s.win, ids::addons_gb_update(id)));
 }
 
@@ -900,13 +969,13 @@ fn a_gone_addon_whose_files_were_deleted_offers_install_again(cx: &mut TestAppCo
     let id = tf2tools_core::GbId::new(15);
     // The library copy needs nothing from GameBanana, so the store detail's offer holds here.
     support::wait_real(cx, "install again", |cx| {
-        support::present(cx, s.win, ids::addons_gb_reinstall(id))
+        support::present(cx, s.win, ids::addons_gb_install(id))
     });
     assert_eq!(
         tf2tools_app::gb_addon_installs::GbAddonOffer::of(env_entry(cx, 15).as_ref()),
         tf2tools_app::gb_addon_installs::GbAddonOffer::InstallAgain
     );
-    support::click_id(cx, s.win, ids::addons_gb_reinstall(id));
+    support::click_id(cx, s.win, ids::addons_gb_install(id));
     support::wait_real(cx, "the files back", |_| file.is_file());
 }
 
@@ -936,7 +1005,7 @@ fn at_800_by_600_a_gamebanana_card_keeps_its_tag_and_buttons_inside(cx: &mut Tes
     for part in [
         ids::addons_gb_tag(id),
         ids::addons_gb_update(id),
-        ids::addons_gb_remove(id),
+        ids::addons_gb_uninstall(id),
         ids::addons_gb_open(id),
     ] {
         let b = support::bounds_of(cx, s.win, part.clone()).expect("drawn");
@@ -969,12 +1038,12 @@ fn a_gamebanana_row_with_an_unknown_section_is_not_counted(cx: &mut TestAppConte
     );
 }
 
-/// The ids of add-on `id`'s Update, Remove and link buttons.
+/// The ids of add-on `id`'s Update, Uninstall and link buttons, its footer with an update.
 fn gb_buttons(id: u64) -> [gpui_kit::ElementId; 3] {
     let id = tf2tools_core::GbId::new(id);
     [
         ids::addons_gb_update(id),
-        ids::addons_gb_remove(id),
+        ids::addons_gb_uninstall(id),
         ids::addons_gb_open(id),
     ]
 }
@@ -1005,10 +1074,18 @@ fn without_tf2_gamebanana_buttons_rest_but_the_link(cx: &mut TestAppContext) {
         })
     });
     let _page = open_addons(cx, &s);
-    let [update, remove, open] = gb_buttons(11);
+    // Without TF2 nothing counts as installed, so the footer offers Install beside Update.
+    let id = tf2tools_core::GbId::new(11);
+    let (update, install, delete, open) = (
+        ids::addons_gb_update(id),
+        ids::addons_gb_install(id),
+        ids::addons_gb_delete(id),
+        ids::addons_gb_open(id),
+    );
+    let all = [update.clone(), install.clone(), delete.clone(), open];
     assert_eq!(
-        support::disabled_ids(cx, s.win, &[update.clone(), remove.clone(), open]),
-        vec![update, remove]
+        support::disabled_ids(cx, s.win, &all),
+        vec![update, install, delete]
     );
 }
 
@@ -1021,8 +1098,8 @@ fn while_another_addon_works_gamebanana_buttons_rest_but_the_link(cx: &mut TestA
     let s = store_shell(cx, &env, &server);
     install_gb_with_update(cx, &s, &env, 12);
     let _page = open_addons(cx, &s);
-    let [update, remove, open] = gb_buttons(12);
-    let all = [update.clone(), remove.clone(), open];
+    let [update, uninstall, open] = gb_buttons(12);
+    let all = [update.clone(), uninstall.clone(), open];
     assert!(support::disabled_ids(cx, s.win, &all).is_empty());
     // The pack waits on its checklist, so its install stays running.
     let rt = cx.update(|cx| tf2tools_app::tokio_bridge::handle(cx));
@@ -1040,7 +1117,10 @@ fn while_another_addon_works_gamebanana_buttons_rest_but_the_link(cx: &mut TestA
     support::wait_real(cx, "the checklist", |cx| {
         support::present(cx, s.win, ids::PAYLOAD_CHECKLIST)
     });
-    assert_eq!(support::disabled_ids(cx, s.win, &all), vec![update, remove]);
+    assert_eq!(
+        support::disabled_ids(cx, s.win, &all),
+        vec![update, uninstall]
+    );
 }
 
 #[gpui_kit::test]
