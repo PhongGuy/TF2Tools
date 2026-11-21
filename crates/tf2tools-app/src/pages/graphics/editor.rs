@@ -13,8 +13,9 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
-    Styled as _, Subscription, TestSupportExt as _, Window, div, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
@@ -26,6 +27,10 @@ use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::widgets::{Named as _, labelled};
+
+// The chip strip's height with one row of 28 px chips. The empty strip reserves it, so the first
+// change does not push the rows below down under the pointer.
+const STRIP_HEIGHT: Pixels = px(54.);
 
 /// An edit the editor proposes to its host; the editor's own choices stay as they are.
 #[derive(Debug, Clone, PartialEq)]
@@ -361,6 +366,9 @@ impl GraphicsChoicesEditor {
         if list.is_empty() {
             return labelled(
                 div()
+                    .flex()
+                    .items_center()
+                    .min_h(STRIP_HEIGHT)
                     .text_sm()
                     .text_color(muted)
                     .py_3()
@@ -385,7 +393,9 @@ impl GraphicsChoicesEditor {
         let chips: Vec<AnyElement> = list
             .into_iter()
             .map(|change| {
-                let sentence = match &change.was {
+                // A saved value the preset now matches names itself once, not "High → High".
+                let was = change.was.clone().filter(|_| !change.same);
+                let sentence = match &was {
                     None if change.gone => tr!(
                         "graphics.changes.chip_gone",
                         name = change.label,
@@ -403,13 +413,19 @@ impl GraphicsChoicesEditor {
                         now = change.now
                     ),
                 };
-                // A dropped setting has no preset value to go back to, so its X removes it.
-                let undo_name = match &change.was {
-                    Some(was) => Some(tr!("graphics.changes.undo", name = change.label, was = was)),
-                    None if change.gone => {
+                // A matched value resets like its row; a dropped setting has no preset value to
+                // go back to, so its X removes it.
+                let undo_name = match (&change.was, &was) {
+                    (Some(preset), Some(_)) => Some(tr!(
+                        "graphics.changes.undo",
+                        name = change.label,
+                        was = preset
+                    )),
+                    (Some(_), None) => Some(tr!("graphics.row.reset")),
+                    (None, _) if change.gone => {
                         Some(tr!("graphics.changes.remove", name = change.label))
                     }
-                    None => None,
+                    (None, _) => None,
                 };
                 let undo = undo_name.filter(|_| editable).map(|name| {
                     let module = change.module.clone();
@@ -439,9 +455,7 @@ impl GraphicsChoicesEditor {
                     .rounded_full()
                     .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
                     .children(
-                        change.was.map(|was| {
-                            h_flex().gap(px(6.)).text_color(muted).child(was).child("→")
-                        }),
+                        was.map(|was| h_flex().gap(px(6.)).text_color(muted).child(was).child("→")),
                     )
                     .child(change.now)
                     .children(undo)
