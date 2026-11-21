@@ -3330,7 +3330,7 @@ graphics:
       line: "Weniger Effekte und weichere Texturen, für schwache PCs"
     medium:
       label: "Mittel"
-      line: "Ein Ausgleich aus Optik und Bildrate für die meisten PCs"
+      line: "Ausgewogen zwischen Optik und Bildrate, für die meisten PCs"
     high:
       label: "Hoch"
       line: "Schärfere Texturen und mehr Effekte, für einen leistungsstarken PC"
