@@ -381,6 +381,63 @@ fn saving_a_hud_deleted_meanwhile_toasts_and_drops_its_tile(cx: &mut TestAppCont
     );
 }
 
+#[gpui_kit::test]
+fn a_refused_save_drops_the_deleted_picks_so_the_next_save_works(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let p = comp(&s, &seeded);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    type_name(cx, &s, &e, "Comp two");
+    let budhud = seeded.budhud.folder_name().to_owned();
+    support::wait_real(cx, "the tiles", |cx| {
+        support::present(cx, s.win, ids::profile_pick_hud(&budhud))
+    });
+    support::click_id(cx, s.win, ids::profile_pick_hud(&budhud));
+    let kill = cx.update(|cx| e.read(cx).sound_select(SoundKind::Killsound).clone());
+    let bell = SoundOption {
+        id: Some(seeded.bell.id().clone()),
+        label: "Bell".into(),
+    };
+    cx.update(|cx| {
+        kill.update(cx, |_, cx| {
+            cx.emit(SelectEvent::<Vec<SoundOption>>::Confirm(Some(bell)))
+        })
+    });
+    s.services.library.delete_hud(seeded.budhud.id()).unwrap();
+    s.services
+        .library
+        .delete_sound(seeded.bell.id(), None)
+        .unwrap();
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the reload", |cx| {
+        !support::present(cx, s.win, ids::profile_pick_hud(&budhud))
+    });
+    let draft = cx.update(|cx| e.read(cx).draft().clone());
+    assert!(draft.hud.is_none(), "the deleted HUD left the draft");
+    assert!(draft.kill.is_none(), "the deleted killsound left the draft");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_EDITOR_NAME_ERROR).as_deref(),
+        Some("Pick a HUD, or choose None")
+    );
+    support::click_id(
+        cx,
+        s.win,
+        ids::profile_pick_hud(seeded.rayshud.folder_name()),
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    assert_eq!(saved.name(), "Comp two");
+    let sounds = saved.sounds().as_set().expect("Sounds stays Set");
+    assert!(sounds.kill.is_none());
+    assert_eq!(game_files(&env), before);
+}
+
 type Load = Result<Vec<u8>, OpError>;
 
 /// Holds the shared player on `folder`'s sound with a load that resolves only when the test

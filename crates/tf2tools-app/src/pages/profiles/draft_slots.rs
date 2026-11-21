@@ -97,6 +97,7 @@ impl ProfileDraftEditor {
                                     addons: addons.into(),
                                     images: Rc::new(images),
                                 });
+                                e.drop_deleted_picks();
                                 e.sync_sound_selects(window, cx);
                                 e.want_images(cx);
                             }
@@ -108,6 +109,18 @@ impl ProfileDraftEditor {
             });
         })
         .detach();
+    }
+
+    // Drops each draft pick the fresh library no longer lists, so Save stops failing on it.
+    fn drop_deleted_picks(&mut self) {
+        let Some(l) = &self.library else {
+            return;
+        };
+        let huds: Vec<HudId> = l.huds.iter().map(|h| h.id().clone()).collect();
+        let sounds: Vec<SoundId> = l.sounds.iter().map(|x| x.id().clone()).collect();
+        let crosshairs: Vec<CrosshairId> = l.crosshairs.iter().map(|c| c.id().clone()).collect();
+        let addons: Vec<AddonName> = l.addons.iter().map(|a| a.name().clone()).collect();
+        (self.draft).drop_missing_picks(&huds, &sounds, &crosshairs, &addons);
     }
 
     // Asks for every library HUD's card picture under this editor's viewer.

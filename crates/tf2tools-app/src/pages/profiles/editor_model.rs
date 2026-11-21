@@ -3,9 +3,9 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    AddonEntry, AddonName, Choices, CurrentSetup, DraftCrosshair, DraftItem, HudEntry, HudId,
-    MissingItem, MissingKind, Preset, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft,
-    ProfileItem, SlotMode, SoundEntry, SoundId, SoundKind,
+    AddonEntry, AddonName, Choices, CrosshairId, CrosshairRef, CurrentSetup, DraftCrosshair,
+    DraftItem, HudEntry, HudId, MissingItem, MissingKind, Preset, Profile, ProfileCrosshair,
+    ProfileCrosshairRef, ProfileDraft, ProfileItem, SlotMode, SoundEntry, SoundId, SoundKind,
 };
 
 use super::model::{crosshair_list, hit, hud_item, kill, taken_message};
@@ -327,6 +327,45 @@ impl Draft {
             self.modes[SlotKind::Addons as usize] = Mode::None;
         }
         forbidden
+    }
+
+    /// Drops every library pick whose id the library lists no longer hold, so a Save does not
+    /// fail on it again; kept items stay, since Save writes them back as they are.
+    pub fn drop_missing_picks(
+        &mut self,
+        huds: &[HudId],
+        sounds: &[SoundId],
+        crosshairs: &[CrosshairId],
+        addons: &[AddonName],
+    ) {
+        fn listed<T: PartialEq>(pick: Option<&Picked<T>>, ids: &[T]) -> bool {
+            if let Some(DraftItem::Pick(id)) = pick.map(|p| &p.item) {
+                ids.contains(id)
+            } else {
+                true
+            }
+        }
+        if !listed(self.hud.as_ref(), huds) {
+            self.hud = None;
+        }
+        if !listed(self.hit.as_ref(), sounds) {
+            self.hit = None;
+        }
+        if !listed(self.kill.as_ref(), sounds) {
+            self.kill = None;
+        }
+        self.crosshairs.retain(|p| {
+            if let DraftCrosshair::Set {
+                crosshair: CrosshairRef::Library(id),
+                ..
+            } = &p.item
+            {
+                crosshairs.contains(id)
+            } else {
+                true
+            }
+        });
+        self.addons.retain(|a| listed(Some(a), addons));
     }
 
     /// True while Graphics is None, so Add-ons cannot be Set.
