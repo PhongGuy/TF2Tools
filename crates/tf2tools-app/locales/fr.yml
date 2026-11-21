@@ -427,6 +427,13 @@ logs_tf:
     gone: "logs.tf n'a plus ce log."
     offline: "Vérifiez votre connexion Internet."
     too_big: "Ce log est trop volumineux pour être téléchargé."
+  demo:
+    done: "Démo téléchargée"
+    failed: "Impossible de télécharger cette démo."
+    gone: "demos.tf n'a plus cette démo."
+    too_big: "Cette démo est trop volumineuse pour être téléchargée."
+    down: "demos.tf ne répond pas pour le moment. Réessayez plus tard."
+    busy: "demos.tf est occupé. Réessayez dans quelques minutes."
   open:
     loading: "Chargement du log..."
     offline: "Impossible de charger ce log hors ligne."
@@ -528,6 +535,9 @@ logs_tf:
     type: "Type"
     description: "Description"
     won: "%{team} gagne"
+    demo_download: "Télécharger la démo"
+    demo_downloading: "Téléchargement de la démo"
+    demo_downloading_percent: "Téléchargement de la démo %{percent}"
   event:
     point_capture: "Capture de point"
     captured: " a capturé le point %{point}"
