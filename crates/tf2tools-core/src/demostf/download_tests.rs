@@ -207,3 +207,44 @@ async fn clean_downloads_ease_a_widened_gate() {
     }
     assert_eq!(client.pacer.gap_of(Priority::Interactive), base);
 }
+
+#[tokio::test]
+async fn a_429_on_a_download_widens_the_gate_and_is_no_clean_answer() {
+    use crate::store::pacer::{EASE_AFTER, Priority};
+
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/files/aa/7.dem"))
+        .respond_with(ResponseTemplate::new(429))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/files/aa/7.dem"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes()))
+        .mount(&server)
+        .await;
+    let base = Duration::from_millis(1);
+    let config = StoreConfig::default()
+        .with_request_spacing(base)
+        .with_retry_backoff(Duration::from_millis(1));
+    let client = DemosClient::new(DemosEndpoints::loopback(&server.uri())).with_config(config);
+    let url = format!("{}/files/aa/7.dem", server.uri());
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("m.dem");
+    client
+        .download_demo(&summary(&url), &dest, &no_progress)
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(&dest).unwrap(), bytes());
+    assert_eq!(client.pacer.gap_of(Priority::Interactive), base * 2);
+    // Had the retried download counted as a clean answer, one fewer would ease the gate.
+    for _ in 1..EASE_AFTER {
+        client
+            .download_demo(&summary(&url), &dest, &no_progress)
+            .await
+            .unwrap();
+    }
+    assert_eq!(client.pacer.gap_of(Priority::Interactive), base * 2);
+}
