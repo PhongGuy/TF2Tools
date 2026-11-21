@@ -1052,3 +1052,35 @@ fn an_empty_addon_library_points_at_the_store(cx: &mut TestAppContext) {
     );
     assert_eq!(game_files(&env), before);
 }
+
+#[gpui_kit::test]
+fn a_stored_graphics_none_with_addons_set_opens_and_saves_addons_none(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk, false);
+    let draft = ProfileDraft::new("Forbidden")
+        .with_graphics(SlotMode::None)
+        .with_addons(SlotMode::Set((vec![DraftItem::Pick(addon(PYRO))], true)));
+    let p = s.services.library.create_profile(&draft).unwrap();
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    assert_eq!(
+        cx.update(|cx| e.read(cx).draft().mode(SlotKind::Addons)),
+        Mode::None
+    );
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_slot_mode("addons", "set")),
+        Some(false)
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    assert!(saved.graphics().as_set().is_none());
+    assert!(saved.addons().as_set().is_none(), "add-ons left Set");
+    drop(e);
+    assert_eq!(game_files(&env), before);
+}

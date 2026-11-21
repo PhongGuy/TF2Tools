@@ -319,6 +319,16 @@ impl Draft {
         }
     }
 
+    /// Moves a Set Add-ons slot to None while Graphics is None, the combination the editor
+    /// never saves; true when it moved.
+    pub fn drop_forbidden_addons(&mut self) -> bool {
+        let forbidden = self.addons_need_graphics() && self.mode(SlotKind::Addons) == Mode::Set;
+        if forbidden {
+            self.modes[SlotKind::Addons as usize] = Mode::None;
+        }
+        forbidden
+    }
+
     /// True while Graphics is None, so Add-ons cannot be Set.
     pub fn addons_need_graphics(&self) -> bool {
         self.mode(SlotKind::Graphics) == Mode::None

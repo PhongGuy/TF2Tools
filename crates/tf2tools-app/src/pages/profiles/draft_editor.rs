@@ -151,6 +151,11 @@ impl ProfileDraftEditor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        // A stored Graphics None with Add-ons Set opens as Add-ons None against the stored
+        // baseline, so the draft reads dirty and Save writes the fix.
+        let baseline = draft.clone();
+        let mut draft = draft;
+        draft.drop_forbidden_addons();
         let name = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder(tr!("profiles.editor.name_placeholder"))
@@ -225,7 +230,7 @@ impl ProfileDraftEditor {
             hit_select,
             kill_select,
             saved,
-            baseline: draft.clone(),
+            baseline,
             draft,
             name,
             name_touched: false,
