@@ -167,6 +167,23 @@ fn a_saved_choice_for_a_dropped_setting_shows_and_can_be_removed(cx: &mut TestAp
 // move, or the list shifts under the pointer that made the change.
 #[gpui_kit::test]
 fn the_first_change_keeps_the_rows_where_they_were(cx: &mut TestAppContext) {
+    first_change_holds_still(cx, px(1280.), "fpscap", "120");
+}
+
+// Narrow, the title and one chip no longer fit one line, so the strip stacks them.
+#[gpui_kit::test]
+fn the_first_change_keeps_the_rows_still_at_the_narrowest_window(cx: &mut TestAppContext) {
+    first_change_holds_still(cx, px(800.), "fpscap", "120");
+}
+
+// Just narrow, one line would still fit; the stacked strip keeps the same height there too.
+#[gpui_kit::test]
+fn the_first_change_keeps_the_rows_still_when_just_narrow(cx: &mut TestAppContext) {
+    first_change_holds_still(cx, px(1100.), "fpscap", "120");
+}
+
+// Makes `module`'s first change at `width` and asserts the strip and the row keep their place.
+fn first_change_holds_still(cx: &mut TestAppContext, width: Pixels, module: &str, to: &str) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
@@ -174,18 +191,18 @@ fn the_first_change_keeps_the_rows_where_they_were(cx: &mut TestAppContext) {
     support::seed_mastercomfig_choices(&env, "{}");
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
-    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    cx.simulate_window_resize(s.win, size(width, px(900.)));
     support::settle(cx, s.win);
     let empty = support::bounds_of(cx, s.win, ids::GRAPHICS_NO_CHANGES).unwrap();
-    let row_before = support::bounds_of(cx, s.win, ids::graphics_row("fpscap")).unwrap();
-    pick(cx, &s, &page, "fpscap", value("120"));
+    let row_before = support::bounds_of(cx, s.win, ids::graphics_row(module)).unwrap();
+    pick(cx, &s, &page, module, value(to));
     support::wait_real(cx, "the first change", |cx| {
-        saved(cx, &page, "fpscap").is_some()
+        saved(cx, &page, module).is_some()
     });
     idle(cx, &page);
     support::settle(cx, s.win);
     let strip = support::bounds_of(cx, s.win, ids::GRAPHICS_CHANGES).unwrap();
-    let row_after = support::bounds_of(cx, s.win, ids::graphics_row("fpscap")).unwrap();
+    let row_after = support::bounds_of(cx, s.win, ids::graphics_row(module)).unwrap();
     assert_eq!(
         empty.size.height, strip.size.height,
         "the strip keeps its height: {empty:?} {strip:?}"
