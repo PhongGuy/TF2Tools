@@ -657,6 +657,13 @@ profiles:
     apply: "Aplicar"
     edit: "Editar"
     new: "Novo perfil"
+  mode: { set: "Definir", none: "Nenhum", leave: "Deixar como está" }
+  slot:
+    hud: { help: "O HUD que este perfil instala.", leave: "Aplicar este perfil não mexe no seu HUD.", none: "Usa o HUD do próprio TF2: qualquer HUD personalizado é removido." }
+    sounds: { help: "Som de acerto e som de abate.", leave: "Aplicar este perfil não mexe nos seus sons.", none: "Usa os sons do próprio TF2: sons de acerto e de abate personalizados são removidos." }
+    crosshairs: { help: "Uma mira por arma, escolhida do mesmo jeito que na página Miras.", leave: "Aplicar este perfil não mexe nas suas miras.", none: "Usa a mira padrão do TF2 em todas as armas." }
+    graphics: { help: "Um preset do mastercomfig e suas mudanças nele.", leave: "Aplicar este perfil não mexe nos seus gráficos.", none: "Remove o mastercomfig, assim o TF2 usa as próprias configurações de vídeo." }
+    addons: { help: "Quais add-ons ficam ligados.", leave: "Aplicar este perfil não mexe nos seus add-ons.", none: "Desliga todos os add-ons." }
   card:
     leave: "Fica como está"
     hud_none: "O HUD próprio do TF2"

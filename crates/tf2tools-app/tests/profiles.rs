@@ -428,7 +428,7 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
     let comp = empty_profile(&s, "Competitive");
     let page = open_profiles(cx, &s);
     support::profiles::edit(cx, &s, &page, comp.id());
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
         Some("Are you sure you want to delete \"Competitive\"? This cannot be undone.")
@@ -454,7 +454,7 @@ fn cancelling_delete_keeps_the_profile(cx: &mut TestAppContext) {
     let comp = empty_profile(&s, "Competitive");
     let page = open_profiles(cx, &s);
     support::profiles::edit(cx, &s, &page, comp.id());
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     assert_eq!(s.services.library.profiles().unwrap().len(), 1);
     assert!(support::log_rows(&s.services).is_empty());
@@ -471,7 +471,7 @@ fn deleting_the_active_profile_clears_the_active_mark(cx: &mut TestAppContext) {
         .unwrap();
     let page = open_profiles(cx, &s);
     support::profiles::edit(cx, &s, &page, vanilla.id());
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     toast_is(cx, &s, "Profile deleted");
     assert_eq!(s.services.library.active_profile().unwrap(), None);

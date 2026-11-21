@@ -1147,7 +1147,7 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::nav(Page::Settings));
     let _page = open_profiles(cx, &s);
     support::click_id(cx, s.win, ids::profile_card_edit(comp.id()));
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
         Some("Удалить профиль")

@@ -239,7 +239,7 @@ fn delete_at_the_foot_confirms_then_returns(cx: &mut TestAppContext) {
         label(cx, &s, ids::PROFILE_EDITOR_DELETE).as_deref(),
         Some("Delete profile")
     );
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     support::wait_real(cx, "the confirm", |cx| {
         support::present(cx, s.win, ids::CONFIRM_OK)
     });

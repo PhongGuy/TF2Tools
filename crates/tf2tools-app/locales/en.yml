@@ -633,6 +633,13 @@ profiles:
     apply: "Apply"
     edit: "Edit"
     new: "New profile"
+  mode: { set: "Set", none: "None", leave: "Leave as is" }
+  slot:
+    hud: { help: "The HUD this profile installs.", leave: "Applying this profile won't touch your HUD.", none: "Uses TF2's own HUD: any custom HUD is taken out." }
+    sounds: { help: "Hitsound and killsound.", leave: "Applying this profile won't touch your sounds.", none: "Uses TF2's own sounds: custom hit and kill sounds are taken out." }
+    crosshairs: { help: "A crosshair per weapon, set the same way as on the Crosshairs page.", leave: "Applying this profile won't touch your crosshairs.", none: "Uses TF2's default crosshair on every weapon." }
+    graphics: { help: "A mastercomfig preset and your changes to it.", leave: "Applying this profile won't touch your graphics.", none: "Takes mastercomfig out, so TF2 uses its own video settings." }
+    addons: { help: "Which add-ons are on.", leave: "Applying this profile won't touch your add-ons.", none: "Turns every add-on off." }
   card:
     leave: "Left as is"
     hud_none: "TF2's own HUD"

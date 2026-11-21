@@ -656,6 +656,13 @@ profiles:
     apply: "Anwenden"
     edit: "Bearbeiten"
     new: "Neues Profil"
+  mode: { set: "Festlegen", none: "Keine", leave: "So lassen" }
+  slot:
+    hud: { help: "Das HUD, das dieses Profil installiert.", leave: "Dieses Profil lässt dein HUD beim Anwenden in Ruhe.", none: "Nutzt das HUD von TF2: ein eigenes HUD wird entfernt." }
+    sounds: { help: "Treffer- und Kill-Sound.", leave: "Dieses Profil lässt deine Sounds beim Anwenden in Ruhe.", none: "Nutzt die Sounds von TF2: eigene Treffer- und Kill-Sounds werden entfernt." }
+    crosshairs: { help: "Ein Fadenkreuz pro Waffe, so festgelegt wie auf der Seite Fadenkreuze.", leave: "Dieses Profil lässt deine Fadenkreuze beim Anwenden in Ruhe.", none: "Nutzt auf jeder Waffe das Standard-Fadenkreuz von TF2." }
+    graphics: { help: "Ein mastercomfig-Preset und deine Änderungen daran.", leave: "Dieses Profil lässt deine Grafik beim Anwenden in Ruhe.", none: "Entfernt mastercomfig, sodass TF2 seine eigenen Videoeinstellungen nutzt." }
+    addons: { help: "Welche Add-ons an sind.", leave: "Dieses Profil lässt deine Add-ons beim Anwenden in Ruhe.", none: "Schaltet alle Add-ons aus." }
   card:
     leave: "Bleibt, wie es ist"
     hud_none: "Das HUD von TF2"

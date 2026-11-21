@@ -658,6 +658,13 @@ profiles:
     apply: "Appliquer"
     edit: "Modifier"
     new: "Nouveau profil"
+  mode: { set: "Définir", none: "Aucun", leave: "Laisser tel quel" }
+  slot:
+    hud: { help: "Le HUD que ce profil installe.", leave: "Appliquer ce profil ne touchera pas à ton HUD.", none: "Utilise le HUD de TF2\u00A0: tout HUD personnalisé est retiré." }
+    sounds: { help: "Son de touche et son de kill.", leave: "Appliquer ce profil ne touchera pas à tes sons.", none: "Utilise les sons de TF2\u00A0: les sons de touche et de kill personnalisés sont retirés." }
+    crosshairs: { help: "Un viseur par arme, choisi comme sur la page Viseurs.", leave: "Appliquer ce profil ne touchera pas à tes viseurs.", none: "Utilise le viseur par défaut de TF2 sur chaque arme." }
+    graphics: { help: "Un preset mastercomfig et tes changements dessus.", leave: "Appliquer ce profil ne touchera pas à tes graphismes.", none: "Retire mastercomfig, pour que TF2 utilise ses propres réglages vidéo." }
+    addons: { help: "Quels add-ons sont activés.", leave: "Appliquer ce profil ne touchera pas à tes add-ons.", none: "Désactive tous les add-ons." }
   card:
     leave: "Laissé tel quel"
     hud_none: "Le HUD de TF2"

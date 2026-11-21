@@ -655,6 +655,13 @@ profiles:
     apply: "应用"
     edit: "编辑"
     new: "新建配置文件"
+  mode: { set: "设置", none: "无", leave: "保持不变" }
+  slot:
+    hud: { help: "此配置文件安装的 HUD。", leave: "应用此配置文件不会改动你的 HUD。", none: "使用 TF2 自带的 HUD：移除任何自定义 HUD。" }
+    sounds: { help: "命中音效和击杀音效。", leave: "应用此配置文件不会改动你的音效。", none: "使用 TF2 自带的音效：移除自定义的命中和击杀音效。" }
+    crosshairs: { help: "每把武器一个准星，设置方式和准星页面相同。", leave: "应用此配置文件不会改动你的准星。", none: "所有武器都使用 TF2 的默认准星。" }
+    graphics: { help: "一个 mastercomfig 预设以及你对它的改动。", leave: "应用此配置文件不会改动你的图形设置。", none: "移除 mastercomfig，让 TF2 使用自己的视频设置。" }
+    addons: { help: "哪些插件处于开启状态。", leave: "应用此配置文件不会改动你的插件。", none: "关闭所有插件。" }
   card:
     leave: "保持不变"
     hud_none: "TF2 自带 HUD"

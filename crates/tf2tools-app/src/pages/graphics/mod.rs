@@ -5,7 +5,7 @@ pub mod jobs;
 pub mod model;
 mod picture_panel;
 pub mod pictures;
-mod pill;
+pub(crate) mod pill;
 mod presets;
 mod rows;
 mod settings;

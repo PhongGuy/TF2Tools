@@ -95,7 +95,7 @@ fn delete_at_the_foot_says_when_the_profile_is_active(cx: &mut TestAppContext) {
     let page = page(cx, &s);
     let before = game_files(&env);
     edit(cx, &s, &page, comp.id());
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     support::wait_real(cx, "the confirm", |cx| {
         support::present(cx, s.win, ids::CONFIRM_DESCRIPTION)
     });
@@ -121,7 +121,7 @@ fn cancelling_delete_stays_in_the_editor(cx: &mut TestAppContext) {
     let comp = hud_profile(&s, "Comp", &seeded.rayshud);
     let page = page(cx, &s);
     edit(cx, &s, &page, comp.id());
-    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::profiles::click_delete(cx, &s);
     support::wait_real(cx, "the confirm", |cx| {
         support::present(cx, s.win, ids::CONFIRM_CANCEL)
     });

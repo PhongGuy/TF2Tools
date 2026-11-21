@@ -965,6 +965,34 @@ pub const PROFILE_EDITOR_SCROLLBAR: &str = "profile-editor-scrollbar";
 /// The Delete profile button at the editor's foot.
 pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
 
+/// The editor's slot rail: a column beside the cards, or a row above them when narrow.
+pub const PROFILE_RAIL: &str = "profile-rail";
+
+/// A slot's rail link: "profile-rail:<slot>".
+pub fn profile_rail(slot: &str) -> ElementId {
+    keyed("profile-rail", slot)
+}
+
+/// A rail link's Set, None or Left as is badge: "profile-rail-badge:<slot>".
+pub fn profile_rail_badge(slot: &str) -> ElementId {
+    keyed("profile-rail-badge", slot)
+}
+
+/// A slot card's help line: "profile-slot-help:<slot>".
+pub fn profile_slot_help(slot: &str) -> ElementId {
+    keyed("profile-slot-help", slot)
+}
+
+/// One segment of a slot's mode control: "profile-slot-mode:<slot>:<mode>".
+pub fn profile_slot_mode(slot: &str, mode: &str) -> ElementId {
+    keyed("profile-slot-mode", &format!("{slot}:{mode}"))
+}
+
+/// The line a None or Leave slot shows in place of its body: "profile-slot-text:<slot>".
+pub fn profile_slot_text(slot: &str) -> ElementId {
+    keyed("profile-slot-text", slot)
+}
+
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
     ElementId::Name(format!("nav-{}", page.slug()).into())

@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::ProfilesPage;
@@ -274,4 +275,15 @@ pub fn type_name(
     })
     .unwrap();
     super::settle(cx, s.win);
+}
+
+/// Wheels the editor body to its foot and clicks Delete, as a player scrolls down to it.
+pub fn click_delete(cx: &mut TestAppContext, s: &super::ShellWindow) {
+    let down = gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -1000.));
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(ids::PROFILE_EDITOR_BODY, down, cx)
+    })
+    .unwrap();
+    super::settle(cx, s.win);
+    super::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
 }

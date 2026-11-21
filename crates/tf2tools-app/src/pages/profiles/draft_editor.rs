@@ -1,14 +1,18 @@
-//! The profile draft editor: a header crumb with Cancel and Save, the Name field and the
-//! Delete foot. Every change stays in the draft until Save writes it to the library.
+//! The profile draft editor: a header crumb with Cancel and Save, the Name field, a rail and
+//! one Set / None / Leave card per slot, and the Delete foot. Every change stays in the draft
+//! until Save writes it to the library.
 
+use gpui_kit::base::Radio;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
+use gpui_kit::component::tag::Tag;
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyView, App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, px,
+    AnyElement, AnyView, App, AppContext as _, Context, Div, Entity, EventEmitter, FocusHandle,
+    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
 };
 use tf2tools_core::{LogLevel, NewLogEntry, Profile, ProfileError, ProfileId};
 
@@ -19,15 +23,27 @@ use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
+use crate::pages::common::{badge_of, card_frame};
+use crate::pages::graphics::pill;
 use crate::services::{OpError, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
+use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 
 /// The body's widest column, centred in a wider window.
 const BODY_MAX_WIDTH: f32 = 1180.;
+
+/// The slot rail's width beside the cards.
+pub const RAIL_WIDTH: Pixels = px(184.);
+
+/// Content narrower than this puts the rail in a wrapping row above the cards.
+pub const RAIL_ROW_BELOW: Pixels = px(900.);
+
+/// The space between the rail and the cards beside it.
+const RAIL_GUTTER: Pixels = px(24.);
 
 /// What the editor asks of the page that hosts it.
 #[derive(Debug, Clone)]
@@ -61,6 +77,8 @@ pub struct ProfileDraftEditor {
     page: Option<WeakEntity<ProfilesPage>>,
     focus: FocusHandle,
     scroll: ScrollHandle,
+    /// The scroll column's child index of the first slot card, for the rail's jumps.
+    cards_from: usize,
     crumb: Entity<EditorCrumb>,
     _subscriptions: Vec<Subscription>,
 }
@@ -99,6 +117,7 @@ impl ProfileDraftEditor {
             page: None,
             focus,
             scroll: ScrollHandle::new(),
+            cards_from: 1,
             crumb,
             _subscriptions: subscriptions,
         }
@@ -323,10 +342,248 @@ impl ProfileDraftEditor {
                 )
             }))
     }
+
+    // Scrolls the body so `slot`'s card is at the top.
+    fn jump(&mut self, slot: SlotKind, cx: &mut Context<Self>) {
+        self.scroll
+            .scroll_to_top_of_item(self.cards_from + slot as usize);
+        cx.notify();
+    }
+
+    // How far down the first card the wide rail sits, so it stays in view while the cards
+    // scroll and stops at the last card's top.
+    fn rail_pin(&self) -> Pixels {
+        let last_card = self.cards_from + SlotKind::ALL.len() - 1;
+        let first = self.scroll.bounds_for_item(self.cards_from);
+        let last = self.scroll.bounds_for_item(last_card);
+        let (Some(first), Some(last)) = (first, last) else {
+            return px(0.);
+        };
+        let top = first.top() + self.scroll.offset().y;
+        let pin = (self.scroll.bounds().top() + CONTENT_PADDING - top).max(px(0.));
+        pin.min(last.top() - first.top())
+    }
+
+    /// The slot rail: a link per slot with its mode's badge, in a column, or a wrapping row
+    /// when `narrow`. A link scrolls to its card.
+    fn rail(&self, narrow: bool, cx: &mut Context<Self>) -> AnyElement {
+        let entries = SlotKind::ALL.map(|slot| {
+            let button = Button::new(ids::profile_rail(slot.key()))
+                .small()
+                .accessibility_label(slot.label())
+                .on_click(cx.listener(move |editor, _, _, cx| editor.jump(slot, cx)))
+                .child(
+                    h_flex()
+                        .when(!narrow, |row| row.w_full())
+                        .gap_2()
+                        .child(div().flex_1().child(slot.label()))
+                        .child(mode_badge(slot, self.draft.mode(slot), cx)),
+                );
+            if narrow {
+                button.outline()
+            } else {
+                button.ghost().w_full()
+            }
+        });
+        let rail = if narrow {
+            h_flex().flex_wrap().gap_2()
+        } else {
+            v_flex().flex_none().w(RAIL_WIDTH).gap_1()
+        };
+        rail.id(ids::PROFILE_RAIL)
+            .test_support()
+            .children(entries)
+            .into_any_element()
+    }
+
+    // The three-segment Set / None / Leave control: a radio group drawn as the Graphics pill,
+    // so the chosen mode reports selected. A mode the draft would refuse (Add-ons Set while
+    // Graphics is None) is drawn disabled rather than ignoring the click.
+    fn mode_control(&self, slot: SlotKind, cx: &mut Context<Self>) -> Div {
+        let current = self.draft.mode(slot);
+        let foreground = cx.theme().foreground;
+        let segments = Mode::ALL.into_iter().enumerate().map(|(ix, mode)| {
+            let checked = current == mode;
+            let refused =
+                slot == SlotKind::Addons && mode == Mode::Set && self.draft.addons_need_graphics();
+            let disabled = refused || self.busy;
+            let editor = cx.entity().downgrade();
+            let label = mode_label(mode);
+            let segment = Radio::new(ids::profile_slot_mode(slot.key(), mode.key()))
+                .accessibility_label(label.clone())
+                .set_position(ix + 1, Mode::ALL.len())
+                .checked(checked)
+                .disabled(disabled)
+                .on_change(move |_, _, _, cx| {
+                    let _ = editor.update(cx, |e, cx| e.set_mode(slot, mode, cx));
+                })
+                .flex()
+                .items_center()
+                .h(px(26.))
+                .px(px(10.))
+                .text_size(px(13.))
+                .when(disabled, |segment| segment.opacity(0.5))
+                .when(!disabled && !checked, |segment| {
+                    segment
+                        .cursor_pointer()
+                        .hover(move |style| style.text_color(foreground))
+                })
+                .child(label);
+            pill::segment_look(segment, checked, cx)
+        });
+        pill::track(cx).flex_none().children(segments)
+    }
+
+    // A slot's card: title, help and mode control over the Set body, or the line saying what
+    // None or Leave does.
+    fn slot_card(&self, slot: SlotKind, cx: &mut Context<Self>) -> AnyElement {
+        let key = slot.key();
+        let muted = cx.theme().muted_foreground;
+        let header = h_flex()
+            .flex_wrap()
+            .items_start()
+            .justify_between()
+            .gap_3()
+            .child(
+                v_flex()
+                    .flex_1()
+                    .min_w(px(220.))
+                    .gap_1()
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(slot.label()))
+                    .child(labelled(
+                        div().text_sm().text_color(muted),
+                        ids::profile_slot_help(key),
+                        slot_help(slot),
+                    )),
+            )
+            .child(self.mode_control(slot, cx));
+        let body = match self.draft.mode(slot) {
+            Mode::Set => self.set_body(slot, cx),
+            mode @ (Mode::None | Mode::Leave) => labelled(
+                div().text_sm().text_color(muted),
+                ids::profile_slot_text(key),
+                slot_text(slot, mode),
+            )
+            .into_any_element(),
+        };
+        card_frame(cx)
+            .id(ids::profile_slot(key))
+            .test_support()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .p_4()
+            .child(header)
+            .child(body)
+            .into_any_element()
+    }
+
+    // A Set slot's body; the slot bodies fill this in.
+    fn set_body(&self, _slot: SlotKind, _cx: &mut Context<Self>) -> AnyElement {
+        div().into_any_element()
+    }
+}
+
+// The scroll column's centred lane every body child sits in.
+fn lane() -> Div {
+    div()
+        .flex_none()
+        .w_full()
+        .max_w(px(BODY_MAX_WIDTH))
+        .mx_auto()
+}
+
+// "Set", "None", "Leave as is": the mode control's labels.
+fn mode_label(mode: Mode) -> SharedString {
+    match mode {
+        Mode::Set => tr!("profiles.mode.set"),
+        Mode::None => tr!("profiles.mode.none"),
+        Mode::Leave => tr!("profiles.mode.leave"),
+    }
+}
+
+// The rail's badge for `mode`: Set filled, None and Left as is dashed and muted.
+fn mode_badge(slot: SlotKind, mode: Mode, cx: &App) -> impl IntoElement {
+    let theme = cx.theme();
+    let dashed = || {
+        Tag::secondary()
+            .outline()
+            .border_dashed()
+            .text_color(theme.muted_foreground)
+    };
+    let (tag, border, text) = match mode {
+        Mode::Set => (
+            Tag::primary(),
+            transparent_black(),
+            tr!("profiles.mode.set"),
+        ),
+        Mode::None => (dashed(), theme.border, tr!("profiles.mode.none")),
+        Mode::Leave => (dashed(), theme.border, tr!("profiles.card.leave")),
+    };
+    badge_of(ids::profile_rail_badge(slot.key()), tag, border, text)
+}
+
+// The card's help line under its title.
+fn slot_help(slot: SlotKind) -> SharedString {
+    match slot {
+        SlotKind::Hud => tr!("profiles.slot.hud.help"),
+        SlotKind::Sounds => tr!("profiles.slot.sounds.help"),
+        SlotKind::Crosshairs => tr!("profiles.slot.crosshairs.help"),
+        SlotKind::Graphics => tr!("profiles.slot.graphics.help"),
+        SlotKind::Addons => tr!("profiles.slot.addons.help"),
+    }
+}
+
+// What a None or Leave slot does on Apply, shown in place of its body.
+fn slot_text(slot: SlotKind, mode: Mode) -> SharedString {
+    match (slot, mode == Mode::None) {
+        (SlotKind::Hud, true) => tr!("profiles.slot.hud.none"),
+        (SlotKind::Hud, false) => tr!("profiles.slot.hud.leave"),
+        (SlotKind::Sounds, true) => tr!("profiles.slot.sounds.none"),
+        (SlotKind::Sounds, false) => tr!("profiles.slot.sounds.leave"),
+        (SlotKind::Crosshairs, true) => tr!("profiles.slot.crosshairs.none"),
+        (SlotKind::Crosshairs, false) => tr!("profiles.slot.crosshairs.leave"),
+        (SlotKind::Graphics, true) => tr!("profiles.slot.graphics.none"),
+        (SlotKind::Graphics, false) => tr!("profiles.slot.graphics.leave"),
+        (SlotKind::Addons, true) => tr!("profiles.slot.addons.none"),
+        (SlotKind::Addons, false) => tr!("profiles.slot.addons.leave"),
+    }
 }
 
 impl Render for ProfileDraftEditor {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < RAIL_ROW_BELOW;
+        // Each card is a direct child of the scroll column so the rail can scroll to it by
+        // index; the narrow rail row comes first, the wide rail hangs off the first card.
+        self.cards_from = if narrow { 2 } else { 1 };
+        let pin = self.rail_pin();
+        let mut children: Vec<AnyElement> = vec![
+            lane()
+                .flex()
+                .flex_col()
+                .gap_6()
+                .child(self.name_field(cx))
+                .children(self.new_draft_note(cx))
+                .into_any_element(),
+        ];
+        if narrow {
+            children.push(lane().child(self.rail(true, cx)).into_any_element());
+        }
+        for slot in SlotKind::ALL {
+            let card = self.slot_card(slot, cx);
+            let side = (!narrow && slot == SlotKind::Hud).then(|| {
+                div()
+                    .absolute()
+                    .left_0()
+                    .top(pin)
+                    .child(self.rail(false, cx))
+            });
+            let lane = lane()
+                .when(!narrow, |lane| lane.relative().pl(RAIL_WIDTH + RAIL_GUTTER))
+                .child(card)
+                .children(side);
+            children.push(lane.into_any_element());
+        }
         // Only a saved profile can be deleted; a new draft is dropped with Cancel.
         let delete = self.saved.is_some().then(|| {
             Button::new(ids::PROFILE_EDITOR_DELETE)
@@ -336,23 +593,16 @@ impl Render for ProfileDraftEditor {
                 .disabled(self.busy)
                 .on_click(cx.listener(|editor, _, window, cx| editor.delete(window, cx)))
         });
-        let body = div()
+        children.extend(delete.map(|b| lane().flex().child(b).into_any_element()));
+        let body = v_flex()
             .id(ids::PROFILE_EDITOR_BODY)
             .test_support()
             .size_full()
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
-            .child(
-                v_flex()
-                    .w_full()
-                    .max_w(px(BODY_MAX_WIDTH))
-                    .mx_auto()
-                    .gap_6()
-                    .child(self.name_field(cx))
-                    .children(self.new_draft_note(cx))
-                    .children(delete.map(|b| h_flex().child(b))),
-            );
+            .gap_6()
+            .children(children);
         v_flex()
             .id(ids::PROFILE_EDITOR)
             .test_support()
