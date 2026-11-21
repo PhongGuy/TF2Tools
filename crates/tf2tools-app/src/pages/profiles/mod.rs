@@ -29,7 +29,7 @@ use gpui_kit::{
 use tf2tools_core::{
     AddonName, ApplyProfileError, ApplyProfileReport, ApplyStep, Choices, CrosshairRef,
     ExternalHud, LogLevel, MastercomfigStatus, MissingItem, MissingKind, NewLogEntry, Profile,
-    ProfileError, ProfileId, StoreKind, Tf2Install,
+    ProfileError, ProfileId, StoreItemId, StoreKind, Tf2Install,
 };
 
 use self::draft_editor::{EditorEvent, ProfileDraftEditor};
@@ -38,11 +38,13 @@ use self::editor_model::{
 };
 use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
+use super::addon_store::any_busy;
 use super::addons;
 use super::common::{ORANGE_500, SM_ICON_PX, card_frame, no_tf2_warning};
 use super::graphics::jobs::{self, ModulesFailure};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
+use crate::addon_updates::AddonUpdates;
 use crate::font_check::active_hud;
 use crate::i18n::tr;
 use crate::ids;
@@ -60,6 +62,7 @@ use crate::shell::leave;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
+use crate::store_download::StoreDownloads;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::DialogFrame;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
@@ -803,7 +806,8 @@ fn summary_job(
 // Opens the Apply summary over the page: what changes, what is missing and stays, or that nothing
 // does, and the slots left alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and
 // closing answer false. A library change while it is open (a finished Re-download) reads the
-// summary again, so a downloaded item's row turns into its change.
+// summary again, so a downloaded item's row turns into its change; a download starting or
+// ending redraws it, so an add-on's Re-download shows whether it can start.
 fn apply_summary_dialog(
     name: &str,
     summary: Summary,
@@ -833,13 +837,23 @@ fn apply_summary_dialog(
         })
         .detach();
     });
+    let redraw = move |cx: &mut App| {
+        let _ = win.update(cx, |_, window, _| window.refresh());
+    };
+    let updates = AddonUpdates::global(cx);
+    let downloads = StoreDownloads::install(cx);
+    let busy = [
+        cx.observe(&updates, move |_, cx| redraw(cx)),
+        cx.observe(&downloads, move |_, cx| redraw(cx)),
+    ];
     // The rows' scroll position outlives the builder, which runs every frame.
     let rows_scroll = ScrollHandle::new();
     window.defer(cx, move |window, cx| {
         let frame = DialogFrame::new(SUMMARY_WIDTH);
         window.open_dialog(cx, move |dialog, window, cx| {
-            let _ = &refresh;
+            let _ = (&refresh, &busy);
             let summary = shown.read(cx).clone();
+            let blocked = any_busy(cx);
             // The builder runs every frame, so each handler clones what it captures.
             let answer = |said: bool| {
                 let tx = tx.clone();
@@ -886,7 +900,7 @@ fn apply_summary_dialog(
                                 .rows
                                 .iter()
                                 .enumerate()
-                                .map(|(ix, row)| summary_row(row, ix < last, cx)),
+                                .map(|(ix, row)| summary_row(row, ix < last, blocked, cx)),
                         ),
                 )
                 .into_any_element()
@@ -960,7 +974,7 @@ fn apply_summary_dialog(
 // One summary row: the slot label in a fixed column, then "from → to"; a rule under all but the
 // last row. A missing item's row reads its sentence beside a warning, then offers Re-download
 // for a store item (the store detail stacks over the summary) or says a local import can't.
-fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
+fn summary_row(row: &SummaryRow, rule: bool, blocked: bool, cx: &App) -> AnyElement {
     let theme = cx.theme();
     let (muted, border) = (theme.muted_foreground, theme.border);
     let text = row.text();
@@ -986,7 +1000,7 @@ fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
                     )
                     .child(div().min_w_0().child(text.clone())),
             )
-            .child(missing_action(&row.key, item, muted))
+            .child(missing_action(&row.key, item, muted, blocked))
             .into_any_element(),
     };
     h_flex()
@@ -1009,8 +1023,15 @@ fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// A missing row's Re-download, which opens the item's store detail, or v5's local-import note.
-fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyElement {
+// A missing row's Re-download, which opens the item's store detail (or, for an add-on, which
+// has none, starts its library download, disabled while `blocked` by any download), or v5's
+// local-import note.
+fn missing_action(
+    key: &str,
+    item: &MissingItem,
+    muted: gpui_kit::Hsla,
+    blocked: bool,
+) -> AnyElement {
     let Some((kind, id)) = model::redownload_target(item.kind(), item.provenance()) else {
         let local = tr!("profiles.missing.local");
         return div()
@@ -1023,6 +1044,27 @@ fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyEl
             .child(local)
             .into_any_element();
     };
+    let button = Button::new(ids::profile_apply_redownload(key))
+        .outline()
+        .small()
+        .icon(IconName::Download)
+        .label(tr!("profiles.missing.redownload"));
+    if let StoreItemId::Addon(name) = id {
+        // A library download only, gated as the Addon Store gates it; the library change
+        // refreshes the summary and Apply then installs it.
+        let display = item.name().to_owned();
+        return button
+            .disabled(blocked)
+            .on_click(move |_, window, cx| {
+                if any_busy(cx) {
+                    return;
+                }
+                let win = window.window_handle();
+                let (name, display) = (name.clone(), display.clone());
+                AddonUpdates::global(cx).update(cx, |u, cx| u.start(name, display, false, win, cx));
+            })
+            .into_any_element();
+    }
     let body = if kind == StoreKind::CuratedHuds {
         curated_body
     } else {
@@ -1034,11 +1076,7 @@ fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyEl
         name: item.name().to_owned(),
         in_library: false,
     };
-    Button::new(ids::profile_apply_redownload(key))
-        .outline()
-        .small()
-        .icon(IconName::Download)
-        .label(tr!("profiles.missing.redownload"))
+    button
         .on_click(move |_, window, cx| {
             open_detail(detail.clone(), body(), window, cx);
         })

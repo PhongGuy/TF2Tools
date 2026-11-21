@@ -788,7 +788,7 @@ fn missing_slot(
                 kept,
             )
         }
-        MissingKind::Addon { name } => (
+        MissingKind::Addon { name, .. } => (
             format!("addon:{}", name.as_str()),
             SlotKind::Addons.label(),
             current

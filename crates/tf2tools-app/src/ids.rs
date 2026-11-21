@@ -3430,9 +3430,14 @@ pub fn addons_gb_card(id: GbId) -> ElementId {
     keyed("addons-gb-card", &id.to_string())
 }
 
-/// The card's "Remove" button: "addons-gb-remove:<id>".
-pub fn addons_gb_remove(id: GbId) -> ElementId {
-    keyed("addons-gb-remove", &id.to_string())
+/// The card's "Delete" button, which removes it from TF2 and the library: "addons-gb-delete:<id>".
+pub fn addons_gb_delete(id: GbId) -> ElementId {
+    keyed("addons-gb-delete", &id.to_string())
+}
+
+/// The card's "Uninstall" button, present only when installed: "addons-gb-uninstall:<id>".
+pub fn addons_gb_uninstall(id: GbId) -> ElementId {
+    keyed("addons-gb-uninstall", &id.to_string())
 }
 
 /// The card's "Update" button, present only with a newer file: "addons-gb-update:<id>".
@@ -3440,9 +3445,9 @@ pub fn addons_gb_update(id: GbId) -> ElementId {
     keyed("addons-gb-update", &id.to_string())
 }
 
-/// The card's "Install again" button, present only when not installed: "addons-gb-reinstall:<id>".
-pub fn addons_gb_reinstall(id: GbId) -> ElementId {
-    keyed("addons-gb-reinstall", &id.to_string())
+/// The card's "Install" button, present only when not installed: "addons-gb-install:<id>".
+pub fn addons_gb_install(id: GbId) -> ElementId {
+    keyed("addons-gb-install", &id.to_string())
 }
 
 /// The card's one loading button while an operation works on it: "addons-gb-busy:<id>".

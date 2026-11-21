@@ -855,9 +855,6 @@ confirm:
   remove_map:
     title: "Remove map?"
     body: "%{name} will be deleted from TF2. You can download it again later."
-  remove_gb_addon:
-    title: "Remove Add-on"
-    body: "Are you sure you want to remove %{name}? It will be removed from TF2 and from your library."
   addon_needs_mastercomfig:
     title: "mastercomfig needed"
     body: "This addon needs mastercomfig. Install both?"
@@ -1080,10 +1077,8 @@ addons:
     browse: "Browse Addon Store"
     update: "Update"
     install: "Install"
-    install_again: "Install again"
     uninstall: "Uninstall"
     delete: "Remove from library"
-    remove: "Remove"
     open_gamebanana: "Open on GameBanana"
     installing: "Installing..."
     removing: "Removing..."
@@ -2787,6 +2782,8 @@ messages:
     addon_update_failed: "Couldn't update the add-on"
     addon_removed: "Add-on removed"
     addon_remove_failed: "Couldn't remove the add-on"
+    addon_uninstalled: "Add-on uninstalled"
+    addon_uninstall_failed: "Couldn't uninstall the add-on"
     map_installed: "Map installed"
     map_install_failed: "Couldn't install the map"
     map_updated: "Map updated"

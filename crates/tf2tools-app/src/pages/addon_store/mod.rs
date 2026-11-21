@@ -573,7 +573,7 @@ impl Render for AddonStorePage {
 }
 
 // Whether any store download or addon job (lookup, download, reinstall) runs.
-fn any_busy(cx: &mut App) -> bool {
+pub(crate) fn any_busy(cx: &mut App) -> bool {
     StoreDownloads::global(cx).is_some_and(|d| d.read(cx).is_busy())
         || AddonUpdates::global(cx).read(cx).is_busy()
 }
