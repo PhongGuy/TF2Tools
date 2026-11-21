@@ -25,7 +25,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids::{self, IdScope};
 use crate::local_messages::describe_store_status;
 use crate::pages::common::no_tf2_warning;
@@ -99,6 +99,8 @@ pub struct GraphicsPage {
     asked: Option<String>,
     /// The settings search; rows filter on its value at render.
     search: Entity<InputState>,
+    /// The language the search box's placeholder was set in.
+    language: &'static str,
     /// "Changed only" is on: the list shows only rows that differ from the preset.
     changed_only: bool,
     /// Each shown section's child index in the scroll column, from the last render.
@@ -176,6 +178,7 @@ impl GraphicsPage {
             note: None,
             asked: None,
             search,
+            language: i18n::current(),
             changed_only: false,
             section_items: BTreeMap::new(),
             toolbar_item: None,
@@ -192,6 +195,18 @@ impl GraphicsPage {
         page.reload(cx);
         page.load_pictures(cx);
         page
+    }
+
+    // The page is kept while other pages show, and the search box holds its placeholder text,
+    // so a language switched meanwhile retitles it here.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.search.update(cx, |input, cx| {
+            input.set_placeholder(tr!("graphics.settings.search"), window, cx)
+        });
     }
 
     /// Takes the shell's answer to whether TF2 runs; redraws only when it changed.
@@ -808,22 +823,35 @@ impl GraphicsPage {
 
 impl Render for GraphicsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
         let warning =
             missing.then(|| no_tf2_warning(ids::GRAPHICS_NO_TF2, tr!("graphics.no_tf2"), cx));
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
-        self.wanted = self.editor.update(cx, |e, cx| {
-            e.want_images(cx);
-            e.wanted_images().to_vec()
-        });
         let filter = self.filter(cx);
         let sections = self
             .catalog
             .as_deref()
             .filter(|_| self.preset().is_some())
             .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
+        // A row the search or "Changed only" hides takes its open pictures with it, before
+        // this frame's image wants are gathered, so it never reopens when it shows again.
+        if let (Some(sections), Some(open)) = (&sections, self.open_row.as_deref()) {
+            let shown = sections
+                .iter()
+                .flat_map(|s| &s.rows)
+                .any(|r| r.module == open);
+            if !shown {
+                self.open_row = None;
+                self.editor.update(cx, |e, cx| e.close_pictures(cx));
+            }
+        }
+        self.wanted = self.editor.update(cx, |e, cx| {
+            e.want_images(cx);
+            e.wanted_images().to_vec()
+        });
         let mut children: Vec<AnyElement> = Vec::new();
         children.extend(warning.map(IntoElement::into_any_element));
         if let Some(card) = self.card() {
