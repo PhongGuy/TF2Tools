@@ -16,7 +16,8 @@ use gpui_kit::{
     TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
 };
 use tf2tools_core::{
-    CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId, SoundKind,
+    Choices, CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId,
+    SoundKind,
 };
 
 use super::ProfilesPage;
@@ -29,7 +30,7 @@ use crate::ids::{self, IdScope};
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
-use crate::pages::graphics::pill;
+use crate::pages::graphics::{ChoicesEdit, GraphicsChoicesEditor, pill};
 use crate::previews::CrosshairPreviews;
 use crate::remote_images::RemoteImages;
 use crate::services::{OpError, run_blocking};
@@ -133,6 +134,12 @@ pub struct ProfileDraftEditor {
     pub(super) card_width: Pixels,
     /// This editor's own `RemoteImages` viewer, handed back on release.
     pub(super) image_viewer: String,
+    /// The Graphics body's presets, changes and rows over the draft's choices.
+    pub(super) graphics: Entity<GraphicsChoicesEditor>,
+    /// The Graphics page's saved choices for Copy; None until the read lands.
+    pub(super) page_choices: Option<Result<Option<Choices>, OpError>>,
+    /// The content area was narrower than the wide layout last frame.
+    pub(super) narrow: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -177,6 +184,21 @@ impl ProfileDraftEditor {
         ));
         let previews = CrosshairPreviews::global(cx);
         subscriptions.push(cx.observe(&previews, |_, _, cx| cx.notify()));
+        // The Graphics widget has no Render of its own, so the editor redraws for it.
+        let graphics = cx.new(|cx| {
+            GraphicsChoicesEditor::new(
+                IdScope::PROFILE_GRAPHICS,
+                draft.graphics.clone(),
+                window,
+                cx,
+            )
+        });
+        subscriptions.push(cx.observe(&graphics, |_, _, cx| cx.notify()));
+        subscriptions.push(cx.subscribe_in(
+            &graphics,
+            window,
+            |editor, _, edit: &ChoicesEdit, window, cx| editor.graphics_edit(edit, window, cx),
+        ));
         let image_viewer = format!("profile-draft-editor:{}", cx.entity_id());
         if let Some(images) = RemoteImages::global(cx) {
             subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
@@ -185,8 +207,14 @@ impl ProfileDraftEditor {
                 images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
             }));
         }
-        cx.defer_in(window, |editor, window, cx| editor.load_library(window, cx));
+        cx.defer_in(window, |editor, window, cx| {
+            editor.load_library(window, cx);
+            editor.load_graphics(window, cx);
+        });
         Self {
+            graphics,
+            page_choices: None,
+            narrow: false,
             library: None,
             library_generation: 0,
             player,
@@ -224,6 +252,11 @@ impl ProfileDraftEditor {
         } else {
             &self.kill_select
         }
+    }
+
+    /// The Graphics body's choices editor, under `IdScope::PROFILE_GRAPHICS`.
+    pub fn graphics(&self) -> &Entity<GraphicsChoicesEditor> {
+        &self.graphics
     }
 
     /// The Crosshairs body's gallery strip.
@@ -565,6 +598,15 @@ impl ProfileDraftEditor {
                     )),
             )
             .child(self.mode_control(slot, cx));
+        // Under the Add-ons header: why its Set segment is off.
+        let need_graphics =
+            (slot == SlotKind::Addons && self.draft.addons_need_graphics()).then(|| {
+                labelled(
+                    div().text_sm().text_color(muted),
+                    ids::PROFILE_ADDONS_NEED_GRAPHICS,
+                    tr!("profiles.editor.addons_need_graphics"),
+                )
+            });
         let body = match self.draft.mode(slot) {
             Mode::Set => self.set_body(slot, cx),
             mode @ (Mode::None | Mode::Leave) => labelled(
@@ -582,6 +624,7 @@ impl ProfileDraftEditor {
             .gap_4()
             .p_4()
             .child(header)
+            .children(need_graphics)
             .child(body)
             .into_any_element()
     }
@@ -657,6 +700,7 @@ impl Render for ProfileDraftEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let content = window.viewport_size().width - SHELL_CHROME_WIDTH;
         let narrow = content < RAIL_ROW_BELOW;
+        self.narrow = narrow;
         // A card's lane less the side rail when it stands beside, then the card's own padding.
         let lane_width = (content - CONTENT_PADDING * 2.).min(px(BODY_MAX_WIDTH));
         let beside = if narrow {

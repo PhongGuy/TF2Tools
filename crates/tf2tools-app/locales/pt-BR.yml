@@ -727,6 +727,15 @@ profiles:
     xh_everywhere: "Colocar em todas as armas"
     xh_on: { one: "Em %{count} arma", other: "Em %{count} armas" }
     xh_pick_first: "Escolha uma mira e depois clique em uma arma"
+    gfx_copy: "Copiar da página de Gráficos"
+    gfx_copy_none: "Instale o mastercomfig na página de Gráficos primeiro"
+    gfx_no_catalog: "Abra a página de Gráficos uma vez para escolher as configurações"
+    addons_only: "Só estes"
+    addons_only_on: "Os add-ons não ativados aqui são desativados quando você aplica."
+    addons_only_off: "Os add-ons ativados aqui são ativados; o resto fica como está."
+    addons_need_graphics: "Os add-ons precisam do mastercomfig, e Gráficos está como Nenhum"
+    addons_empty: "Ainda não há add-ons do mastercomfig na sua biblioteca."
+    addons_store: "Abrir a Loja de add-ons"
   toast:
     saved: "%{name} salvo."
     saved_active: "%{name} salvo. Aplique-o para usar as mudanças."

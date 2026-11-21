@@ -728,6 +728,15 @@ profiles:
     xh_everywhere: "Mettre sur toutes les armes"
     xh_on: { one: "Sur %{count} arme", other: "Sur %{count} armes" }
     xh_pick_first: "Choisissez un viseur, puis cliquez sur une arme"
+    gfx_copy: "Copier depuis la page Graphismes"
+    gfx_copy_none: "Installez d'abord mastercomfig sur la page Graphismes"
+    gfx_no_catalog: "Ouvrez une fois la page Graphismes pour choisir les réglages"
+    addons_only: "Uniquement ceux-ci"
+    addons_only_on: "Les add-ons non activés ici sont désactivés quand vous appliquez."
+    addons_only_off: "Les add-ons activés ici sont activés\u00A0; les autres restent tels quels."
+    addons_need_graphics: "Les add-ons ont besoin de mastercomfig, et Graphismes est sur Aucun"
+    addons_empty: "Aucun add-on mastercomfig dans votre bibliothèque pour l'instant."
+    addons_store: "Ouvrir le Magasin d'add-ons"
   toast:
     saved: "%{name} enregistré."
     saved_active: "%{name} enregistré. Applique-le pour utiliser les changements."

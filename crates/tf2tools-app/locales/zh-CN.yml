@@ -725,6 +725,15 @@ profiles:
     xh_everywhere: "用于所有武器"
     xh_on: { other: "用于 %{count} 把武器" }
     xh_pick_first: "先选一个准星，再点击一把武器"
+    gfx_copy: "从图形页面复制"
+    gfx_copy_none: "请先在图形页面安装 mastercomfig"
+    gfx_no_catalog: "先打开一次图形页面再选择设置"
+    addons_only: "仅限这些"
+    addons_only_on: "应用时，这里没有开启的插件会被关闭。"
+    addons_only_off: "这里开启的插件会被开启；其余的保持原样。"
+    addons_need_graphics: "插件需要 mastercomfig，而图形设为了无"
+    addons_empty: "你的库里还没有 mastercomfig 插件。"
+    addons_store: "打开插件商店"
   toast:
     saved: "%{name} 已保存。"
     saved_active: "%{name} 已保存。应用它以使用这些更改。"

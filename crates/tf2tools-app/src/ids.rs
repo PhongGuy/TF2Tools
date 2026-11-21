@@ -1013,6 +1013,18 @@ pub const PROFILE_SOUND_KILL_PLAY_SPINNER: &str = "profile-sound-kill-play-spinn
 pub const PROFILE_XH_EVERYWHERE: &str = "profile-xh-everywhere";
 /// The Crosshairs Set body's line naming the picked crosshair and how many weapons show it.
 pub const PROFILE_XH_SELECTION: &str = "profile-xh-selection";
+/// The Graphics Set body's "Copy from the Graphics page" button.
+pub const PROFILE_GFX_COPY: &str = "profile-gfx-copy";
+/// The Graphics Set body's line while no settings catalogue is cached.
+pub const PROFILE_GFX_NO_CATALOG: &str = "profile-gfx-no-catalog";
+/// The Add-ons Set body's "Only these" switch.
+pub const PROFILE_ADDONS_ONLY: &str = "profile-addons-only";
+/// The Add-ons card's line while Graphics is None.
+pub const PROFILE_ADDONS_NEED_GRAPHICS: &str = "profile-addons-need-graphics";
+/// The Add-ons Set body's line when the library has no add-ons.
+pub const PROFILE_ADDONS_EMPTY: &str = "profile-addons-empty";
+/// The empty Add-ons body's link to the Addon Store.
+pub const PROFILE_ADDONS_STORE: &str = "profile-addons-store";
 
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
@@ -1415,6 +1427,11 @@ pub fn profile_slot(slot: &str) -> ElementId {
 /// A HUD tile in the HUD Set body, keyed by folder: "profile-pick-hud:<folder>".
 pub fn profile_pick_hud(folder: &str) -> ElementId {
     keyed("profile-pick-hud", folder)
+}
+
+/// An add-on's switch in the Add-ons Set body, keyed by asset name: "profile-addon:<asset>".
+pub fn profile_addon(name: &str) -> ElementId {
+    keyed("profile-addon", name)
 }
 
 /// A missing item's Re-download button on its summary row, keyed like the row:

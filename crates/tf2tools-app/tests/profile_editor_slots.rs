@@ -5,7 +5,7 @@ use crate::support;
 use gpui_kit::component::select::SelectEvent;
 use gpui_kit::{AppContext as _, TestAppContext, px, size};
 use support::graphics::found;
-use support::profiles::{edit, game_files, page, seed, type_name};
+use support::profiles::{FLAT, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name};
 use tf2tools_app::audio::player::{NowPlaying, sound_player};
 use tf2tools_app::ids;
 use tf2tools_app::loadout::BoardTarget;
@@ -15,8 +15,8 @@ use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_app::services::OpError;
 use tf2tools_app::widgets::loadout_board::BoardEvent;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftItem, ProfileCrosshairRef, ProfileDraft, SlotMode,
-    SoundKind, TfClass, WeaponSlot,
+    Choices, CrosshairRef, DraftCrosshair, DraftItem, Preset, ProfileCrosshairRef, ProfileDraft,
+    SlotMode, SoundKind, TfClass, WeaponSlot,
 };
 
 const SLOTS: [&str; 5] = ["hud", "sounds", "crosshairs", "graphics", "addons"];
@@ -798,6 +798,257 @@ fn dropping_a_strip_tile_on_a_cell_puts_it_on_that_weapon(cx: &mut TestAppContex
     assert_eq!(
         cx.update(|cx| e.read(cx).draft().crosshairs.len()),
         scripts.len()
+    );
+    assert_eq!(game_files(&env), before);
+}
+
+fn gfx_profile(s: &support::ShellWindow, env: &support::Env) -> tf2tools_core::Profile {
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    for name in [PYRO, FLAT] {
+        support::seed_library_addon(&s.services, env, name, "9.100.1", &vpk, false);
+    }
+    let draft = ProfileDraft::new("Potato")
+        .with_graphics(SlotMode::Set(low_fps60()))
+        .with_addons(SlotMode::Set((vec![DraftItem::Pick(addon(PYRO))], true)));
+    s.services.library.create_profile(&draft).unwrap()
+}
+
+#[gpui_kit::test]
+fn graphics_shows_the_presets_rows_and_changes_under_profile_ids(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_row("fpscap")))
+    });
+    assert_eq!(
+        support::checked_of(cx, s.win, gfx.id(ids::graphics_preset(Preset::Low))),
+        Some(true)
+    );
+    assert!(support::present(
+        cx,
+        s.win,
+        gfx.id(ids::graphics_change("fpscap"))
+    ));
+    assert!(
+        !support::present(cx, s.win, ids::graphics_row("fpscap")),
+        "no Graphics page ids"
+    );
+    support::click_id(cx, s.win, gfx.id(ids::graphics_preset(Preset::High)));
+    let choices = cx.update(|cx| e.read(cx).draft().graphics.clone());
+    assert_eq!(choices.preset(), Preset::High);
+    assert!(
+        choices.modules().contains_key("fpscap"),
+        "the change survives a preset switch"
+    );
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn without_a_catalog_only_the_presets_show(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    edit(cx, &s, &page, p.id());
+    let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the no-catalog line", |cx| {
+        support::present(cx, s.win, ids::PROFILE_GFX_NO_CATALOG)
+    });
+    assert!(support::present(
+        cx,
+        s.win,
+        gfx.id(ids::graphics_preset(Preset::Low))
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_GFX_NO_CATALOG).as_deref(),
+        Some("Open the Graphics page once to choose settings")
+    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        gfx.id(ids::graphics_row("fpscap"))
+    ));
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn copy_from_the_graphics_page_takes_the_saved_choices(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "ultra");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, r#"{"fpscap":"144"}"#);
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the saved choices", |cx| {
+        support::present(cx, s.win, ids::PROFILE_GFX_COPY)
+            && !support::disabled_of(cx, s.win, ids::PROFILE_GFX_COPY)
+    });
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
+    support::click_id(cx, s.win, ids::PROFILE_GFX_COPY);
+    support::wait_real(cx, "the copy", |cx| {
+        cx.update(|cx| e.read(cx).draft().graphics.preset() == Preset::Ultra)
+    });
+    assert_ne!(
+        cx.update(|cx| e.read(cx).draft().graphics.clone()),
+        Choices::new(Preset::Ultra)
+    );
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn copy_is_disabled_without_a_managed_mastercomfig(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the copy button", |cx| {
+        support::present(cx, s.win, ids::PROFILE_GFX_COPY)
+    });
+    support::settle(cx, s.win);
+    assert!(support::disabled_of(cx, s.win, ids::PROFILE_GFX_COPY));
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn a_preset_switch_without_a_catalog_keeps_the_module_changes(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    support::click_id(cx, s.win, gfx.id(ids::graphics_preset(Preset::High)));
+    let choices = cx.update(|cx| e.read(cx).draft().graphics.clone());
+    assert_eq!(choices.preset(), Preset::High);
+    assert_eq!(
+        choices.modules(),
+        low_fps60().modules(),
+        "no catalog, and still nothing is lost"
+    );
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn the_addon_switches_and_only_these_edit_the_draft(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the switches", |cx| {
+        support::present(cx, s.win, ids::profile_addon(FLAT))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_addon(FLAT)).as_deref(),
+        Some("Flat Mouse")
+    );
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_addon(PYRO)),
+        Some(true)
+    );
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::profile_addon(FLAT)),
+        Some(false)
+    );
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::PROFILE_ADDONS_ONLY),
+        Some(true)
+    );
+    support::click_id(cx, s.win, ids::profile_rail("addons"));
+    support::click_id(cx, s.win, ids::profile_addon(FLAT));
+    support::click_id(cx, s.win, ids::PROFILE_ADDONS_ONLY);
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_SAVE);
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    let addons = saved.addons().as_set().expect("Set");
+    assert_eq!(addons.on, [addon(FLAT), addon(PYRO)]);
+    assert!(!addons.only_these);
+    drop(e);
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn addons_set_is_disabled_while_graphics_is_none(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = gfx_profile(&s, &env);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    support::click_id(cx, s.win, ids::profile_slot_mode("graphics", "none"));
+    assert_eq!(
+        cx.update(|cx| e.read(cx).draft().mode(SlotKind::Addons)),
+        Mode::None
+    );
+    assert!(support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_slot_mode("addons", "set")
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_ADDONS_NEED_GRAPHICS).as_deref(),
+        Some("Add-ons need mastercomfig, and Graphics is set to None")
+    );
+    support::click_id(cx, s.win, ids::profile_slot_mode("addons", "set"));
+    assert_eq!(
+        cx.update(|cx| e.read(cx).draft().mode(SlotKind::Addons)),
+        Mode::None
+    );
+    support::click_id(cx, s.win, ids::profile_slot_mode("graphics", "leave"));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_slot_mode("addons", "set")
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::PROFILE_ADDONS_NEED_GRAPHICS
+    ));
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn an_empty_addon_library_points_at_the_store(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = s
+        .services
+        .library
+        .create_profile(
+            &ProfileDraft::new("None yet").with_addons(SlotMode::Set((Vec::new(), false))),
+        )
+        .unwrap();
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    edit(cx, &s, &page, p.id());
+    support::wait_real(cx, "the empty line", |cx| {
+        support::present(cx, s.win, ids::PROFILE_ADDONS_EMPTY)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_ADDONS_EMPTY).as_deref(),
+        Some("No mastercomfig add-ons in your library yet.")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_ADDONS_STORE).as_deref(),
+        Some("Open the Addon Store")
     );
     assert_eq!(game_files(&env), before);
 }

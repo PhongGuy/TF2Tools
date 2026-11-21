@@ -726,6 +726,15 @@ profiles:
     xh_everywhere: "Auf jede Waffe legen"
     xh_on: { one: "Auf %{count} Waffe", other: "Auf %{count} Waffen" }
     xh_pick_first: "Wähle ein Fadenkreuz und klicke dann auf eine Waffe"
+    gfx_copy: "Von der Grafik-Seite übernehmen"
+    gfx_copy_none: "Installiere zuerst mastercomfig auf der Grafik-Seite"
+    gfx_no_catalog: "Öffne einmal die Grafik-Seite, um Einstellungen zu wählen"
+    addons_only: "Nur diese"
+    addons_only_on: "Add-ons, die hier nicht eingeschaltet sind, werden beim Anwenden ausgeschaltet."
+    addons_only_off: "Add-ons, die hier eingeschaltet sind, werden eingeschaltet; der Rest bleibt, wie er ist."
+    addons_need_graphics: "Add-ons brauchen mastercomfig, und Grafik steht auf Keine"
+    addons_empty: "Noch keine mastercomfig-Add-ons in deiner Bibliothek."
+    addons_store: "Add-on-Shop öffnen"
   toast:
     saved: "%{name} gespeichert."
     saved_active: "%{name} gespeichert. Wende es an, um die Änderungen zu nutzen."

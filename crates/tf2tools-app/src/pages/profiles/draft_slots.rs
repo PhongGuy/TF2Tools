@@ -1,10 +1,12 @@
-//! The draft editor's HUD, Sounds and Crosshairs Set bodies, and the library they pick from.
+//! The draft editor's five Set bodies, and the library they pick from.
 
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::select::{Select, SelectEvent};
+use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -13,8 +15,9 @@ use gpui_kit::{
     px,
 };
 use tf2tools_core::{
-    CrosshairEntry, CrosshairId, CrosshairRef, DraftCrosshair, DraftItem, HudEntry, HudId,
-    LibraryError, ProfileCrosshairRef, SoundEntry, SoundId, SoundKind,
+    AddonEntry, AddonName, Choices, CrosshairEntry, CrosshairId, CrosshairRef, DraftCrosshair,
+    DraftItem, HudEntry, HudId, LibraryError, MastercomfigStatus, ModuleCatalog,
+    ProfileCrosshairRef, SoundEntry, SoundId, SoundKind,
 };
 
 use super::draft_editor::{BoardRef, ProfileDraftEditor, SoundOption};
@@ -28,11 +31,15 @@ use crate::loadout::{BoardTarget, Loadout};
 use crate::local_messages::describe_library;
 use crate::pages::common::card_frame;
 use crate::pages::crosshairs::{added_message, import_job};
+use crate::pages::graphics::ChoicesEdit;
+use crate::pages::graphics::model::{describe_status, version_parts};
+use crate::pages::graphics::pictures::PictureIndex;
+use crate::pages::graphics::view::{self, Filter};
 use crate::pages::huds::{card_images, hud_picture};
 use crate::pages::sounds::{sound_key, with_play_state};
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::services::{OpError, Services, run_blocking};
+use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
@@ -42,11 +49,12 @@ use crate::widgets::loadout_board::{BOARD_COLUMNS, BoardBusy, BoardEvent, Loadou
 const HUD_TILE_WIDTH: f32 = 200.;
 
 /// What the Set bodies pick from: the library HUDs with their card pictures by folder, the
-/// library sounds by name, and the library crosshairs.
+/// library sounds by name, the library crosshairs and the library add-ons.
 pub(super) struct Library {
     huds: Rc<[HudEntry]>,
     sounds: Rc<[SoundEntry]>,
     crosshairs: Rc<[CrosshairEntry]>,
+    addons: Rc<[AddonEntry]>,
     images: Rc<HashMap<String, String>>,
 }
 
@@ -63,8 +71,9 @@ impl ProfileDraftEditor {
             let mut sounds = s.library.list_sounds().map_err(failed)?;
             sounds.sort_by_key(|sound| sound.name().to_lowercase());
             let crosshairs = s.library.list_crosshairs().map_err(failed)?;
+            let addons = s.library.list_addons(None).map_err(failed)?;
             let images = card_images(s, &huds);
-            Ok((huds, sounds, crosshairs, images))
+            Ok((huds, sounds, crosshairs, addons, images))
         });
         let win = window.window_handle();
         cx.spawn(async move |editor, cx| {
@@ -76,7 +85,7 @@ impl ProfileDraftEditor {
                             return;
                         }
                         match loaded {
-                            Ok((huds, sounds, crosshairs, images)) => {
+                            Ok((huds, sounds, crosshairs, addons, images)) => {
                                 let crosshairs: Rc<[CrosshairEntry]> = crosshairs.into();
                                 let listed = Rc::clone(&crosshairs);
                                 e.picker
@@ -85,6 +94,7 @@ impl ProfileDraftEditor {
                                     huds: huds.into(),
                                     sounds: sounds.into(),
                                     crosshairs,
+                                    addons: addons.into(),
                                     images: Rc::new(images),
                                 });
                                 e.sync_sound_selects(window, cx);
@@ -218,7 +228,8 @@ impl ProfileDraftEditor {
             SlotKind::Hud => self.hud_body(cx),
             SlotKind::Sounds => self.sounds_body(cx),
             SlotKind::Crosshairs => self.crosshairs_body(cx),
-            SlotKind::Graphics | SlotKind::Addons => div().into_any_element(),
+            SlotKind::Graphics => self.graphics_body(cx),
+            SlotKind::Addons => self.addons_body(cx),
         }
     }
 
@@ -633,4 +644,241 @@ pub(super) fn on_sound_confirm(
     cx.subscribe(select, move |editor, _, event, cx| {
         editor.sound_confirmed(kind, event, cx)
     })
+}
+
+impl ProfileDraftEditor {
+    /// Reads, off the UI thread and once per editor, the Graphics page's saved choices for
+    /// Copy, the settings catalogue (the managed version's, else the newest cached one) and
+    /// the setting pictures, and hands the last two to the Graphics widget.
+    pub(super) fn load_graphics(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let tf2 = tf2_state(cx).read(cx).install().cloned();
+        let reading = run_blocking(cx, move |s| {
+            let choices = (s.library.mastercomfig_choices())
+                .map_err(|e| describe_status(&e).into_op(tr!("messages.action.load_mastercomfig")));
+            let managed = tf2.and_then(|tf2| match s.library.mastercomfig_status(&tf2) {
+                Ok(MastercomfigStatus::Managed { version, .. }) => Some(version),
+                _ => None,
+            });
+            let catalog = managed
+                .and_then(|tag| s.store.cached_mastercomfig_catalog(&tag))
+                .or_else(|| newest_cached_catalog(s));
+            let pictures = PictureIndex::open(&s.assets.setting_pictures_dir());
+            Ok((choices, catalog, pictures))
+        });
+        let win = window.window_handle();
+        cx.spawn(async move |editor, cx| {
+            let Ok((choices, catalog, pictures)) = reading.await else {
+                return;
+            };
+            let _ = cx.update(|cx| {
+                win.update(cx, |_, window, cx| {
+                    let _ = editor.update(cx, |e, cx| {
+                        e.page_choices = Some(choices);
+                        e.graphics.update(cx, |g, cx| {
+                            g.set_catalog(catalog.map(Arc::new), window, cx);
+                            g.set_pictures(Some(Arc::new(pictures)), cx);
+                        });
+                        cx.notify();
+                    });
+                })
+            });
+        })
+        .detach();
+    }
+
+    /// Takes the Graphics widget's proposed edit into the draft and shows it back. A preset
+    /// switch keeps every module choice, so it needs no catalogue.
+    pub(super) fn graphics_edit(
+        &mut self,
+        edit: &ChoicesEdit,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let choices = match edit {
+            ChoicesEdit::Preset(preset) => self.draft.graphics.with_preset(*preset),
+            ChoicesEdit::Modules { to, .. } => to.clone(),
+        };
+        self.set_graphics(choices, window, cx);
+    }
+
+    fn set_graphics(&mut self, choices: Choices, window: &mut Window, cx: &mut Context<Self>) {
+        self.edit(|d| d.graphics = choices.clone(), cx);
+        (self.graphics).update(cx, |g, cx| g.set_choices(choices, window, cx));
+    }
+
+    // Copy: the Graphics page's saved choices into the draft; a failed read toasts.
+    fn copy_graphics(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.page_choices.clone() {
+            Some(Ok(Some(choices))) => self.set_graphics(choices, window, cx),
+            Some(Err(err)) => toast_error(window, cx, &err),
+            Some(Ok(None)) | None => {}
+        }
+    }
+
+    // The presets card, the changes strip, Copy, then each category's heading over its rows;
+    // without a catalogue only the presets, Copy and a line saying where to get one.
+    fn graphics_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        let narrow = self.narrow;
+        let muted = cx.theme().muted_foreground;
+        let no_tf2 = tf2_state(cx).read(cx).install().is_none();
+        let not_managed = matches!(self.page_choices, Some(Ok(None)));
+        let copy = Button::new(ids::PROFILE_GFX_COPY)
+            .ghost()
+            .small()
+            .label(tr!("profiles.editor.gfx_copy"))
+            .disabled(no_tf2 || not_managed || self.page_choices.is_none() || self.busy)
+            .when(not_managed, |b| {
+                b.tooltip(tr!("profiles.editor.gfx_copy_none"))
+            })
+            .on_click(cx.listener(|editor, _, window, cx| editor.copy_graphics(window, cx)));
+        let copy = h_flex().child(copy);
+        self.graphics.update(cx, |g, cx| {
+            g.want_images(cx);
+            let presets = g.presets_card(narrow, cx);
+            let Some(catalog) = g.catalog().cloned() else {
+                let line = labelled(
+                    div().text_sm().text_color(muted),
+                    ids::PROFILE_GFX_NO_CATALOG,
+                    tr!("profiles.editor.gfx_no_catalog"),
+                );
+                return (v_flex().gap_4().child(presets).child(copy).child(line))
+                    .into_any_element();
+            };
+            let scope = g.scope();
+            let mut body = v_flex()
+                .gap_4()
+                .child(presets)
+                .child(g.changes_strip(cx))
+                .child(copy);
+            for section in view::sections(&catalog, g.choices(), &Filter::default()) {
+                let rows = (section.rows.iter().enumerate())
+                    .filter_map(|(i, r)| g.settings_row(&r.module, i == 0, narrow, cx));
+                let rows: Vec<AnyElement> = rows.collect();
+                if rows.is_empty() {
+                    continue;
+                }
+                let heading = labelled(
+                    div()
+                        .pt_2()
+                        .text_sm()
+                        .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                        .text_color(muted),
+                    scope.id(ids::graphics_category(&section.key)),
+                    section.label.clone(),
+                );
+                body = body.child(heading).child(v_flex().children(rows));
+            }
+            body.into_any_element()
+        })
+    }
+
+    // The add-ons this body lists: every library one, then any saved or picked one the
+    // library no longer has, by its saved name.
+    fn addon_rows(&self) -> Vec<Picked<AddonName>> {
+        let mut rows: Vec<Picked<AddonName>> = (self.library.iter())
+            .flat_map(|l| l.addons.iter().map(Picked::addon))
+            .collect();
+        for pick in self.baseline.addons.iter().chain(&self.draft.addons) {
+            if !rows.contains(pick) {
+                rows.push(pick.clone());
+            }
+        }
+        rows
+    }
+
+    // Turns `pick` on or off in the draft, keeping the list sorted by asset name.
+    fn toggle_addon(&mut self, pick: Picked<AddonName>, on: bool, cx: &mut Context<Self>) {
+        self.edit(
+            |d| {
+                d.addons.retain(|a| *a != pick);
+                if on {
+                    d.addons.push(pick);
+                    d.addons.sort_by(|a, b| a.folder.cmp(&b.folder));
+                }
+            },
+            cx,
+        );
+    }
+
+    // A switch per add-on, then Only these with what it means; or, with nothing to list, the
+    // empty line and a link to the Addon Store.
+    fn addons_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.library.is_none() {
+            return div().into_any_element();
+        }
+        let muted = cx.theme().muted_foreground;
+        let rows = self.addon_rows();
+        if rows.is_empty() {
+            let page = self.page.clone();
+            return h_flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .child(labelled(
+                    div().text_sm().text_color(muted),
+                    ids::PROFILE_ADDONS_EMPTY,
+                    tr!("profiles.editor.addons_empty"),
+                ))
+                .child(
+                    Button::new(ids::PROFILE_ADDONS_STORE)
+                        .outline()
+                        .small()
+                        .label(tr!("profiles.editor.addons_store"))
+                        .on_click(move |_, _, cx| {
+                            if let Some(page) = page.as_ref() {
+                                let _ =
+                                    page.update(cx, |_, cx| cx.emit(NavigateTo(Page::AddonStore)));
+                            }
+                        }),
+                )
+                .into_any_element();
+        }
+        let switches = rows.into_iter().map(|pick| {
+            let on = self.draft.addons.contains(&pick);
+            Switch::new(ids::profile_addon(&pick.folder))
+                .checked(on)
+                .label(pick.name.clone())
+                .disabled(self.busy)
+                .on_click(cx.listener(move |editor, &on: &bool, _, cx| {
+                    editor.toggle_addon(pick.clone(), on, cx)
+                }))
+        });
+        let only = self.draft.only_these;
+        let help = if only {
+            tr!("profiles.editor.addons_only_on")
+        } else {
+            tr!("profiles.editor.addons_only_off")
+        };
+        v_flex()
+            .gap_3()
+            .children(switches)
+            .child(
+                v_flex()
+                    .pt_2()
+                    .gap_1()
+                    .child(
+                        Switch::new(ids::PROFILE_ADDONS_ONLY)
+                            .checked(only)
+                            .label(tr!("profiles.editor.addons_only"))
+                            .disabled(self.busy)
+                            .on_click(cx.listener(|editor, &on: &bool, _, cx| {
+                                editor.edit(|d| d.only_these = on, cx)
+                            })),
+                    )
+                    .child(div().text_sm().text_color(muted).child(help)),
+            )
+            .into_any_element()
+    }
+}
+
+/// The newest release's catalogue saved in the mastercomfig cache, if any parses.
+fn newest_cached_catalog(s: &Services) -> Option<ModuleCatalog> {
+    let mut tags: Vec<(Vec<u64>, String)> = std::fs::read_dir(s.data.mastercomfig_dir())
+        .ok()?
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter_map(|tag| Some((version_parts(&tag)?, tag)))
+        .collect();
+    tags.sort();
+    (tags.iter().rev()).find_map(|(_, tag)| s.store.cached_mastercomfig_catalog(tag))
 }
