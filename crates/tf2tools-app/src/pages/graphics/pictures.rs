@@ -136,8 +136,27 @@ pub struct RowPictures {
     pub has_zoom: bool,
 }
 
+/// The preset's and the player's compare pictures. Under `zoom` the sides with a picture
+/// show crops only when every one of them has a crop, so a crop never wipes against a whole shot.
+pub fn compared_pair(
+    preset: Option<&ValuePicture>,
+    yours: Option<&ValuePicture>,
+    zoom: bool,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    let cropped = zoom
+        && [preset, yours]
+            .into_iter()
+            .flatten()
+            .all(|p| p.zoom.is_some());
+    let pick = |p: &ValuePicture| match (&p.zoom, cropped) {
+        (Some(crop), true) => crop.clone(),
+        _ => p.full.clone(),
+    };
+    (preset.map(pick), yours.map(pick))
+}
+
 /// None when no value of the row's module has a picture. Thumb and strip use full pictures;
-/// `zoom` swaps the compare pictures for crops where the value has one.
+/// `zoom` swaps the compare pictures for crops when every compared side has one (see `compared_pair`).
 pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<RowPictures> {
     if !index.has_pictures(&row.module) {
         return None;
@@ -145,12 +164,6 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
     let picture = |choice: &ModuleChoice| match choice {
         ModuleChoice::Value(value) => index.get(&row.module, value),
         ModuleChoice::NotSet | _ => None,
-    };
-    let compared = |choice: &ModuleChoice| {
-        picture(choice).map(|p| match (&p.zoom, zoom) {
-            (Some(crop), true) => crop.clone(),
-            _ => p.full.clone(),
-        })
     };
     let label = |choice: &ModuleChoice| {
         row.options
@@ -162,7 +175,7 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
     let yours_pill = || tr!("graphics.pictures.yours", value = label(&row.shown));
     // The same value on both sides shows once; otherwise the player's pick wipes over the
     // preset's, or whichever side has a picture stands alone.
-    let compare = match (compared(&row.preset_value), compared(&row.shown)) {
+    let compare = match compared_pair(picture(&row.preset_value), picture(&row.shown), zoom) {
         (Some(picture), Some(_)) if row.shown == row.preset_value => Compare::Same {
             picture,
             pill: tr!(
