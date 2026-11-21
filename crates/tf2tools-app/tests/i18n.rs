@@ -46,6 +46,9 @@ mod logs;
 #[path = "i18n/messages.rs"]
 mod messages;
 
+#[path = "i18n/profile_graphics.rs"]
+mod profile_graphics;
+
 #[path = "i18n/profile_header.rs"]
 mod profile_header;
 

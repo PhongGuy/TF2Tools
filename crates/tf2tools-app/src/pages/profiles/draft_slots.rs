@@ -33,7 +33,7 @@ use crate::pages::crosshairs::{added_message, import_job};
 use crate::pages::graphics::ChoicesEdit;
 use crate::pages::graphics::model::{describe_status, version_parts};
 use crate::pages::graphics::pictures::PictureIndex;
-use crate::pages::graphics::view::{self, Filter};
+use crate::pages::graphics::view::Filter;
 use crate::pages::huds::{card_images, rounded_picture};
 use crate::pages::sounds::{sound_key, with_play_state};
 use crate::picker::PickKind;
@@ -743,11 +743,27 @@ impl ProfileDraftEditor {
         }
     }
 
+    // Cuts the Graphics sections again only when the rows were rebuilt, rewording them first
+    // after a language switch, so a plain redraw reads the last cut.
+    pub(super) fn cut_graphics_sections(&mut self, cx: &mut Context<Self>) {
+        let generation = self.graphics.update(cx, |g, _| {
+            g.follow_language();
+            g.rows_generation()
+        });
+        if (self.graphics_sections.as_ref()).is_some_and(|(cut, _)| *cut == generation) {
+            return;
+        }
+        let sections = self.graphics.read(cx).sections(&Filter::default());
+        self.graphics_sections = Some((generation, sections.into()));
+        self.sections_cut += 1;
+    }
+
     // The presets card, the changes strip, then one Settings card headed by Copy over each
     // category's heading and rows; without a catalogue the card holds a line saying where to
     // get one.
     fn graphics_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let narrow = self.narrow;
+        let sections = (self.graphics_sections.as_ref()).map(|(_, s)| Rc::clone(s));
         let theme = cx.theme();
         let (muted, border, background) = (theme.muted_foreground, theme.border, theme.background);
         let no_tf2 = tf2_state(cx).read(cx).install().is_none();
@@ -798,7 +814,7 @@ impl ProfileDraftEditor {
         self.graphics.update(cx, |g, cx| {
             g.want_images(cx);
             let presets = g.presets_card(narrow, cx);
-            let Some(catalog) = g.catalog().cloned() else {
+            if g.catalog().is_none() {
                 let line = labelled(
                     div().p_4().text_sm().text_color(muted),
                     ids::PROFILE_GFX_NO_CATALOG,
@@ -806,11 +822,10 @@ impl ProfileDraftEditor {
                 );
                 return (v_flex().gap_4().child(presets).child(card.child(line)))
                     .into_any_element();
-            };
+            }
             let scope = g.scope();
             let mut card = card;
-            let sections = view::sections(&catalog, g.choices(), &Filter::default());
-            for (n, section) in sections.iter().enumerate() {
+            for (n, section) in sections.iter().flat_map(|s| s.iter()).enumerate() {
                 let rows = (section.rows.iter().enumerate())
                     .filter_map(|(i, r)| g.settings_row(&r.module, i == 0, narrow, cx));
                 let rows: Vec<AnyElement> = rows.collect();

@@ -202,6 +202,7 @@ mod player_states;
 mod previews;
 mod profile_draft;
 mod profile_editor;
+mod profile_editor_built_rows;
 mod profile_editor_edges;
 mod profile_editor_look;
 mod profile_editor_open;
