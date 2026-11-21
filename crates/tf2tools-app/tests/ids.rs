@@ -669,6 +669,14 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_EDITOR_BODY,
             ids::PROFILE_EDITOR_SCROLLBAR,
             ids::PROFILE_EDITOR_DELETE,
+            ids::PROFILE_HUD_EMPTY,
+            ids::PROFILE_HUDS_LINK,
+            ids::PROFILE_SOUND_HIT,
+            ids::PROFILE_SOUND_KILL,
+            ids::PROFILE_SOUND_HIT_PLAY,
+            ids::PROFILE_SOUND_KILL_PLAY,
+            ids::PROFILE_SOUND_HIT_PLAY_SPINNER,
+            ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
         ],
         [
             "profiles-new",
@@ -684,6 +692,14 @@ fn profile_editor_ids_are_stable() {
             "profile-editor-body",
             "profile-editor-scrollbar",
             "profile-editor-delete",
+            "profile-hud-empty",
+            "profile-huds-link",
+            "profile-sound-hit",
+            "profile-sound-kill",
+            "profile-sound-hit-play",
+            "profile-sound-kill-play",
+            "profile-sound-hit-play-spinner",
+            "profile-sound-kill-play-spinner",
         ]
     );
 }

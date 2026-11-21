@@ -722,6 +722,7 @@ profiles:
     pick_hud: "Elige un HUD o elige Ninguno"
     loading: "Leyendo lo que tienes ahora…"
     note_title: "Rellenado con lo que tienes ahora"
+    hud_empty: "Aún no hay HUDs en tu biblioteca."
   toast:
     saved: "%{name} guardado."
     saved_active: "%{name} guardado. Aplícalo para usar los cambios."
@@ -2866,6 +2867,7 @@ messages:
     load_gamemodes: "No se pudieron cargar los modos de juego"
     load_maps: "No se pudieron cargar los mapas"
     remove_failed: "No se pudo quitar"
+    load_library: "No se pudo cargar la biblioteca"
     save_profile: "No se pudo guardar el perfil"
     open_profile: "No se pudo abrir el perfil"
     load_profiles: "No se pudieron cargar los perfiles"

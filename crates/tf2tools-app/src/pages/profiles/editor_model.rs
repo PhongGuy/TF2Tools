@@ -301,6 +301,24 @@ impl Draft {
         true
     }
 
+    /// The draft's `kind` sound; None for TF2's default.
+    pub fn sound(&self, kind: SoundKind) -> Option<&Picked<SoundId>> {
+        if kind == SoundKind::Hitsound {
+            self.hit.as_ref()
+        } else {
+            self.kill.as_ref()
+        }
+    }
+
+    /// Puts `pick` in the draft's `kind` sound; None for TF2's default.
+    pub fn set_sound(&mut self, kind: SoundKind, pick: Option<Picked<SoundId>>) {
+        if kind == SoundKind::Hitsound {
+            self.hit = pick;
+        } else {
+            self.kill = pick;
+        }
+    }
+
     /// True while Graphics is None, so Add-ons cannot be Set.
     pub fn addons_need_graphics(&self) -> bool {
         self.mode(SlotKind::Graphics) == Mode::None

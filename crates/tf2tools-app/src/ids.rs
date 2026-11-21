@@ -993,6 +993,23 @@ pub fn profile_slot_text(slot: &str) -> ElementId {
     keyed("profile-slot-text", slot)
 }
 
+/// The HUD Set body's line when the library has no HUDs.
+pub const PROFILE_HUD_EMPTY: &str = "profile-hud-empty";
+/// The empty HUD body's link to the HUDs page.
+pub const PROFILE_HUDS_LINK: &str = "profile-huds-link";
+/// The Sounds Set body's Hitsound select.
+pub const PROFILE_SOUND_HIT: &str = "profile-sound-hit";
+/// The Sounds Set body's Killsound select.
+pub const PROFILE_SOUND_KILL: &str = "profile-sound-kill";
+/// The Hitsound row's play button.
+pub const PROFILE_SOUND_HIT_PLAY: &str = "profile-sound-hit-play";
+/// The Killsound row's play button.
+pub const PROFILE_SOUND_KILL_PLAY: &str = "profile-sound-kill-play";
+/// The spinner in the Hitsound play button while its sound loads.
+pub const PROFILE_SOUND_HIT_PLAY_SPINNER: &str = "profile-sound-hit-play-spinner";
+/// The spinner in the Killsound play button while its sound loads.
+pub const PROFILE_SOUND_KILL_PLAY_SPINNER: &str = "profile-sound-kill-play-spinner";
+
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
     ElementId::Name(format!("nav-{}", page.slug()).into())
@@ -1391,7 +1408,7 @@ pub fn profile_slot(slot: &str) -> ElementId {
     keyed("profile-slot", slot)
 }
 
-/// A HUD card in the picker, keyed by folder: "profile-pick-hud:<folder>".
+/// A HUD tile in the HUD Set body, keyed by folder: "profile-pick-hud:<folder>".
 pub fn profile_pick_hud(folder: &str) -> ElementId {
     keyed("profile-pick-hud", folder)
 }

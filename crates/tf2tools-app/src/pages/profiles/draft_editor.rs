@@ -5,6 +5,7 @@
 use gpui_kit::base::Radio;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::select::{SelectItem, SelectState};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -14,17 +15,20 @@ use gpui_kit::{
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
 };
-use tf2tools_core::{LogLevel, NewLogEntry, Profile, ProfileError, ProfileId};
+use tf2tools_core::{LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId, SoundKind};
 
 use super::ProfilesPage;
+use super::draft_slots::{Library, on_sound_confirm};
 use super::editor_model::{self, Draft, Mode, SaveBlock, SlotKind};
 use crate::activity;
+use crate::audio::player::{Player, sound_player};
 use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
 use crate::pages::graphics::pill;
+use crate::remote_images::RemoteImages;
 use crate::services::{OpError, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
@@ -62,24 +66,53 @@ pub enum EditorEvent {
 
 impl EventEmitter<EditorEvent> for ProfileDraftEditor {}
 
+/// A library sound, or TF2 default when `id` is None.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SoundOption {
+    pub id: Option<SoundId>,
+    pub label: SharedString,
+}
+
+impl SelectItem for SoundOption {
+    type Value = Self;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self {
+        self
+    }
+}
+
 /// One profile's draft, edited in place of the Profiles list.
 pub struct ProfileDraftEditor {
     saved: Option<Profile>,
-    draft: Draft,
-    baseline: Draft,
+    pub(super) draft: Draft,
+    pub(super) baseline: Draft,
     name: Entity<InputState>,
     /// The name field was edited or Save was tried, so a blank name may say so.
     name_touched: bool,
     /// The name core refused as taken at Save, until the field changes.
     name_taken: Option<String>,
-    busy: bool,
+    pub(super) busy: bool,
     /// The hosting page, whose loaded list answers the live name check.
-    page: Option<WeakEntity<ProfilesPage>>,
+    pub(super) page: Option<WeakEntity<ProfilesPage>>,
     focus: FocusHandle,
     scroll: ScrollHandle,
     /// The scroll column's child index of the first slot card, for the rail's jumps.
     cards_from: usize,
     crumb: Entity<EditorCrumb>,
+    hit_select: Entity<SelectState<Vec<SoundOption>>>,
+    kill_select: Entity<SelectState<Vec<SoundOption>>>,
+    /// The HUDs and sounds the Set bodies pick from; None until the first load lands.
+    pub(super) library: Option<Library>,
+    /// Bumped per library load, so a slower older load never replaces a newer one.
+    pub(super) library_generation: u64,
+    /// The app's floating player, which plays the previews.
+    pub(super) player: Entity<Player>,
+    /// This editor's own `RemoteImages` viewer, handed back on release.
+    pub(super) image_viewer: String,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -97,7 +130,7 @@ impl ProfileDraftEditor {
                 .default_value(draft.name.clone())
         });
         // `set_value` emits no input event, so the name is read back on every redraw request.
-        let subscriptions = vec![cx.observe(&name, |editor, _, cx| editor.sync_name(cx))];
+        let mut subscriptions = vec![cx.observe(&name, |editor, _, cx| editor.sync_name(cx))];
         let editor = cx.entity();
         let crumb = cx.new(|cx| EditorCrumb {
             editor: editor.downgrade(),
@@ -106,7 +139,30 @@ impl ProfileDraftEditor {
         // Focus starts inside the editor, so Esc reaches its key context.
         let focus = cx.focus_handle();
         focus.focus(window, cx);
+        let hit_select = cx.new(|cx| SelectState::new(Vec::new(), None, window, cx));
+        let kill_select = cx.new(|cx| SelectState::new(Vec::new(), None, window, cx));
+        subscriptions.push(on_sound_confirm(&hit_select, SoundKind::Hitsound, cx));
+        subscriptions.push(on_sound_confirm(&kill_select, SoundKind::Killsound, cx));
+        // The play buttons read the player's phase, and HUD pictures redraw as they land; the
+        // editor's picture wants go when it does.
+        let player = sound_player(window, cx);
+        subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
+        let image_viewer = format!("profile-draft-editor:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
+        cx.defer_in(window, |editor, window, cx| editor.load_library(window, cx));
         Self {
+            library: None,
+            library_generation: 0,
+            player,
+            image_viewer,
+            hit_select,
+            kill_select,
             saved,
             baseline: draft.clone(),
             draft,
@@ -126,6 +182,15 @@ impl ProfileDraftEditor {
     // The page that hosts the editor; set once, right after it is built.
     pub(super) fn set_page(&mut self, page: WeakEntity<ProfilesPage>) {
         self.page = Some(page);
+    }
+
+    /// The Sounds body's select for `kind`.
+    pub fn sound_select(&self, kind: SoundKind) -> &Entity<SelectState<Vec<SoundOption>>> {
+        if kind == SoundKind::Hitsound {
+            &self.hit_select
+        } else {
+            &self.kill_select
+        }
     }
 
     pub fn draft(&self) -> &Draft {
@@ -252,7 +317,8 @@ impl ProfileDraftEditor {
     }
 
     // Save's answer: the page closes on success; a taken name shows inline; a profile deleted
-    // meanwhile toasts and closes; anything else toasts and stays.
+    // meanwhile toasts and closes; an item deleted meanwhile toasts and reloads the library, so
+    // its tile goes; anything else toasts and stays.
     fn saved(
         &mut self,
         done: Result<Result<(Profile, bool), ProfileError>, OpError>,
@@ -272,6 +338,10 @@ impl ProfileDraftEditor {
                 toast_error(window, cx, &failed(&e));
                 let name = self.saved.as_ref().map(|p| p.name().to_owned());
                 cx.emit(EditorEvent::Deleted(name.unwrap_or_default()));
+            }
+            Ok(Err(e @ ProfileError::ItemNotFound { .. })) => {
+                toast_error(window, cx, &failed(&e));
+                self.load_library(window, cx);
             }
             Ok(Err(e)) => toast_error(window, cx, &failed(&e)),
             Err(err) => toast_error(window, cx, &err),
@@ -476,11 +546,6 @@ impl ProfileDraftEditor {
             .child(header)
             .child(body)
             .into_any_element()
-    }
-
-    // A Set slot's body; the slot bodies fill this in.
-    fn set_body(&self, _slot: SlotKind, _cx: &mut Context<Self>) -> AnyElement {
-        div().into_any_element()
     }
 }
 

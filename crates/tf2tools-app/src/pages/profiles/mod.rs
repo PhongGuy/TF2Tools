@@ -2,6 +2,7 @@
 //! in one go.
 
 pub mod draft_editor;
+mod draft_slots;
 pub mod editor_model;
 pub mod model;
 pub mod probe;
