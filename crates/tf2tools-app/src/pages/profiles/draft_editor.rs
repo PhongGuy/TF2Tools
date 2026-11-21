@@ -313,15 +313,23 @@ impl ProfileDraftEditor {
         }
     }
 
-    /// Switches `slot` to `mode` in the draft; false when the draft refuses it.
+    /// Switches `slot` to `mode` in the draft; false when the draft refuses it or a Save is
+    /// running.
     pub fn set_mode(&mut self, slot: SlotKind, mode: Mode, cx: &mut Context<Self>) -> bool {
+        if self.busy {
+            return false;
+        }
         let done = self.draft.set_mode(slot, mode);
         cx.notify();
         done
     }
 
-    /// Applies `change` to the draft and redraws.
+    /// Applies `change` to the draft and redraws; refused while a Save is running, so the
+    /// draft on screen is the one being written.
     pub fn edit(&mut self, change: impl FnOnce(&mut Draft), cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
         change(&mut self.draft);
         cx.notify();
     }
@@ -364,8 +372,7 @@ impl ProfileDraftEditor {
             cx.notify();
             return;
         }
-        self.busy = true;
-        cx.notify();
+        self.set_busy(true, cx);
         let (draft, id) = (self.draft.to_profile_draft(), self.profile_id().cloned());
         let saving = run_blocking(cx, move |s| {
             let saved = match &id {
@@ -401,7 +408,7 @@ impl ProfileDraftEditor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.busy = false;
+        self.set_busy(false, cx);
         let failed =
             |e: &ProfileError| describe_profile(e).into_op(tr!("messages.action.save_profile"));
         match done {
@@ -422,6 +429,13 @@ impl ProfileDraftEditor {
             Ok(Err(e)) => toast_error(window, cx, &failed(&e)),
             Err(err) => toast_error(window, cx, &err),
         }
+        cx.notify();
+    }
+
+    // Holds every slot control still while a Save runs; the Graphics widget draws its own.
+    fn set_busy(&mut self, busy: bool, cx: &mut Context<Self>) {
+        self.busy = busy;
+        (self.graphics).update(cx, |g, cx| g.set_disabled(busy, cx));
         cx.notify();
     }
 

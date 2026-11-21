@@ -279,7 +279,8 @@ impl ProfileDraftEditor {
             .test_support()
             .w(px(HUD_TILE_WIDTH))
             .overflow_hidden()
-            .cursor_pointer()
+            .when(self.busy, |tile| tile.opacity(0.5))
+            .when(!self.busy, |tile| tile.cursor_pointer())
             .when(selected, |tile| tile.border_color(primary))
             .child(hud_picture(
                 ids::hud_shot(&folder),
@@ -452,8 +453,12 @@ impl ProfileDraftEditor {
     }
 
     /// The board's OnBoard target: Assign calls `assign`; a dropped tile is selected, then
-    /// assigned to its target, as on the Crosshairs page. Every other event is ignored.
+    /// assigned to its target, as on the Crosshairs page. Every other event, and every event
+    /// while a Save runs, is ignored.
     pub fn board_event(&mut self, event: BoardEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
         match event {
             BoardEvent::Assign(target) => self.assign(target, cx),
             BoardEvent::Drop(target, crosshair) => {
@@ -702,6 +707,9 @@ impl ProfileDraftEditor {
     }
 
     fn set_graphics(&mut self, choices: Choices, window: &mut Window, cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
         self.edit(|d| d.graphics = choices.clone(), cx);
         (self.graphics).update(cx, |g, cx| g.set_choices(choices, window, cx));
     }

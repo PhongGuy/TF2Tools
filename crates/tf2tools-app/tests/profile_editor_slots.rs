@@ -3,6 +3,7 @@
 use crate::support;
 
 use gpui_kit::component::select::SelectEvent;
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext, px, size};
 use support::graphics::found;
 use support::profiles::{FLAT, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name};
@@ -1082,5 +1083,105 @@ fn a_stored_graphics_none_with_addons_set_opens_and_saves_addons_none(cx: &mut T
     assert!(saved.graphics().as_set().is_none());
     assert!(saved.addons().as_set().is_none(), "add-ons left Set");
     drop(e);
+    assert_eq!(game_files(&env), before);
+}
+
+#[gpui_kit::test]
+fn an_edit_while_saving_is_refused_and_the_save_holds_the_draft(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let vpk = support::vpk_bytes(&[("cfg/addon.cfg", b"echo addon\n")]);
+    for name in [PYRO, FLAT] {
+        support::seed_library_addon(&s.services, &env, name, "9.100.1", &vpk, false);
+    }
+    let draft = ProfileDraft::new("Busy")
+        .with_hud(SlotMode::Set(DraftItem::Pick(seeded.rayshud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(seeded.ding.id().clone())),
+            None,
+        )))
+        .with_crosshairs(SlotMode::Set(Vec::new()))
+        .with_graphics(SlotMode::Set(low_fps60()))
+        .with_addons(SlotMode::Set((vec![DraftItem::Pick(addon(PYRO))], true)));
+    let p = s.services.library.create_profile(&draft).unwrap();
+    // Tall enough that every card is on screen, so each click lands without scrolling.
+    cx.simulate_window_resize(s.win, size(px(1280.), px(4000.)));
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    type_name(cx, &s, &e, "Busy two");
+    let budhud = seeded.budhud.folder_name().to_owned();
+    support::wait_real(cx, "the bodies", |cx| {
+        support::present(cx, s.win, ids::profile_pick_hud(&budhud))
+            && support::present(cx, s.win, ids::profile_addon(FLAT))
+    });
+    let dot = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
+    let picker = cx.update(|cx| e.read(cx).picker().clone());
+    cx.update(|cx| picker.update(cx, |p, cx| p.select(Some(dot), cx)));
+    support::settle(cx, s.win);
+    let gfx = tf2tools_app::ids::IdScope::PROFILE_GRAPHICS;
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    let bell = SoundOption {
+        id: Some(seeded.bell.id().clone()),
+        label: "Bell".into(),
+    };
+    let kill = cx.update(|cx| e.read(cx).sound_select(SoundKind::Killsound).clone());
+    // Save starts, the busy editor draws, then every kind of slot edit is tried before the
+    // save's answer can land.
+    let shown_disabled = cx
+        .update_window(s.win, |_, w, cx| {
+            e.update(cx, |e, cx| e.save(w, cx));
+            w.render_frame(cx);
+            let disabled = [
+                ids::profile_slot_mode("hud", "none"),
+                ids::profile_addon(FLAT),
+                ids::PROFILE_ADDONS_ONLY.into(),
+                gfx.id(ids::graphics_preset(Preset::High)),
+                ids::PROFILE_XH_EVERYWHERE.into(),
+            ]
+            .map(|id| (id.clone(), support::button_disabled(w, id)));
+            w.click(ids::profile_pick_hud(&budhud), cx);
+            w.click(ids::profile_slot_mode("hud", "none"), cx);
+            w.click(ids::profile_addon(FLAT), cx);
+            w.click(gfx.id(ids::graphics_preset(Preset::High)), cx);
+            w.click(
+                xh.id(ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary)),
+                cx,
+            );
+            kill.update(cx, |_, cx| {
+                cx.emit(SelectEvent::<Vec<SoundOption>>::Confirm(Some(bell)))
+            });
+            e.update(cx, |e, cx| {
+                assert!(!e.set_mode(SlotKind::Graphics, Mode::None, cx));
+                e.board_event(BoardEvent::Assign(BoardTarget::Everything), w, cx);
+            });
+            disabled
+        })
+        .unwrap();
+    for (id, disabled) in shown_disabled {
+        assert!(disabled, "{id:?} is drawn disabled while saving");
+    }
+    let draft = cx.update(|cx| e.read(cx).draft().clone());
+    assert_eq!(
+        draft.hud.as_ref().map(|h| h.folder.as_str()),
+        Some(seeded.rayshud.folder_name())
+    );
+    assert_eq!(draft.mode(SlotKind::Hud), Mode::Set);
+    assert_eq!(draft.mode(SlotKind::Graphics), Mode::Set);
+    assert_eq!(draft.graphics.preset(), Preset::Low);
+    assert_eq!(draft.addons.len(), 1);
+    assert!(draft.crosshairs.is_empty());
+    assert!(draft.kill.is_none());
+    support::wait_real(cx, "the list", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_none())
+    });
+    let saved = s.services.library.profile(p.id()).unwrap();
+    assert_eq!(saved.name(), "Busy two");
+    assert_eq!(
+        saved.hud().as_set().map(|h| h.folder_name()),
+        Some(seeded.rayshud.folder_name())
+    );
+    assert_eq!(saved.addons().as_set().map(|a| a.on.len()), Some(1));
     assert_eq!(game_files(&env), before);
 }
