@@ -769,3 +769,35 @@ fn the_strips_import_adds_the_crosshair_and_picks_it(cx: &mut TestAppContext) {
     );
     assert_eq!(game_files(&env), before);
 }
+
+#[gpui_kit::test]
+fn dropping_a_strip_tile_on_a_cell_puts_it_on_that_weapon(cx: &mut TestAppContext) {
+    use gpui_kit::test::TestWindowExt as _;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = xh_profile(&s);
+    let page = page(cx, &s);
+    let before = game_files(&env);
+    let e = edit(cx, &s, &page, p.id());
+    let xh = tf2tools_app::ids::IdScope::PROFILE_CROSSHAIRS;
+    let first = s.services.builtins.all()[0].name().to_owned();
+    support::click_id(cx, s.win, ids::profile_rail("crosshairs"));
+    let tile = xh.id(ids::crosshair_builtin(&first));
+    let cell = xh.id(ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary));
+    cx.update_window(s.win, |_, w, cx| w.drag_to(tile, cell, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    let scripts = BoardTarget::Cell(TfClass::Scout, WeaponSlot::Primary).scripts();
+    for script in &scripts {
+        assert_eq!(
+            cx.update(|cx| e.read(cx).board_ref(script)),
+            Some(BoardRef::Shown(CrosshairRef::Builtin(first.clone()))),
+            "{script}"
+        );
+    }
+    assert_eq!(
+        cx.update(|cx| e.read(cx).draft().crosshairs.len()),
+        scripts.len()
+    );
+    assert_eq!(game_files(&env), before);
+}

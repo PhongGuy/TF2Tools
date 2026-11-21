@@ -440,10 +440,16 @@ impl ProfileDraftEditor {
         );
     }
 
-    /// The board's OnBoard target: Assign calls `assign`, every other event is ignored.
+    /// The board's OnBoard target: Assign calls `assign`; a dropped tile is selected, then
+    /// assigned to its target, as on the Crosshairs page. Every other event is ignored.
     pub fn board_event(&mut self, event: BoardEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if let BoardEvent::Assign(target) = event {
-            self.assign(target, cx);
+        match event {
+            BoardEvent::Assign(target) => self.assign(target, cx),
+            BoardEvent::Drop(target, crosshair) => {
+                (self.picker).update(cx, |picker, cx| picker.select(Some(crosshair), cx));
+                self.assign(target, cx);
+            }
+            BoardEvent::Open(..) | BoardEvent::Reset(_) | BoardEvent::Close => {}
         }
     }
 
