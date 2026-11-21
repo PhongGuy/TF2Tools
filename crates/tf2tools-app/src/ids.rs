@@ -942,30 +942,26 @@ pub const PROFILE_APPLY_OK: &str = "profile-apply-ok";
 pub const PROFILES_NEW: &str = "profiles-new";
 /// The profile editor's root.
 pub const PROFILE_EDITOR: &str = "profile-editor";
-/// The editor's Back button, which returns to the grid.
-pub const PROFILE_EDITOR_BACK: &str = "profile-editor-back";
+/// The header crumb's "Profiles" link, which asks to close the editor.
+pub const PROFILE_EDITOR_CRUMB: &str = "profile-editor-crumb";
+/// The header crumb's profile name, or "New profile" while the name is blank.
+pub const PROFILE_EDITOR_CRUMB_NAME: &str = "profile-editor-crumb-name";
+/// The header's Cancel button.
+pub const PROFILE_EDITOR_CANCEL: &str = "profile-editor-cancel";
+/// The header's Save button.
+pub const PROFILE_EDITOR_SAVE: &str = "profile-editor-save";
 /// The editor's name field.
 pub const PROFILE_EDITOR_NAME: &str = "profile-editor-name";
-/// The line under the name field when another profile has that name.
-pub const PROFILE_EDITOR_NAME_TAKEN: &str = "profile-editor-name-taken";
-/// The editor's Activate button.
-pub const PROFILE_EDITOR_ACTIVATE: &str = "profile-editor-activate";
-/// The editor's "Active" badge, shown when the open profile is active.
-pub const PROFILE_EDITOR_ACTIVE_BADGE: &str = "profile-editor-active-badge";
-/// The editor's Delete button.
+/// The line under the name field saying why Save is off.
+pub const PROFILE_EDITOR_NAME_ERROR: &str = "profile-editor-name-error";
+/// The new draft's note on what it copied.
+pub const PROFILE_EDITOR_NOTE: &str = "profile-editor-note";
+/// The editor's scrolling body.
+pub const PROFILE_EDITOR_BODY: &str = "profile-editor-body";
+/// The editor body's scrollbar.
+pub const PROFILE_EDITOR_SCROLLBAR: &str = "profile-editor-scrollbar";
+/// The Delete profile button at the editor's foot.
 pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
-/// The note that an edit deactivated the profile, so its changes are not in the game yet.
-pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
-/// The HUD picker's card grid.
-pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
-/// The HUD slot card's picture area, drawn while the slot holds a HUD.
-pub const PROFILE_SLOT_HUD_SHOT: &str = "profile-slot-hud-shot";
-/// The HUD slot card's picture, once it has loaded.
-pub const PROFILE_SLOT_HUD_IMAGE: &str = "profile-slot-hud-image";
-/// The sound picker's list.
-pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
-/// The sound picker list's scrollbar.
-pub const PROFILE_PICKER_SOUNDS_SCROLLBAR: &str = "profile-picker-sounds-scrollbar";
 
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
@@ -1365,69 +1361,9 @@ pub fn profile_slot(slot: &str) -> ElementId {
     keyed("profile-slot", slot)
 }
 
-/// An editor slot's clear button: "profile-slot-clear:<slot>".
-pub fn profile_slot_clear(slot: &str) -> ElementId {
-    keyed("profile-slot-clear", slot)
-}
-
-/// A sound slot's play button: "profile-slot-play:<slot>".
-pub fn profile_slot_play(slot: &str) -> ElementId {
-    keyed("profile-slot-play", slot)
-}
-
-/// The spinner inside a slot's play button while its sound loads.
-pub fn profile_slot_play_spinner(slot: &str) -> ElementId {
-    keyed("profile-slot-play-spinner", slot)
-}
-
-/// A slot's missing-item note: "profile-slot-missing:<slot>".
-pub fn profile_slot_missing(slot: &str) -> ElementId {
-    keyed("profile-slot-missing", slot)
-}
-
-/// A slot's picker: "profile-picker:<slot>".
-pub fn profile_picker(slot: &str) -> ElementId {
-    keyed("profile-picker", slot)
-}
-
-/// A picker's search field: "profile-picker-search:<slot>".
-pub fn profile_picker_search(slot: &str) -> ElementId {
-    keyed("profile-picker-search", slot)
-}
-
-/// A picker's empty-library note: "profile-picker-empty:<slot>".
-pub fn profile_picker_empty(slot: &str) -> ElementId {
-    keyed("profile-picker-empty", slot)
-}
-
-/// A picker's note that its search matches nothing: "profile-picker-no-match:<slot>".
-pub fn profile_picker_no_match(slot: &str) -> ElementId {
-    keyed("profile-picker-no-match", slot)
-}
-
-/// An empty picker's button to the store: "profile-picker-store:<slot>".
-pub fn profile_picker_store(slot: &str) -> ElementId {
-    keyed("profile-picker-store", slot)
-}
-
 /// A HUD card in the picker, keyed by folder: "profile-pick-hud:<folder>".
 pub fn profile_pick_hud(folder: &str) -> ElementId {
     keyed("profile-pick-hud", folder)
-}
-
-/// A sound row in a sound slot's picker: "profile-pick-sound:<slot>:<folder>".
-pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
-    keyed("profile-pick-sound", &format!("{slot}:{folder}"))
-}
-
-/// A picker sound row's play button: "profile-pick-play:<folder>".
-pub fn profile_pick_play(folder: &str) -> ElementId {
-    keyed("profile-pick-play", folder)
-}
-
-/// The spinner inside a picker row's play button while its sound loads.
-pub fn profile_pick_play_spinner(folder: &str) -> ElementId {
-    keyed("profile-pick-play-spinner", folder)
 }
 
 /// A missing item's Re-download button on its summary row, keyed like the row:

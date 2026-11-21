@@ -654,11 +654,8 @@ profiles:
   badge:
     active: "Activo"
   button:
-    activate: "Activar"
-    activating: "Activando..."
     apply: "Aplicar"
     edit: "Editar"
-    delete: "Eliminar perfil"
     new: "Nuevo perfil"
   card:
     leave: "Se queda como está"
@@ -710,23 +707,16 @@ profiles:
     redownload: "Volver a descargar"
     local: "Importación local: no se puede volver a descargar"
   editor:
+    crumb_new: "Nuevo perfil"
+    name: "Nombre"
+    name_placeholder: "Ponle nombre a este perfil"
+    save: "Guardar"
+    delete: "Eliminar perfil"
     name_blank: "Ponle un nombre a este perfil"
     pick_hud: "Elige un HUD o elige Ninguno"
-    back: "Volver a perfiles"
-    clear: "Vaciar"
-    unknown: "Desconocido"
-    missing_crosshair: "%{name} (falta)"
-    slot:
-      none: "Ninguno"
-      default_crosshairs: "Miras predeterminadas"
-      missing: "Falta: %{name}"
-    empty:
-      huds: "Aún no hay HUDs en tu biblioteca"
-      browse_huds: "Explorar la tienda de HUDs"
-      sounds: "Aún no hay sonidos en tu biblioteca"
-      browse_sounds: "Explorar la tienda de sonidos"
-      no_match: "Sin resultados"
   toast:
+    saved: "%{name} guardado."
+    saved_active: "%{name} guardado. Aplícalo para usar los cambios."
     created_from_setup: "Perfil creado a partir de tu configuración actual"
     deleted: "Perfil eliminado"
     failed_steps: "No se pudo colocar esto: %{steps}. Asegúrate de que TF2 esté cerrado y de que TF2Tools pueda escribir en tu carpeta de TF2, y vuelve a intentarlo."
@@ -743,6 +733,7 @@ profiles:
     no_catalog: "Abre la página de Gráficos una vez para que TF2Tools pueda leer los ajustes de tu mastercomfig"
     foreign: "Tu modules.cfg no lo escribió TF2Tools; abre la página de Gráficos para reemplazarlo"
   activity:
+    saved: "Perfil guardado: %{name}"
     saved_current: "Configuración actual guardada como perfil: %{name}"
     deleted: "Perfil eliminado: %{name}"
     failed: "No se pudo activar el perfil: %{name}"
@@ -2675,9 +2666,6 @@ messages:
       newer_database: "Tu biblioteca se guardó con un TF2Tools más nuevo. Instala el último TF2Tools desde la página de versiones para abrirla."
   profiles:
     name_taken: "Ya tienes un perfil llamado %{name}. Elige otro nombre."
-    hud_gone: "Ese HUD ya no está en tu biblioteca"
-    sound_gone: "Ese sonido ya no está en tu biblioteca"
-    crosshair_gone: "Esa mira ya no está en tu biblioteca"
   mastercomfig:
     no_release: "GitHub no tiene ahora mismo una versión de mastercomfig que TF2Tools pueda instalar. Inténtalo de nuevo más tarde."
     foreign_modules_cfg: "TF2 tiene un modules.cfg que TF2Tools no escribió, así que TF2Tools no lo tocó."
@@ -2871,9 +2859,7 @@ messages:
     load_gamemodes: "No se pudieron cargar los modos de juego"
     load_maps: "No se pudieron cargar los mapas"
     remove_failed: "No se pudo quitar"
-    load_library: "No se pudo cargar la biblioteca"
     save_profile: "No se pudo guardar el perfil"
-    load_profile: "No se pudo cargar el perfil"
     open_profile: "No se pudo abrir el perfil"
     load_profiles: "No se pudieron cargar los perfiles"
     create_profile: "No se pudo crear el perfil"

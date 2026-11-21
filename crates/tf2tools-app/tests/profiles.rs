@@ -426,8 +426,8 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = empty_profile(&s, "Competitive");
-    let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_edit(comp.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, comp.id());
     support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
     assert_eq!(
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
@@ -452,8 +452,8 @@ fn cancelling_delete_keeps_the_profile(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = empty_profile(&s, "Competitive");
-    let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_edit(comp.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, comp.id());
     support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     assert_eq!(s.services.library.profiles().unwrap().len(), 1);
@@ -469,12 +469,28 @@ fn deleting_the_active_profile_clears_the_active_mark(cx: &mut TestAppContext) {
         .library
         .apply_profile(vanilla.id(), &tf2(&env), &s.services.builtins, false)
         .unwrap();
-    let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_card_edit(vanilla.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, vanilla.id());
     support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     toast_is(cx, &s, "Profile deleted");
     assert_eq!(s.services.library.active_profile().unwrap(), None);
+}
+
+// The card's own buttons do their job only; the click stops before the card behind them.
+#[gpui_kit::test]
+fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_apply(cx, s.win, comp.id());
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
 }
 
 /// Counts `LibraryChanged` from now on; keep the subscription alive.

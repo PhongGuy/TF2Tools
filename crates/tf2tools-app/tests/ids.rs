@@ -646,46 +646,7 @@ fn situation_switch_ids_name_each_switch() {
 fn profile_editor_ids_are_stable() {
     for (el, want) in [
         (ids::profile_slot("hud"), "profile-slot:hud"),
-        (
-            ids::profile_slot_clear("crosshairs"),
-            "profile-slot-clear:crosshairs",
-        ),
-        (
-            ids::profile_slot_play("hitsound"),
-            "profile-slot-play:hitsound",
-        ),
-        (
-            ids::profile_slot_missing("killsound"),
-            "profile-slot-missing:killsound",
-        ),
-        (ids::profile_picker("hud"), "profile-picker:hud"),
-        (
-            ids::profile_picker_search("hud"),
-            "profile-picker-search:hud",
-        ),
-        (
-            ids::profile_picker_empty("hitsound"),
-            "profile-picker-empty:hitsound",
-        ),
-        (ids::profile_picker_store("hud"), "profile-picker-store:hud"),
-        (
-            ids::profile_picker_no_match("hud"),
-            "profile-picker-no-match:hud",
-        ),
         (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
-        (
-            ids::profile_pick_sound("killsound", "bell"),
-            "profile-pick-sound:killsound:bell",
-        ),
-        (ids::profile_pick_play("bell"), "profile-pick-play:bell"),
-        (
-            ids::profile_pick_play_spinner("bell"),
-            "profile-pick-play-spinner:bell",
-        ),
-        (
-            ids::profile_slot_play_spinner("hitsound"),
-            "profile-slot-play-spinner:hitsound",
-        ),
         (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
@@ -697,34 +658,30 @@ fn profile_editor_ids_are_stable() {
         [
             ids::PROFILES_NEW,
             ids::PROFILE_EDITOR,
-            ids::PROFILE_EDITOR_BACK,
+            ids::PROFILE_EDITOR_CRUMB,
+            ids::PROFILE_EDITOR_CRUMB_NAME,
+            ids::PROFILE_EDITOR_CANCEL,
+            ids::PROFILE_EDITOR_SAVE,
             ids::PROFILE_EDITOR_NAME,
-            ids::PROFILE_EDITOR_NAME_TAKEN,
-            ids::PROFILE_EDITOR_ACTIVATE,
-            ids::PROFILE_EDITOR_ACTIVE_BADGE,
+            ids::PROFILE_EDITOR_NAME_ERROR,
+            ids::PROFILE_EDITOR_NOTE,
+            ids::PROFILE_EDITOR_BODY,
+            ids::PROFILE_EDITOR_SCROLLBAR,
             ids::PROFILE_EDITOR_DELETE,
-            ids::PROFILE_EDITOR_NOT_APPLIED,
-            ids::PROFILE_PICKER_GRID,
-            ids::PROFILE_PICKER_SOUNDS,
-            ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
-            ids::PROFILE_SLOT_HUD_SHOT,
-            ids::PROFILE_SLOT_HUD_IMAGE,
         ],
         [
             "profiles-new",
             "profile-editor",
-            "profile-editor-back",
+            "profile-editor-crumb",
+            "profile-editor-crumb-name",
+            "profile-editor-cancel",
+            "profile-editor-save",
             "profile-editor-name",
-            "profile-editor-name-taken",
-            "profile-editor-activate",
-            "profile-editor-active-badge",
+            "profile-editor-name-error",
+            "profile-editor-note",
+            "profile-editor-body",
+            "profile-editor-scrollbar",
             "profile-editor-delete",
-            "profile-editor-not-applied",
-            "profile-picker-grid",
-            "profile-picker-sounds",
-            "profile-picker-sounds-scrollbar",
-            "profile-slot-hud-shot",
-            "profile-slot-hud-image",
         ]
     );
 }

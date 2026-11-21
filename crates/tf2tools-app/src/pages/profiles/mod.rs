@@ -1,7 +1,7 @@
 //! The Profiles page: saved whole setups (HUD, sounds, crosshairs, graphics, add-ons), applied
 //! in one go.
 
-pub mod editor;
+pub mod draft_editor;
 pub mod editor_model;
 pub mod model;
 pub mod probe;
@@ -30,9 +30,9 @@ use tf2tools_core::{
     ProfileError, ProfileId, StoreKind, Tf2Install,
 };
 
-use self::editor::ProfileEditor;
+use self::draft_editor::{EditorEvent, ProfileDraftEditor};
 use self::editor_model::{
-    Mode, Slot, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing,
+    Draft, Mode, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing,
     next_profile_name, summary,
 };
 use self::model::ApplyOutcome;
@@ -54,6 +54,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, ask_external};
 use crate::shell::font_check::ask_about_fonts;
+use crate::shell::header_slot::HeaderSlot;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
@@ -101,11 +102,14 @@ fn card_height(w: Pixels, columns: usize) -> Pixels {
 /// The editor's empty pickers ask for a store page by event.
 impl EventEmitter<NavigateTo> for ProfilesPage {}
 
-// What the page shows: its grid of profiles, or one profile open in the editor (with its id,
-// readable while the editor itself is being updated).
+// What the page shows: its grid of profiles, or one draft open in the editor, with the page's
+// subscription to it.
 enum View {
     Grid,
-    Editor(Entity<ProfileEditor>, ProfileId),
+    Editor {
+        editor: Entity<ProfileDraftEditor>,
+        _events: Subscription,
+    },
 }
 
 /// The Profiles page. Built fresh on each visit; it reloads on TF2 state and library changes.
@@ -140,7 +144,11 @@ impl ProfilesPage {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
         let events = LibraryEvents::global(cx);
         let library = cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| page.reload(cx));
-        let mut subscriptions = vec![tf2, library];
+        // The crumb belongs to this page's editor, so it goes when the page does.
+        let crumb = cx.on_release(|_, cx| {
+            HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::Profiles, cx));
+        });
+        let mut subscriptions = vec![tf2, library, crumb];
         // HUD pictures redraw the cards as they land; the page's wants go when it does.
         let image_viewer = format!("profiles-page:{}", cx.entity_id());
         if let Some(images) = RemoteImages::global(cx) {
@@ -237,13 +245,13 @@ impl ProfilesPage {
         self.show_editor(profile, window, cx);
     }
 
-    /// Opens the editor for `id` on its Crosshairs slot with `crosshair` picked, saving nothing;
-    /// a profile that can't be read toasts its error and leaves the grid.
+    /// Opens the editor for `id` with its Crosshairs slot Set, saving nothing; a profile that
+    /// can't be read toasts its error and leaves the grid.
     // Reads the one profile at once rather than waiting for the page's first load.
     pub fn open_with_crosshair(
         &mut self,
         id: ProfileId,
-        crosshair: CrosshairRef,
+        _crosshair: CrosshairRef,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -256,37 +264,107 @@ impl ProfilesPage {
         };
         self.show_editor(profile, window, cx);
         if let Some(editor) = self.editor() {
-            editor.update(cx, |editor, cx| {
-                editor.select(Slot::Crosshairs, cx);
-                let picker = editor.picker().clone();
-                picker.update(cx, |picker, cx| picker.select(Some(crosshair), cx));
-            });
+            editor.update(cx, |e, cx| e.set_mode(SlotKind::Crosshairs, Mode::Set, cx));
         }
     }
 
-    // Opens the editor on a profile already in hand, such as one just created.
+    // Opens the editor on a draft of a profile already in hand, its crumb in the header.
     fn show_editor(&mut self, profile: Profile, window: &mut Window, cx: &mut Context<Self>) {
-        let (page, active, id) = (
-            cx.entity().downgrade(),
-            self.active.clone(),
-            profile.id().clone(),
-        );
-        let editor = cx.new(|cx| ProfileEditor::new(profile, page, active, window, cx));
-        self.view = View::Editor(editor, id);
+        let names = Rc::clone(&self.addon_names);
+        let addon_name = move |name: &AddonName| {
+            names
+                .get(name.as_str())
+                .cloned()
+                .unwrap_or_else(|| name.as_str().to_owned())
+        };
+        let draft = Draft::from_profile(&profile, &addon_name);
+        let page = cx.entity().downgrade();
+        let editor = cx.new(|cx| {
+            let mut editor = ProfileDraftEditor::new(Some(profile), draft, window, cx);
+            editor.set_page(page);
+            editor
+        });
+        let events = cx.subscribe_in(&editor, window, |page, _, event, window, cx| {
+            page.editor_event(event, window, cx)
+        });
+        let crumb = editor.read(cx).crumb();
+        HeaderSlot::global(cx).update(cx, |slot, cx| slot.set(Page::Profiles, crumb, cx));
+        self.view = View::Editor {
+            editor,
+            _events: events,
+        };
         cx.notify();
     }
 
+    // Saved toasts and closes; Close asks first when the draft has changes; Deleted closes.
+    fn editor_event(&mut self, event: &EditorEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            EditorEvent::Close => self.request_close(window, cx),
+            EditorEvent::Saved {
+                profile,
+                deactivated,
+            } => {
+                let name = profile.name();
+                let (kind, title) = if *deactivated {
+                    (
+                        ToastKind::Info,
+                        tr!("profiles.toast.saved_active", name = name),
+                    )
+                } else {
+                    (ToastKind::Success, tr!("profiles.toast.saved", name = name))
+                };
+                toast(window, cx, kind, title, SharedString::default());
+                self.close_editor(cx);
+            }
+            EditorEvent::Deleted(_) => self.close_editor(cx),
+        }
+    }
+
     /// The open editor, while the page shows one.
-    pub fn editor(&self) -> Option<Entity<ProfileEditor>> {
+    pub fn editor(&self) -> Option<Entity<ProfileDraftEditor>> {
         match &self.view {
-            View::Editor(editor, _) => Some(editor.clone()),
+            View::Editor { editor, .. } => Some(editor.clone()),
             View::Grid => None,
         }
     }
 
+    /// True with no editor open, or one whose draft has no changes.
+    pub fn can_leave(&self, cx: &App) -> bool {
+        self.editor().is_none_or(|e| !e.read(cx).is_dirty())
+    }
+
+    /// Cancel, Esc and the crumb: closes at once when clean, else asks Confirm::discard_changes.
+    pub fn request_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        if !editor.read(cx).is_dirty() {
+            return self.close_editor(cx);
+        }
+        let answer = confirm(Confirm::discard_changes(), window, cx);
+        cx.spawn(async move |page, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                let _ = page.update(cx, |page, cx| {
+                    // Only the editor the prompt was about; a later one stays open.
+                    if page.editor().as_ref() == Some(&editor) {
+                        page.close_editor(cx);
+                    }
+                });
+            }
+        })
+        .detach();
+    }
+
+    // Drops the editor and its crumb without a reload.
+    fn drop_editor(&mut self, cx: &mut Context<Self>) {
+        self.view = View::Grid;
+        HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::Profiles, cx));
+        cx.notify();
+    }
+
     /// Back to the grid; reloads.
     pub fn close_editor(&mut self, cx: &mut Context<Self>) {
-        self.view = View::Grid;
+        self.drop_editor(cx);
         self.reload(cx);
     }
 
@@ -430,10 +508,6 @@ impl ProfilesPage {
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         self.load_generation += 1;
         let generation = self.load_generation;
-        let open_at_start = match &self.view {
-            View::Editor(_, id) => Some(id.clone()),
-            View::Grid => None,
-        };
         let loading = run_blocking(cx, |s| {
             let failed = |e: ProfileError| {
                 describe_profile(&e).into_op(tr!("messages.action.load_profiles"))
@@ -471,16 +545,6 @@ impl ProfilesPage {
                         page.hud_images = Rc::new(images.clone());
                         page.addon_names = Rc::new(names.clone());
                         page.want_images(cx);
-                        // A profile deleted here or elsewhere takes its open editor with it.
-                        if let View::Editor(_, open) = &page.view
-                            && model::load_closes_editor(
-                                open_at_start.as_ref(),
-                                open,
-                                profiles.iter().map(Profile::id),
-                            )
-                        {
-                            page.view = View::Grid;
-                        }
                     }
                     page.loaded = true;
                     cx.notify();
@@ -615,6 +679,11 @@ impl ProfilesPage {
                 return;
             }
             let _ = page.update(cx, |page, cx| {
+                // The deleted profile's draft goes with it; the run below reloads the list.
+                let open = page.editor().map(|e| e.read(cx).profile_id().cloned());
+                if open.flatten().as_ref() == Some(&id) {
+                    page.drop_editor(cx);
+                }
                 page.run(
                     move |s| {
                         s.library.delete_profile(&id).map_err(|e| {
@@ -1486,6 +1555,15 @@ impl ProfilesPage {
 
 impl Render for ProfilesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The editor takes the place of the list and scrolls its own body.
+        if let View::Editor { editor, .. } = &self.view {
+            return div()
+                .id(ids::page(Page::Profiles))
+                .test_support()
+                .size_full()
+                .child(editor.clone())
+                .into_any_element();
+        }
         let state = tf2_state(cx).read(cx);
         let has_tf2 = state.install().is_some();
         let missing = matches!(state, Tf2State::Missing { .. });
@@ -1500,13 +1578,10 @@ impl Render for ProfilesPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning);
-        // The editor takes the place of the list.
-        let content = if let View::Editor(editor, _) = &self.view {
-            content.child(editor.clone())
-        } else {
-            content.child(self.library(has_tf2, busy, cx))
-        };
-        scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content).size_full()
+            .children(warning)
+            .child(self.library(has_tf2, busy, cx));
+        scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content)
+            .size_full()
+            .into_any_element()
     }
 }

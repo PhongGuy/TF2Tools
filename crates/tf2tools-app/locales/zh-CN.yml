@@ -653,11 +653,8 @@ profiles:
   badge:
     active: "使用中"
   button:
-    activate: "激活"
-    activating: "正在激活…"
     apply: "应用"
     edit: "编辑"
-    delete: "删除配置文件"
     new: "新建配置文件"
   card:
     leave: "保持不变"
@@ -709,23 +706,16 @@ profiles:
     redownload: "重新下载"
     local: "本地导入，无法重新下载"
   editor:
+    crumb_new: "新建配置文件"
+    name: "名称"
+    name_placeholder: "为这个配置文件命名"
+    save: "保存"
+    delete: "删除配置文件"
     name_blank: "给这个配置文件起个名字"
     pick_hud: "选择一个 HUD，或选择“无”"
-    back: "返回配置文件"
-    clear: "清除"
-    unknown: "未知"
-    missing_crosshair: "%{name}（缺失）"
-    slot:
-      none: "无"
-      default_crosshairs: "默认准星"
-      missing: "缺失：%{name}"
-    empty:
-      huds: "库中还没有 HUD"
-      browse_huds: "浏览 HUD 商店"
-      sounds: "库中还没有音效"
-      browse_sounds: "浏览音效商店"
-      no_match: "无匹配项"
   toast:
+    saved: "%{name} 已保存。"
+    saved_active: "%{name} 已保存。应用它以使用这些更改。"
     created_from_setup: "已根据当前设置创建配置文件"
     deleted: "配置文件已删除"
     failed_steps: "无法放置以下内容：%{steps}。请确保 TF2 已关闭且 TF2Tools 可以写入 TF2 文件夹，然后重试。"
@@ -742,6 +732,7 @@ profiles:
     no_catalog: "请打开一次图形页面，让 TF2Tools 读取你的 mastercomfig 设置。"
     foreign: "你的 modules.cfg 不是由 TF2Tools 写入的；请打开图形页面替换它。"
   activity:
+    saved: "已保存配置文件：%{name}"
     saved_current: "已将当前设置保存为配置文件：%{name}"
     deleted: "已删除配置文件：%{name}"
     failed: "激活配置文件失败：%{name}"
@@ -2674,9 +2665,6 @@ messages:
       newer_database: "库由更新版本的 TF2Tools 保存。请从发布页面安装最新的 TF2Tools 以打开它。"
   profiles:
     name_taken: "已有名为 %{name} 的配置文件。请换一个名称。"
-    hud_gone: "该 HUD 已不在库中"
-    sound_gone: "该音效已不在库中"
-    crosshair_gone: "该准星已不在库中"
   mastercomfig:
     no_release: "GitHub 上目前没有 TF2Tools 可安装的 mastercomfig 版本。请稍后重试。"
     foreign_modules_cfg: "TF2 中有一个并非由 TF2Tools 写入的 modules.cfg，因此 TF2Tools 未改动它。"
@@ -2870,9 +2858,7 @@ messages:
     load_gamemodes: "无法加载游戏模式"
     load_maps: "加载地图失败"
     remove_failed: "移除失败"
-    load_library: "加载库失败"
     save_profile: "保存配置文件失败"
-    load_profile: "加载配置文件失败"
     open_profile: "打开配置文件失败"
     load_profiles: "加载配置文件失败"
     create_profile: "创建配置文件失败"

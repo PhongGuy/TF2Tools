@@ -3,13 +3,12 @@ use crate::support;
 use gpui_kit::{SharedString, TestAppContext};
 use tf2tools_app::pages::profiles::model::{ApplyOutcome, modules_no_catalog, outcome_toast};
 use tf2tools_app::pages::profiles::model::{
-    failed_description, kept_parts, load_closes_editor, matches, redownload_target, report_details,
-    step_label,
+    failed_description, kept_parts, redownload_target, report_details, step_label,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::shell::toast::ToastKind;
 use tf2tools_core::ApplySkipReason;
-use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
+use tf2tools_core::{ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
 
 fn parts(names: &[&'static str]) -> Vec<SharedString> {
     names.iter().map(|&n| n.into()).collect()
@@ -20,15 +19,6 @@ fn gb(id: u64) -> Provenance {
         gb_id: GbId::new(id),
         author: String::new(),
     }
-}
-
-#[test]
-fn search_ignores_case_and_surrounding_space() {
-    assert!(matches("Competitive", "comp"));
-    assert!(matches("Competitive", "  PETIT "));
-    assert!(matches("Competitive", ""));
-    assert!(matches("Competitive", "   "));
-    assert!(!matches("Competitive", "casual"));
 }
 
 #[test]
@@ -145,18 +135,6 @@ fn the_default_probe_scans_the_proc_root_and_can_be_pinned(cx: &mut TestAppConte
     assert!(!cx.update(|cx| Tf2Probe::get(cx))());
     cx.update(|cx| Tf2Probe::install(cx, || true));
     assert!(cx.update(|cx| Tf2Probe::get(cx))());
-}
-
-// An editor opened after a load started, such as one on a just-created profile, may be newer
-// than what the load read, so only one already open then can be closed by its result.
-#[test]
-fn a_load_closes_only_an_editor_open_when_it_started_and_missing_from_it() {
-    let (made, other) = (ProfileId::new("made"), ProfileId::new("other"));
-    assert!(!load_closes_editor(None, &made, [&other]));
-    assert!(load_closes_editor(Some(&made), &made, [&other]));
-    assert!(!load_closes_editor(Some(&made), &made, [&other, &made]));
-    // The editor open now replaced the one open at the start, so the load predates it.
-    assert!(!load_closes_editor(Some(&other), &made, [&other]));
 }
 
 const APPLIED: &str = "Comp applied. TF2 picks it up the next time it starts.";

@@ -19,8 +19,8 @@ use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::pages::huds::copy_name;
 use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
+use tf2tools_app::pages::profiles::editor_model::next_profile_name;
 use tf2tools_app::pages::profiles::editor_model::weapon_crosshairs;
-use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
 use tf2tools_app::pages::profiles::model::not_applied;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::pages::sounds::SoundsPage;
@@ -1161,86 +1161,6 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Профиль удалён");
 }
 
-// At the 800x600 minimum the editor's Crosshairs picker keeps every bulk button in `lang`
-// inside it, for the class with the longest class name in `lang` too.
-fn bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext, lang: &str) {
-    let _guard = LocaleGuard::switch(lang);
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let comp = s
-        .services
-        .library
-        .create_profile(&ProfileDraft::new("Competitive"))
-        .unwrap();
-    let page = open_profiles(cx, &s);
-    let id = comp.id().clone();
-    cx.update_window(s.win, |_, window, cx| {
-        page.update(cx, |p, cx| p.open_editor(id, window, cx))
-    })
-    .unwrap();
-    let editor = cx.update(|cx| page.read(cx).editor()).expect("an editor");
-    support::wait_real(cx, "the editor's queue", |cx| {
-        cx.update(|cx| editor.read(cx).is_idle())
-    });
-    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
-    cx.simulate_window_resize(
-        s.win,
-        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
-    );
-    support::settle(cx, s.win);
-    let longest = TfClass::ALL
-        .into_iter()
-        .max_by_key(|c| names::class_name(*c).chars().count())
-        .unwrap();
-    for class in [TfClass::Scout, longest] {
-        support::click_id(cx, s.win, ids::class_tab(&class.name().to_lowercase()));
-        support::settle(cx, s.win);
-        let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
-        for bulk in [
-            ids::CROSSHAIRS_BULK_ALL,
-            ids::CROSSHAIRS_BULK_PRIMARY,
-            ids::CROSSHAIRS_BULK_SECONDARY,
-            ids::CROSSHAIRS_BULK_MELEE,
-        ] {
-            let b = support::bounds_of(cx, s.win, bulk).unwrap();
-            assert!(
-                b.left() >= picker.left() && b.right() <= picker.right(),
-                "{lang} {class:?}: {bulk} {b:?} runs past the picker {picker:?}"
-            );
-        }
-    }
-}
-
-#[gpui_kit::test]
-fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "ru");
-}
-
-#[gpui_kit::test]
-fn the_portuguese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "pt-BR");
-}
-
-#[gpui_kit::test]
-fn the_spanish_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "es");
-}
-
-#[gpui_kit::test]
-fn the_german_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "de");
-}
-
-#[gpui_kit::test]
-fn the_french_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "fr");
-}
-
-#[gpui_kit::test]
-fn the_chinese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "zh-CN");
-}
-
 #[test]
 fn profile_texts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
@@ -1274,17 +1194,6 @@ fn profile_texts_read_in_russian() {
     assert_eq!(
         next_profile_name(&services.library.profiles().unwrap()),
         "Профиль 2"
-    );
-    let labels: Vec<String> = Slot::ALL.iter().map(|s| s.label().to_string()).collect();
-    assert_eq!(labels, ["HUD", "Хитсаунд", "Килсаунд", "Прицелы"]);
-    assert_eq!(slot_text(&SlotState::Empty, Slot::Hud), "Нет");
-    assert_eq!(
-        slot_text(&SlotState::Empty, Slot::Crosshairs),
-        "Стандартные прицелы"
-    );
-    assert_eq!(
-        slot_text(&SlotState::Missing("budhud".into()), Slot::Hud),
-        "Отсутствует: budhud"
     );
     assert_eq!(
         texts(&Confirm::clear_profile_crosshairs())[..3],

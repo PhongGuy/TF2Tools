@@ -631,11 +631,8 @@ profiles:
   badge:
     active: "Active"
   button:
-    activate: "Activate"
-    activating: "Activating..."
     apply: "Apply"
     edit: "Edit"
-    delete: "Delete profile"
     new: "New profile"
   card:
     leave: "Left as is"
@@ -687,23 +684,16 @@ profiles:
     redownload: "Re-download"
     local: "Local import — can't re-download"
   editor:
+    crumb_new: "New profile"
+    name: "Name"
+    name_placeholder: "Name this profile"
+    save: "Save"
+    delete: "Delete profile"
     name_blank: "Give this profile a name"
     pick_hud: "Pick a HUD, or choose None"
-    back: "Back to profiles"
-    clear: "Clear"
-    unknown: "Unknown"
-    missing_crosshair: "%{name} (missing)"
-    slot:
-      none: "None"
-      default_crosshairs: "Default crosshairs"
-      missing: "Missing: %{name}"
-    empty:
-      huds: "No HUDs in your library yet"
-      browse_huds: "Browse the HUD Store"
-      sounds: "No sounds in your library yet"
-      browse_sounds: "Browse the Sound Store"
-      no_match: "No matches"
   toast:
+    saved: "%{name} saved."
+    saved_active: "%{name} saved. Apply it to use the changes."
     created_from_setup: "Profile created from your current setup"
     deleted: "Profile deleted"
     failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
@@ -720,6 +710,7 @@ profiles:
     no_catalog: "Open the Graphics page once so TF2Tools can read your mastercomfig's settings"
     foreign: "Your modules.cfg was not written by TF2Tools; open the Graphics page to replace it"
   activity:
+    saved: "Saved profile: %{name}"
     saved_current: "Saved current setup as profile: %{name}"
     deleted: "Deleted profile: %{name}"
     failed: "Failed to activate profile: %{name}"
@@ -2652,9 +2643,6 @@ messages:
       newer_database: "Your library was saved by a newer TF2Tools. Install the latest TF2Tools from the release page to open it."
   profiles:
     name_taken: "You already have a profile called %{name}. Pick another name."
-    hud_gone: "That HUD is no longer in your library"
-    sound_gone: "That sound is no longer in your library"
-    crosshair_gone: "That crosshair is no longer in your library"
   mastercomfig:
     no_release: "GitHub has no mastercomfig release TF2Tools can install right now. Try again later."
     foreign_modules_cfg: "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone."
@@ -2848,9 +2836,7 @@ messages:
     load_gamemodes: "Couldn't load the gamemodes"
     load_maps: "Failed to load maps"
     remove_failed: "Remove failed"
-    load_library: "Failed to load library"
     save_profile: "Failed to save profile"
-    load_profile: "Failed to load profile"
     open_profile: "Failed to open the profile"
     load_profiles: "Failed to load profiles"
     create_profile: "Failed to create profile"

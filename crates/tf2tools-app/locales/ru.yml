@@ -629,11 +629,8 @@ profiles:
   badge:
     active: "Активен"
   button:
-    activate: "Включить"
-    activating: "Включение..."
     apply: "Применить"
     edit: "Изменить"
-    delete: "Удалить профиль"
     new: "Новый профиль"
   card:
     leave: "Остаётся как есть"
@@ -685,23 +682,16 @@ profiles:
     redownload: "Скачать снова"
     local: "Свой файл — скачать снова нельзя"
   editor:
+    crumb_new: "Новый профиль"
+    name: "Имя"
+    name_placeholder: "Назовите этот профиль"
+    save: "Сохранить"
+    delete: "Удалить профиль"
     name_blank: "Дайте профилю имя"
     pick_hud: "Выберите HUD или «Нет»"
-    back: "Назад к профилям"
-    clear: "Очистить"
-    unknown: "Неизвестный"
-    missing_crosshair: "%{name} (отсутствует)"
-    slot:
-      none: "Нет"
-      default_crosshairs: "Стандартные прицелы"
-      missing: "Отсутствует: %{name}"
-    empty:
-      huds: "В библиотеке пока нет HUD"
-      browse_huds: "Открыть магазин HUD"
-      sounds: "В библиотеке пока нет звуков"
-      browse_sounds: "Открыть магазин звуков"
-      no_match: "Ничего не найдено"
   toast:
+    saved: "%{name}: сохранено."
+    saved_active: "%{name}: сохранено. Примените профиль, чтобы изменения вступили в силу."
     created_from_setup: "Профиль создан из текущей сборки"
     deleted: "Профиль удалён"
     failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыта и TF2Tools может записывать в папку TF2, затем попробуйте снова."
@@ -718,6 +708,7 @@ profiles:
     no_catalog: "Откройте страницу «Графика» один раз, чтобы TF2Tools прочитала настройки вашего mastercomfig"
     foreign: "Ваш modules.cfg записан не TF2Tools; откройте страницу «Графика», чтобы заменить его"
   activity:
+    saved: "Профиль сохранён: %{name}"
     saved_current: "Текущая сборка сохранена как профиль: %{name}"
     deleted: "Профиль удалён: %{name}"
     failed: "Не удалось включить профиль: %{name}"
@@ -2650,9 +2641,6 @@ messages:
       newer_database: "Ваша библиотека сохранена более новой версией TF2Tools. Установите последнюю версию TF2Tools со страницы релиза, чтобы открыть её."
   profiles:
     name_taken: "У вас уже есть профиль с названием %{name}. Выберите другое название."
-    hud_gone: "Этого HUD больше нет в вашей библиотеке"
-    sound_gone: "Этого звука больше нет в вашей библиотеке"
-    crosshair_gone: "Этого прицела больше нет в вашей библиотеке"
   mastercomfig:
     no_release: "На GitHub сейчас нет выпуска mastercomfig, который TF2Tools может установить. Попробуйте позже."
     foreign_modules_cfg: "В TF2 уже есть modules.cfg, который создан не в TF2Tools, поэтому TF2Tools оставляет его без изменений."
@@ -2846,9 +2834,7 @@ messages:
     load_gamemodes: "Не удалось загрузить режимы игры"
     load_maps: "Не удалось загрузить карты"
     remove_failed: "Не удалось удалить"
-    load_library: "Не удалось загрузить библиотеку"
     save_profile: "Не удалось сохранить профиль"
-    load_profile: "Не удалось загрузить профиль"
     open_profile: "Не удалось открыть профиль"
     load_profiles: "Не удалось загрузить профили"
     create_profile: "Не удалось создать профиль"

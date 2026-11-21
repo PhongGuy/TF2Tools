@@ -1,9 +1,19 @@
 //! A library with two HUDs, two sounds and three mastercomfig add-ons, for the profile tests.
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::ProfilesPage;
+use tf2tools_app::pages::profiles::draft_editor::ProfileDraftEditor;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Services;
+use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
     AddonName, Choices, CrosshairRef, CurrentSetup, DraftCrosshair, DraftItem, HudEntry,
-    ModuleChoice, Preset, Profile, ProfileDraft, Provenance, SlotMode, SoundEntry, Tf2Install,
+    ModuleChoice, Preset, Profile, ProfileDraft, ProfileId, Provenance, SlotMode, SoundEntry,
+    Tf2Install,
 };
 
 pub const PYRO: &str = "mastercomfig-addon-no-pyroland.vpk";
@@ -152,4 +162,116 @@ impl Fixture {
         self.s.library.install_addon(&addon(PYRO), &tf2).unwrap();
         self.s.library.current_setup(&tf2).unwrap()
     }
+}
+
+pub struct Seeded {
+    pub rayshud: HudEntry,
+    pub budhud: HudEntry,
+    pub ding: SoundEntry,
+    pub bell: SoundEntry,
+}
+
+/// The fixture's two HUDs and two sounds, imported through a shell window's services.
+pub fn seed(s: &super::ShellWindow, env: &super::Env) -> Seeded {
+    let hud = |name: &str| {
+        let path = env.tmp.path().join(format!("{name}.zip"));
+        std::fs::write(&path, super::hud_zip_bytes(name)).unwrap();
+        s.services
+            .library
+            .import_hud(&path, Provenance::Local)
+            .unwrap()
+    };
+    let sound = |name: &str| {
+        let path = env.tmp.path().join(format!("{name}.wav"));
+        std::fs::write(&path, super::wav_bytes()).unwrap();
+        s.services
+            .library
+            .import_sound(&path, name, Provenance::Local)
+            .unwrap()
+    };
+    Seeded {
+        rayshud: hud("rayshud"),
+        budhud: hud("budhud"),
+        ding: sound("Ding"),
+        bell: sound("Bell"),
+    }
+}
+
+/// Every file under the game folder with its bytes, to prove the editor wrote nothing.
+pub fn game_files(env: &super::Env) -> BTreeMap<PathBuf, Vec<u8>> {
+    fn walk(dir: &std::path::Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out)
+            } else {
+                out.insert(path.clone(), std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    let mut out = BTreeMap::new();
+    walk(&env.game, &mut out);
+    out
+}
+
+pub fn page(cx: &mut TestAppContext, s: &super::ShellWindow) -> Entity<ProfilesPage> {
+    cx.executor().allow_parking();
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    super::click_id(cx, s.win, ids::nav(Page::Profiles));
+    let page = cx.update(|cx| s.shell.read(cx).profiles_page()).unwrap();
+    super::wait_real(cx, "Profiles to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    page
+}
+
+fn opened(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<ProfilesPage>,
+) -> Entity<ProfileDraftEditor> {
+    super::wait_real(cx, "the editor", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_some())
+    });
+    super::settle(cx, s.win);
+    cx.update(|cx| page.read(cx).editor()).unwrap()
+}
+
+pub fn edit(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<ProfilesPage>,
+    id: &ProfileId,
+) -> Entity<ProfileDraftEditor> {
+    super::click_id(cx, s.win, ids::profile_card_edit(id));
+    opened(cx, s, page)
+}
+
+pub fn new_draft(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<ProfilesPage>,
+) -> Entity<ProfileDraftEditor> {
+    super::click_id(cx, s.win, ids::PROFILES_NEW);
+    opened(cx, s, page)
+}
+
+pub fn type_name(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    e: &Entity<ProfileDraftEditor>,
+    text: &str,
+) {
+    let input = cx.update(|cx| e.read(cx).name_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| {
+            st.focus(window, cx);
+            st.set_value(text, window, cx)
+        })
+    })
+    .unwrap();
+    super::settle(cx, s.win);
 }

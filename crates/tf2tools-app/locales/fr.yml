@@ -656,11 +656,8 @@ profiles:
   badge:
     active: "Actif"
   button:
-    activate: "Activer"
-    activating: "Activation..."
     apply: "Appliquer"
     edit: "Modifier"
-    delete: "Supprimer le profil"
     new: "Nouveau profil"
   card:
     leave: "Laissé tel quel"
@@ -712,23 +709,16 @@ profiles:
     redownload: "Retélécharger"
     local: "Import local — impossible de retélécharger"
   editor:
+    crumb_new: "Nouveau profil"
+    name: "Nom"
+    name_placeholder: "Nomme ce profil"
+    save: "Enregistrer"
+    delete: "Supprimer le profil"
     name_blank: "Donne un nom à ce profil"
     pick_hud: "Choisis un HUD, ou choisis Aucun"
-    back: "Retour aux profils"
-    clear: "Effacer"
-    unknown: "Inconnu"
-    missing_crosshair: "%{name} (manquant)"
-    slot:
-      none: "Aucun"
-      default_crosshairs: "Viseurs par défaut"
-      missing: "Manquant\u00A0: %{name}"
-    empty:
-      huds: "Aucun HUD dans votre bibliothèque"
-      browse_huds: "Parcourir le Magasin de HUD"
-      sounds: "Aucun son dans votre bibliothèque"
-      browse_sounds: "Parcourir le Magasin de sons"
-      no_match: "Aucun résultat"
   toast:
+    saved: "%{name} enregistré."
+    saved_active: "%{name} enregistré. Applique-le pour utiliser les changements."
     created_from_setup: "Profil créé à partir de votre configuration actuelle"
     deleted: "Profil supprimé"
     failed_steps: "Impossible de mettre en place\u00A0: %{steps}. Vérifiez que TF2 est fermé et que TF2Tools peut écrire dans votre dossier TF2, puis réessayez."
@@ -745,6 +735,7 @@ profiles:
     no_catalog: "Ouvrez une fois la page Graphismes pour que TF2Tools puisse lire les paramètres de votre mastercomfig"
     foreign: "Votre modules.cfg n'a pas été écrit par TF2Tools\u00A0; ouvrez la page Graphismes pour le remplacer"
   activity:
+    saved: "Profil enregistré\u00A0: %{name}"
     saved_current: "Configuration actuelle enregistrée comme profil\u00A0: %{name}"
     deleted: "Profil supprimé\u00A0: %{name}"
     failed: "Échec de l'activation du profil\u00A0: %{name}"
@@ -2677,9 +2668,6 @@ messages:
       newer_database: "Votre bibliothèque a été enregistrée par une version plus récente de TF2Tools. Installez la dernière version de TF2Tools depuis la page des versions pour l'ouvrir."
   profiles:
     name_taken: "Vous avez déjà un profil nommé %{name}. Choisissez un autre nom."
-    hud_gone: "Ce HUD n'est plus dans votre bibliothèque"
-    sound_gone: "Ce son n'est plus dans votre bibliothèque"
-    crosshair_gone: "Ce viseur n'est plus dans votre bibliothèque"
   mastercomfig:
     no_release: "GitHub n'a pour l'instant aucune version de mastercomfig que TF2Tools puisse installer. Réessayez plus tard."
     foreign_modules_cfg: "TF2 contient un modules.cfg que TF2Tools n'a pas écrit, donc TF2Tools n'y a pas touché."
@@ -2873,9 +2861,7 @@ messages:
     load_gamemodes: "Impossible de charger les modes de jeu"
     load_maps: "Impossible de charger les cartes"
     remove_failed: "Échec du retrait"
-    load_library: "Impossible de charger la bibliothèque"
     save_profile: "Impossible d'enregistrer le profil"
-    load_profile: "Impossible de charger le profil"
     open_profile: "Impossible d'ouvrir le profil"
     load_profiles: "Impossible de charger les profils"
     create_profile: "Impossible de créer le profil"

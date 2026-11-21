@@ -5,7 +5,7 @@ use crate::support;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::ids;
-use tf2tools_app::pages::profiles::editor_model::Slot;
+use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
@@ -323,12 +323,12 @@ fn open_crosshairs(cx: &mut TestAppContext, s: &support::ShellWindow) {
 }
 
 /// Picks profile `p` from the selection panel's menu and checks the Profiles page opened `p`'s
-/// editor on its Crosshairs slot with `crosshair` picked and nothing saved.
+/// editor with its Crosshairs slot Set and nothing saved.
 fn pick_opens_editor(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
     p: &Profile,
-    crosshair: CrosshairRef,
+    _crosshair: CrosshairRef,
 ) {
     support::click_id(cx, s.win, ids::CROSSHAIRS_ADD_TO_PROFILE);
     support::click_id(cx, s.win, ids::crosshair_profile_pick(p.id()));
@@ -346,17 +346,15 @@ fn pick_opens_editor(
     });
     support::settle(cx, s.win);
     let editor = cx.update(|cx| page.read(cx).editor()).expect("the editor");
-    let (id, slot, picked) = cx.update(|cx| {
+    let (id, mode) = cx.update(|cx| {
         let e = editor.read(cx);
         (
-            e.id().clone(),
-            e.selected(),
-            e.picker().read(cx).selected().cloned(),
+            e.profile_id().cloned(),
+            e.draft().mode(SlotKind::Crosshairs),
         )
     });
-    assert_eq!(&id, p.id(), "the picked profile's editor");
-    assert_eq!(slot, Slot::Crosshairs, "on the Crosshairs slot");
-    assert_eq!(picked, Some(crosshair), "with the crosshair picked");
+    assert_eq!(id.as_ref(), Some(p.id()), "the picked profile's editor");
+    assert_eq!(mode, Mode::Set, "its Crosshairs slot Set");
     assert_eq!(
         reload(s, p)
             .crosshairs()
