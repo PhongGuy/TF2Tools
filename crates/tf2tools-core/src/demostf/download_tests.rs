@@ -168,3 +168,26 @@ async fn a_folder_that_cannot_be_written_fails_before_asking() {
         "nothing was asked"
     );
 }
+
+#[tokio::test]
+async fn clean_downloads_ease_a_widened_gate() {
+    use crate::store::pacer::{EASE_AFTER, Priority};
+
+    let (server, _, url) = serving(ResponseTemplate::new(200).set_body_bytes(bytes())).await;
+    let base = Duration::from_millis(1);
+    let config = StoreConfig::default()
+        .with_request_spacing(base)
+        .with_retry_backoff(Duration::from_millis(1));
+    let client = DemosClient::new(DemosEndpoints::loopback(&server.uri())).with_config(config);
+    client.pacer.rate_limited();
+    assert_eq!(client.pacer.gap_of(Priority::Interactive), base * 2);
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("m.dem");
+    for _ in 0..EASE_AFTER {
+        client
+            .download_demo(&summary(&url), &dest, &no_progress)
+            .await
+            .unwrap();
+    }
+    assert_eq!(client.pacer.gap_of(Priority::Interactive), base);
+}

@@ -191,12 +191,20 @@ impl DemosClient {
             .tempfile_in(dir)
             .map_err(write_failure)?;
 
+        // As in `get`: each 429 widens the gate, and an answer with none helps ease it back.
         self.pacer.slot(Priority::Interactive).await;
-        let mut body = match self
+        let rate_limits = Cell::new(0u32);
+        let opened = self
             .http
-            .open_retrying(url, || self.pacer.rate_limited())
-            .await
-        {
+            .open_retrying(url, || {
+                rate_limits.set(rate_limits.get() + 1);
+                self.pacer.rate_limited();
+            })
+            .await;
+        if rate_limits.get() == 0 && opened.is_ok() {
+            self.pacer.answered();
+        }
+        let mut body = match opened {
             Ok(body) => body,
             Err(NetFailure::Status { status: 404, .. }) => return Err(DemosError::Gone),
             Err(failure) => return Err(failure.into()),
@@ -223,14 +231,16 @@ impl DemosClient {
         out.sync_all().await.map_err(write_failure)?;
         drop(out);
 
-        part.persist(dest).map_err(|e| write_failure(e.error))?;
-        // The part file was private to its owner; a saved demo is readable like any download.
+        // The part file starts private to its owner; a saved demo is readable like any
+        // download. Set before the rename, so a failure here never replaces `dest`.
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;
-            std::fs::set_permissions(dest, std::fs::Permissions::from_mode(0o644))
+            part.as_file()
+                .set_permissions(std::fs::Permissions::from_mode(0o644))
                 .map_err(write_failure)?;
         }
+        part.persist(dest).map_err(|e| write_failure(e.error))?;
         Ok(())
     }
 
