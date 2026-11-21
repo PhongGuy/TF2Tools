@@ -89,7 +89,6 @@ fn only_real_pictures_count_and_a_shared_look_borrows_the_other_file() {
     assert_eq!(index.get("shadows", "low"), None, "outside the manifest");
     assert!(index.has_pictures("lod") && index.has_pictures("decals"));
     assert!(!index.has_pictures("vsync") && !index.has_pictures("shadows"));
-    assert!(index.has_zoom("lod") && !index.has_zoom("decals"));
     let path = dir.join("lod/low.webp");
     assert_eq!(index.url(&path), local_image_url(&path, "3"));
 }
@@ -281,4 +280,32 @@ fn a_wipe_against_a_value_without_a_crop_stays_whole_under_zoom() {
             tmp.path().join("lod/low.webp")
         ]
     );
+}
+
+#[test]
+fn the_zoom_toggle_shows_only_when_every_compared_side_has_a_crop() {
+    let tmp = folder();
+    // Ultra gets a whole picture without a crop, so a pair with it cannot zoom.
+    std::fs::write(tmp.path().join("lod/ultra.webp"), b"x").unwrap();
+    let index = PictureIndex::open(tmp.path());
+    let catalog = support::full_module_catalog();
+    let has_zoom = |preset: Preset, saved: Option<&str>| {
+        let mut choices = Choices::new(preset);
+        if let Some(v) = saved {
+            choices.set(&catalog, "lod", value(v));
+        }
+        let row = row(&catalog, &choices, catalog.module("lod").unwrap());
+        row_pictures(&index, &row, false).unwrap().has_zoom
+    };
+    assert!(has_zoom(Preset::Medium, Some("low")), "both sides cropped");
+    assert!(
+        !has_zoom(Preset::Medium, Some("ultra")),
+        "yours has no crop"
+    );
+    assert!(has_zoom(Preset::Custom, Some("low")), "a lone crop zooms");
+    assert!(
+        !has_zoom(Preset::Custom, Some("ultra")),
+        "a lone whole picture"
+    );
+    assert!(!has_zoom(Preset::Custom, None), "nothing to compare");
 }
