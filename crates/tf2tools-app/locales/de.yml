@@ -695,6 +695,9 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, ändert deine Bewegungstasten"
     left: "Bleibt, wie es ist: %{list}."
+    missing_keeps: "%{name} fehlt; %{kept} bleibt"
+    missing_none: "%{name} fehlt; dort ist nichts installiert"
+    missing_other_hud: "dein aktuelles HUD"
   apply:
     title: "Zu %{name} wechseln?"
     intro: "Das ändert sich jetzt. Alles andere bleibt, wie es ist."
@@ -704,17 +707,8 @@ profiles:
     title: "Noch keine Profile"
     body: "Speichere dein aktuelles Setup als Profil, um schnell zwischen Konfigurationen zu wechseln."
   missing:
-    title: "Fehlende Einträge"
-    body: "Einige Einträge in „%{name}“ sind nicht mehr in deiner Bibliothek."
-    install: "Trotzdem installieren (Fehlende überspringen)"
     redownload: "Erneut herunterladen"
     local: "Lokaler Import — kein erneuter Download möglich"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "FADENKREUZ"
-      item: "EINTRAG"
-      addon: "ADD-ON"
   editor:
     name_blank: "Gib diesem Profil einen Namen"
     pick_hud: "Wähle ein HUD oder „Keine“"

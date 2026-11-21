@@ -794,31 +794,43 @@ fn profile_missing_its_hud(s: &support::ShellWindow, env: &support::Env) -> Prof
     profile
 }
 
+/// Clicks a card's Apply and waits for its summary, without answering it.
+fn open_summary(cx: &mut TestAppContext, s: &support::ShellWindow, id: &tf2tools_core::ProfileId) {
+    support::click_id(cx, s.win, ids::profile_card_apply(id));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+}
+
 #[gpui_kit::test]
-fn a_missing_item_opens_the_dialog_and_touches_nothing(cx: &mut TestAppContext) {
+fn a_missing_item_shows_as_its_row_in_the_summary_and_touches_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_MISSING_DESCRIPTION).as_deref(),
-        Some("Some items in \"Comp\" are no longer in your library.")
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: rayshud is missing; nothing is installed there")
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_item(0)).as_deref(),
-        Some("rayshud (HUD)")
+        row_label(cx, &s, "hitsound").as_deref(),
+        Some("Hitsound: TF2 default → Classic Ding")
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_local(0)).as_deref(),
+        support::label_of(cx, s.win, ids::profile_apply_local("hud")).as_deref(),
         Some("Local import — can't re-download")
     );
-    assert!(!support::present(cx, s.win, ids::missing_redownload(0)));
-    assert!(!support::present(cx, s.win, ids::missing_item(1)));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_redownload("hud")
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_OK).as_deref(),
+        Some("Apply Comp")
+    );
     assert!(!env.game.join("tf/custom/tf2tools-sounds").exists());
     assert_eq!(s.services.library.active_profile().unwrap(), None);
     assert_eq!(changes.get(), 0);
@@ -826,42 +838,48 @@ fn a_missing_item_opens_the_dialog_and_touches_nothing(cx: &mut TestAppContext) 
 }
 
 #[gpui_kit::test]
-fn the_missing_items_header_sits_together_like_v5s(cx: &mut TestAppContext) {
+fn a_missing_hud_row_names_the_hud_that_stays(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
+    let budhud = seed_hud(&s, &env, "budhud", Provenance::Local);
+    s.services
+        .library
+        .install_hud(budhud.id(), &tf2(&env))
+        .unwrap();
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
-    let title = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_TITLE).unwrap();
-    let description = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_DESCRIPTION).unwrap();
-    let first = support::bounds_of(cx, s.win, ids::missing_item(0)).unwrap();
+    open_summary(cx, &s, comp.id());
     assert_eq!(
-        description.top() - title.bottom(),
-        px(8.),
-        "v5's gap-2 header"
-    );
-    assert_eq!(
-        first.top() - description.bottom(),
-        px(16.),
-        "v5's gap-4 content"
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: rayshud is missing; keeps budhud")
     );
 }
 
 #[gpui_kit::test]
-fn cancel_in_missing_items_changes_nothing(cx: &mut TestAppContext) {
+fn a_missing_row_sits_in_the_summary_rows(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = profile_missing_its_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, comp.id());
+    let rows = support::bounds_of(cx, s.win, ids::PROFILE_APPLY_ROWS).unwrap();
+    let hud = support::bounds_of(cx, s.win, ids::profile_apply_row("hud")).unwrap();
+    assert!(
+        hud.top() >= rows.top() && hud.bottom() <= rows.bottom(),
+        "{hud:?} outside {rows:?}"
+    );
+    assert!(!support::present(cx, s.win, "profiles-missing-dialog"));
+}
+
+#[gpui_kit::test]
+fn cancel_on_a_summary_with_a_missing_item_changes_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert!(cx.update(|cx| page.read(cx).activating().is_some()));
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_CANCEL);
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
     assert!(!has_dialog(cx, &s));
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
     assert_eq!(s.services.library.active_profile().unwrap(), None);
@@ -869,17 +887,13 @@ fn cancel_in_missing_items_changes_nothing(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
+fn confirming_the_summary_skips_the_missing_item_without_a_second_dialog(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
     support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
     toast_is(
         cx,
         &s,
@@ -907,7 +921,9 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_moves_the_active_pill_to_the_applied_profile(cx: &mut TestAppContext) {
+fn confirming_with_a_missing_item_moves_the_active_pill_to_the_applied_profile(
+    cx: &mut TestAppContext,
+) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let pub_ = empty_profile(&s, "Pub");
@@ -918,10 +934,6 @@ fn install_anyway_moves_the_active_pill_to_the_applied_profile(cx: &mut TestAppC
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
     support::wait_real(cx, "the active pill on Comp", |cx| {
         support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref()
             == Some("Active")
@@ -937,8 +949,29 @@ fn install_anyway_moves_the_active_pill_to_the_applied_profile(cx: &mut TestAppC
     );
 }
 
+/// "Comp" whose HUD "flawhud" came from GameBanana 4242 and is gone from the library.
+fn profile_missing_its_store_hud(s: &support::ShellWindow, env: &support::Env) -> Profile {
+    let hud = seed_hud(s, env, "flawhud", flawhud_provenance());
+    let comp = s
+        .services
+        .library
+        .create_profile(
+            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
+        )
+        .unwrap();
+    s.services.library.delete_hud(hud.id()).unwrap();
+    comp
+}
+
+fn flawhud_provenance() -> Provenance {
+    Provenance::GameBanana {
+        gb_id: GbId::new(4242),
+        author: "vex".into(),
+    }
+}
+
 #[gpui_kit::test]
-fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
+fn a_store_item_offers_re_download_on_its_row(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     server.mount_gb_files(
@@ -949,30 +982,53 @@ fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     support::store_ready(cx, &server);
     support::seed_gb_huds(&env, &[(4242, "FlawHUD")]);
-    let gb = Provenance::GameBanana {
-        gb_id: GbId::new(4242),
-        author: "vex".into(),
-    };
-    let hud = seed_hud(&s, &env, "flawhud", gb);
-    let comp = s
-        .services
-        .library
-        .create_profile(
-            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
-        )
-        .unwrap();
-    s.services.library.delete_hud(hud.id()).unwrap();
+    let comp = profile_missing_its_store_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
+    open_summary(cx, &s, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
-        support::present(cx, s.win, ids::missing_redownload(0))
+        support::present(cx, s.win, ids::profile_apply_redownload("hud"))
     });
-    assert!(!support::present(cx, s.win, ids::missing_local(0)));
-    support::click_id(cx, s.win, ids::missing_redownload(0));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_local("hud")
+    ));
+    support::click_id(cx, s.win, ids::profile_apply_redownload("hud"));
     support::wait_real(cx, "the store detail", |cx| {
         support::present(cx, s.win, ids::STORE_DETAIL)
     });
-    assert!(support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG));
+    assert!(support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+}
+
+// A finished download lands in the library and emits `LibraryChanged`; the summary reads again.
+#[gpui_kit::test]
+fn a_finished_re_download_refreshes_the_row_and_apply_installs_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = profile_missing_its_store_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, comp.id());
+    assert_eq!(
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: flawhud is missing; nothing is installed there")
+    );
+    seed_hud(&s, &env, "flawhud", flawhud_provenance());
+    cx.update(LibraryEvents::changed);
+    support::wait_real(cx, "the refreshed row", |cx| {
+        row_label(cx, &s, "hud").as_deref() == Some("HUD: TF2's own HUD → flawhud")
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_redownload("hud")
+    ));
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    assert!(env.game.join("tf/custom/flawhud").is_dir());
 }
 
 #[gpui_kit::test]
@@ -1029,7 +1085,7 @@ fn nothing_else_starts_while_an_activate_runs(cx: &mut TestAppContext) {
     assert_eq!(s.services.library.profiles().unwrap().len(), 2);
 }
 
-// The Missing Items dialog holds the activate open, so every button is read in a steady busy state.
+// The Apply summary holds the activate open, so every button is read in a steady busy state.
 #[gpui_kit::test]
 fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestAppContext) {
     let env = support::env();
@@ -1048,13 +1104,10 @@ fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestApp
         support::disabled_ids(cx, s.win, &buttons),
         Vec::<ElementId>::new()
     );
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert!(cx.update(|cx| page.read(cx).is_busy()));
     assert_eq!(support::disabled_ids(cx, s.win, &buttons), buttons);
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_CANCEL);
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
     assert!(cx.update(|cx| !page.read(cx).is_busy()));
     assert_eq!(
         support::disabled_ids(cx, s.win, &buttons),
@@ -1063,15 +1116,12 @@ fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestApp
 }
 
 #[gpui_kit::test]
-fn escape_on_missing_items_answers_cancel(cx: &mut TestAppContext) {
+fn escape_on_a_summary_with_a_missing_item_answers_cancel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     support::press(cx, s.win, "escape");
     assert!(!has_dialog(cx, &s));
     support::wait_real(cx, "the flow to end", |cx| {
@@ -1081,7 +1131,7 @@ fn escape_on_missing_items_answers_cancel(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppContext) {
+fn closing_the_stacked_store_detail_keeps_the_summary_open(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     server.mount_gb_files(
@@ -1092,46 +1142,31 @@ fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppCon
     let s = support::shell_window(cx, &env, found(&env));
     support::store_ready(cx, &server);
     support::seed_gb_huds(&env, &[(4242, "FlawHUD")]);
-    let gb = Provenance::GameBanana {
-        gb_id: GbId::new(4242),
-        author: "vex".into(),
-    };
-    let hud = seed_hud(&s, &env, "flawhud", gb);
-    let comp = s
-        .services
-        .library
-        .create_profile(
-            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
-        )
-        .unwrap();
-    s.services.library.delete_hud(hud.id()).unwrap();
+    let comp = profile_missing_its_store_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
+    open_summary(cx, &s, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
-        support::present(cx, s.win, ids::missing_redownload(0))
+        support::present(cx, s.win, ids::profile_apply_redownload("hud"))
     });
-    support::click_id(cx, s.win, ids::missing_redownload(0));
+    support::click_id(cx, s.win, ids::profile_apply_redownload("hud"));
     support::wait_real(cx, "the store detail", |cx| {
         support::present(cx, s.win, ids::STORE_DETAIL)
     });
     support::press(cx, s.win, "escape");
     assert!(!support::present(cx, s.win, ids::STORE_DETAIL));
-    assert!(support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG));
+    assert!(support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
     assert!(cx.update(|cx| page.read(cx).activating().is_some()));
 }
 
 #[gpui_kit::test]
-fn missing_items_is_padded_like_v5(cx: &mut TestAppContext) {
+fn a_summary_with_a_missing_item_is_padded_like_v5(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     let b = support::dialog_box(cx, s.win);
-    let body = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_DIALOG).unwrap();
+    let body = support::bounds_of(cx, s.win, ids::PROFILE_APPLY_DIALOG).unwrap();
     assert_eq!(
         body.left() - b.left(),
         gpui_kit::px(25.),
@@ -1176,7 +1211,7 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
+fn a_long_summary_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     // Builtin crosshairs the catalog does not know, each its own missing row.
@@ -1192,13 +1227,15 @@ fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext
         .create_profile(&ProfileDraft::new("Comp").with_crosshairs(SlotMode::Set(crosshairs)))
         .unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
+    assert_eq!(
+        row_label(cx, &s, "crosshair:tf_weapon_probe_0").as_deref(),
+        Some("Crosshairs: gone0 is missing; nothing is installed there")
+    );
     support::dialog_box(cx, s.win);
-    let bar = ids::PROFILES_MISSING_LIST_SCROLLBAR;
-    assert_bar_beside(cx, s.win, ids::PROFILES_MISSING_LIST, bar);
-    assert_clear_of_bar(cx, s.win, ids::missing_item(0), bar);
-    assert_track_scrolls(cx, s.win, bar, ids::missing_item(0));
+    let bar = ids::PROFILE_APPLY_ROWS_SCROLLBAR;
+    let first = ids::profile_apply_row("crosshair:tf_weapon_probe_0");
+    assert_bar_beside(cx, s.win, ids::PROFILE_APPLY_ROWS, bar);
+    assert_clear_of_bar(cx, s.win, first.clone(), bar);
+    assert_track_scrolls(cx, s.win, bar, first);
 }

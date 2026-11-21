@@ -508,7 +508,7 @@ fn the_chinese_profile_card_fits_at_800(cx: &mut TestAppContext) {
     profile_card_fits_at_800(cx, "zh-CN");
 }
 
-// The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
+// The Apply summary calls a missing local import "Свой", as the HUD card's badge does.
 #[gpui_kit::test]
 fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
@@ -525,13 +525,17 @@ fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
     let comp = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::wait_real(cx, "the Apply summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
     });
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_local(0)).as_deref(),
+        support::label_of(cx, s.win, ids::profile_apply_local("hud")).as_deref(),
         Some("Свой файл — скачать снова нельзя")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_apply_row("hud")).as_deref(),
+        Some("HUD: budhud отсутствует; на этом месте ничего не установлено")
     );
 }
 

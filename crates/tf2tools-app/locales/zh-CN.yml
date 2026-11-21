@@ -694,6 +694,9 @@ profiles:
     both: "%{on}；%{off}"
     movement: "%{text}，会改变移动按键"
     left: "保持不变：%{list}。"
+    missing_keeps: "%{name} 已缺失；保留 %{kept}"
+    missing_none: "%{name} 已缺失；这里没有安装任何内容"
+    missing_other_hud: "你当前的 HUD"
   apply:
     title: "切换到 %{name}？"
     intro: "以下内容会立即更改，其他保持不变。"
@@ -703,17 +706,8 @@ profiles:
     title: "还没有配置文件"
     body: "将当前设置保存为配置文件，即可在不同配置之间快速切换。"
   missing:
-    title: "缺失的物品"
-    body: "“%{name}”中的部分物品已不在库中。"
-    install: "仍然安装（跳过缺失项）"
     redownload: "重新下载"
     local: "本地导入，无法重新下载"
-    kind:
-      hitsound: "命中音效"
-      killsound: "击杀音效"
-      crosshair: "准星"
-      item: "物品"
-      addon: "插件"
   editor:
     name_blank: "给这个配置文件起个名字"
     pick_hud: "选择一个 HUD，或选择“无”"

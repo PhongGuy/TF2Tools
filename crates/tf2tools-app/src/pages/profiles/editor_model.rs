@@ -807,12 +807,24 @@ pub fn new_draft_note(draft: &Draft) -> String {
 }
 
 /// One part of the game Apply changes: from what is installed to what the profile puts there.
+/// A row for a missing item carries it, leaves `from` empty and holds its sentence in `to`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SummaryRow {
-    pub key: &'static str,
+    pub key: String,
     pub label: SharedString,
     pub from: String,
     pub to: String,
+    pub missing: Option<MissingItem>,
+}
+
+impl SummaryRow {
+    /// "from → to", or a missing row's sentence.
+    pub fn text(&self) -> String {
+        match self.missing {
+            Some(_) => self.to.clone(),
+            None => format!("{} → {}", self.from, self.to),
+        }
+    }
 }
 
 /// The Apply summary: the parts that change, and the Leave slots in page order.
@@ -825,11 +837,116 @@ pub struct Summary {
 impl Summary {
     fn row(&mut self, key: &'static str, label: SharedString, from: String, to: String) {
         self.rows.push(SummaryRow {
-            key,
+            key: key.to_owned(),
             label,
             from,
             to,
+            missing: None,
         });
+    }
+}
+
+/// Shows each item Apply will skip as its slot's row: "<name> is missing; keeps <what stays>".
+/// A HUD or sound replaces its slot's row; a crosshair or add-on gets a row of its own beside
+/// its slot's, since the rest of that slot still changes.
+pub fn mark_missing(summary: &mut Summary, missing: &[MissingItem], current: &CurrentSetup) {
+    for item in missing {
+        let (key, label, kept) = missing_slot(item, current);
+        let to = match kept {
+            Some(kept) => tr!(
+                "profiles.summary.missing_keeps",
+                name = item.name(),
+                kept = kept
+            ),
+            None => tr!("profiles.summary.missing_none", name = item.name()),
+        };
+        let row = SummaryRow {
+            key,
+            label,
+            from: String::new(),
+            to: to.into(),
+            missing: Some(item.clone()),
+        };
+        let rows = &mut summary.rows;
+        if let Some(same) = rows.iter_mut().find(|r| r.key == row.key) {
+            *same = row;
+        } else {
+            let at = rows
+                .iter()
+                .position(|r| row_rank(&r.key) > row_rank(&row.key))
+                .unwrap_or(rows.len());
+            rows.insert(at, row);
+        }
+    }
+}
+
+// A missing item's row key, its slot label, and what stays installed in its place.
+fn missing_slot(
+    item: &MissingItem,
+    current: &CurrentSetup,
+) -> (String, SharedString, Option<String>) {
+    let name = |i: &Option<ProfileItem>| i.as_ref().map(|i| i.name().to_owned());
+    match item.kind() {
+        MissingKind::Hud => {
+            let kept = match &current.hud {
+                SlotMode::Set(h) => Some(h.name().to_owned()),
+                SlotMode::None => None,
+                SlotMode::Leave | _ => Some(tr!("profiles.summary.missing_other_hud").into()),
+            };
+            ("hud".into(), "HUD".into(), kept)
+        }
+        MissingKind::Hitsound => (
+            "hitsound".into(),
+            names::sound_kind_name(SoundKind::Hitsound),
+            name(&current.sounds.hit),
+        ),
+        MissingKind::Killsound => (
+            "killsound".into(),
+            names::sound_kind_name(SoundKind::Killsound),
+            name(&current.sounds.kill),
+        ),
+        MissingKind::Crosshair { weapon_script } => {
+            let kept = current
+                .crosshairs
+                .iter()
+                .find(|c| c.weapon_script() == weapon_script)
+                .and_then(|c| match c.crosshair() {
+                    ProfileCrosshairRef::Builtin(name) => Some(name.clone()),
+                    ProfileCrosshairRef::Library { folder_name } => Some(folder_name.clone()),
+                    _ => None,
+                });
+            (
+                format!("crosshair:{weapon_script}"),
+                SlotKind::Crosshairs.label(),
+                kept,
+            )
+        }
+        MissingKind::Addon { name } => (
+            format!("addon:{}", name.as_str()),
+            SlotKind::Addons.label(),
+            current
+                .addons
+                .contains(name)
+                .then(|| name.as_str().to_owned()),
+        ),
+        _ => (
+            format!("item:{}", item.name()),
+            tr!("profiles.part.item"),
+            None,
+        ),
+    }
+}
+
+// Where a row sits: the summary's slot order, a missing crosshair or add-on after its slot.
+fn row_rank(key: &str) -> u8 {
+    match key.split(':').next().unwrap_or(key) {
+        "hud" => 0,
+        "hitsound" => 1,
+        "killsound" | "sounds" => 2,
+        "crosshairs" | "crosshair" => 3,
+        "graphics" => 4,
+        "addons" | "addon" => 5,
+        _ => 6,
     }
 }
 

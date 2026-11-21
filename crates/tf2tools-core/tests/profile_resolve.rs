@@ -279,3 +279,26 @@ fn missing_items_of_an_unknown_profile_is_not_found() {
         Err(ProfileError::NotFound { .. })
     ));
 }
+
+#[test]
+fn a_builtin_the_catalog_lacks_is_missing_only_when_checked_against_it() {
+    let env = library_env();
+    let draft = ProfileDraft::new("P").with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
+        weapon_script: "tf_weapon_scattergun".into(),
+        crosshair: CrosshairRef::Builtin("gone".into()),
+    }]));
+    let p = env.lib.create_profile(&draft).unwrap();
+    assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
+    let missing = env
+        .lib
+        .missing_items_for_apply(p.id(), &common::builtin_catalog())
+        .unwrap();
+    assert_eq!(missing.len(), 1);
+    assert_eq!(
+        missing[0].kind(),
+        &MissingKind::Crosshair {
+            weapon_script: "tf_weapon_scattergun".into()
+        }
+    );
+    assert_eq!(missing[0].name(), "gone");
+}

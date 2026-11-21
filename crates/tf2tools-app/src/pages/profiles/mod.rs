@@ -32,7 +32,8 @@ use tf2tools_core::{
 
 use self::editor::ProfileEditor;
 use self::editor_model::{
-    Mode, Slot, SlotKind, Summary, SummaryRow, card_lines, left_line, next_profile_name, summary,
+    Mode, Slot, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing,
+    next_profile_name, summary,
 };
 use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
@@ -57,7 +58,7 @@ use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::card_grid::CardGrid;
-use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::DialogFrame;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
 
 /// A card below its 16:9 picture: padding, the name, five slot lines, the buttons and the border
@@ -74,6 +75,8 @@ const CARD_RADIUS: Pixels = px(12.);
 // The Apply summary dialog and its rows' label column.
 const SUMMARY_WIDTH: Pixels = px(520.);
 const SUMMARY_LABEL_WIDTH: Pixels = px(96.);
+// The summary's rows scroll past this, so a long list of missing crosshairs still fits 800x600.
+const SUMMARY_ROWS_MAX: Pixels = px(320.);
 // How much of the next card row the grid's floor shows, so a one-column window reads as a list.
 const NEXT_ROW_PEEK: Pixels = px(48.);
 
@@ -305,8 +308,9 @@ impl ProfilesPage {
                 if let Some(reading) = reading {
                     let answer = match reading.await {
                         Ok((name, summary)) => cx.update(|cx| {
+                            let target = (id.clone(), tf2.clone());
                             win.update(cx, |_, window, cx| {
-                                apply_summary_dialog(&name, &summary, window, cx)
+                                apply_summary_dialog(&name, summary, target, window, cx)
                             })
                         }),
                         Err(err) => {
@@ -335,32 +339,16 @@ impl ProfilesPage {
                         return;
                     }
                 }
-                // A missing item asks first; "Install Anyway" re-runs the apply skipping it,
-                // without the earlier confirms.
-                let mut skip_missing = false;
+                // The summary showed what is missing, so the apply skips whatever still is.
                 let mut plan = ExternalPlan::default();
                 loop {
                     let (id, applying_tf2, applying_plan) = (id.clone(), tf2.clone(), plan.clone());
                     let applying = cx.update(|cx| {
                         run_blocking(cx, move |s| {
-                            apply_job(s, &id, &applying_tf2, skip_missing, &applying_plan)
+                            apply_job(s, &id, &applying_tf2, &applying_plan)
                         })
                     });
                     let done = applying.await;
-                    if !skip_missing && let Ok(Activation::Missing { name: shown, items }) = &done {
-                        let Ok(answer) = cx.update(|cx| {
-                            win.update(cx, |_, window, cx| {
-                                missing_items_dialog(shown, items, window, cx)
-                            })
-                        }) else {
-                            return;
-                        };
-                        if answer.recv().await != Ok(MissingAnswer::InstallAnyway) {
-                            return;
-                        }
-                        skip_missing = true;
-                        continue;
-                    }
                     // HUDs the library cannot put back ask next, and the re-run does as told.
                     if let Ok(Activation::External(huds)) = &done {
                         let (action, huds) = (HudAction::ActivateProfile, huds.clone());
@@ -627,7 +615,7 @@ impl ProfilesPage {
     }
 }
 
-// The activate job's result: `OpError` cannot carry the missing items, so `Missing` is a value.
+// The activate job's result: `OpError` cannot carry the unnamed HUDs, so `External` is a value.
 enum Activation {
     Applied {
         // Boxed since the report carries a whole profile and dwarfs the other variants.
@@ -636,15 +624,11 @@ enum Activation {
         /// What the toast adds about the HUDs kept or removed on the way.
         note: Option<String>,
     },
-    Missing {
-        name: String,
-        items: Vec<MissingItem>,
-    },
     External(Vec<ExternalHud>),
 }
 
-// Reads the profile, what is installed now and the add-on display names, and words the
-// summary; add-on names only dress the rows, so a failed list falls back to asset names.
+// Reads the profile, what is installed now, what is missing and the add-on display names, and
+// words the summary; add-on names only dress the rows, so a failed list falls back to asset names.
 fn summary_job(
     s: &Services,
     id: &ProfileId,
@@ -670,26 +654,55 @@ fn summary_job(
             .cloned()
             .unwrap_or_else(|| name.as_str().to_owned())
     };
-    let summary = summary(&profile, &current, &addon_name);
+    let missing = s
+        .library
+        .missing_items_for_apply(id, &s.builtins)
+        .map_err(failed)?;
+    let mut summary = summary(&profile, &current, &addon_name);
+    mark_missing(&mut summary, &missing, &current);
     Ok((profile.name().to_owned(), summary))
 }
 
-// Opens the Apply summary over the page: what changes, or that nothing does, and the slots left
-// alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and closing answer false.
+// Opens the Apply summary over the page: what changes, what is missing and stays, or that nothing
+// does, and the slots left alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and
+// closing answer false. A library change while it is open (a finished Re-download) reads the
+// summary again, so a downloaded item's row turns into its change.
 fn apply_summary_dialog(
     name: &str,
-    summary: &Summary,
+    summary: Summary,
+    (id, tf2): (ProfileId, Tf2Install),
     window: &mut Window,
     cx: &mut App,
 ) -> async_channel::Receiver<bool> {
     let (tx, rx) = async_channel::bounded(1);
     let title: SharedString = tr!("profiles.apply.title", name = name);
     let ok_label: SharedString = tr!("profiles.apply.ok", name = name);
-    let left: Option<SharedString> = left_line(&summary.left).map(Into::into);
-    let rows: Rc<[SummaryRow]> = summary.rows.as_slice().into();
+    let shown = cx.new(|_| summary);
+    let win = window.window_handle();
+    let events = LibraryEvents::global(cx);
+    let weak = shown.downgrade();
+    // Held by the dialog's builder, so the refresh stops when the dialog goes away.
+    let refresh = cx.subscribe(&events, move |_, _: &LibraryChanged, cx| {
+        let (id, tf2, weak) = (id.clone(), tf2.clone(), weak.clone());
+        let reading = run_blocking(cx, move |s| summary_job(s, &id, &tf2));
+        cx.spawn(async move |cx| {
+            if let Ok((_, summary)) = reading.await {
+                let _ = weak.update(cx, |shown, cx| {
+                    *shown = summary;
+                    cx.notify();
+                });
+                let _ = cx.update(|cx| win.update(cx, |_, window, _| window.refresh()));
+            }
+        })
+        .detach();
+    });
+    // The rows' scroll position outlives the builder, which runs every frame.
+    let rows_scroll = ScrollHandle::new();
     window.defer(cx, move |window, cx| {
         let frame = DialogFrame::new(SUMMARY_WIDTH);
         window.open_dialog(cx, move |dialog, window, cx| {
+            let _ = &refresh;
+            let summary = shown.read(cx).clone();
             // The builder runs every frame, so each handler clones what it captures.
             let answer = |said: bool| {
                 let tx = tx.clone();
@@ -707,7 +720,7 @@ fn apply_summary_dialog(
             };
             let theme = cx.theme();
             let (muted, border) = (theme.muted_foreground, theme.border);
-            let changes = if rows.is_empty() {
+            let changes = if summary.rows.is_empty() {
                 let nothing: SharedString = tr!("profiles.apply.nothing");
                 div()
                     .id(ids::PROFILE_APPLY_NOTHING)
@@ -717,21 +730,32 @@ fn apply_summary_dialog(
                     .child(nothing)
                     .into_any_element()
             } else {
-                let last = rows.len() - 1;
-                v_flex()
-                    .id(ids::PROFILE_APPLY_ROWS)
-                    .test_support()
-                    .border_1()
-                    .border_color(border)
-                    .rounded_md()
-                    .children(
-                        rows.iter()
-                            .enumerate()
-                            .map(|(ix, row)| summary_row(row, ix < last, muted, border)),
-                    )
-                    .into_any_element()
+                let last = summary.rows.len() - 1;
+                // The bar sits in the box padding, so the rows keep their width.
+                scroll_beside(
+                    ids::PROFILE_APPLY_ROWS_SCROLLBAR,
+                    &rows_scroll,
+                    v_flex()
+                        .id(ids::PROFILE_APPLY_ROWS)
+                        .track_scroll(&rows_scroll)
+                        .test_support()
+                        .max_h(SUMMARY_ROWS_MAX)
+                        .overflow_y_scroll()
+                        .border_1()
+                        .border_color(border)
+                        .rounded_md()
+                        .children(
+                            summary
+                                .rows
+                                .iter()
+                                .enumerate()
+                                .map(|(ix, row)| summary_row(row, ix < last, cx)),
+                        ),
+                )
+                .into_any_element()
             };
-            let left = left.clone().map(|line| {
+            let left = left_line(&summary.left).map(|line| {
+                let line = SharedString::from(line);
                 div()
                     .id(ids::PROFILE_APPLY_LEFT)
                     .aria_label(line.clone())
@@ -797,17 +821,40 @@ fn apply_summary_dialog(
 }
 
 // One summary row: the slot label in a fixed column, then "from → to"; a rule under all but the
-// last row.
-fn summary_row(
-    row: &SummaryRow,
-    rule: bool,
-    muted: gpui_kit::Hsla,
-    border: gpui_kit::Hsla,
-) -> AnyElement {
-    let change = format!("{} → {}", row.from, row.to);
+// last row. A missing item's row reads its sentence beside a warning, then offers Re-download
+// for a store item (the store detail stacks over the summary) or says a local import can't.
+fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let (muted, border) = (theme.muted_foreground, theme.border);
+    let text = row.text();
+    let body = match &row.missing {
+        None => div()
+            .flex_1()
+            .min_w_0()
+            .child(text.clone())
+            .into_any_element(),
+        Some(item) => h_flex()
+            .flex_1()
+            .min_w_0()
+            .gap_2()
+            .justify_between()
+            .child(
+                h_flex()
+                    .min_w_0()
+                    .gap_2()
+                    .child(
+                        Icon::new(IconName::TriangleAlert)
+                            .with_size(Size::Size(px(16.)))
+                            .text_color(gpui_kit::rgb(ORANGE_500)),
+                    )
+                    .child(div().min_w_0().child(text.clone())),
+            )
+            .child(missing_action(&row.key, item, muted))
+            .into_any_element(),
+    };
     h_flex()
-        .id(ids::profile_apply_row(row.key))
-        .aria_label(format!("{}: {change}", row.label))
+        .id(ids::profile_apply_row(&row.key))
+        .aria_label(format!("{}: {text}", row.label))
         .test_support()
         .gap_3()
         .px_3()
@@ -821,17 +868,52 @@ fn summary_row(
                 .text_color(muted)
                 .child(row.label.clone()),
         )
-        .child(div().flex_1().min_w_0().child(change))
+        .child(body)
         .into_any_element()
 }
 
-// Reads the profile, carries out `plan` and applies it; a missing item or an unnamed HUD in the
-// way touches nothing, so it becomes a value. `finish_apply` writes the activity row.
+// A missing row's Re-download, which opens the item's store detail, or v5's local-import note.
+fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyElement {
+    let Some((kind, id)) = model::redownload_target(item.kind(), item.provenance()) else {
+        let local = tr!("profiles.missing.local");
+        return div()
+            .id(ids::profile_apply_local(key))
+            .aria_label(local.clone())
+            .test_support()
+            .flex_none()
+            .text_xs()
+            .text_color(muted)
+            .child(local)
+            .into_any_element();
+    };
+    let body = if kind == StoreKind::CuratedHuds {
+        curated_body
+    } else {
+        gamebanana_body
+    };
+    let detail = DetailItem {
+        kind,
+        id,
+        name: item.name().to_owned(),
+        in_library: false,
+    };
+    Button::new(ids::profile_apply_redownload(key))
+        .outline()
+        .small()
+        .icon(IconName::Download)
+        .label(tr!("profiles.missing.redownload"))
+        .on_click(move |_, window, cx| {
+            open_detail(detail.clone(), body(), window, cx);
+        })
+        .into_any_element()
+}
+
+// Reads the profile, carries out `plan` and applies it, skipping missing items; an unnamed HUD
+// in the way touches nothing, so it becomes a value. `finish_apply` writes the activity row.
 fn apply_job(
     s: &Services,
     id: &ProfileId,
     tf2: &Tf2Install,
-    skip_missing: bool,
     plan: &ExternalPlan,
 ) -> Result<Activation, OpError> {
     fn failed() -> SharedString {
@@ -844,15 +926,9 @@ fn apply_job(
     let discard = plan.prepare(s, tf2, failed())?;
     let applied = s
         .library
-        .apply_profile_discarding(id, tf2, &s.builtins, skip_missing, discard);
+        .apply_profile_discarding(id, tf2, &s.builtins, true, discard);
     let report = match applied {
         Ok(report) => report,
-        Err(ApplyProfileError::Missing(items)) => {
-            return Ok(Activation::Missing {
-                name: profile.name().to_owned(),
-                items,
-            });
-        }
         Err(ApplyProfileError::ExternalHuds(huds)) => return Ok(Activation::External(huds)),
         Err(e) => return Err(describe_apply_profile(&e).into_op(failed())),
     };
@@ -999,8 +1075,8 @@ fn announce(
     }
 }
 
-// A refusal or error that reached the end of the flow changed nothing; the missing items and
-// unnamed HUDs are answered in the flow, so those only arrive here when that went wrong.
+// A refusal or error that reached the end of the flow changed nothing; unnamed HUDs are
+// answered in the flow, so those only arrive here when that went wrong.
 fn announce_refusal(
     done: Result<Activation, OpError>,
     name: &str,
@@ -1017,195 +1093,6 @@ fn announce_refusal(
             tr!("profiles.toast.missing"),
         ),
     }
-}
-
-// The Missing Items dialog's answer; Re-download opens the store detail and answers nothing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MissingAnswer {
-    Cancel,
-    InstallAnyway,
-}
-
-// Opens v5's Missing Items dialog over the page. Cancel, Escape and Enter answer `Cancel`; the
-// receiver errs if the dialog goes away unanswered, which the flow also reads as a cancel.
-fn missing_items_dialog(
-    profile_name: &str,
-    items: &[MissingItem],
-    window: &mut Window,
-    cx: &mut App,
-) -> async_channel::Receiver<MissingAnswer> {
-    let (tx, rx) = async_channel::bounded(1);
-    let description: SharedString = tr!("profiles.missing.body", name = profile_name);
-    let items: Rc<[MissingItem]> = items.into();
-    // The list's scroll position outlives the builder, which runs every frame.
-    let list_scroll = ScrollHandle::new();
-    window.defer(cx, move |window, cx| {
-        let frame = DialogFrame::new(DIALOG_WIDTH);
-        window.open_dialog(cx, move |dialog, window, cx| {
-            // The builder runs every frame, so each handler clones what it captures.
-            let answer = |reply: MissingAnswer| {
-                let tx = tx.clone();
-                move |_: &_, _: &mut Window, _: &mut App| {
-                    let _ = tx.try_send(reply);
-                    true
-                }
-            };
-            let button = |id: &'static str, reply: MissingAnswer| {
-                let tx = tx.clone();
-                Button::new(id).on_click(move |_, window, cx| {
-                    let _ = tx.try_send(reply);
-                    window.close_dialog(cx);
-                })
-            };
-            let muted = cx.theme().muted_foreground;
-            let rows = items
-                .iter()
-                .enumerate()
-                .map(|(ix, item)| missing_row(ix, item, cx))
-                .collect::<Vec<_>>();
-            frame
-                .apply(dialog, &*window, &*cx)
-                .close_button(false)
-                .on_ok(answer(MissingAnswer::Cancel))
-                .on_cancel(answer(MissingAnswer::Cancel))
-                .child(
-                    frame.measure(
-                        v_flex()
-                            .id(ids::PROFILES_MISSING_DIALOG)
-                            .test_support()
-                            .gap_4()
-                            // v5's dialog header: title and description 8 px apart.
-                            .child(
-                                v_flex()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .id(ids::PROFILES_MISSING_TITLE)
-                                            .aria_label(tr!("profiles.missing.title"))
-                                            .test_support()
-                                            .text_lg()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .child(tr!("profiles.missing.title")),
-                                    )
-                                    .child(
-                                        div()
-                                            .id(ids::PROFILES_MISSING_DESCRIPTION)
-                                            .aria_label(description.clone())
-                                            .test_support()
-                                            .text_sm()
-                                            .text_color(muted)
-                                            .child(description.clone()),
-                                    ),
-                            )
-                            // The bar sits in the box padding, so the rows keep their width.
-                            .child(scroll_beside(
-                                ids::PROFILES_MISSING_LIST_SCROLLBAR,
-                                &list_scroll,
-                                v_flex()
-                                    .id(ids::PROFILES_MISSING_LIST)
-                                    .track_scroll(&list_scroll)
-                                    .test_support()
-                                    .gap_3()
-                                    .max_h(px(256.))
-                                    .overflow_y_scroll()
-                                    .children(rows),
-                            ))
-                            .child(
-                                h_flex()
-                                    .justify_end()
-                                    .gap_2()
-                                    .child(
-                                        button(ids::PROFILES_MISSING_CANCEL, MissingAnswer::Cancel)
-                                            .outline()
-                                            .label(tr!("confirm.cancel")),
-                                    )
-                                    .child(
-                                        button(
-                                            ids::PROFILES_MISSING_INSTALL,
-                                            MissingAnswer::InstallAnyway,
-                                        )
-                                        .primary()
-                                        .label(tr!("profiles.missing.install")),
-                                    ),
-                            ),
-                    ),
-                )
-        });
-    });
-    rx
-}
-
-// One bordered Missing Items row: the warning, the name over its kind, and Re-download for a
-// store item (the store detail stacks over this dialog) or v5's local-import note.
-fn missing_row(ix: usize, item: &MissingItem, cx: &App) -> AnyElement {
-    let orange: gpui_kit::Hsla = gpui_kit::rgb(ORANGE_500).into();
-    let muted = cx.theme().muted_foreground;
-    let kind = model::kind_label(item.kind());
-    let action = match model::redownload_target(item.kind(), item.provenance()) {
-        Some((kind, id)) => {
-            let body = if kind == StoreKind::CuratedHuds {
-                curated_body
-            } else {
-                gamebanana_body
-            };
-            let detail = DetailItem {
-                kind,
-                id,
-                name: item.name().to_owned(),
-                in_library: false,
-            };
-            Button::new(ids::missing_redownload(ix))
-                .outline()
-                .icon(IconName::Download)
-                .label(tr!("profiles.missing.redownload"))
-                .on_click(move |_, window, cx| {
-                    open_detail(detail.clone(), body(), window, cx);
-                })
-                .into_any_element()
-        }
-        None => {
-            let local = tr!("profiles.missing.local");
-            div()
-                .id(ids::missing_local(ix))
-                .aria_label(local.clone())
-                .test_support()
-                .text_xs()
-                .text_color(muted)
-                .child(local)
-                .into_any_element()
-        }
-    };
-    h_flex()
-        .id(ids::missing_item(ix))
-        .aria_label(format!("{} ({kind})", item.name()))
-        .test_support()
-        .justify_between()
-        .gap_2()
-        .p_3()
-        .rounded(cx.theme().radius_lg)
-        .border_1()
-        .border_color(cx.theme().border)
-        .child(
-            h_flex()
-                .gap_2()
-                .child(
-                    Icon::new(IconName::TriangleAlert)
-                        .with_size(Size::Size(px(16.)))
-                        .text_color(orange),
-                )
-                .child(
-                    v_flex()
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(item.name().to_owned()),
-                        )
-                        .child(div().text_xs().text_color(muted).child(kind)),
-                ),
-        )
-        .child(action)
-        .into_any_element()
 }
 
 // v5's EmptyState inside a Card: an icon, the title and a muted description, plus any buttons.

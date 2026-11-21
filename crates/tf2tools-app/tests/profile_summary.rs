@@ -21,7 +21,14 @@ fn texts(lines: &[CardLine; 5]) -> Vec<(&'static str, &str, bool)> {
 fn rows(s: &Summary) -> Vec<(&str, String, &str, &str)> {
     s.rows
         .iter()
-        .map(|r| (r.key, r.label.to_string(), r.from.as_str(), r.to.as_str()))
+        .map(|r| {
+            (
+                r.key.as_str(),
+                r.label.to_string(),
+                r.from.as_str(),
+                r.to.as_str(),
+            )
+        })
         .collect()
 }
 

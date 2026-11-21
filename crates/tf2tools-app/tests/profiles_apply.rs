@@ -151,11 +151,8 @@ fn a_skipped_item_still_marks_the_profile_active_after_the_modules_phase(
         .clone();
     s.services.library.delete_hud(hud.id()).unwrap();
     open(cx, &s);
+    // The summary's one confirm applies, skipping the missing HUD.
     support::click_apply(cx, s.win, &potato);
-    support::wait_real(cx, "Missing Items", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
     let text = toast(cx, &s);
     assert!(text.starts_with("Potato applied."), "{text}");
     assert!(text.contains("Kept what you had for: HUD"), "{text}");

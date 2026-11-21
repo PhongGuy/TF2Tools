@@ -924,28 +924,16 @@ pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
 pub const PROFILES_GRID: &str = "profiles-grid";
 /// The box the Profiles page's grid fills, under the lead row.
 pub const PROFILES_LIBRARY: &str = "profiles-library";
-/// The scrolling list of missing items in the profile apply dialog.
-pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
-/// The scrollbar beside the Missing Items list.
-pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The empty state shown when there are no profiles.
 pub const PROFILES_EMPTY: &str = "profiles-empty";
-/// The Missing Items dialog.
-pub const PROFILES_MISSING_DIALOG: &str = "profiles-missing-dialog";
-/// The Missing Items dialog's title, "Missing Items".
-pub const PROFILES_MISSING_TITLE: &str = "profiles-missing-title";
-/// The Missing Items dialog's description.
-pub const PROFILES_MISSING_DESCRIPTION: &str = "profiles-missing-description";
-/// The Missing Items dialog's Cancel button.
-pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
-/// The Missing Items dialog's "Install Anyway (skip missing)" button.
-pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
 /// The Apply summary dialog's root, title, intro, bordered rows box, "nothing changes" note,
 /// "Stays as it is" line and its two buttons.
 pub const PROFILE_APPLY_DIALOG: &str = "profile-apply-dialog";
 pub const PROFILE_APPLY_TITLE: &str = "profile-apply-title";
 pub const PROFILE_APPLY_INTRO: &str = "profile-apply-intro";
 pub const PROFILE_APPLY_ROWS: &str = "profile-apply-rows";
+/// The scrollbar beside the summary's rows once they outgrow their box.
+pub const PROFILE_APPLY_ROWS_SCROLLBAR: &str = "profile-apply-rows-scrollbar";
 pub const PROFILE_APPLY_NOTHING: &str = "profile-apply-nothing";
 pub const PROFILE_APPLY_LEFT: &str = "profile-apply-left";
 pub const PROFILE_APPLY_CANCEL: &str = "profile-apply-cancel";
@@ -1326,9 +1314,6 @@ pub fn addon_busy(name: &AddonName) -> ElementId {
 // The kinds of the Profiles page's per-card ids, each keyed by the profile id, and of the
 // Missing Items dialog's per-row ids, keyed by the row's index.
 const PROFILE_CARD: &str = "profile-card";
-const MISSING_ITEM: &str = "missing-item";
-const MISSING_REDOWNLOAD: &str = "missing-redownload";
-const MISSING_LOCAL: &str = "missing-local";
 
 /// A profile card, keyed by the profile id: "profile-card:<id>".
 pub fn profile_card(id: &ProfileId) -> ElementId {
@@ -1445,19 +1430,16 @@ pub fn profile_pick_play_spinner(folder: &str) -> ElementId {
     keyed("profile-pick-play-spinner", folder)
 }
 
-/// A Missing Items row, keyed by its index: "missing-item:<ix>".
-pub fn missing_item(ix: usize) -> ElementId {
-    keyed(MISSING_ITEM, &ix.to_string())
+/// A missing item's Re-download button on its summary row, keyed like the row:
+/// "profile-apply-redownload:<key>".
+pub fn profile_apply_redownload(key: &str) -> ElementId {
+    keyed("profile-apply-redownload", key)
 }
 
-/// A row's Re-download button, keyed by its index: "missing-redownload:<ix>".
-pub fn missing_redownload(ix: usize) -> ElementId {
-    keyed(MISSING_REDOWNLOAD, &ix.to_string())
-}
-
-/// A row's "Local import" note, keyed by its index: "missing-local:<ix>".
-pub fn missing_local(ix: usize) -> ElementId {
-    keyed(MISSING_LOCAL, &ix.to_string())
+/// A missing local import's "can't re-download" note on its summary row:
+/// "profile-apply-local:<key>".
+pub fn profile_apply_local(key: &str) -> ElementId {
+    keyed("profile-apply-local", key)
 }
 
 /// A header sync ring, keyed by the store's slug: "sync-ring:<slug>".

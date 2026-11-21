@@ -3,15 +3,13 @@ use crate::support;
 use gpui_kit::{SharedString, TestAppContext};
 use tf2tools_app::pages::profiles::model::{ApplyOutcome, modules_no_catalog, outcome_toast};
 use tf2tools_app::pages::profiles::model::{
-    failed_description, kept_parts, kind_label, load_closes_editor, matches, redownload_target,
-    report_details, step_label,
+    failed_description, kept_parts, load_closes_editor, matches, redownload_target, report_details,
+    step_label,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::shell::toast::ToastKind;
 use tf2tools_core::ApplySkipReason;
-use tf2tools_core::{
-    AddonName, ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind,
-};
+use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
 
 fn parts(names: &[&'static str]) -> Vec<SharedString> {
     names.iter().map(|&n| n.into()).collect()
@@ -34,26 +32,13 @@ fn search_ignores_case_and_surrounding_space() {
 }
 
 #[test]
-fn steps_and_kinds_have_v5_s_labels() {
+fn steps_have_v5_s_labels() {
     assert_eq!(step_label(ApplyStep::Hud), "HUD");
     assert_eq!(step_label(ApplyStep::Hitsound), "Hitsound");
     assert_eq!(step_label(ApplyStep::Killsound), "Killsound");
     assert_eq!(step_label(ApplyStep::Crosshairs), "Crosshairs");
     assert_eq!(step_label(ApplyStep::Graphics), "Graphics");
     assert_eq!(step_label(ApplyStep::Addons), "Add-ons");
-    assert_eq!(
-        kind_label(&MissingKind::Addon {
-            name: AddonName::new("mastercomfig-addon-no-pyroland.vpk").unwrap()
-        }),
-        "ADD-ON"
-    );
-    assert_eq!(kind_label(&MissingKind::Hud), "HUD");
-    assert_eq!(kind_label(&MissingKind::Hitsound), "HITSOUND");
-    assert_eq!(kind_label(&MissingKind::Killsound), "KILLSOUND");
-    let crosshair = MissingKind::Crosshair {
-        weapon_script: "tf_weapon_scattergun".into(),
-    };
-    assert_eq!(kind_label(&crosshair), "CROSSHAIR");
 }
 
 #[test]

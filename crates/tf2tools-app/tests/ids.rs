@@ -189,21 +189,23 @@ fn profile_ids_are_keyed_by_profile_id() {
         name(ids::profile_card(&id)),
         "profile-card:1700000000000-ab12"
     );
-    assert_eq!(name(ids::missing_item(0)), "missing-item:0");
-    assert_eq!(name(ids::missing_redownload(2)), "missing-redownload:2");
-    assert_eq!(name(ids::missing_local(1)), "missing-local:1");
+    assert_eq!(
+        name(ids::profile_apply_redownload("hud")),
+        "profile-apply-redownload:hud"
+    );
+    assert_eq!(
+        name(ids::profile_apply_local("crosshair:tf_weapon_scattergun")),
+        "profile-apply-local:crosshair:tf_weapon_scattergun"
+    );
     assert_eq!(
         [
             ids::PROFILES_NO_TF2,
             ids::PROFILES_EMPTY,
-            ids::PROFILES_MISSING_DIALOG,
-            ids::PROFILES_MISSING_DESCRIPTION,
-            ids::PROFILES_MISSING_CANCEL,
-            ids::PROFILES_MISSING_INSTALL,
             ids::PROFILE_APPLY_DIALOG,
             ids::PROFILE_APPLY_TITLE,
             ids::PROFILE_APPLY_INTRO,
             ids::PROFILE_APPLY_ROWS,
+            ids::PROFILE_APPLY_ROWS_SCROLLBAR,
             ids::PROFILE_APPLY_NOTHING,
             ids::PROFILE_APPLY_LEFT,
             ids::PROFILE_APPLY_CANCEL,
@@ -212,14 +214,11 @@ fn profile_ids_are_keyed_by_profile_id() {
         [
             "profiles-no-tf2",
             "profiles-empty",
-            "profiles-missing-dialog",
-            "profiles-missing-description",
-            "profiles-missing-cancel",
-            "profiles-missing-install",
             "profile-apply-dialog",
             "profile-apply-title",
             "profile-apply-intro",
             "profile-apply-rows",
+            "profile-apply-rows-scrollbar",
             "profile-apply-nothing",
             "profile-apply-left",
             "profile-apply-cancel",
@@ -356,7 +355,6 @@ fn the_grid_and_list_ids_are_stable() {
     assert_eq!(ids::HUDS_LIBRARY, "huds-library");
     assert_eq!(ids::SOUNDS_GRID, "sounds-grid");
     assert_eq!(ids::PROFILES_GRID, "profiles-grid");
-    assert_eq!(ids::PROFILES_MISSING_LIST, "profiles-missing-list");
     assert_eq!(ids::ADDON_STORE_INFO_TEXT, "addon-store-info-text");
     assert_eq!(ids::SOUND_STORE_CARD_TARGET, "sound-card");
 }
@@ -368,7 +366,7 @@ fn literal_ids_in(dir: &std::path::Path, hits: &mut Vec<String>) {
         "\"huds-grid\"",
         "\"sounds-grid\"",
         "\"profiles-grid\"",
-        "\"profiles-missing-list\"",
+        "\"profile-apply-rows-scrollbar\"",
         "\"addon-store-info-text\"",
         "\"payload-check\"",
     ];

@@ -696,6 +696,9 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, muda suas teclas de movimento"
     left: "Fica como está: %{list}."
+    missing_keeps: "%{name} está faltando; fica %{kept}"
+    missing_none: "%{name} está faltando; não há nada instalado no lugar"
+    missing_other_hud: "o HUD que você tem agora"
   apply:
     title: "Mudar para %{name}?"
     intro: "Isto muda agora. Todo o resto fica como está."
@@ -705,17 +708,8 @@ profiles:
     title: "Nenhum perfil ainda"
     body: "Salve sua configuração atual como perfil para alternar rapidamente entre configurações."
   missing:
-    title: "Itens ausentes"
-    body: "Alguns itens de \"%{name}\" não estão mais na sua biblioteca."
-    install: "Instalar mesmo assim (pular ausentes)"
     redownload: "Baixar de novo"
     local: "Importação local — não dá para baixar de novo"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "MIRA"
-      item: "ITEM"
-      addon: "ADD-ON"
   editor:
     name_blank: "Dê um nome a este perfil"
     pick_hud: "Escolha um HUD ou escolha Nenhum"

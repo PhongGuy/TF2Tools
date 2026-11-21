@@ -697,6 +697,9 @@ profiles:
     both: "%{on}\u00A0; %{off}"
     movement: "%{text}, change tes touches de déplacement"
     left: "Reste tel quel\u00A0: %{list}."
+    missing_keeps: "%{name} est manquant\u00A0; %{kept} reste"
+    missing_none: "%{name} est manquant\u00A0; rien n'est installé à sa place"
+    missing_other_hud: "votre HUD actuel"
   apply:
     title: "Passer à %{name}\u00A0?"
     intro: "Ceci change maintenant. Tout le reste reste tel quel."
@@ -706,17 +709,8 @@ profiles:
     title: "Aucun profil pour l'instant"
     body: "Enregistrez votre configuration actuelle comme profil pour passer vite d'une configuration à l'autre."
   missing:
-    title: "Objets manquants"
-    body: "Certains objets de «\u00A0%{name}\u00A0» ne sont plus dans votre bibliothèque."
-    install: "Installer quand même (sans les manquants)"
     redownload: "Retélécharger"
     local: "Import local — impossible de retélécharger"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "VISEUR"
-      item: "OBJET"
-      addon: "ADD-ON"
   editor:
     name_blank: "Donne un nom à ce profil"
     pick_hud: "Choisis un HUD, ou choisis Aucun"

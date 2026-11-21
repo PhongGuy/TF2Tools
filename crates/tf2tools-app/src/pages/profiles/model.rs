@@ -109,18 +109,6 @@ pub fn step_label(step: ApplyStep) -> SharedString {
     }
 }
 
-/// The Missing Items row's kind: "HUD", "HITSOUND", "KILLSOUND", "CROSSHAIR", "ADD-ON".
-pub fn kind_label(kind: &MissingKind) -> SharedString {
-    match kind {
-        MissingKind::Hud => "HUD".into(),
-        MissingKind::Hitsound => tr!("profiles.missing.kind.hitsound"),
-        MissingKind::Killsound => tr!("profiles.missing.kind.killsound"),
-        MissingKind::Crosshair { .. } => tr!("profiles.missing.kind.crosshair"),
-        MissingKind::Addon { .. } => tr!("profiles.missing.kind.addon"),
-        _ => tr!("profiles.missing.kind.item"),
-    }
-}
-
 /// The slots whose missing items were skipped, once each in step order, as `step_label`s.
 pub fn kept_parts(kinds: &[MissingKind]) -> Vec<SharedString> {
     let crosshair = |k: &MissingKind| matches!(k, MissingKind::Crosshair { .. });

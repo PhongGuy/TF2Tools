@@ -627,9 +627,7 @@ fn a_profile_keeps_a_copy_then_applies(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
-    cx: &mut TestAppContext,
-) {
+fn applying_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let gone = seed(&s, &env, "budhud");
@@ -638,10 +636,6 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
     place(&env, "manual");
     let _page = open_profiles(cx, &s);
     support::click_apply(cx, s.win, comp.id());
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
     // The skipped HUD step removes nothing, so the player is not asked about their HUD.
     wait_toast(cx, &s);
     assert!(!support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG));

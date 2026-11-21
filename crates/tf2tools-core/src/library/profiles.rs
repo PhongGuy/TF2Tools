@@ -1483,6 +1483,20 @@ impl Library {
             .map_err(ProfileError::from)
     }
 
+    /// `missing_items` as an apply sees them: a builtin crosshair `builtins` lacks is missing
+    /// too. An unknown id is `NotFound`.
+    pub fn missing_items_for_apply(
+        &self,
+        id: &ProfileId,
+        builtins: &BuiltinCrosshairs,
+    ) -> Result<Vec<MissingItem>, ProfileError> {
+        self.db
+            .write(|conn| Ok(resolve_profile(conn, &self.dir, id, Some(builtins))))
+            .map_err(profile_db)?
+            .map(|resolved| resolved.missing)
+            .map_err(ProfileError::from)
+    }
+
     /// Applies a profile to `tf2`: resolves it (a builtin the catalog lacks is missing),
     /// then, slot by slot, installs a Set item, uninstalls a None one and leaves a Leave one
     /// alone, best effort. Missing items fail with `Missing` before any file is touched unless

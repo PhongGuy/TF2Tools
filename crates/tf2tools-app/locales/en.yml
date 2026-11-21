@@ -672,6 +672,9 @@ profiles:
     both: "%{on}; %{off}"
     movement: "%{text}, changes your movement keys"
     left: "Stays as it is: %{list}."
+    missing_keeps: "%{name} is missing; keeps %{kept}"
+    missing_none: "%{name} is missing; nothing is installed there"
+    missing_other_hud: "the HUD you have now"
   apply:
     title: "Switch to %{name}?"
     intro: "These change now. Everything else stays how it is."
@@ -681,17 +684,8 @@ profiles:
     title: "No profiles yet"
     body: "Save your current setup as a profile to quickly switch between configurations."
   missing:
-    title: "Missing Items"
-    body: "Some items in \"%{name}\" are no longer in your library."
-    install: "Install Anyway (skip missing)"
     redownload: "Re-download"
     local: "Local import — can't re-download"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "CROSSHAIR"
-      item: "ITEM"
-      addon: "ADD-ON"
   editor:
     name_blank: "Give this profile a name"
     pick_hud: "Pick a HUD, or choose None"
