@@ -2,9 +2,11 @@
 
 use crate::support;
 
-use gpui_kit::{Bounds, ElementId, Pixels, TestAppContext, px, size};
+use gpui_kit::component::Theme;
+use gpui_kit::{AppContext as _, Bounds, ElementId, Hsla, Pixels, TestAppContext, px, size};
 use support::graphics::{found, open, picture_page, reveal, toggle_pictures, wait_for_list};
 use tf2tools_app::ids;
+use tf2tools_core::Preset;
 
 fn at(
     cx: &mut TestAppContext,
@@ -89,6 +91,59 @@ fn learn_more_sits_under_the_description_and_opens_the_docs(cx: &mut TestAppCont
     assert_eq!(
         cx.opened_url().as_deref(),
         Some("https://docs.mastercomfig.com/")
+    );
+}
+
+// The solid fills the last frame painted exactly over `id`'s box, read from its quads.
+fn fills_at(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    id: impl Into<ElementId>,
+) -> Vec<Hsla> {
+    let b = at(cx, s, id);
+    cx.update_window(s.win, |_, w, _| {
+        let scale = w.scale_factor();
+        let near = |a: f32, b: Pixels| (a - f32::from(b) * scale).abs() <= 0.5;
+        w.painted_quads()
+            .iter()
+            .filter(|q| {
+                near(q.bounds.origin.x.0, b.origin.x)
+                    && near(q.bounds.origin.y.0, b.origin.y)
+                    && near(q.bounds.size.width.0, b.size.width)
+                    && near(q.bounds.size.height.0, b.size.height)
+            })
+            .filter_map(|q| q.background.as_solid())
+            .filter(|c| c.a > 0.)
+            .collect()
+    })
+    .unwrap()
+}
+
+// A row's checked segment is painted like the checked preset: the page background on the
+// secondary track, while the other segments paint no fill of their own.
+#[gpui_kit::test]
+fn the_checked_segment_is_painted_like_the_checked_preset(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = wide_page(cx, &env);
+    let (background, secondary) = cx.update(|cx| {
+        let t = Theme::global(cx);
+        (t.background, t.secondary)
+    });
+    let preset = fills_at(cx, &s, ids::graphics_preset(Preset::Medium));
+    assert_eq!(preset, [background], "the checked preset");
+    reveal(cx, &s, ids::graphics_segments("lod"));
+    assert_eq!(
+        fills_at(cx, &s, ids::graphics_segment("lod", "medium")),
+        preset,
+        "the checked segment"
+    );
+    for v in ["low", "high", "ultra"] {
+        assert_eq!(fills_at(cx, &s, ids::graphics_segment("lod", v)), [], "{v}");
+    }
+    assert_eq!(
+        fills_at(cx, &s, ids::graphics_segments("lod")),
+        [secondary],
+        "the track"
     );
 }
 
