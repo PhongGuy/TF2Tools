@@ -4,7 +4,9 @@ use crate::support;
 
 use std::path::PathBuf;
 
-use tf2tools_app::pages::graphics::pictures::{Compare, PictureIndex, RowPictures, row_pictures};
+use tf2tools_app::pages::graphics::pictures::{
+    Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, row_pictures,
+};
 use tf2tools_app::pages::graphics::view::row;
 use tf2tools_app::remote_images::local_image_url;
 use tf2tools_core::{Choices, ModuleChoice, Preset};
@@ -218,4 +220,65 @@ fn under_custom_nothing_carries_the_preset_tag_and_unpictured_modules_have_none(
             "{module}"
         );
     }
+}
+
+#[test]
+fn zoom_crops_both_sides_only_when_both_have_a_crop() {
+    let cropped = |name: &str| ValuePicture {
+        full: PathBuf::from(format!("{name}.webp")),
+        zoom: Some(PathBuf::from(format!("{name}.zoom.webp"))),
+    };
+    let whole = ValuePicture {
+        full: PathBuf::from("c.webp"),
+        zoom: None,
+    };
+    let paths = |names: [&str; 2]| (Some(PathBuf::from(names[0])), Some(PathBuf::from(names[1])));
+    let (a, b) = (cropped("a"), cropped("b"));
+    assert_eq!(
+        compared_pair(Some(&a), Some(&b), true),
+        paths(["a.zoom.webp", "b.zoom.webp"])
+    );
+    assert_eq!(
+        compared_pair(Some(&a), Some(&whole), true),
+        paths(["a.webp", "c.webp"]),
+        "one side without a crop keeps both whole"
+    );
+    assert_eq!(
+        compared_pair(Some(&whole), Some(&b), true),
+        paths(["c.webp", "b.webp"])
+    );
+    assert_eq!(
+        compared_pair(Some(&a), Some(&b), false),
+        paths(["a.webp", "b.webp"])
+    );
+    assert_eq!(
+        compared_pair(Some(&a), None, true),
+        (Some(PathBuf::from("a.zoom.webp")), None),
+        "a picture standing alone still zooms"
+    );
+}
+
+#[test]
+fn a_wipe_against_a_value_without_a_crop_stays_whole_under_zoom() {
+    // lod has a crop, but only medium has the crop file; low has its full picture alone.
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("manifest.json"), MANIFEST).unwrap();
+    for file in ["lod/low.webp", "lod/medium.webp", "lod/medium.zoom.webp"] {
+        let path = tmp.path().join(file);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"x").unwrap();
+    }
+    let catalog = support::full_module_catalog();
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&catalog, "lod", value("low"));
+    let row = row(&catalog, &choices, catalog.module("lod").unwrap());
+    let index = PictureIndex::open(tmp.path());
+    let zoomed = row_pictures(&index, &row, true).unwrap();
+    assert_eq!(
+        zoomed.compare.pictures(),
+        [
+            tmp.path().join("lod/medium.webp"),
+            tmp.path().join("lod/low.webp")
+        ]
+    );
 }
