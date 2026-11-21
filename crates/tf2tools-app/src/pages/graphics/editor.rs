@@ -10,7 +10,8 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::slider::{SliderEvent, SliderState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
@@ -26,11 +27,13 @@ use crate::i18n::{self, counted_plural, tr};
 use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::widgets::{Named as _, labelled};
+use crate::widgets::Named as _;
 
 // The chip strip's height with one row of 28 px chips. The empty strip reserves it, so the first
 // change does not push the rows below down under the pointer.
 const STRIP_HEIGHT: Pixels = px(54.);
+// A narrow strip stacks its title line over the chips, so it is one 28 px line and a gap taller.
+const STACKED_STRIP_HEIGHT: Pixels = px(90.);
 
 /// An edit the editor proposes to its host; the editor's own choices stay as they are.
 #[derive(Debug, Clone, PartialEq)]
@@ -420,8 +423,9 @@ impl GraphicsChoicesEditor {
     }
 
     /// The changes from the preset as chips with an undo each, and Reset all; a dashed "as is"
-    /// strip when there are none. Without a catalog the chips only name the saved values.
-    pub fn changes_strip(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// strip when there are none. Without a catalog the chips only name the saved values. When
+    /// `narrow`, the title and Reset all sit on a line above the chips.
+    pub fn changes_strip(&self, narrow: bool, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
         let (accent, fill) = (theme.sidebar_primary, theme.background);
@@ -429,23 +433,38 @@ impl GraphicsChoicesEditor {
         let catalog = self.catalog.as_deref();
         let list = self.built.changes();
         if list.is_empty() {
-            return labelled(
-                div()
-                    .flex()
-                    .items_center()
-                    .min_h(STRIP_HEIGHT)
-                    .text_sm()
-                    .text_color(muted)
-                    .py_3()
-                    .px_4()
-                    .border_1()
-                    .border_dashed()
-                    .border_color(border)
-                    .rounded(radius),
-                self.scope.id(ids::GRAPHICS_NO_CHANGES),
-                tr!("graphics.changes.as_is", preset = preset),
-            )
-            .into_any_element();
+            let text = tr!("graphics.changes.as_is", preset = preset);
+            // The text is its own shrinkable block, so it wraps inside the strip's padding.
+            let line = div()
+                .id(self.scope.id(ids::GRAPHICS_NO_CHANGES_TEXT))
+                .test_support()
+                .flex_1()
+                .min_w_0()
+                .child(text.clone());
+            return div()
+                .id(self.scope.id(ids::GRAPHICS_NO_CHANGES))
+                .aria_label(text)
+                .test_support()
+                .flex()
+                .items_center()
+                .min_h(if narrow {
+                    STACKED_STRIP_HEIGHT
+                } else {
+                    STRIP_HEIGHT
+                })
+                .text_sm()
+                .text_color(muted)
+                // Narrow, the longest translations wrap to three lines; a slimmer padding keeps
+                // them inside the reserved height.
+                .when(narrow, |strip| strip.py_2())
+                .when(!narrow, |strip| strip.py_3())
+                .px_4()
+                .border_1()
+                .border_dashed()
+                .border_color(border)
+                .rounded(radius)
+                .child(line)
+                .into_any_element();
         }
         let n = u64::try_from(list.len()).unwrap_or(u64::MAX);
         let title = counted_plural(
@@ -454,6 +473,7 @@ impl GraphicsChoicesEditor {
             &n.to_string(),
             &[("preset", &preset)],
         );
+        let title_name = title.clone();
         let editable = catalog.is_some();
         let chips: Vec<AnyElement> = list
             .iter()
@@ -539,19 +559,39 @@ impl GraphicsChoicesEditor {
                 .disabled(self.disabled)
                 .on_click(cx.listener(|editor, _, _, cx| editor.propose(|c, _| c.clear(), cx)))
         });
-        // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
-        card_frame(cx)
+        let title = div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title);
+        let strip = card_frame(cx)
             .id(self.scope.id(ids::GRAPHICS_CHANGES))
-            .aria_label(title.clone())
+            .aria_label(title_name)
             .test_support()
+            .py_3()
+            .px_4()
+            .border_color(accent);
+        // Narrow, one chip beside the title would already wrap, so the title line stands above
+        // the chips and the strip's height no longer depends on where the first chip lands.
+        if narrow {
+            return strip
+                .child(
+                    v_flex()
+                        .gap_2()
+                        .child(
+                            h_flex()
+                                .h(px(28.))
+                                .child(title)
+                                .child(div().flex_1())
+                                .children(reset_all),
+                        )
+                        .child(h_flex().flex_wrap().gap_2().children(chips)),
+                )
+                .into_any_element();
+        }
+        // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
+        strip
             .flex()
             .items_center()
             .flex_wrap()
             .gap_2()
-            .py_3()
-            .px_4()
-            .border_color(accent)
-            .child(div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title))
+            .child(title)
             .children(chips)
             .child(div().flex_1())
             .children(reset_all)

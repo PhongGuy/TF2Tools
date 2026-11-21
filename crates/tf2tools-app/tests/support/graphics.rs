@@ -214,6 +214,45 @@ pub fn assert_controls_fit(cx: &mut TestAppContext, s: &super::ShellWindow, widt
     }
 }
 
+/// At `width`, asserts the empty strip keeps the reserved `height`, its text stays inside the
+/// strip's side padding and border, and sits vertically centred.
+pub fn assert_as_is_text_fits(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    width: f32,
+    height: f32,
+) {
+    use gpui_kit::px;
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(width), px(900.)));
+    super::settle(cx, s.win);
+    let ids = (
+        tf2tools_app::ids::GRAPHICS_NO_CHANGES,
+        tf2tools_app::ids::GRAPHICS_NO_CHANGES_TEXT,
+    );
+    let strip = super::bounds_of(cx, s.win, ids.0).expect("the empty strip");
+    let text = super::bounds_of(cx, s.win, ids.1).expect("the empty strip's text");
+    // The strip's 1 px border and its px_4 side padding.
+    let (side, border) = (px(17.), px(1.));
+    assert_eq!(
+        strip.size.height,
+        px(height),
+        "the strip keeps its height: {strip:?}"
+    );
+    assert!(
+        text.left() >= strip.left() + side && text.right() <= strip.right() - side,
+        "the text {text:?} runs out of the strip {strip:?} at {width} px"
+    );
+    let (above, below) = (text.top() - strip.top(), strip.bottom() - text.bottom());
+    assert!(
+        above >= border && below >= border,
+        "the text {text:?} overflows the strip's height {strip:?} at {width} px"
+    );
+    assert!(
+        (above - below).abs() <= px(1.),
+        "the text {text:?} is not centred in the strip {strip:?} at {width} px"
+    );
+}
+
 pub fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {
     super::wait_real(cx, "the page to settle", |cx| {
         cx.update(|cx| !page.read(cx).is_busy())

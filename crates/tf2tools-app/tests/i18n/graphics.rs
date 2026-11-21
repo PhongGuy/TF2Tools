@@ -107,3 +107,26 @@ fn the_settings_search_follows_a_language_switch(cx: &mut TestAppContext) {
         Some("Поиск настроек")
     );
 }
+
+// Russian and French have the longest "as is" text; it still wraps inside the reserved 90 px.
+#[gpui_kit::test]
+fn the_russian_as_is_text_fits_its_box_at_800_px(cx: &mut TestAppContext) {
+    as_is_text_fits_at_800_px(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_french_as_is_text_fits_its_box_at_800_px(cx: &mut TestAppContext) {
+    as_is_text_fits_at_800_px(cx, "fr");
+}
+
+fn as_is_text_fits_at_800_px(cx: &mut TestAppContext, code: &str) {
+    let _guard = LocaleGuard::switch(code);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "high");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, "{}");
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    graphics::assert_as_is_text_fits(cx, &s, 800., 90.);
+}
