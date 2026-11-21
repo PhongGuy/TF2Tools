@@ -3048,7 +3048,9 @@ graphics:
     as_is: "Using %{preset} as is. Change any setting below and it shows up here."
     chip: "%{name}: %{was} → %{now}"
     chip_saved: "%{name}: %{now}"
+    chip_gone: "%{name}: %{now} (no longer in mastercomfig)"
     undo: "Put %{name} back to %{was}"
+    remove: "Remove %{name}"
     reset_all: "Reset all"
   settings:
     search: "Search settings"

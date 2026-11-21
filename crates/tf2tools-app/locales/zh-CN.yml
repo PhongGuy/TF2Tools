@@ -3070,7 +3070,9 @@ graphics:
     as_is: "正在原样使用 %{preset}。更改下方任一设置后，它会显示在这里。"
     chip: "%{name}：%{was} → %{now}"
     chip_saved: "%{name}：%{now}"
+    chip_gone: "%{name}：%{now}（mastercomfig 中已不存在）"
     undo: "将 %{name} 恢复为 %{was}"
+    remove: "移除 %{name}"
     reset_all: "全部重置"
   settings:
     search: "搜索设置"

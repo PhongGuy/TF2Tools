@@ -133,3 +133,32 @@ fn the_strip_keeps_its_count_chips_and_reset_all_on_one_row(cx: &mut TestAppCont
         }
     }
 }
+
+// A setting a newer mastercomfig dropped keeps its saved choice until an apply prunes it, so
+// the strip must show it with a way to remove it.
+#[gpui_kit::test]
+fn a_saved_choice_for_a_dropped_setting_shows_and_can_be_removed(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, r#"{"old_bloom":"on"}"#);
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::GRAPHICS_CHANGES).as_deref(),
+        Some("1 change from Medium")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_change("old_bloom")).as_deref(),
+        Some("Old bloom: On (no longer in mastercomfig)")
+    );
+    assert!(support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    support::click_id(cx, s.win, ids::graphics_change_undo("old_bloom"));
+    support::wait_real(cx, "the removal", |cx| {
+        saved(cx, &page, "old_bloom").is_none()
+    });
+    idle(cx, &page);
+    assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
+    assert!(support::present(cx, s.win, ids::GRAPHICS_NO_CHANGES));
+}
