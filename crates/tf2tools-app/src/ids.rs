@@ -905,6 +905,8 @@ pub const GRAPHICS_RESET_ALL: &str = "graphics-reset-all";
 pub const GRAPHICS_CHANGES: &str = "graphics-changes";
 /// The dashed strip shown while nothing differs from the preset, labelled with its text.
 pub const GRAPHICS_NO_CHANGES: &str = "graphics-no-changes";
+/// The dashed strip's text, which wraps inside the strip.
+pub const GRAPHICS_NO_CHANGES_TEXT: &str = "graphics-no-changes-text";
 /// The settings search box.
 pub const GRAPHICS_SEARCH: &str = "graphics-search";
 /// The "Changed only" switch beside the search.

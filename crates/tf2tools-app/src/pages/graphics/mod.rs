@@ -881,7 +881,7 @@ impl Render for GraphicsPage {
         let mut toolbar = None;
         if self.preset().is_some() {
             let (presets, changes) = self.editor.update(cx, |e, cx| {
-                (e.presets_card(narrow, cx), e.changes_strip(cx))
+                (e.presets_card(narrow, cx), e.changes_strip(narrow, cx))
             });
             children.push(presets);
             children.push(changes);
