@@ -182,6 +182,20 @@ fn the_first_change_keeps_the_rows_still_when_just_narrow(cx: &mut TestAppContex
     first_change_holds_still(cx, px(1100.), "fpscap", "120");
 }
 
+// At the narrowest window the "as is" text wraps inside its box rather than running past it.
+#[gpui_kit::test]
+fn the_as_is_text_wraps_inside_its_box_at_the_narrowest_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "high");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, "{}");
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    support::graphics::assert_as_is_text_fits(cx, &s, 800., 90.);
+    support::graphics::assert_as_is_text_fits(cx, &s, 1280., 54.);
+}
+
 // Makes `module`'s first change at `width` and asserts the strip and the row keep their place.
 fn first_change_holds_still(cx: &mut TestAppContext, width: Pixels, module: &str, to: &str) {
     let env = support::env();

@@ -11,6 +11,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
@@ -26,7 +27,7 @@ use crate::i18n::{self, counted_plural, tr};
 use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::widgets::{Named as _, labelled};
+use crate::widgets::Named as _;
 
 // The chip strip's height with one row of 28 px chips. The empty strip reserves it, so the first
 // change does not push the rows below down under the pointer.
@@ -432,27 +433,38 @@ impl GraphicsChoicesEditor {
         let catalog = self.catalog.as_deref();
         let list = self.built.changes();
         if list.is_empty() {
-            return labelled(
-                div()
-                    .flex()
-                    .items_center()
-                    .min_h(if narrow {
-                        STACKED_STRIP_HEIGHT
-                    } else {
-                        STRIP_HEIGHT
-                    })
-                    .text_sm()
-                    .text_color(muted)
-                    .py_3()
-                    .px_4()
-                    .border_1()
-                    .border_dashed()
-                    .border_color(border)
-                    .rounded(radius),
-                self.scope.id(ids::GRAPHICS_NO_CHANGES),
-                tr!("graphics.changes.as_is", preset = preset),
-            )
-            .into_any_element();
+            let text = tr!("graphics.changes.as_is", preset = preset);
+            // The text is its own shrinkable block, so it wraps inside the strip's padding.
+            let line = div()
+                .id(self.scope.id(ids::GRAPHICS_NO_CHANGES_TEXT))
+                .test_support()
+                .flex_1()
+                .min_w_0()
+                .child(text.clone());
+            return div()
+                .id(self.scope.id(ids::GRAPHICS_NO_CHANGES))
+                .aria_label(text)
+                .test_support()
+                .flex()
+                .items_center()
+                .min_h(if narrow {
+                    STACKED_STRIP_HEIGHT
+                } else {
+                    STRIP_HEIGHT
+                })
+                .text_sm()
+                .text_color(muted)
+                // Narrow, the longest translations wrap to three lines; a slimmer padding keeps
+                // them inside the reserved height.
+                .when(narrow, |strip| strip.py_2())
+                .when(!narrow, |strip| strip.py_3())
+                .px_4()
+                .border_1()
+                .border_dashed()
+                .border_color(border)
+                .rounded(radius)
+                .child(line)
+                .into_any_element();
         }
         let n = u64::try_from(list.len()).unwrap_or(u64::MAX);
         let title = counted_plural(
