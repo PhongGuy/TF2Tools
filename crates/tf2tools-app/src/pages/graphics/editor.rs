@@ -381,6 +381,11 @@ impl GraphicsChoicesEditor {
                 // A saved value the preset now matches names itself once, not "High → High".
                 let was = change.was.clone().filter(|_| !change.same);
                 let sentence = match &was {
+                    None if change.gone => tr!(
+                        "graphics.changes.chip_gone",
+                        name = change.label,
+                        now = change.now
+                    ),
                     Some(was) => tr!(
                         "graphics.changes.chip",
                         name = change.label,
@@ -393,14 +398,22 @@ impl GraphicsChoicesEditor {
                         now = change.now
                     ),
                 };
-                let undo = change.was.clone().filter(|_| editable).map(|preset| {
+                // A matched value resets like its row; a dropped setting has no preset value to
+                // go back to, so its X removes it.
+                let undo_name = match (&change.was, &was) {
+                    (Some(preset), Some(_)) => Some(tr!(
+                        "graphics.changes.undo",
+                        name = change.label,
+                        was = preset
+                    )),
+                    (Some(_), None) => Some(tr!("graphics.row.reset")),
+                    (None, _) if change.gone => {
+                        Some(tr!("graphics.changes.remove", name = change.label))
+                    }
+                    (None, _) => None,
+                };
+                let undo = undo_name.filter(|_| editable).map(|name| {
                     let module = change.module.clone();
-                    let name = match &was {
-                        Some(_) => {
-                            tr!("graphics.changes.undo", name = change.label, was = preset)
-                        }
-                        None => tr!("graphics.row.reset"),
-                    };
                     Button::new(self.scope.id(ids::graphics_change_undo(&change.module)))
                         .ghost()
                         .xsmall()

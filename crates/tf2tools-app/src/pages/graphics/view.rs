@@ -105,6 +105,7 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
 }
 
 /// One line of the changes strip; `was` is None when there is no catalogue to resolve it.
+/// `gone` marks a saved choice for a setting the catalogue no longer has.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChangeView {
     pub module: String,
@@ -113,24 +114,30 @@ pub struct ChangeView {
     pub now: SharedString,
     /// The saved value equals the preset's, as after a preset switch.
     pub same: bool,
+    pub gone: bool,
 }
 
-/// The player's changes from the preset: changed rows in catalogue order, or without a
-/// catalogue every saved choice by module name, worded from the keys alone.
+/// The player's changes from the preset: changed rows in catalogue order, then saved choices
+/// for settings the catalogue dropped (`gone`), or without a catalogue every saved choice by
+/// module name, worded from the keys alone.
 pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<ChangeView> {
-    let Some(catalog) = catalog else {
-        return choices
-            .modules()
-            .iter()
-            .map(|(name, choice)| ChangeView {
-                module: name.clone(),
-                label: module_label_by_name(name),
-                was: None,
-                now: choice_label_by_id(name, choice),
-                same: false,
-            })
-            .collect();
+    let by_name = |(name, choice): (&String, &ModuleChoice)| ChangeView {
+        module: name.clone(),
+        label: module_label_by_name(name),
+        was: None,
+        now: choice_label_by_id(name, choice),
+        same: false,
+        gone: catalog.is_some(),
     };
+    let Some(catalog) = catalog else {
+        return choices.modules().iter().map(by_name).collect();
+    };
+    // A newer mastercomfig can drop a saved setting; it stays listed so it can be removed.
+    let dropped = choices
+        .modules()
+        .iter()
+        .filter(|(name, _)| catalog.module(name).is_none())
+        .map(by_name);
     catalog
         .categories()
         .iter()
@@ -143,7 +150,9 @@ pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<Change
             same: row.shown == row.preset_value,
             module: row.module,
             label: row.label,
+            gone: false,
         })
+        .chain(dropped)
         .collect()
 }
 
