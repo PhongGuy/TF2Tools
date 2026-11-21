@@ -241,3 +241,27 @@ fn every_control_fits_its_row_at_800_and_1280_px(cx: &mut TestAppContext) {
     support::graphics::assert_controls_fit(cx, &s, 800.);
     support::graphics::assert_controls_fit(cx, &s, 1280.);
 }
+
+#[gpui_kit::test]
+fn a_saved_choice_the_new_preset_matches_still_offers_reset(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = full_page(cx, &env, r#"{"lod":"high"}"#);
+    support::click_id(cx, s.win, ids::graphics_preset(Preset::High));
+    support::wait_real(cx, "the pick", |cx| {
+        cx.update(|cx| page.read(cx).preset()) == Some(Preset::High)
+    });
+    idle(cx, &page);
+    support::settle(cx, s.win);
+    // High gives lod=high too, yet the saved choice still pins it across later switches.
+    assert_eq!(saved(cx, &page, "lod"), Some(value("high")));
+    assert_eq!(row_value(cx, &page, "lod"), Some(value("high")));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::graphics_module_reset("lod")
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_module_preset("lod")).as_deref(),
+        Some("High: High")
+    );
+}
