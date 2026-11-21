@@ -713,6 +713,8 @@ profiles:
     redownload: "Volver a descargar"
     local: "Importación local: no se puede volver a descargar"
   editor:
+    header_label: "Editor de perfiles"
+    modes_label: "Qué hace este perfil con %{slot}"
     crumb_new: "Nuevo perfil"
     name: "Nombre"
     name_placeholder: "Ponle nombre a este perfil"
@@ -726,6 +728,8 @@ profiles:
     xh_everywhere: "Poner en todas las armas"
     xh_on: { one: "En %{count} arma", other: "En %{count} armas" }
     xh_pick_first: "Elige una mira y luego haz clic en un arma"
+    gfx_settings: "Ajustes"
+    gfx_settings_help: "La lista de la página de Gráficos, guardada en este perfil."
     gfx_copy: "Copiar de la página de Gráficos"
     gfx_copy_none: "Instala mastercomfig primero en la página de Gráficos"
     gfx_no_catalog: "Abre la página de Gráficos una vez para elegir ajustes"

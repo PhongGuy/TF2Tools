@@ -712,6 +712,8 @@ profiles:
     redownload: "重新下载"
     local: "本地导入，无法重新下载"
   editor:
+    header_label: "配置文件编辑器"
+    modes_label: "此配置文件如何处理%{slot}"
     crumb_new: "新建配置文件"
     name: "名称"
     name_placeholder: "为这个配置文件命名"
@@ -725,6 +727,8 @@ profiles:
     xh_everywhere: "用于所有武器"
     xh_on: { other: "用于 %{count} 把武器" }
     xh_pick_first: "先选一个准星，再点击一把武器"
+    gfx_settings: "设置"
+    gfx_settings_help: "图形页面的列表，保存到此配置文件。"
     gfx_copy: "从图形页面复制"
     gfx_copy_none: "请先在图形页面安装 mastercomfig"
     gfx_no_catalog: "先打开一次图形页面再选择设置"

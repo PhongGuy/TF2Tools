@@ -647,6 +647,12 @@ fn profile_editor_ids_are_stable() {
     for (el, want) in [
         (ids::profile_slot("hud"), "profile-slot:hud"),
         (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
+        (ids::profile_hud_shot("rayshud"), "profile-hud-shot:rayshud"),
+        (
+            ids::profile_hud_image("rayshud"),
+            "profile-hud-image:rayshud",
+        ),
+        (ids::profile_slot_modes("hud"), "profile-slot-modes:hud"),
         (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
@@ -659,6 +665,7 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILES_NEW,
             ids::PROFILE_EDITOR,
             ids::PROFILE_EDITOR_LOADING,
+            ids::PROFILE_EDITOR_HEADER,
             ids::PROFILE_EDITOR_CRUMB,
             ids::PROFILE_EDITOR_CRUMB_NAME,
             ids::PROFILE_EDITOR_CANCEL,
@@ -679,11 +686,13 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
             ids::PROFILE_XH_EVERYWHERE,
             ids::PROFILE_XH_SELECTION,
+            ids::PROFILE_GFX_SETTINGS,
         ],
         [
             "profiles-new",
             "profile-editor",
             "profile-editor-loading",
+            "profile-editor-header",
             "profile-editor-crumb",
             "profile-editor-crumb-name",
             "profile-editor-cancel",
@@ -704,6 +713,7 @@ fn profile_editor_ids_are_stable() {
             "profile-sound-kill-play-spinner",
             "profile-xh-everywhere",
             "profile-xh-selection",
+            "profile-gfx-settings",
         ]
     );
 }

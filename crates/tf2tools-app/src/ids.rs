@@ -944,6 +944,8 @@ pub const PROFILES_NEW: &str = "profiles-new";
 pub const PROFILE_EDITOR: &str = "profile-editor";
 /// The line New profile shows while it reads the current setup for its draft.
 pub const PROFILE_EDITOR_LOADING: &str = "profile-editor-loading";
+/// The header crumb's root, labelled as the profile editor.
+pub const PROFILE_EDITOR_HEADER: &str = "profile-editor-header";
 /// The header crumb's "Profiles" link, which asks to close the editor.
 pub const PROFILE_EDITOR_CRUMB: &str = "profile-editor-crumb";
 /// The header crumb's profile name, or "New profile" while the name is blank.
@@ -983,6 +985,11 @@ pub fn profile_slot_help(slot: &str) -> ElementId {
     keyed("profile-slot-help", slot)
 }
 
+/// A slot's Set / None / Leave radio group: "profile-slot-modes:<slot>".
+pub fn profile_slot_modes(slot: &str) -> ElementId {
+    keyed("profile-slot-modes", slot)
+}
+
 /// One segment of a slot's mode control: "profile-slot-mode:<slot>:<mode>".
 pub fn profile_slot_mode(slot: &str, mode: &str) -> ElementId {
     keyed("profile-slot-mode", &format!("{slot}:{mode}"))
@@ -1015,6 +1022,8 @@ pub const PROFILE_XH_EVERYWHERE: &str = "profile-xh-everywhere";
 pub const PROFILE_XH_SELECTION: &str = "profile-xh-selection";
 /// The Graphics Set body's "Copy from the Graphics page" button.
 pub const PROFILE_GFX_COPY: &str = "profile-gfx-copy";
+/// The Graphics Set body's Settings card, whose header holds Copy.
+pub const PROFILE_GFX_SETTINGS: &str = "profile-gfx-settings";
 /// The Graphics Set body's line while no settings catalogue is cached.
 pub const PROFILE_GFX_NO_CATALOG: &str = "profile-gfx-no-catalog";
 /// The Add-ons Set body's "Only these" switch.
@@ -1427,6 +1436,16 @@ pub fn profile_slot(slot: &str) -> ElementId {
 /// A HUD tile in the HUD Set body, keyed by folder: "profile-pick-hud:<folder>".
 pub fn profile_pick_hud(folder: &str) -> ElementId {
     keyed("profile-pick-hud", folder)
+}
+
+/// A HUD tile's picture area, keyed by folder: "profile-hud-shot:<folder>".
+pub fn profile_hud_shot(folder: &str) -> ElementId {
+    keyed("profile-hud-shot", folder)
+}
+
+/// A HUD tile's picture, keyed by folder: "profile-hud-image:<folder>".
+pub fn profile_hud_image(folder: &str) -> ElementId {
+    keyed("profile-hud-image", folder)
 }
 
 /// An add-on's switch in the Add-ons Set body, keyed by asset name: "profile-addon:<asset>".

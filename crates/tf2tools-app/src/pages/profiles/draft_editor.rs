@@ -11,9 +11,9 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyView, App, AppContext as _, Context, Div, Entity, EventEmitter, FocusHandle,
-    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, Role,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
+    TestSupportExt as _, WeakEntity, Window, deferred, div, px, transparent_black,
 };
 use tf2tools_core::{
     Choices, CrosshairRef, LogLevel, NewLogEntry, Profile, ProfileError, ProfileId, SoundId,
@@ -492,7 +492,7 @@ impl ProfileDraftEditor {
                     .id(ids::PROFILE_EDITOR_NAME)
                     .test_support()
                     .max_w(px(480.))
-                    .child(Input::new(&self.name)),
+                    .child(Input::new(&self.name).readonly(self.busy)),
             )
             .children(self.name_error(cx).map(|message| {
                 labelled(
@@ -510,17 +510,17 @@ impl ProfileDraftEditor {
         cx.notify();
     }
 
-    // How far down the first card the wide rail sits, so it stays in view while the cards
-    // scroll and stops at the last card's top.
-    fn rail_pin(&self) -> Pixels {
+    // How far down its own spot in the scroll column (child `item`) the rail sits, so it stays
+    // `inset` below the body's top while the cards scroll, and stops at the last card's top.
+    fn rail_pin(&self, item: usize, inset: Pixels) -> Pixels {
         let last_card = self.cards_from + SlotKind::ALL.len() - 1;
-        let first = self.scroll.bounds_for_item(self.cards_from);
+        let first = self.scroll.bounds_for_item(item);
         let last = self.scroll.bounds_for_item(last_card);
         let (Some(first), Some(last)) = (first, last) else {
             return px(0.);
         };
         let top = first.top() + self.scroll.offset().y;
-        let pin = (self.scroll.bounds().top() + CONTENT_PADDING - top).max(px(0.));
+        let pin = (self.scroll.bounds().top() + inset - top).max(px(0.));
         pin.min(last.top() - first.top())
     }
 
@@ -545,13 +545,20 @@ impl ProfileDraftEditor {
                 button.ghost().w_full()
             }
         });
+        // The narrow row is drawn over the cards scrolling under it, so it carries the page's
+        // background and keeps their clicks, but lets the wheel through to the body.
         let rail = if narrow {
-            h_flex().flex_wrap().gap_2()
+            h_flex()
+                .flex_wrap()
+                .gap_2()
+                .py_1()
+                .bg(cx.theme().background)
         } else {
             v_flex().flex_none().w(RAIL_WIDTH).gap_1()
         };
         rail.id(ids::PROFILE_RAIL)
             .test_support()
+            .when(narrow, |rail| rail.block_mouse_except_scroll())
             .children(entries)
             .into_any_element()
     }
@@ -559,7 +566,7 @@ impl ProfileDraftEditor {
     // The three-segment Set / None / Leave control: a radio group drawn as the Graphics pill,
     // so the chosen mode reports selected. A mode the draft would refuse (Add-ons Set while
     // Graphics is None) is drawn disabled rather than ignoring the click.
-    fn mode_control(&self, slot: SlotKind, cx: &mut Context<Self>) -> Div {
+    fn mode_control(&self, slot: SlotKind, cx: &mut Context<Self>) -> impl IntoElement {
         let current = self.draft.mode(slot);
         let foreground = cx.theme().foreground;
         let segments = Mode::ALL.into_iter().enumerate().map(|(ix, mode)| {
@@ -589,19 +596,29 @@ impl ProfileDraftEditor {
                 .child(label);
             pill::segment_look(segment, checked, cx)
         });
-        pill::track(cx).flex_none().children(segments)
+        pill::row_track(cx)
+            .id(ids::profile_slot_modes(slot.key()))
+            .role(Role::RadioGroup)
+            .aria_label(tr!("profiles.editor.modes_label", slot = slot.label()))
+            .test_support()
+            .flex_none()
+            .children(segments)
     }
 
-    // A slot's card: title, help and mode control over the Set body, or the line saying what
-    // None or Leave does.
+    // A slot's card: a header of title, help and mode control over a divider, then the Set
+    // body or the line saying what None or Leave does.
     fn slot_card(&self, slot: SlotKind, cx: &mut Context<Self>) -> AnyElement {
         let key = slot.key();
-        let muted = cx.theme().muted_foreground;
+        let (muted, border) = (cx.theme().muted_foreground, cx.theme().border);
         let header = h_flex()
             .flex_wrap()
             .items_start()
             .justify_between()
             .gap_3()
+            .px_4()
+            .py(px(14.))
+            .border_b_1()
+            .border_color(border)
             .child(
                 v_flex()
                     .flex_1()
@@ -638,11 +655,8 @@ impl ProfileDraftEditor {
             .test_support()
             .flex()
             .flex_col()
-            .gap_4()
-            .p_4()
             .child(header)
-            .children(need_graphics)
-            .child(body)
+            .child(v_flex().gap_4().p_4().children(need_graphics).child(body))
             .into_any_element()
     }
 }
@@ -665,7 +679,7 @@ fn mode_label(mode: Mode) -> SharedString {
     }
 }
 
-// The rail's badge for `mode`: Set filled, None and Left as is dashed and muted.
+// The rail's badge for `mode`: Set on the secondary fill, None and Left as is dashed and muted.
 fn mode_badge(slot: SlotKind, mode: Mode, cx: &App) -> impl IntoElement {
     let theme = cx.theme();
     let dashed = || {
@@ -676,7 +690,7 @@ fn mode_badge(slot: SlotKind, mode: Mode, cx: &App) -> impl IntoElement {
     };
     let (tag, border, text) = match mode {
         Mode::Set => (
-            Tag::primary(),
+            Tag::secondary(),
             transparent_black(),
             tr!("profiles.mode.set"),
         ),
@@ -718,8 +732,9 @@ impl Render for ProfileDraftEditor {
         let content = window.viewport_size().width - SHELL_CHROME_WIDTH;
         let narrow = content < RAIL_ROW_BELOW;
         self.narrow = narrow;
-        // A card's lane less the side rail when it stands beside, then the card's own padding.
-        let lane_width = (content - CONTENT_PADDING * 2.).min(px(BODY_MAX_WIDTH));
+        // A card's lane (the content width, which already leaves out the body's padding) less
+        // the side rail when it stands beside, then the card's own padding.
+        let lane_width = content.min(px(BODY_MAX_WIDTH));
         let beside = if narrow {
             px(0.)
         } else {
@@ -729,7 +744,7 @@ impl Render for ProfileDraftEditor {
         // Each card is a direct child of the scroll column so the rail can scroll to it by
         // index; the narrow rail row comes first, the wide rail hangs off the first card.
         self.cards_from = if narrow { 2 } else { 1 };
-        let pin = self.rail_pin();
+        let pin = self.rail_pin(self.cards_from, CONTENT_PADDING);
         let mut children: Vec<AnyElement> = vec![
             lane()
                 .flex()
@@ -739,8 +754,14 @@ impl Render for ProfileDraftEditor {
                 .children(self.new_draft_note(cx))
                 .into_any_element(),
         ];
+        // The narrow row keeps its place in the column but sticks to the body's top once the
+        // cards scroll past, painted after them so they pass underneath.
         if narrow {
-            children.push(lane().child(self.rail(true, cx)).into_any_element());
+            let stuck = div()
+                .relative()
+                .top(self.rail_pin(1, px(0.)))
+                .child(deferred(self.rail(true, cx)));
+            children.push(lane().child(stuck).into_any_element());
         }
         for slot in SlotKind::ALL {
             let card = self.slot_card(slot, cx);
@@ -797,7 +818,7 @@ struct EditorCrumb {
 impl Render for EditorCrumb {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(editor) = self.editor.upgrade() else {
-            return h_flex();
+            return h_flex().into_any_element();
         };
         let e = editor.read(cx);
         let name = match e.draft.name.trim() {
@@ -815,6 +836,9 @@ impl Render for EditorCrumb {
             }
         };
         h_flex()
+            .id(ids::PROFILE_EDITOR_HEADER)
+            .aria_label(tr!("profiles.editor.header_label"))
+            .test_support()
             .w_full()
             .min_w_0()
             .items_center()
@@ -862,5 +886,6 @@ impl Render for EditorCrumb {
                         editor.update(cx, |e, cx| e.save(window, cx));
                     }),
             )
+            .into_any_element()
     }
 }

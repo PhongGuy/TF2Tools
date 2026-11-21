@@ -690,6 +690,8 @@ profiles:
     redownload: "Re-download"
     local: "Local import — can't re-download"
   editor:
+    header_label: "Profile editor"
+    modes_label: "What this profile does with %{slot}"
     crumb_new: "New profile"
     name: "Name"
     name_placeholder: "Name this profile"
@@ -703,6 +705,8 @@ profiles:
     xh_everywhere: "Put on every weapon"
     xh_on: { one: "On %{count} weapon", other: "On %{count} weapons" }
     xh_pick_first: "Pick a crosshair, then click a weapon"
+    gfx_settings: "Settings"
+    gfx_settings_help: "The Graphics page's list, saved to this profile."
     gfx_copy: "Copy from the Graphics page"
     gfx_copy_none: "Install mastercomfig on the Graphics page first"
     gfx_no_catalog: "Open the Graphics page once to choose settings"

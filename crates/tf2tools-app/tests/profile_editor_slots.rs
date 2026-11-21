@@ -880,6 +880,8 @@ fn graphics_shows_the_presets_rows_and_changes_under_profile_ids(cx: &mut TestAp
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     support::seed_mastercomfig_catalog(&env, "9.100.1");
     let p = gfx_profile(&s, &env);
+    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
+    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());
@@ -987,6 +989,8 @@ fn a_preset_switch_without_a_catalog_keeps_the_module_changes(cx: &mut TestAppCo
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let p = gfx_profile(&s, &env);
+    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
+    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());
@@ -1049,6 +1053,8 @@ fn addons_set_is_disabled_while_graphics_is_none(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let p = gfx_profile(&s, &env);
+    // Tall enough that the Graphics and Add-ons cards are on screen at the narrow width.
+    cx.simulate_window_resize(s.win, size(px(1200.), px(4000.)));
     let page = page(cx, &s);
     let before = game_files(&env);
     let e = edit(cx, &s, &page, p.id());

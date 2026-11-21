@@ -713,6 +713,8 @@ profiles:
     redownload: "Erneut herunterladen"
     local: "Lokaler Import — kein erneuter Download möglich"
   editor:
+    header_label: "Profil-Editor"
+    modes_label: "Was dieses Profil mit %{slot} macht"
     crumb_new: "Neues Profil"
     name: "Name"
     name_placeholder: "Gib diesem Profil einen Namen"
@@ -726,6 +728,8 @@ profiles:
     xh_everywhere: "Auf jede Waffe legen"
     xh_on: { one: "Auf %{count} Waffe", other: "Auf %{count} Waffen" }
     xh_pick_first: "Wähle ein Fadenkreuz und klicke dann auf eine Waffe"
+    gfx_settings: "Einstellungen"
+    gfx_settings_help: "Die Liste der Grafik-Seite, in diesem Profil gespeichert."
     gfx_copy: "Von der Grafik-Seite übernehmen"
     gfx_copy_none: "Installiere zuerst mastercomfig auf der Grafik-Seite"
     gfx_no_catalog: "Öffne einmal die Grafik-Seite, um Einstellungen zu wählen"
