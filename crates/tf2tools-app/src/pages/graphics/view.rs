@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use gpui_kit::SharedString;
 use tf2tools_core::{Choices, ComfigModule, ModuleCatalog, ModuleChoice};
 
-use super::model::{preset_label, shown_choice};
+use super::model::{preset_choice, preset_label, select_choices, shown_choice, value_choices};
 use crate::i18n::mastercomfig::{
     category_label, choice_label, choice_label_by_id, module_description, module_label,
     module_label_by_name,
@@ -66,9 +66,7 @@ pub struct RowView {
 pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) -> RowView {
     let name = module.name();
     let kind = control_kind(module);
-    let preset_value = catalog
-        .resolve(name, choices.preset())
-        .map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()));
+    let preset_value = preset_choice(catalog, choices, name);
     // Any saved choice counts, even one a later preset switch made equal to the preset: it
     // still pins the value in modules.cfg across switches, so it keeps its Reset.
     let changed = choices.get(name).is_some();
@@ -78,15 +76,12 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
         preset = preset_name.clone(),
         value = choice_label(module, &preset_value)
     );
-    let unset = (kind == ControlKind::Select).then_some(ModuleChoice::NotSet);
-    let options = unset
+    let offered = match kind {
+        ControlKind::Select => select_choices(module),
+        ControlKind::Switch | ControlKind::Segmented => value_choices(module).collect(),
+    };
+    let options = offered
         .into_iter()
-        .chain(
-            module
-                .values()
-                .iter()
-                .map(|v| ModuleChoice::Value(v.value().to_owned())),
-        )
         .map(|choice| ChoiceView {
             label: choice_label(module, &choice),
             choice,

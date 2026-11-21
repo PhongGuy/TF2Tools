@@ -288,13 +288,8 @@ pub fn value_options(module: &ComfigModule) -> Vec<ValueOption> {
 
 /// `value_options` with each entry's id drawn under `scope`.
 pub fn scoped_value_options(module: &ComfigModule, scope: IdScope) -> Vec<ValueOption> {
-    std::iter::once(ModuleChoice::NotSet)
-        .chain(
-            module
-                .values()
-                .iter()
-                .map(|v| ModuleChoice::Value(v.value().to_owned())),
-        )
+    select_choices(module)
+        .into_iter()
         .map(|choice| ValueOption {
             id: scope.id(ids::graphics_value(module.name(), &choice)),
             label: choice_label(module, &choice),
@@ -303,14 +298,34 @@ pub fn scoped_value_options(module: &ComfigModule, scope: IdScope) -> Vec<ValueO
         .collect()
 }
 
-/// The value a row shows: the saved choice, else the preset's resolved value, else NotSet.
-pub fn shown_choice(catalog: &ModuleCatalog, choices: &Choices, module: &str) -> ModuleChoice {
-    if let Some(saved) = choices.get(module) {
-        return saved.clone();
-    }
+/// The module's own values in catalog order, as choices.
+pub fn value_choices(module: &ComfigModule) -> impl Iterator<Item = ModuleChoice> + '_ {
+    module
+        .values()
+        .iter()
+        .map(|v| ModuleChoice::Value(v.value().to_owned()))
+}
+
+/// A Select's choices: Let TF2 decide first, then each value in catalog order.
+pub fn select_choices(module: &ComfigModule) -> Vec<ModuleChoice> {
+    std::iter::once(ModuleChoice::NotSet)
+        .chain(value_choices(module))
+        .collect()
+}
+
+/// What the preset sets for `module`, ignoring any saved choice; NotSet leaves it to TF2.
+pub fn preset_choice(catalog: &ModuleCatalog, choices: &Choices, module: &str) -> ModuleChoice {
     catalog
         .resolve(module, choices.preset())
         .map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()))
+}
+
+/// The value a row shows: the saved choice, else the preset's value.
+pub fn shown_choice(catalog: &ModuleCatalog, choices: &Choices, module: &str) -> ModuleChoice {
+    choices
+        .get(module)
+        .cloned()
+        .unwrap_or_else(|| preset_choice(catalog, choices, module))
 }
 
 /// What shows in place of the settings list.
