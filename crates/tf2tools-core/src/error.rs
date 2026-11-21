@@ -2555,6 +2555,60 @@ impl From<LogsCacheError> for LogsFetchError {
     }
 }
 
+/// Why a demos.tf lookup or demo download failed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemosError {
+    /// demos.tf could not be reached.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// What went wrong.
+        message: String,
+    },
+    /// demos.tf answered an error status other than 404 and 429.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// demos.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// demos.tf no longer has the demo.
+    #[error("demos.tf no longer has this demo")]
+    Gone,
+    /// The body grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The answer was not the JSON shape demos.tf sends.
+    #[error("demos.tf sent an answer that could not be read")]
+    Unreadable,
+    /// The demo's address, or a redirect, left demos.tf's hosts.
+    #[error("{url} is not a demos.tf file")]
+    ForeignUrl {
+        /// The refused address.
+        url: String,
+    },
+    /// The demo file could not be written.
+    #[error("the demo could not be saved: {message}")]
+    Write {
+        /// What the filesystem reported.
+        message: String,
+    },
+}
+
 /// Why a stored logs.tf body could not be read as a log.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
