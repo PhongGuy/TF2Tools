@@ -3074,7 +3074,9 @@ graphics:
     as_is: "%{preset} wird unverändert genutzt. Ändere unten eine Einstellung, dann erscheint sie hier."
     chip: "%{name}: %{was} → %{now}"
     chip_saved: "%{name}: %{now}"
+    chip_gone: "%{name}: %{now} (nicht mehr in mastercomfig)"
     undo: "%{name} auf %{was} zurücksetzen"
+    remove: "%{name} entfernen"
     reset_all: "Alle zurücksetzen"
   settings:
     search: "Einstellungen durchsuchen"

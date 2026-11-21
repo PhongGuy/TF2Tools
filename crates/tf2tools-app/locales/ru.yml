@@ -3049,7 +3049,9 @@ graphics:
     as_is: "Пресет «%{preset}» используется без изменений. Измените любую настройку ниже, и она появится здесь."
     chip: "%{name}: %{was} → %{now}"
     chip_saved: "%{name}: %{now}"
+    chip_gone: "%{name}: %{now} (больше нет в mastercomfig)"
     undo: "Вернуть «%{name}» к значению «%{was}»"
+    remove: "Убрать «%{name}»"
     reset_all: "Сбросить всё"
   settings:
     search: "Поиск настроек"
