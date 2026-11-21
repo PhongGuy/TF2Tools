@@ -26,9 +26,9 @@ struct Host {
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let (presets, changes) = self.editor.update(cx, |e, cx| {
-            (e.presets_card(false, cx), e.changes_strip(false, cx))
-        });
+        let (presets, changes) = self
+            .editor
+            .update(cx, |e, cx| (e.presets_card(false, cx), e.changes_strip(cx)));
         v_flex().size_full().gap_4().child(presets).child(changes)
     }
 }

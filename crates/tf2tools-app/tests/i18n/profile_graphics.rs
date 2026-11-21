@@ -1,13 +1,15 @@
 //! The profile editor's Graphics rows and section headings reword when the app's language
-//! changes.
+//! changes, and its German changes strip holds still on the first change.
 
-use gpui_kit::TestAppContext;
+use gpui_kit::component::select::SelectEvent;
+use gpui_kit::{TestAppContext, px, size};
 use tf2tools_app::ids::{self, IdScope};
-use tf2tools_core::{ProfileDraft, SlotMode};
+use tf2tools_app::pages::graphics::model::ValueOption;
+use tf2tools_core::{Choices, Preset, ProfileDraft, SlotMode};
 
 use crate::LocaleGuard;
 use crate::support;
-use support::graphics::found;
+use support::graphics::{found, value};
 use support::profiles::{edit, low_fps60, page};
 
 #[gpui_kit::test]
@@ -43,4 +45,50 @@ fn a_language_switch_rewords_the_editor_rows(cx: &mut TestAppContext) {
     );
     assert_ne!(german, english, "the row kept its German label");
     assert_eq!(english, "Frame rate cap");
+}
+
+// At 1300 px the editor's strip is narrower than the Graphics page's, so it stacks by its own
+// width; the long German chip would otherwise wrap on the first change and move the rows.
+#[gpui_kit::test]
+fn the_first_german_change_keeps_the_editor_rows_still_at_1300_px(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("de");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    let draft =
+        ProfileDraft::new("Potato").with_graphics(SlotMode::Set(Choices::new(Preset::Medium)));
+    let p = s.services.library.create_profile(&draft).unwrap();
+    let page = page(cx, &s);
+    let e = edit(cx, &s, &page, p.id());
+    let gfx = IdScope::PROFILE_GRAPHICS;
+    cx.simulate_window_resize(s.win, size(px(1300.), px(900.)));
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_row("fpscap")))
+    });
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
+    support::settle(cx, s.win);
+    let empty = support::bounds_of(cx, s.win, gfx.id(ids::GRAPHICS_NO_CHANGES)).unwrap();
+    let row = |cx: &mut TestAppContext| {
+        support::bounds_of(cx, s.win, gfx.id(ids::graphics_row("fpscap"))).unwrap()
+    };
+    let row_before = row(cx);
+    let select = cx
+        .update(|cx| e.read(cx).graphics().read(cx).module_select("fpscap"))
+        .expect("the fpscap Select");
+    cx.update(|cx| {
+        select.update(cx, |_, cx| {
+            cx.emit(SelectEvent::<Vec<ValueOption>>::Confirm(Some(value("120"))))
+        })
+    });
+    support::wait_real(cx, "the first change", |cx| {
+        support::present(cx, s.win, gfx.id(ids::GRAPHICS_CHANGES))
+    });
+    support::settle(cx, s.win);
+    let strip = support::bounds_of(cx, s.win, gfx.id(ids::GRAPHICS_CHANGES)).unwrap();
+    assert_eq!(
+        empty.size.height, strip.size.height,
+        "the strip keeps its height: {empty:?} {strip:?}"
+    );
+    assert_eq!(row_before.top(), row(cx).top(), "the first row moved");
 }
