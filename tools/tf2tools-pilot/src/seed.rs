@@ -197,6 +197,24 @@ fn fill(
     seed_store(dir, empty_store)
 }
 
+/// The endpoints the seed's store client talks to: a closed loopback port, so no request the
+/// seed might make can leave the machine.
+pub fn offline_endpoints() -> tf2tools_core::Endpoints {
+    tf2tools_core::Endpoints::loopback(tf2tools_app::app::CLOSED_BASE)
+}
+
+/// The seed's store client config: the offline mask on top of the loopback endpoints.
+pub fn offline_config() -> tf2tools_core::StoreConfig {
+    tf2tools_core::StoreConfig::default().with_loopback_only(true)
+}
+
+/// The file in the data dir a finished Graphics seed leaves; while it is there, a rerun keeps
+/// whatever the player changed since.
+pub const GRAPHICS_DONE: &str = ".pilot-graphics-seeded";
+
+/// The first line of a modules.cfg the app wrote; it must match core's own header.
+pub const MODULES_HEADER: &str = "// Written by TF2Tools; changes here are replaced";
+
 /// The mastercomfig release the Graphics seed installs; its full catalogue and preset data
 /// are core fixtures.
 const MC_TAG: &str = "9.100.1";
@@ -212,22 +230,21 @@ const MC_PRESETS: &[u8] = include_bytes!(
 /// modules.cfg with vsync=on (switch), motion_blur=high (segments), fpscap=144 (select) and
 /// decals left to TF2 (select); and profiles Potato (Low with shadows=off and fpscap=60, only
 /// no-pyroland, the rest left) and Screenshots (Ultra, no HUD, sounds or crosshairs, add-ons
-/// left). Offline; does nothing once mastercomfig is managed.
+/// left). Offline. Does nothing once a run finished (`GRAPHICS_DONE`); until then every step
+/// rewrites its result, so a rerun after a run that failed midway leaves what a clean run does.
 pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     use tf2tools_core::{
-        Choices, Endpoints, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
+        Choices, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset, StoreClient,
     };
 
+    let done = data.join(GRAPHICS_DONE);
+    if done.exists() {
+        return Ok(());
+    }
     let dir = DataDir::at(data);
     let db = Database::open(&dir)?;
     let lib = Library::new(db.clone(), dir.clone());
     let tf2 = Tf2Install::from_path(game)?;
-    if matches!(
-        lib.mastercomfig_status(&tf2)?,
-        MastercomfigStatus::Managed { .. }
-    ) {
-        return Ok(());
-    }
 
     // A hand-placed base taken over and set to High is what an install leaves, without the download.
     let custom = tf2.custom_dir();
@@ -237,7 +254,12 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
         custom.join("mastercomfig-base.vpk"),
         vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())]),
     )?;
-    lib.take_over_mastercomfig(&tf2)?;
+    if !matches!(
+        lib.mastercomfig_status(&tf2)?,
+        MastercomfigStatus::Managed { .. }
+    ) {
+        lib.take_over_mastercomfig(&tf2)?;
+    }
     lib.apply_preset(&tf2, Preset::High)?;
 
     // Cached where the Graphics page looks, so it never fetches the catalogue.
@@ -247,10 +269,9 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
     fs::write(cached.join("preset_modules.json"), MC_PRESETS)?;
     let catalog = ModuleCatalog::parse(MC_TAG, MC_MODULES, MC_PRESETS)?;
 
-    // None of these needs an override VPK, so the apply stays offline.
-    let mut choices = lib
-        .mastercomfig_choices()?
-        .context("mastercomfig is not managed after the take-over")?;
+    // None of these needs an override VPK, so the apply stays offline. A modules.cfg a failed
+    // run cut off inside the header is dropped; any other foreign one still refuses the apply.
+    let mut choices = Choices::new(Preset::High);
     for (module, value) in [
         ("vsync", Some("on")),
         ("motion_blur", Some("high")),
@@ -260,7 +281,14 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
         let choice = value.map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()));
         choices.set(&catalog, module, choice);
     }
-    let store = StoreClient::new(db, dir, Endpoints::default());
+    let modules_cfg = tf2.tf_dir().join("cfg/overrides/modules.cfg");
+    if let Ok(bytes) = fs::read(&modules_cfg)
+        && MODULES_HEADER.as_bytes().starts_with(&bytes)
+    {
+        fs::remove_file(&modules_cfg)
+            .with_context(|| format!("cannot remove {}", modules_cfg.display()))?;
+    }
+    let store = StoreClient::new(db, dir, offline_endpoints()).with_config(offline_config());
     tokio::runtime::Builder::new_current_thread()
         .build()?
         .block_on(store.apply_mastercomfig_modules(&tf2, &catalog, &choices, false))?;
@@ -271,17 +299,34 @@ pub fn seed_graphics(data: &Path, game: &Path) -> anyhow::Result<()> {
         low.set(&catalog, module, ModuleChoice::Value(value.to_owned()));
     }
     let pyroland = AddonName::new(ADDONS[0]).context("invalid seeded addon name")?;
-    lib.create_profile(
-        &ProfileDraft::new("Potato")
+    put_profile(&lib, "Potato", |draft| {
+        draft
             .with_hud(SlotMode::Leave)
             .with_sounds(SlotMode::Leave)
             .with_crosshairs(SlotMode::Leave)
             .with_graphics(SlotMode::Set(low))
-            .with_addons(SlotMode::Set((vec![DraftItem::keep_addon(pyroland)], true))),
-    )?;
-    lib.create_profile(
-        &ProfileDraft::new("Screenshots").with_graphics(SlotMode::Set(Choices::new(Preset::Ultra))),
-    )?;
+            .with_addons(SlotMode::Set((vec![DraftItem::keep_addon(pyroland)], true)))
+    })?;
+    put_profile(&lib, "Screenshots", |draft| {
+        draft.with_graphics(SlotMode::Set(Choices::new(Preset::Ultra)))
+    })?;
+    fs::write(&done, b"").with_context(|| format!("cannot write {}", done.display()))
+}
+
+// Rewrites the profile `name` in place when an earlier run made it, else creates it from
+// `ProfileDraft::new(name)` with `slots` applied.
+fn put_profile(
+    lib: &Library,
+    name: &str,
+    slots: impl FnOnce(ProfileDraft) -> ProfileDraft,
+) -> anyhow::Result<()> {
+    let draft = slots(ProfileDraft::new(name));
+    let draft = &draft;
+    let existing = lib.profiles()?.into_iter().find(|p| p.name() == name);
+    match existing {
+        Some(profile) => lib.update_profile(profile.id(), draft).map(drop)?,
+        None => lib.create_profile(draft).map(drop)?,
+    }
     Ok(())
 }
 

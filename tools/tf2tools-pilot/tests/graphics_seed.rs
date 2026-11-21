@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use rusqlite::types::Value;
 
 use tf2tools_core::{
     AddonName, BuiltinCrosshairs, DataDir, Database, Endpoints, Library, MastercomfigStatus,
     ModuleChoice, Preset, Profile, SlotMode, StoreClient, Tf2Install,
 };
-use tf2tools_pilot::seed::{seed, seed_graphics};
+use tf2tools_pilot::seed::{GRAPHICS_DONE, MODULES_HEADER, seed, seed_graphics};
 use tf2tools_pilot::{GRAPHICS_VAR, graphics_requested};
 
 fn assets() -> PathBuf {
@@ -36,7 +38,7 @@ fn the_graphics_seed_manages_mastercomfig_with_changed_choices() {
         other => panic!("expected a managed mastercomfig, got {other:?}"),
     }
 
-    let catalog = StoreClient::new(db, dir, Endpoints::default())
+    let catalog = StoreClient::new(db, dir, tf2tools_pilot::seed::offline_endpoints())
         .cached_mastercomfig_catalog("9.100.1")
         .expect("the 9.100.1 catalogue is cached");
     let modules: usize = catalog.categories().iter().map(|c| c.modules().len()).sum();
@@ -75,14 +77,317 @@ fn the_plain_seed_leaves_mastercomfig_out() {
 #[test]
 fn seeding_graphics_twice_changes_nothing() {
     let tmp = tempfile::tempdir().unwrap();
-    let data = tmp.path().join("com.tf2tools.app");
-    let game = tmp.path().join("fake-tf2/Team Fortress 2");
+    let (data, game) = dirs(tmp.path());
     seed(&data, &game, &assets()).unwrap();
     seed_graphics(&data, &game).unwrap();
-    let cfg = game.join("tf/cfg/overrides/modules.cfg");
-    let before = std::fs::read(&cfg).unwrap();
+    let before = seeded_state(tmp.path());
     seed_graphics(&data, &game).unwrap();
-    assert_eq!(std::fs::read(&cfg).unwrap(), before);
+    assert_seeded_eq(&seeded_state(tmp.path()), &before);
+}
+
+// A run that stopped at any step, or left a file half-written, heals on the next run into
+// exactly what a clean run leaves.
+#[test]
+fn a_rerun_after_a_half_failed_graphics_seed_equals_a_clean_one() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (data, game) = dirs(tmp.path());
+    seed(&data, &game, &assets()).unwrap();
+    let base = raw_tree(tmp.path());
+    seed_graphics(&data, &game).unwrap();
+    let clean = seeded_state(tmp.path());
+
+    let modules_cfg = game.join("tf/cfg/overrides/modules.cfg");
+    let hook = game.join("tf/custom/comfig-custom/cfg/app/setup_hook.cfg");
+    let cache = DataDir::at(&data).mastercomfig_dir().join("9.100.1");
+    let stops: [(&str, &dyn Fn()); 5] = [
+        ("after the base VPK", &|| {
+            undo_after_preset(&data, &modules_cfg, &cache);
+            std::fs::remove_file(&hook).unwrap();
+            sql(&data, "DELETE FROM mastercomfig_state");
+        }),
+        ("after the preset", &|| {
+            undo_after_preset(&data, &modules_cfg, &cache)
+        }),
+        ("mid catalogue", &|| {
+            undo_after_preset(&data, &modules_cfg, &cache);
+            std::fs::create_dir_all(&cache).unwrap();
+            std::fs::write(cache.join("modules.json"), b"{\"trunc").unwrap();
+        }),
+        ("mid modules.cfg", &|| {
+            delete_profiles(&data, &["Potato", "Screenshots"]);
+            std::fs::write(&modules_cfg, &MODULES_HEADER.as_bytes()[..9]).unwrap();
+            sql(&data, "UPDATE mastercomfig_state SET modules = '{}'");
+        }),
+        ("between the profiles", &|| {
+            delete_profiles(&data, &["Screenshots"])
+        }),
+    ];
+    for (stop, undo) in stops {
+        restore(tmp.path(), &base);
+        seed_graphics(&data, &game).unwrap();
+        undo();
+        // The marker is the last thing a run writes, so a run that stopped never left one.
+        std::fs::remove_file(data.join(GRAPHICS_DONE)).unwrap();
+        seed_graphics(&data, &game).unwrap_or_else(|e| panic!("rerun {stop}: {e:#}"));
+        let healed = seeded_state(tmp.path());
+        assert_seeded_eq_named(&healed, &clean, stop);
+    }
+}
+
+// A finished seed is the player's from then on: a kept data dir relaunched with the Graphics
+// seed on keeps whatever they changed.
+#[test]
+fn a_finished_graphics_seed_keeps_the_players_changes() {
+    let (tmp, lib, tf2) = seeded_with_graphics();
+    let (data, game) = dirs(tmp.path());
+    lib.apply_preset(&tf2, Preset::Low).unwrap();
+    lib.delete_profile(profile(&lib, "Screenshots").id())
+        .unwrap();
+    std::fs::write(game.join("tf/cfg/overrides/modules.cfg"), b"// mine\n").unwrap();
+    let changed = seeded_state(tmp.path());
+    seed_graphics(&data, &game).unwrap();
+    assert_seeded_eq(&seeded_state(tmp.path()), &changed);
+}
+
+// The seed writes modules.cfg as the app does, and a modules.cfg the app did not write, in a
+// game dir the seed binary was pointed at, is refused as before rather than deleted.
+#[test]
+fn the_graphics_seed_leaves_a_foreign_modules_cfg_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (data, game) = dirs(tmp.path());
+    seed(&data, &game, &assets()).unwrap();
+    let cfg = game.join("tf/cfg/overrides/modules.cfg");
+    std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
+    std::fs::write(&cfg, b"// hand-written\n").unwrap();
+    assert!(seed_graphics(&data, &game).is_err());
+    assert_eq!(std::fs::read(&cfg).unwrap(), b"// hand-written\n");
+    assert!(!data.join(GRAPHICS_DONE).exists());
+
+    std::fs::remove_file(&cfg).unwrap();
+    seed_graphics(&data, &game).unwrap();
+    let written = std::fs::read_to_string(&cfg).unwrap();
+    assert_eq!(written.lines().next(), Some(MODULES_HEADER));
+}
+
+// What a run that stopped right after `apply_preset` leaves: no catalogue, no modules.cfg,
+// no saved choices and neither profile.
+fn undo_after_preset(data: &Path, modules_cfg: &Path, cache: &Path) {
+    delete_profiles(data, &["Potato", "Screenshots"]);
+    std::fs::remove_file(modules_cfg).unwrap();
+    std::fs::remove_dir_all(cache).unwrap();
+    sql(data, "UPDATE mastercomfig_state SET modules = '{}'");
+}
+
+fn delete_profiles(data: &Path, names: &[&str]) {
+    let dir = DataDir::at(data);
+    let lib = Library::new(Database::open(&dir).unwrap(), dir);
+    for name in names {
+        lib.delete_profile(profile(&lib, name).id()).unwrap();
+    }
+}
+
+fn sql(data: &Path, statement: &str) {
+    rusqlite::Connection::open(DataDir::at(data).db_path())
+        .unwrap()
+        .execute(statement, [])
+        .unwrap();
+}
+
+fn dirs(root: &Path) -> (PathBuf, PathBuf) {
+    (
+        root.join("com.tf2tools.app"),
+        root.join("fake-tf2/Team Fortress 2"),
+    )
+}
+
+/// Every directory (None) and file (its bytes) under `root`, keyed by relative path.
+type Tree = BTreeMap<PathBuf, Option<Vec<u8>>>;
+
+fn raw_tree(root: &Path) -> Tree {
+    fn walk(root: &Path, dir: &Path, out: &mut Tree) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let rel = path.strip_prefix(root).unwrap().to_path_buf();
+            if path.is_dir() {
+                out.insert(rel, None);
+                walk(root, &path, out);
+            } else {
+                out.insert(rel, Some(std::fs::read(&path).unwrap()));
+            }
+        }
+    }
+    let mut out = Tree::new();
+    walk(root, root, &mut out);
+    out
+}
+
+/// Puts `root` back to `tree` exactly, the database's WAL included.
+fn restore(root: &Path, tree: &Tree) {
+    for entry in std::fs::read_dir(root).unwrap() {
+        std::fs::remove_dir_all(entry.unwrap().path()).unwrap();
+    }
+    for (rel, bytes) in tree {
+        match bytes {
+            None => std::fs::create_dir_all(root.join(rel)).unwrap(),
+            Some(bytes) => std::fs::write(root.join(rel), bytes).unwrap(),
+        }
+    }
+}
+
+/// The seeded tree with the database swapped for a dump of its rows. The database files are
+/// compared by rows, not bytes: page layout, the WAL and its shm change with every open.
+/// Row ids and timestamps are masked, since each run mints its own.
+struct Seeded {
+    files: Tree,
+    rows: Vec<String>,
+}
+
+fn seeded_state(root: &Path) -> Seeded {
+    let (data, _) = dirs(root);
+    let db = DataDir::at(&data).db_path();
+    let db_name = db.file_name().unwrap().to_str().unwrap().to_owned();
+    let mut files = raw_tree(root);
+    files.retain(|rel, _| {
+        let name = rel.file_name().unwrap().to_str().unwrap();
+        !(name == db_name || name == format!("{db_name}-wal") || name == format!("{db_name}-shm"))
+    });
+    Seeded {
+        files,
+        rows: db_rows(&db),
+    }
+}
+
+fn db_rows(path: &Path) -> Vec<String> {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    let tables: Vec<String> = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    let mut table_rows = Vec::new();
+    for table in tables {
+        let mut stmt = conn.prepare(&format!("SELECT * FROM \"{table}\"")).unwrap();
+        let columns: Vec<String> = stmt.column_names().map(str::to_owned).collect();
+        let mut query = stmt.query([]).unwrap();
+        while let Some(row) = query.next().unwrap() {
+            let cells: Vec<(String, Value)> = columns
+                .iter()
+                .enumerate()
+                .map(|(i, col)| (col.clone(), row.get(i).unwrap()))
+                .collect();
+            table_rows.push((table.clone(), cells));
+        }
+    }
+
+    // Each run mints its own ids, so a uuid reads as the name of the row it identifies,
+    // wherever it appears (the active profile setting included).
+    let mut names = BTreeMap::new();
+    for (table, cells) in &table_rows {
+        let cell = |name: &str| cells.iter().find(|(c, _)| c == name).map(|(_, v)| v);
+        if let (Some(Value::Text(id)), Some(Value::Text(name))) = (cell("id"), cell("name"))
+            && is_uuid(id)
+        {
+            names.insert(id.clone(), format!("<{table} {name:?}>"));
+        }
+    }
+    let mut rows: Vec<String> = table_rows
+        .iter()
+        .map(|(table, cells)| {
+            let cells: Vec<String> = cells
+                .iter()
+                .map(|(col, v)| format!("{col}={}", masked(col, v, &names)))
+                .collect();
+            format!("{table}: {}", cells.join(", "))
+        })
+        .collect();
+    rows.sort();
+    rows
+}
+
+// Timestamps are masked only when set, so a NULL that became a time (or back) still shows.
+fn masked(column: &str, value: &Value, names: &BTreeMap<String, String>) -> String {
+    let is_time = column.ends_with("_at") || column == "timestamp" || column == "date_added";
+    match value {
+        Value::Null => "NULL".to_owned(),
+        _ if is_time => "<time>".to_owned(),
+        Value::Text(text) if is_uuid(text) => names
+            .get(text)
+            .cloned()
+            .unwrap_or_else(|| format!("{text:?}")),
+        other => format!("{other:?}"),
+    }
+}
+
+fn is_uuid(s: &str) -> bool {
+    s.len() == 36
+        && s.char_indices().all(|(i, c)| match i {
+            8 | 13 | 18 | 23 => c == '-',
+            _ => c.is_ascii_hexdigit(),
+        })
+}
+
+fn assert_seeded_eq(got: &Seeded, want: &Seeded) {
+    assert_seeded_eq_named(got, want, "");
+}
+
+fn assert_seeded_eq_named(got: &Seeded, want: &Seeded, label: &str) {
+    let extra: Vec<_> = got
+        .files
+        .keys()
+        .filter(|p| !want.files.contains_key(*p))
+        .collect();
+    let missing: Vec<_> = want
+        .files
+        .keys()
+        .filter(|p| !got.files.contains_key(*p))
+        .collect();
+    assert!(
+        extra.is_empty() && missing.is_empty(),
+        "{label}: extra {extra:?}, missing {missing:?}"
+    );
+    for (rel, bytes) in &want.files {
+        assert!(
+            got.files[rel] == *bytes,
+            "{label}: {} differs",
+            rel.display()
+        );
+    }
+    assert_eq!(got.rows, want.rows, "{label}: database rows");
+}
+
+// The seed's store client and the seeded boot only ever name loopback, and keep the offline
+// mask on top. The boot sets loopback itself and `Boot::offline` sets it again, so the boot half
+// guards the result: it fails only if both go.
+#[test]
+fn the_seed_and_seeded_boot_point_at_loopback() {
+    let endpoints = tf2tools_pilot::seed::offline_endpoints();
+    assert_loopback(&endpoints);
+    assert!(tf2tools_pilot::seed::offline_config().loopback_only());
+
+    let tmp = tempfile::tempdir().unwrap();
+    let boot = tf2tools_pilot::seeded_boot(&tmp.path().join("com.tf2tools.app")).unwrap();
+    assert_loopback(&boot.endpoints);
+    assert!(boot.offline);
+    assert!(!boot.auto_sync);
+}
+
+fn assert_loopback(e: &Endpoints) {
+    let mut urls = vec![
+        e.gamebanana(),
+        e.github_api(),
+        e.github(),
+        e.hud_resources(),
+        e.serveme(),
+        e.map_downloads(),
+        e.mastercomfig_data(),
+    ];
+    urls.extend(e.preview_prefixes().iter().map(String::as_str));
+    urls.extend(e.image_prefixes().iter().map(String::as_str));
+    for url in urls {
+        assert!(url.starts_with("http://127.0.0.1:"), "{url}");
+    }
 }
 
 #[test]
