@@ -154,7 +154,11 @@ fn every_graphics_id_is_drawn_in_some_page_state(cx: &mut TestAppContext) {
 
     // Guards against a vacuous pass if ids.rs ever spells its ids another way.
     let declared = declared_kinds();
-    assert!(declared.len() >= 50, "read only {} Graphics ids from ids.rs", declared.len());
+    assert!(
+        declared.len() >= 50,
+        "read only {} Graphics ids from ids.rs",
+        declared.len()
+    );
     let missing: Vec<String> = declared.difference(&seen).cloned().collect();
     assert!(missing.is_empty(), "never drawn: {missing:?}");
 }
