@@ -3071,7 +3071,7 @@ graphics:
       performance_only: "Sem imagem: esta configuração muda o desempenho, não a aparência do jogo."
       same_in_still: "Sem imagem: numa imagem parada fica igual. A diferença só aparece em movimento."
       needs_item: "Sem imagem: só aparece com um item, cosmético ou spray específico."
-      not_on_local_server: "Sem imagem: não aparece na partida local usada para as imagens."
+      not_on_local_server: "Sem imagem: só aparece quando outros jogadores são atingidos em uma partida real."
       needs_motion: "Sem imagem: a diferença só aparece em movimento."
   changes:
     title: { one: "%{count} alteração em relação a %{preset}", other: "%{count} alterações em relação a %{preset}" }

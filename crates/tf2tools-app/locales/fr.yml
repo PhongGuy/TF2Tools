@@ -3072,7 +3072,7 @@ graphics:
       performance_only: "Pas d'image\u00A0: ce réglage change les performances, pas l'apparence du jeu."
       same_in_still: "Pas d'image\u00A0: sur une image fixe, le rendu est identique. La différence ne se voit qu'en mouvement."
       needs_item: "Pas d'image\u00A0: cela n'apparaît qu'avec un objet, un cosmétique ou un spray particulier."
-      not_on_local_server: "Pas d'image\u00A0: cela n'apparaît pas dans la partie locale utilisée pour les images."
+      not_on_local_server: "Pas d'image\u00A0: cela ne se voit que lorsque d'autres joueurs sont touchés dans une vraie partie."
       needs_motion: "Pas d'image\u00A0: la différence ne se voit qu'en mouvement."
   changes:
     title: { one: "%{count} modification par rapport à %{preset}", other: "%{count} modifications par rapport à %{preset}" }

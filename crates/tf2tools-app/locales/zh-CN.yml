@@ -3069,7 +3069,7 @@ graphics:
       performance_only: "无图片：此设置影响性能，而不是游戏外观。"
       same_in_still: "无图片：静态画面中看起来一样，区别只在移动时出现。"
       needs_item: "无图片：只有装备特定物品、饰品或喷漆时才会出现。"
-      not_on_local_server: "无图片：用于截图的本地游戏中不会出现。"
+      not_on_local_server: "无图片：只有在真实对局中其他玩家被击中时才会显示。"
       needs_motion: "无图片：区别只在运动时出现。"
   changes:
     title: { other: "相对 %{preset} 有 %{count} 处更改" }

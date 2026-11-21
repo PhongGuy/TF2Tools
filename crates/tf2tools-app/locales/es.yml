@@ -3070,7 +3070,7 @@ graphics:
       performance_only: "Sin imagen: este ajuste cambia el rendimiento, no el aspecto del juego."
       same_in_still: "Sin imagen: en una imagen fija se ve igual. La diferencia solo se nota en movimiento."
       needs_item: "Sin imagen: solo se ve con cierto objeto, cosmético o spray."
-      not_on_local_server: "Sin imagen: no se ve en la partida local usada para las imágenes."
+      not_on_local_server: "Sin imagen: solo se ve cuando golpean a otros jugadores en una partida real."
       needs_motion: "Sin imagen: la diferencia solo se nota en movimiento."
   changes:
     title: { one: "%{count} cambio respecto a %{preset}", other: "%{count} cambios respecto a %{preset}" }
