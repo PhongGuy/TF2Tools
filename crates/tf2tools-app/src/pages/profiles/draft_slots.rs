@@ -849,7 +849,7 @@ impl ProfileDraftEditor {
             }
             (v_flex().gap_4())
                 .child(presets)
-                .child(g.changes_strip(narrow, cx))
+                .child(g.changes_strip(cx))
                 .child(card)
                 .into_any_element()
         })

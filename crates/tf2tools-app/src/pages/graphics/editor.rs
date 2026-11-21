@@ -3,7 +3,9 @@
 //! events; the host saves them and calls back with `set_choices`, so it always shows what
 //! was saved.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
@@ -15,8 +17,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window,
+    canvas, div, px,
 };
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
@@ -34,6 +36,9 @@ use crate::widgets::Named as _;
 const STRIP_HEIGHT: Pixels = px(54.);
 // A narrow strip stacks its title line over the chips, so it is one 28 px line and a gap taller.
 const STACKED_STRIP_HEIGHT: Pixels = px(90.);
+// A strip narrower than this stacks: one long translated chip, or the Russian "as is" text,
+// would no longer fit one line beside the title.
+const STACK_BELOW: Pixels = px(800.);
 
 /// An edit the editor proposes to its host; the editor's own choices stay as they are.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +82,8 @@ pub struct GraphicsChoicesEditor {
     generation: u64,
     /// This editor's own `RemoteImages` viewer, so two editors never clear each other's wants.
     image_viewer: String,
+    /// The changes strip's painted width last frame; zero until it is first drawn.
+    strip_width: Rc<Cell<Pixels>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -128,6 +135,7 @@ impl GraphicsChoicesEditor {
             language: i18n::current(),
             generation: 0,
             image_viewer,
+            strip_width: Rc::new(Cell::new(px(0.))),
             _subscriptions: subscriptions,
         };
         editor.rebuild();
@@ -423,15 +431,30 @@ impl GraphicsChoicesEditor {
     }
 
     /// The changes from the preset as chips with an undo each, and Reset all; a dashed "as is"
-    /// strip when there are none. Without a catalog the chips only name the saved values. When
-    /// `narrow`, the title and Reset all sit on a line above the chips.
-    pub fn changes_strip(&self, narrow: bool, cx: &mut Context<Self>) -> AnyElement {
+    /// strip when there are none. Without a catalog the chips only name the saved values. A strip
+    /// narrower than `STACK_BELOW` puts the title and Reset all on a line above the chips.
+    pub fn changes_strip(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
         let (accent, fill) = (theme.sidebar_primary, theme.background);
         let preset = preset_label(self.choices.preset());
         let catalog = self.catalog.as_deref();
         let list = self.built.changes();
+        // The strip stacks by its own width, which the canvas records each frame; a change asks
+        // for another frame, since a refresh requested while drawing is dropped. Unmeasured is wide.
+        let measured = Rc::clone(&self.strip_width);
+        let narrow = measured.get() > px(0.) && measured.get() < STACK_BELOW;
+        let watch = canvas(
+            move |bounds, window, _| {
+                if measured.get() != bounds.size.width {
+                    measured.set(bounds.size.width);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
         if list.is_empty() {
             let text = tr!("graphics.changes.as_is", preset = preset);
             // The text is its own shrinkable block, so it wraps inside the strip's padding.
@@ -445,6 +468,7 @@ impl GraphicsChoicesEditor {
                 .id(self.scope.id(ids::GRAPHICS_NO_CHANGES))
                 .aria_label(text)
                 .test_support()
+                .relative()
                 .flex()
                 .items_center()
                 .min_h(if narrow {
@@ -463,6 +487,7 @@ impl GraphicsChoicesEditor {
                 .border_dashed()
                 .border_color(border)
                 .rounded(radius)
+                .child(watch)
                 .child(line)
                 .into_any_element();
         }
@@ -564,9 +589,11 @@ impl GraphicsChoicesEditor {
             .id(self.scope.id(ids::GRAPHICS_CHANGES))
             .aria_label(title_name)
             .test_support()
+            .relative()
             .py_3()
             .px_4()
-            .border_color(accent);
+            .border_color(accent)
+            .child(watch);
         // Narrow, one chip beside the title would already wrap, so the title line stands above
         // the chips and the strip's height no longer depends on where the first chip lands.
         if narrow {
