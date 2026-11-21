@@ -112,6 +112,8 @@ pub struct ProfilesPage {
     image_viewer: String,
     busy: bool,
     activating: Option<ProfileId>,
+    /// The part of `activating` that does work; idle while one of its dialogs waits.
+    applying: Option<ProfileId>,
     view: View,
     grid: CardGrid,
     /// The page's own scroll, which moves only in a window too short for the page.
@@ -155,6 +157,7 @@ impl ProfilesPage {
             image_viewer,
             busy: false,
             activating: None,
+            applying: None,
             view: View::Grid,
             grid,
             scroll: ScrollHandle::new(),
@@ -202,6 +205,11 @@ impl ProfilesPage {
     /// The profile whose activate flow is running, from the click until it ends.
     pub fn activating(&self) -> Option<&ProfileId> {
         self.activating.as_ref()
+    }
+
+    /// The profile whose Apply button spins: its activate is working, not waiting on a dialog.
+    pub fn applying(&self) -> Option<&ProfileId> {
+        self.applying.as_ref()
     }
 
     /// Shows the editor for `id` in place of the grid; does nothing while `is_busy()` or for an
@@ -303,6 +311,13 @@ impl ProfilesPage {
         let probe = Tf2Probe::get(cx);
         let win = self.win;
         cx.spawn(async move |page, cx| {
+            // The button spins only while the flow works, never while a dialog waits on the user.
+            let spin = |on: bool, cx: &mut AsyncApp| {
+                let _ = page.update(cx, |page, cx| {
+                    page.applying = on.then(|| id.clone());
+                    cx.notify();
+                });
+            };
             let flow = async {
                 // The summary asks before the TF2 probe, so a cancelled summary never probes.
                 if let Some(reading) = reading {
@@ -327,7 +342,9 @@ impl ProfilesPage {
                         return;
                     }
                 }
+                spin(true, cx);
                 if cx.background_spawn(async move { probe() }).await {
+                    spin(false, cx);
                     let Ok(answer) = cx.update(|cx| {
                         win.update(cx, |_, window, cx| {
                             confirm(Confirm::tf2_running(), window, cx)
@@ -338,6 +355,7 @@ impl ProfilesPage {
                     if !answer.recv().await.unwrap_or(false) {
                         return;
                     }
+                    spin(true, cx);
                 }
                 // The summary showed what is missing, so the apply skips whatever still is.
                 let mut plan = ExternalPlan::default();
@@ -387,6 +405,7 @@ impl ProfilesPage {
             flow.await;
             let _ = page.update(cx, |page, cx| {
                 page.activating = None;
+                page.applying = None;
                 cx.notify();
             });
         })
@@ -1153,7 +1172,7 @@ struct CardContext {
     hud_images: Rc<HashMap<String, String>>,
     addon_names: Rc<HashMap<String, String>>,
     gates: Gates,
-    activating: Option<ProfileId>,
+    applying: Option<ProfileId>,
     page: WeakEntity<ProfilesPage>,
 }
 
@@ -1285,7 +1304,7 @@ fn profile_card(profile: &Profile, active: bool, ctx: &CardContext, cx: &App) ->
         Button::new(ids::profile_card_apply(&id))
             .primary()
             .label(tr!("profiles.button.apply"))
-            .loading(ctx.activating.as_ref() == Some(&id))
+            .loading(ctx.applying.as_ref() == Some(&id))
             .disabled(!has_tf2 || busy)
             .on_click(move |_, window, cx| {
                 cx.stop_propagation();
@@ -1374,7 +1393,7 @@ impl ProfilesPage {
                 hud_images: Rc::clone(&self.hud_images),
                 addon_names: Rc::clone(&self.addon_names),
                 gates: Gates { has_tf2, busy },
-                activating: self.activating.clone(),
+                applying: self.applying().cloned(),
                 page: cx.entity().downgrade(),
             };
             Some(

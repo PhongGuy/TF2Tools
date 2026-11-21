@@ -1,6 +1,6 @@
 use crate::support;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -15,8 +15,8 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, Provenance, SlotMode,
-    SoundEntry, Tf2Install,
+    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, ProfileId,
+    Provenance, SlotMode, SoundEntry, Tf2Install,
 };
 use tf2tools_core::{GbId, LibraryKind};
 use tf2tools_core::{LogEntry, LogLevel};
@@ -779,6 +779,86 @@ fn activate_rests_without_tf2(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
 }
 
+/// Every `applying()` the page shows from now on, read at each notify; keep the subscription.
+fn record_applying(
+    cx: &mut TestAppContext,
+    page: &Entity<ProfilesPage>,
+) -> (Rc<RefCell<Vec<Option<ProfileId>>>>, gpui_kit::Subscription) {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let log = Rc::clone(&seen);
+    let sub = cx.update(|cx| {
+        cx.observe(page, move |page, cx| {
+            log.borrow_mut().push(page.read(cx).applying().cloned())
+        })
+    });
+    (seen, sub)
+}
+
+#[gpui_kit::test]
+fn apply_stays_idle_while_its_summary_waits(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let other = empty_profile(&s, "Other");
+    let page = open_profiles(cx, &s);
+    let (seen, _sub) = record_applying(cx, &page);
+    open_summary(cx, &s, comp.id());
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    // The summary still holds the one activate, so a second Apply does nothing.
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.activate(other.id().clone(), window, cx))
+    })
+    .unwrap();
+    assert_eq!(
+        cx.update(|cx| page.read(cx).activating().cloned()),
+        Some(comp.id().clone())
+    );
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
+    support::settle(cx, s.win);
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+}
+
+#[gpui_kit::test]
+fn apply_spins_from_the_summary_s_yes_until_the_apply_ends(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let (seen, _sub) = record_applying(cx, &page);
+    open_summary(cx, &s, comp.id());
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    support::wait_real(cx, "idle", |cx| {
+        cx.update(|cx| page.read(cx).activating().is_none())
+    });
+    assert!(seen.borrow().contains(&Some(comp.id().clone())), "{seen:?}");
+    assert!(cx.update(|cx| page.read(cx).applying().is_none()));
+}
+
+#[gpui_kit::test]
+fn apply_stays_idle_while_the_tf2_running_question_waits(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the running confirm", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_OK)
+    });
+    assert!(cx.update(|cx| page.read(cx).applying().is_none()));
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::settle(cx, s.win);
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+}
+
 /// "Comp" with a local HUD "rayshud" (deleted from the library) and a present hitsound.
 fn profile_missing_its_hud(s: &support::ShellWindow, env: &support::Env) -> Profile {
     let hud = seed_hud(s, env, "rayshud", Provenance::Local);
@@ -933,6 +1013,10 @@ fn confirming_with_a_missing_item_moves_the_active_pill_to_the_applied_profile(
         .unwrap();
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_active(pub_.id())).as_deref(),
+        Some("Active")
+    );
     support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the active pill on Comp", |cx| {
         support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref()
