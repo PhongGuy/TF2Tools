@@ -375,57 +375,65 @@ impl GraphicsChoicesEditor {
             &[("preset", &preset)],
         );
         let editable = catalog.is_some();
-        let chips: Vec<AnyElement> =
-            list.into_iter()
-                .map(|change| {
-                    let sentence = match &change.was {
-                        Some(was) => tr!(
-                            "graphics.changes.chip",
-                            name = change.label,
-                            was = was,
-                            now = change.now
-                        ),
-                        None => tr!(
-                            "graphics.changes.chip_saved",
-                            name = change.label,
-                            now = change.now
-                        ),
+        let chips: Vec<AnyElement> = list
+            .into_iter()
+            .map(|change| {
+                // A saved value the preset now matches names itself once, not "High → High".
+                let was = change.was.clone().filter(|_| !change.same);
+                let sentence = match &was {
+                    Some(was) => tr!(
+                        "graphics.changes.chip",
+                        name = change.label,
+                        was = was,
+                        now = change.now
+                    ),
+                    None => tr!(
+                        "graphics.changes.chip_saved",
+                        name = change.label,
+                        now = change.now
+                    ),
+                };
+                let undo = change.was.clone().filter(|_| editable).map(|preset| {
+                    let module = change.module.clone();
+                    let name = match &was {
+                        Some(_) => {
+                            tr!("graphics.changes.undo", name = change.label, was = preset)
+                        }
+                        None => tr!("graphics.row.reset"),
                     };
-                    let undo = change.was.clone().filter(|_| editable).map(|was| {
-                        let module = change.module.clone();
-                        Button::new(self.scope.id(ids::graphics_change_undo(&change.module)))
-                            .ghost()
-                            .xsmall()
-                            .rounded(px(999.))
-                            .icon(IconName::X)
-                            .named(tr!("graphics.changes.undo", name = change.label, was = was))
-                            .disabled(self.disabled)
-                            .on_click(cx.listener(move |editor, _, _, cx| {
-                                editor.propose(|c, _| c.reset(&module), cx)
-                            }))
-                    });
-                    h_flex()
-                        .id(self.scope.id(ids::graphics_change(&change.module)))
-                        .aria_label(sentence)
-                        .test_support()
-                        .h(px(28.))
-                        .gap(px(6.))
-                        .pl(px(10.))
-                        .pr_1()
-                        .text_sm()
-                        .border_1()
-                        .border_color(accent)
-                        .bg(fill)
-                        .rounded_full()
-                        .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
-                        .children(change.was.map(|was| {
-                            h_flex().gap(px(6.)).text_color(muted).child(was).child("→")
+                    Button::new(self.scope.id(ids::graphics_change_undo(&change.module)))
+                        .ghost()
+                        .xsmall()
+                        .rounded(px(999.))
+                        .icon(IconName::X)
+                        .named(name)
+                        .disabled(self.disabled)
+                        .on_click(cx.listener(move |editor, _, _, cx| {
+                            editor.propose(|c, _| c.reset(&module), cx)
                         }))
-                        .child(change.now)
-                        .children(undo)
-                        .into_any_element()
-                })
-                .collect();
+                });
+                h_flex()
+                    .id(self.scope.id(ids::graphics_change(&change.module)))
+                    .aria_label(sentence)
+                    .test_support()
+                    .h(px(28.))
+                    .gap(px(6.))
+                    .pl(px(10.))
+                    .pr_1()
+                    .text_sm()
+                    .border_1()
+                    .border_color(accent)
+                    .bg(fill)
+                    .rounded_full()
+                    .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
+                    .children(
+                        was.map(|was| h_flex().gap(px(6.)).text_color(muted).child(was).child("→")),
+                    )
+                    .child(change.now)
+                    .children(undo)
+                    .into_any_element()
+            })
+            .collect();
         let reset_all = editable.then(|| {
             Button::new(self.scope.id(ids::GRAPHICS_RESET_ALL))
                 .ghost()

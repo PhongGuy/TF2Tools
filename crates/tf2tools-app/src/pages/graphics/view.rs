@@ -111,6 +111,8 @@ pub struct ChangeView {
     pub label: SharedString,
     pub was: Option<SharedString>,
     pub now: SharedString,
+    /// The saved value equals the preset's, as after a preset switch.
+    pub same: bool,
 }
 
 /// The player's changes from the preset: changed rows in catalogue order, or without a
@@ -125,6 +127,7 @@ pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<Change
                 label: module_label_by_name(name),
                 was: None,
                 now: choice_label_by_id(name, choice),
+                same: false,
             })
             .collect();
     };
@@ -137,6 +140,7 @@ pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<Change
         .map(|(module, row)| ChangeView {
             was: Some(choice_label(module, &row.preset_value)),
             now: choice_label(module, &row.shown),
+            same: row.shown == row.preset_value,
             module: row.module,
             label: row.label,
         })

@@ -264,4 +264,13 @@ fn a_saved_choice_the_new_preset_matches_still_offers_reset(cx: &mut TestAppCont
         support::label_of(cx, s.win, ids::graphics_module_preset("lod")).as_deref(),
         Some("High: High")
     );
+    // The strip names the kept value once, and its undo is a plain Reset like the row's.
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_change("lod")).as_deref(),
+        Some("Model quality: High")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_change_undo("lod")).as_deref(),
+        Some("Reset")
+    );
 }
