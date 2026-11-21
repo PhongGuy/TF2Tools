@@ -495,7 +495,7 @@ async fn remove_deletes_exactly_its_files_and_forgets_it() {
     common::write_file(&s.tf2.custom_dir().join("foreign/x.txt"), b"f");
     s.env
         .lib
-        .remove_gb_addon(GbId::new(20), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(20), &s.tf2, &no)
         .unwrap();
     assert_eq!(custom(&s), ["foreign.vpk", "foreign/x.txt"]);
     assert!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().is_empty());
@@ -513,7 +513,7 @@ async fn remove_refuses_while_tf2_runs_when_a_vpk_is_installed() {
     let err = s
         .env
         .lib
-        .remove_gb_addon(GbId::new(21), &s.tf2, &yes)
+        .delete_gb_addon(GbId::new(21), &s.tf2, &yes)
         .unwrap_err();
     assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
     assert_eq!(custom(&s), ["tf2tools-gb-21-crit.vpk"]);
@@ -531,7 +531,7 @@ async fn remove_deletes_the_sound_cache_tf2_wrote_beside_its_vpk() {
     common::write_file(&dir.join("tf2tools-gb-23-crit.vpk.sound.cache"), b"c");
     s.env
         .lib
-        .remove_gb_addon(GbId::new(23), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(23), &s.tf2, &no)
         .unwrap();
     assert!(custom(&s).is_empty(), "{:?}", custom(&s));
 }
@@ -551,7 +551,7 @@ async fn remove_deletes_a_multi_chunk_vpks_sound_cache_and_keeps_others() {
     common::write_file(&dir.join("foreign.vpk.sound.cache"), b"f");
     s.env
         .lib
-        .remove_gb_addon(GbId::new(24), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(24), &s.tf2, &no)
         .unwrap();
     assert_eq!(custom(&s), ["foreign.vpk.sound.cache"]);
 }
@@ -614,7 +614,7 @@ async fn remove_without_a_sound_cache_is_not_an_error() {
     common::write_file(&s.tf2.custom_dir().join("other.vpk.sound.cache"), b"f");
     s.env
         .lib
-        .remove_gb_addon(GbId::new(25), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(25), &s.tf2, &no)
         .unwrap();
     assert_eq!(custom(&s), ["other.vpk.sound.cache"]);
 }
@@ -625,12 +625,114 @@ async fn removing_an_unknown_addon_is_not_in_library() {
     let err = s
         .env
         .lib
-        .remove_gb_addon(GbId::new(99), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(99), &s.tf2, &no)
         .unwrap_err();
     assert!(
         matches!(err, GbAddonInstallError::NotInLibrary { gb_id } if gb_id == GbId::new(99)),
         "{err:?}"
     );
+}
+
+#[tokio::test]
+async fn uninstall_keeps_the_library_copy_and_row() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("Toon/toon.vpk", &vpk(&[1u8; 64])),
+        ("pack/materials/b.vmt", b"a"),
+    ]);
+    let d = download(&s, 30, "Toon", "toon.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["Toon/toon.vpk", "pack"]), &s.tf2, &no)
+        .unwrap();
+    common::write_file(&s.tf2.custom_dir().join("foreign.vpk"), b"f");
+    s.env
+        .lib
+        .uninstall_gb_addon(GbId::new(30), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["foreign.vpk"]);
+    assert!(s.env.dir.gb_addon_dir().join("30").exists());
+    let list = s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(!list[0].is_installed());
+}
+
+#[tokio::test]
+async fn install_after_uninstall_puts_the_same_files_back() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("Toon/toon.vpk", &vpk(&[1u8; 64])),
+        ("pack/materials/b.vmt", b"a"),
+    ]);
+    let d = download(&s, 31, "Toon", "toon.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["Toon/toon.vpk", "pack"]), &s.tf2, &no)
+        .unwrap();
+    let installed = custom(&s);
+    s.env
+        .lib
+        .uninstall_gb_addon(GbId::new(31), &s.tf2, &no)
+        .unwrap();
+    let entry = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(31), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), installed);
+    assert!(entry.is_installed());
+}
+
+#[tokio::test]
+async fn uninstall_refuses_while_tf2_runs_when_a_vpk_is_installed() {
+    let s = setup().await;
+    let d = download(&s, 32, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let err = s
+        .env
+        .lib
+        .uninstall_gb_addon(GbId::new(32), &s.tf2, &yes)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
+    assert_eq!(custom(&s), ["tf2tools-gb-32-crit.vpk"]);
+}
+
+#[tokio::test]
+async fn uninstall_of_an_unknown_id_is_not_in_library() {
+    let s = setup().await;
+    let err = s
+        .env
+        .lib
+        .uninstall_gb_addon(GbId::new(99), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::NotInLibrary { gb_id } if gb_id == GbId::new(99)),
+        "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn delete_after_uninstall_removes_the_copy_and_row() {
+    let s = setup().await;
+    let d = download(&s, 33, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    s.env
+        .lib
+        .uninstall_gb_addon(GbId::new(33), &s.tf2, &no)
+        .unwrap();
+    s.env
+        .lib
+        .delete_gb_addon(GbId::new(33), &s.tf2, &no)
+        .unwrap();
+    assert!(custom(&s).is_empty());
+    assert!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().is_empty());
+    assert!(!s.env.dir.gb_addon_dir().join("33").exists());
 }
 
 #[tokio::test]
@@ -651,7 +753,7 @@ async fn remove_skips_recorded_paths_that_leave_custom() {
         .unwrap();
     s.env
         .lib
-        .remove_gb_addon(GbId::new(22), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(22), &s.tf2, &no)
         .unwrap();
     assert!(outside.exists());
     assert!(custom(&s).is_empty());
@@ -775,7 +877,7 @@ async fn a_first_install_cut_short_after_its_files_land_leaves_a_row_to_remove()
 
     s.env
         .lib
-        .remove_gb_addon(GbId::new(32), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(32), &s.tf2, &no)
         .unwrap();
     assert!(custom(&s).is_empty());
     assert!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().is_empty());
@@ -812,7 +914,7 @@ async fn an_update_cut_short_owns_the_old_and_new_files() {
     );
     s.env
         .lib
-        .remove_gb_addon(GbId::new(33), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(33), &s.tf2, &no)
         .unwrap();
     assert!(custom(&s).is_empty());
 }
@@ -832,7 +934,7 @@ async fn remove_also_deletes_a_leftover_staging_dir() {
     common::write_file(&s.env.dir.gb_addon_dir().join(".staging-340/1/x"), b"x");
     s.env
         .lib
-        .remove_gb_addon(GbId::new(34), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(34), &s.tf2, &no)
         .unwrap();
     assert_eq!(
         common::packed::gb_tree(&s.env.dir),
@@ -872,7 +974,7 @@ async fn a_renamed_update_whose_old_files_will_not_delete_keeps_them_on_the_row(
     );
     s.env
         .lib
-        .remove_gb_addon(GbId::new(41), &s.tf2, &no)
+        .delete_gb_addon(GbId::new(41), &s.tf2, &no)
         .unwrap();
     assert!(custom(&s).is_empty(), "Remove clears the old files too");
 }

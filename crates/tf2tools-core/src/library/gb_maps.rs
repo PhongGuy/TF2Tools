@@ -109,7 +109,7 @@ impl Library {
             }
         }
         let _copies = self.copies_write();
-        self.remove_gb_addon_locked(gb_id, tf2, &|| false)
+        self.delete_gb_addon_locked(gb_id, tf2, &|| false)
             .map_err(remove_error)
     }
 

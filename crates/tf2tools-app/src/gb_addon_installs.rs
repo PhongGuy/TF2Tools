@@ -376,7 +376,7 @@ impl GbAddonInstalls {
         let probe = Tf2Probe::get(cx);
         let job = run_blocking(cx, move |s: &Services| {
             s.library
-                .remove_gb_addon(id, &tf2, &*probe)
+                .delete_gb_addon(id, &tf2, &*probe)
                 .map_err(|e| gb_install_op(&e, remove().failed))
         });
         self.task = Some(cx.spawn(async move |this, cx| {

@@ -346,7 +346,7 @@ impl Library {
     /// # Errors
     /// [`GbAddonInstallError::NotInLibrary`] without a row, `Tf2Running`, or an I/O or
     /// database failure.
-    pub fn remove_gb_addon(
+    pub fn delete_gb_addon(
         &self,
         gb_id: GbId,
         tf2: &Tf2Install,
@@ -354,12 +354,12 @@ impl Library {
     ) -> Result<(), GbAddonInstallError> {
         let _writes = self.lock_writes();
         let _copies = self.copies_write();
-        self.remove_gb_addon_locked(gb_id, tf2, tf2_running)
+        self.delete_gb_addon_locked(gb_id, tf2, tf2_running)
     }
 
-    /// [`remove_gb_addon`](Self::remove_gb_addon)'s body, for a caller already holding the
+    /// [`delete_gb_addon`](Self::delete_gb_addon)'s body, for a caller already holding the
     /// write lock and the copies write guard.
-    pub(super) fn remove_gb_addon_locked(
+    pub(super) fn delete_gb_addon_locked(
         &self,
         gb_id: GbId,
         tf2: &Tf2Install,
@@ -388,6 +388,37 @@ impl Library {
             .write(|conn| conn.execute("DELETE FROM library_gb_addons WHERE gb_id = ?1", [id]))
             .map(drop)
             .map_err(gb_db)
+    }
+
+    /// Deletes add-on `gb_id`'s recorded files from the game and marks it not installed,
+    /// keeping its library copy and row so it installs again without a download.
+    /// Refuses `Tf2Running` first when a recorded file is a VPK and `tf2_running()` says so.
+    ///
+    /// # Errors
+    /// [`GbAddonInstallError::NotInLibrary`] without a row, `Tf2Running`, or an I/O or
+    /// database failure.
+    pub fn uninstall_gb_addon(
+        &self,
+        gb_id: GbId,
+        tf2: &Tf2Install,
+        tf2_running: &dyn Fn() -> bool,
+    ) -> Result<(), GbAddonInstallError> {
+        let _writes = self.lock_writes();
+        let entry = self
+            .gb_addon_row(gb_id)?
+            .ok_or(GbAddonInstallError::NotInLibrary { gb_id })?;
+        if entry.files.iter().any(|f| is_vpk(f)) && tf2_running() {
+            return Err(GbAddonInstallError::Tf2Running);
+        }
+        // The row keeps its file list, so installing again restores the same names; a
+        // tampered path is skipped as in delete.
+        let tf = tf2.tf_dir();
+        for file in &entry.files {
+            if let Some(path) = recorded_path(&tf, gb_id, file) {
+                remove_installed(&path)?;
+            }
+        }
+        self.mark_not_installed(gb_id)
     }
 
     /// Copies add-on `gb_id`'s library copy back into `tf/custom` and marks it installed with
