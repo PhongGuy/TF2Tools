@@ -33,6 +33,7 @@ use crate::ids::{self, IdScope};
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
+use crate::pages::graphics::view::SectionView;
 use crate::pages::graphics::{ChoicesEdit, GraphicsChoicesEditor, pill};
 use crate::previews::CrosshairPreviews;
 use crate::remote_images::RemoteImages;
@@ -143,6 +144,10 @@ pub struct ProfileDraftEditor {
     pub(super) page_choices: Option<Result<Option<Choices>, OpError>>,
     /// The content area was narrower than the wide layout last frame.
     pub(super) narrow: bool,
+    /// The Graphics sections the last frame drew, with the rows generation they were cut from.
+    pub(super) graphics_sections: Option<(u64, Rc<[SectionView]>)>,
+    /// How many times the Graphics sections were cut.
+    pub(super) sections_cut: u64,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -224,6 +229,8 @@ impl ProfileDraftEditor {
             graphics,
             page_choices: None,
             narrow: false,
+            graphics_sections: None,
+            sections_cut: 0,
             library: None,
             library_generation: 0,
             player,
@@ -266,6 +273,11 @@ impl ProfileDraftEditor {
     /// The Graphics body's choices editor, under `IdScope::PROFILE_GRAPHICS`.
     pub fn graphics(&self) -> &Entity<GraphicsChoicesEditor> {
         &self.graphics
+    }
+
+    /// How many times the Graphics body's sections were cut; it moves only when its rows do.
+    pub fn graphics_sections_cut(&self) -> u64 {
+        self.sections_cut
     }
 
     /// The Crosshairs body's gallery strip.
@@ -782,6 +794,7 @@ impl Render for ProfileDraftEditor {
                 .child(deferred(self.rail(true, cx)));
             children.push(lane().child(stuck).into_any_element());
         }
+        self.cut_graphics_sections(cx);
         for slot in SlotKind::ALL {
             let card = self.slot_card(slot, cx);
             let side = (!narrow && slot == SlotKind::Hud).then(|| {
