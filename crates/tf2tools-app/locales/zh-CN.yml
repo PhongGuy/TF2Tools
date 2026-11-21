@@ -877,9 +877,6 @@ confirm:
   remove_map:
     title: "移除地图？"
     body: "%{name} 将从 TF2 中删除。之后可以重新下载。"
-  remove_gb_addon:
-    title: "移除插件"
-    body: "确定要移除 %{name} 吗？它将从 TF2 和库中移除。"
   addon_needs_mastercomfig:
     title: "需要 mastercomfig"
     body: "此插件需要 mastercomfig。要同时安装两者吗？"
@@ -1102,10 +1099,8 @@ addons:
     browse: "浏览插件商店"
     update: "更新"
     install: "安装"
-    install_again: "重新安装"
     uninstall: "卸载"
     delete: "从库中移除"
-    remove: "移除"
     open_gamebanana: "在 GameBanana 上打开"
     installing: "正在安装…"
     removing: "正在移除…"
@@ -2809,6 +2804,8 @@ messages:
     addon_update_failed: "无法更新插件"
     addon_removed: "插件已移除"
     addon_remove_failed: "无法移除插件"
+    addon_uninstalled: "插件已卸载"
+    addon_uninstall_failed: "无法卸载插件"
     map_installed: "地图已安装"
     map_install_failed: "无法安装地图"
     map_updated: "地图已更新"

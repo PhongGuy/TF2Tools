@@ -166,16 +166,6 @@ impl Confirm {
         }
     }
 
-    /// The prompt before removing the GameBanana add-on called `name` from TF2 and the library.
-    pub fn remove_gb_addon(name: &str) -> Self {
-        Self {
-            title: tr!("confirm.remove_gb_addon.title"),
-            description: tr!("confirm.remove_gb_addon.body", name = name),
-            confirm_label: tr!("confirm.remove"),
-            cancel_label: tr!("confirm.cancel"),
-        }
-    }
-
     /// The prompt before removing the GameBanana map called `name` from TF2.
     pub fn remove_gb_map(name: &str) -> Self {
         Self {

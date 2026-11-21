@@ -145,6 +145,14 @@ fn map_remove() -> Titles {
     }
 }
 
+fn uninstall() -> Titles {
+    Titles {
+        done: tr!("messages.action.addon_uninstalled"),
+        failed: tr!("messages.action.addon_uninstall_failed"),
+        update: false,
+    }
+}
+
 fn remove() -> Titles {
     Titles {
         done: tr!("messages.action.addon_removed"),
@@ -176,6 +184,12 @@ enum Outcome {
     Removed {
         id: GbId,
         name: String,
+    },
+    /// The card stays: `entry` is its row read back, or None when that read failed and the
+    /// reload that follows has to bring it.
+    Uninstalled {
+        name: String,
+        entry: Option<GbAddonEntry>,
     },
     Cancelled,
     Failed(OpError),
@@ -359,6 +373,44 @@ impl GbAddonInstalls {
         true
     }
 
+    /// Takes add-on `id`'s files out of TF2, keeping its library copy and card so Install
+    /// brings it back without a download. Returns false for a map, which keeps no copy,
+    /// and otherwise as `update` does.
+    pub fn uninstall(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        let Some(entry) = self.entry(id) else {
+            return false;
+        };
+        if is_map(entry) {
+            return false;
+        }
+        let name = entry.name().to_owned();
+        let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
+            return false;
+        };
+        let probe = Tf2Probe::get(cx);
+        // The row is read back in the same job, so the card turns "Not installed" at once.
+        let job = run_blocking(cx, move |s: &Services| {
+            s.library
+                .uninstall_gb_addon(id, &tf2, &*probe)
+                .map_err(|e| gb_install_op(&e, uninstall().failed))?;
+            let entry = s
+                .library
+                .list_gb_addons(Some(&tf2))
+                .ok()
+                .and_then(|all| all.into_iter().find(|e| e.gb_id() == id));
+            Ok(entry)
+        });
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = match job.await {
+                Ok(entry) => Outcome::Uninstalled { name, entry },
+                Err(err) => Outcome::Failed(err),
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, uninstall(), win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
     /// Removes `id` from TF2 and the library; the caller has asked the player first.
     /// Returns false as `update` does. Reads only the library row, so an item gone from
     /// GameBanana can still be removed.
@@ -537,6 +589,12 @@ impl GbAddonInstalls {
                     .filter(|e| e.gb_id() != id)
                     .cloned()
                     .collect();
+                Some((ToastKind::Success, titles.done.to_string(), name))
+            }
+            Outcome::Uninstalled { name, entry } => {
+                if let Some(entry) = entry {
+                    self.put(entry);
+                }
                 Some((ToastKind::Success, titles.done.to_string(), name))
             }
             Outcome::Failed(err) => Some((

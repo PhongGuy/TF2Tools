@@ -853,9 +853,6 @@ confirm:
   remove_map:
     title: "Удалить карту?"
     body: "%{name} будет удалена из TF2. Её можно скачать снова позже."
-  remove_gb_addon:
-    title: "Удалить дополнение"
-    body: "Удалить %{name}? Оно будет удалено из TF2 и из вашей библиотеки."
   addon_needs_mastercomfig:
     title: "Нужен mastercomfig"
     body: "Этому дополнению нужен mastercomfig. Установить оба?"
@@ -1078,10 +1075,8 @@ addons:
     browse: "В магазин дополнений"
     update: "Обновить"
     install: "Установить"
-    install_again: "Заново"
     uninstall: "Убрать"
     delete: "Удалить из библиотеки"
-    remove: "Удалить"
     open_gamebanana: "Открыть на GameBanana"
     installing: "Установка..."
     removing: "Удаление..."
@@ -2785,6 +2780,8 @@ messages:
     addon_update_failed: "Не удалось обновить дополнение"
     addon_removed: "Дополнение удалено"
     addon_remove_failed: "Не удалось удалить дополнение"
+    addon_uninstalled: "Дополнение убрано"
+    addon_uninstall_failed: "Не удалось убрать дополнение"
     map_installed: "Карта установлена"
     map_install_failed: "Не удалось установить карту"
     map_updated: "Карта обновлена"

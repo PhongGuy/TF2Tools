@@ -6,12 +6,13 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement, SharedString, StatefulInteractiveElement as _, Styled, TestSupportExt as _,
-    Window, div, px,
+    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Hsla, InteractiveElement as _,
+    IntoElement, ParentElement, SharedString, StatefulInteractiveElement as _, Styled,
+    TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{AddonSection, GbAddonEntry, GbId};
 
+use super::model::{AddonAction, actions};
 use super::{AddonsPage, section};
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer, GbAddonStage};
 use crate::i18n::names::addon_section_name;
@@ -40,20 +41,11 @@ fn tag_text(entry: &GbAddonEntry) -> Option<SharedString> {
     }
 }
 
-/// The card's main action, if any, from the same offer the store detail makes: Update for a
-/// newer file still on GameBanana, Install again when the files are missing.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Main {
-    Update,
-    Reinstall,
-}
-
-fn main_action(entry: &GbAddonEntry) -> Option<Main> {
-    match GbAddonOffer::of(Some(entry)) {
-        GbAddonOffer::Update => Some(Main::Update),
-        GbAddonOffer::InstallAgain => Some(Main::Reinstall),
-        GbAddonOffer::Install | GbAddonOffer::Installed => None,
-    }
+/// The card's footer, as the mastercomfig card picks it: Update shows for a newer file still
+/// on GameBanana, the same offer the store detail makes.
+fn footer(entry: &GbAddonEntry) -> &'static [AddonAction] {
+    let update = GbAddonOffer::of(Some(entry)) == GbAddonOffer::Update;
+    actions(entry.is_installed(), update)
 }
 
 /// The entries the page draws: only Addon Store sections have a group, so a map or a section
@@ -118,10 +110,10 @@ fn labelled_group(kind: AddonSection, cx: &App) -> impl IntoElement {
     )
 }
 
-// Asks first, as Remove also deletes the library copy; a yes hands the work to the installs.
-// A VPK add-on can't go while TF2 runs, so that refusal comes before the question; the
-// installs probe again, as TF2 may start while the dialog is open.
-fn remove(id: GbId, name: String, window: &mut Window, cx: &mut Context<AddonsPage>) {
+// Uninstall and Delete both take files out of TF2, so a VPK add-on refuses first while TF2
+// runs; Delete then asks, as it also drops the library copy. The installs probe again, as
+// TF2 may start while the dialog is open.
+fn take_out(id: GbId, delete: bool, window: &mut Window, cx: &mut Context<AddonsPage>) {
     let installs = GbAddonInstalls::global(cx);
     let has_vpk = installs.read(cx).entry(id).is_some_and(has_vpk);
     let probe = Tf2Probe::get(cx);
@@ -138,8 +130,12 @@ fn remove(id: GbId, name: String, window: &mut Window, cx: &mut Context<AddonsPa
             let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
             return;
         }
+        if !delete {
+            cx.update(|cx| installs.update(cx, |i, cx| i.uninstall(id, win, cx)));
+            return;
+        }
         let Ok(answer) = win.update(cx, |_, window, cx| {
-            confirm(Confirm::remove_gb_addon(&name), window, cx)
+            confirm(Confirm::delete_addon(), window, cx)
         }) else {
             return;
         };
@@ -159,6 +155,65 @@ fn has_vpk(entry: &GbAddonEntry) -> bool {
     })
 }
 
+// One footer button in the mastercomfig card's style: Update and Install fill the row, Install
+// steps back to outline beside Update, and Uninstall shrinks to its icon there.
+fn gb_button(
+    id: GbId,
+    action: AddonAction,
+    beside_update: bool,
+    disabled: bool,
+    danger: Hsla,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> AnyElement {
+    match action {
+        AddonAction::Update => Button::new(ids::addons_gb_update(id))
+            .primary()
+            .flex_1()
+            .icon(IconName::RefreshCw)
+            .label(tr!("addons.button.update"))
+            .disabled(disabled)
+            .on_click(on_click)
+            .into_any_element(),
+        AddonAction::Install => {
+            let button = Button::new(ids::addons_gb_install(id))
+                .flex_1()
+                .icon(IconName::Download)
+                .label(tr!("addons.button.install"))
+                .disabled(disabled)
+                .on_click(on_click);
+            if beside_update {
+                button.outline().into_any_element()
+            } else {
+                button.primary().into_any_element()
+            }
+        }
+        AddonAction::Uninstall => {
+            let button = Button::new(ids::addons_gb_uninstall(id))
+                .outline()
+                .icon(IconName::Unplug)
+                .disabled(disabled)
+                .on_click(on_click);
+            if beside_update {
+                button
+                    .named(tr!("addons.button.uninstall"))
+                    .into_any_element()
+            } else {
+                button
+                    .flex_1()
+                    .label(tr!("addons.button.uninstall"))
+                    .into_any_element()
+            }
+        }
+        AddonAction::Delete => Button::new(ids::addons_gb_delete(id))
+            .ghost()
+            .icon(Icon::new(IconName::Trash).text_color(danger))
+            .named(tr!("addons.button.delete"))
+            .disabled(disabled)
+            .on_click(on_click)
+            .into_any_element(),
+    }
+}
+
 // The words on a running operation's footer.
 fn busy_label(stage: GbAddonStage) -> SharedString {
     match stage {
@@ -169,7 +224,7 @@ fn busy_label(stage: GbAddonStage) -> SharedString {
 }
 
 // The mastercomfig card's frame for one add-on: its name, "by {author}" and tag, then the
-// main action, Remove and the GameBanana link, or one loading button while it works.
+// mastercomfig footer and the GameBanana link, or one loading button while it works.
 fn gb_card(
     entry: &GbAddonEntry,
     stage: Option<GbAddonStage>,
@@ -188,9 +243,10 @@ fn gb_card(
     };
     let id = entry.gb_id();
     let name = entry.name().to_owned();
-    // Everything but the link writes to tf/custom, so it waits for TF2 and for any operation.
+    // Everything but the link writes to tf/custom, Delete included as it clears the installed
+    // files too, so it waits for TF2 and for any operation.
     let disabled = rest || !has_tf2;
-    let main = main_action(entry);
+    let footer = footer(entry);
     let buttons: Vec<AnyElement> = match stage {
         Some(stage) => vec![
             Button::new(ids::addons_gb_busy(id))
@@ -202,50 +258,22 @@ fn gb_card(
                 .into_any_element(),
         ],
         None => {
-            let main_button = main.map(|main| {
-                let (button, label, icon) = match main {
-                    Main::Update => (
-                        Button::new(ids::addons_gb_update(id)),
-                        tr!("addons.button.update"),
-                        IconName::RefreshCw,
-                    ),
-                    Main::Reinstall => (
-                        Button::new(ids::addons_gb_reinstall(id)),
-                        tr!("addons.button.install_again"),
-                        IconName::Download,
-                    ),
-                };
-                button
-                    .primary()
-                    .flex_1()
-                    .icon(icon)
-                    .label(label)
-                    .disabled(disabled)
-                    .on_click(move |_, window, cx| {
-                        let win = window.window_handle();
-                        let installs = GbAddonInstalls::global(cx);
-                        installs.update(cx, |i, cx| match main {
-                            Main::Update => i.update(id, win, cx),
-                            Main::Reinstall => i.reinstall(id, win, cx),
-                        });
-                    })
-                    .into_any_element()
-            });
-            // Remove takes the wide labelled place unless a main action already holds it.
-            let remove_button = {
-                let name = name.clone();
-                let button = Button::new(ids::addons_gb_remove(id))
-                    .outline()
-                    .icon(Icon::new(IconName::Trash).text_color(danger))
-                    .disabled(disabled)
-                    .on_click(
-                        cx.listener(move |_, _, window, cx| remove(id, name.clone(), window, cx)),
-                    );
-                if main.is_some() {
-                    button.named(tr!("addons.button.remove"))
-                } else {
-                    button.flex_1().label(tr!("addons.button.remove"))
-                }
+            let beside_update = footer.contains(&AddonAction::Update);
+            let on = |action: AddonAction| {
+                cx.listener(move |_, _, window, cx| {
+                    let win = window.window_handle();
+                    let installs = GbAddonInstalls::global(cx);
+                    match action {
+                        AddonAction::Update => {
+                            installs.update(cx, |i, cx| i.update(id, win, cx));
+                        }
+                        AddonAction::Install => {
+                            installs.update(cx, |i, cx| i.reinstall(id, win, cx));
+                        }
+                        AddonAction::Uninstall => take_out(id, false, window, cx),
+                        AddonAction::Delete => take_out(id, true, window, cx),
+                    }
+                })
             };
             let url = gamebanana_page("", id);
             let open = Button::new(ids::addons_gb_open(id))
@@ -253,15 +281,16 @@ fn gb_card(
                 .icon(IconName::ExternalLink)
                 .named(tr!("addons.button.open_gamebanana"))
                 .on_click(move |_, _, cx| cx.open_url(&url));
-            main_button
-                .into_iter()
-                .chain([remove_button.into_any_element(), open.into_any_element()])
+            footer
+                .iter()
+                .map(|&action| gb_button(id, action, beside_update, disabled, danger, on(action)))
+                .chain([open.into_any_element()])
                 .collect()
         }
     };
     let tag = tag_text(entry).map(|text| {
         // An update waiting is the one state worth the accent colour, as on the store cards.
-        let tag = if main == Some(Main::Update) {
+        let tag = if footer.contains(&AddonAction::Update) {
             Tag::primary()
         } else {
             Tag::secondary().outline().text_color(theme_fg)
