@@ -197,7 +197,7 @@ impl PilotApp for Tf2Tools {
 }
 
 /// Seeds `data` and returns the offline boot that runs against it.
-fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
+pub fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
     let assets = AssetRoot::resolve();
     if let Ok(root) = &assets {
         let game = data.join("fake-tf2/Team Fortress 2");
@@ -212,7 +212,7 @@ fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         picker: picker(),
         detector: Arc::new(|| Ok(Vec::new())),
         audio: Arc::new(RecordingAudio::new()),
-        endpoints: Endpoints::default(),
+        endpoints: Endpoints::loopback(tf2tools_app::app::CLOSED_BASE),
         auto_sync: false,
         offline: false,
         font_host: Some(Arc::new(PilotFontHost::new(data))),
@@ -220,6 +220,7 @@ fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         // A QA run launched under another LANG starts in that language, as the real app does.
         locales: tf2tools_app::i18n::system_locales(),
     }
-    // A pilot QA run never reaches the real stores; a Resync fails against a closed port.
+    // A pilot QA run never reaches the real stores: its endpoints are a closed loopback port,
+    // and the offline mask refuses any other host on top.
     .offline(None))
 }
