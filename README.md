@@ -44,7 +44,7 @@ The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in
 
 ### The stores
 
-Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs. Next to its mastercomfig tab, the Addon Store has GameBanana tabs for skins, effects, GUIs, textures and game files. Install one from its details; if a download holds several versions, you pick which to install. TF2Tools checks your add-ons for updates once a day, and the Addons page lists them with Update and Remove. Files that failed GameBanana's virus scan, or are only a program, are refused, and add-ons are never changed while TF2 is running.
+Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs. Next to its mastercomfig tab, the Addon Store has GameBanana tabs for skins, effects, GUIs, textures and game files. Install one from its details; if a download holds several versions, you pick which to install. TF2Tools checks your add-ons for updates once a day, and the Addons page lists them with Update. Uninstall takes an add-on out of TF2 and keeps it in your library, so Install puts it back without a download; Delete removes it for good. Files that failed GameBanana's virus scan, or are only a program, are refused, and add-ons are never changed while TF2 is running.
 
 ![The Sound Store](.github/readme/sound-store.webp)
 
