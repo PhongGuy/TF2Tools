@@ -146,6 +146,11 @@ fn the_upload_times_may_differ_by_five_minutes_at_most() {
 }
 
 #[test]
+fn an_upload_time_at_the_edge_of_i64_is_no_match() {
+    assert_eq!(picked(&[wire(7, MAP, i64::MIN, LENGTH, &url(7))]), None);
+}
+
+#[test]
 fn the_lengths_may_differ_by_a_tenth_or_ninety_seconds_whichever_is_more() {
     // 1800 s allows 180 s either way.
     assert_eq!(

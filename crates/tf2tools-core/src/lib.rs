@@ -43,7 +43,10 @@ pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEn
 pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
-pub use demostf::{DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, pick_demo};
+pub use demostf::{
+    DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,
+    pick_demo,
+};
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DemosError, DetectError, DownloadError,

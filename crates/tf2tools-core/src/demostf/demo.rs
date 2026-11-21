@@ -6,7 +6,7 @@ use crate::error::DemosError;
 use crate::logstf::{LogDetail, SteamId};
 
 /// How far apart a log's and its demo's upload times may be, in seconds.
-const TIME_SLACK: i64 = 300;
+const TIME_SLACK: u64 = 300;
 
 /// The least length difference always allowed, in seconds; longer logs allow a tenth.
 const LENGTH_SLACK: i64 = 90;
@@ -140,7 +140,7 @@ pub fn pick_demo<'a>(query: &DemoQuery, candidates: &'a [DemoSummary]) -> Option
     let length_slack = LENGTH_SLACK.max(length / 10);
     let mut close = candidates.iter().filter(|demo| {
         demo.map == query.map
-            && (demo.time - query.date).abs() <= TIME_SLACK
+            && demo.time.abs_diff(query.date) <= TIME_SLACK
             && (i64::from(demo.duration) - length).abs() <= length_slack
             && !demo.url.is_empty()
     });
@@ -196,10 +196,6 @@ impl From<WireDemo> for DemoSummary {
 }
 
 /// A demos.tf list body; anything but a JSON array of demos is `Unreadable`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the demos.tf client reads with it")
-)]
 pub(crate) fn parse_list(body: &[u8]) -> Result<Vec<DemoSummary>, DemosError> {
     let wire: Vec<WireDemo> = serde_json::from_slice(body).map_err(|_| DemosError::Unreadable)?;
     Ok(wire.into_iter().map(DemoSummary::from).collect())
@@ -207,10 +203,6 @@ pub(crate) fn parse_list(body: &[u8]) -> Result<Vec<DemoSummary>, DemosError> {
 
 /// A demos.tf demo body; anything but a demo object is `Unreadable`. A player whose
 /// `steamid` is not a SteamID64 is left out.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the demos.tf client reads with it")
-)]
 pub(crate) fn parse_detail(body: &[u8]) -> Result<DemoDetail, DemosError> {
     let wire: WireDetail = serde_json::from_slice(body).map_err(|_| DemosError::Unreadable)?;
     let players = wire
