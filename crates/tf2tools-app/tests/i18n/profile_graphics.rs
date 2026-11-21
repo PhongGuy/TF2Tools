@@ -32,10 +32,10 @@ fn a_language_switch_rewords_the_editor_rows(cx: &mut TestAppContext) {
     let german = support::label_of(cx, s.win, label.clone()).unwrap();
     let heading_de = support::label_of(cx, s.win, heading.clone());
     tf2tools_app::i18n::apply("en");
-    cx.update(|cx| cx.refresh_windows());
-    support::settle(cx, s.win);
+    // The heading must reword on the first frame after the switch. No refresh beforehand:
+    // its flush draws a frame of its own, which would hide a one-frame lag.
+    let heading_en = support::label_after_one_frame(cx, s.win, heading);
     let english = support::label_of(cx, s.win, label).unwrap();
-    let heading_en = support::label_of(cx, s.win, heading);
     assert_eq!(
         (heading_de.as_deref(), heading_en.as_deref()),
         (Some("Grafik"), Some("Graphics")),
