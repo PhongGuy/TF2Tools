@@ -7,6 +7,7 @@ pub mod editor_model;
 pub mod model;
 pub mod probe;
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
@@ -22,7 +23,7 @@ use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, EventEmitter,
     FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, div, px,
+    TestSupportExt as _, WeakEntity, Window, canvas, div, px,
 };
 
 use tf2tools_core::{
@@ -138,6 +139,8 @@ pub struct ProfilesPage {
     grid: CardGrid,
     /// The page's own scroll, which moves only in a window too short for the page.
     scroll: ScrollHandle,
+    /// Last frame's library top within the scrolled content and the page's height.
+    library_at: Rc<Cell<(Pixels, Pixels)>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -186,6 +189,7 @@ impl ProfilesPage {
             view: View::Grid,
             grid,
             scroll: ScrollHandle::new(),
+            library_at: Rc::default(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -1537,6 +1541,23 @@ impl ProfilesPage {
             ))
         };
         let lead = tr!("profiles.lead");
+        // The library box's top in the scrolled content and the page's height, measured each
+        // frame; a change asks for another, since the floor below reads them.
+        let (measured, page) = (Rc::clone(&self.library_at), self.scroll.clone());
+        let watch = canvas(
+            move |bounds, window, _| {
+                let page_bounds = page.bounds();
+                let top = bounds.origin.y - page_bounds.origin.y - page.offset().y;
+                let at = (top, page_bounds.size.height);
+                if measured.get() != at {
+                    measured.set(at);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
         v_flex()
             .flex_1()
             .gap_4()
@@ -1577,11 +1598,24 @@ impl ProfilesPage {
                 div()
                     .id(ids::PROFILES_LIBRARY)
                     .test_support()
+                    .relative()
                     .flex_1()
-                    // One card row and the top of the next at least; a short window scrolls the page.
-                    .min_h(self.grid.row_height_for(|w| card_height(w, columns)) + NEXT_ROW_PEEK)
+                    .min_h(self.library_floor(columns))
+                    .child(watch)
                     .children(body),
             )
+    }
+
+    // One card row and the top of the next at least. A window too short for that under the lead
+    // fills the page with the library, so the page scrolls the lead wholly away, never halfway.
+    fn library_floor(&self, columns: usize) -> Pixels {
+        let floor = self.grid.row_height_for(|w| card_height(w, columns)) + NEXT_ROW_PEEK;
+        let (top, height) = self.library_at.get();
+        if height > px(0.) && height - top - CONTENT_PADDING < floor {
+            floor.max(height - CONTENT_PADDING)
+        } else {
+            floor
+        }
     }
 }
 

@@ -3,7 +3,11 @@
 
 use crate::support;
 
-use gpui_kit::{Bounds, ElementId, Entity, Pixels, ScrollHandle, TestAppContext, point, px, size};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{
+    AppContext as _, Bounds, ElementId, Entity, Pixels, ScrollDelta, ScrollHandle, TestAppContext,
+    point, px, size,
+};
 use support::scroll::{
     assert_bar_beside, assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls,
     assert_track_scrolls_virtual, bounds,
@@ -12,7 +16,9 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::CONTENT_PADDING;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::widgets::card_grid::GRID_GAP;
 use tf2tools_core::{ProfileDraft, Tf2Install};
 
 fn resize(cx: &mut TestAppContext, s: &support::ShellWindow, w: f32, h: f32) {
@@ -104,4 +110,68 @@ fn at_900x600_the_page_scrolls_to_a_whole_card_row(cx: &mut TestAppContext) {
         last <= grid.bottom() + px(1.),
         "the last row ends at {last:?}, below the grid {grid:?}"
     );
+}
+
+// Wheels over the grid, as a player does, until the grid stops at its last row.
+fn wheel_grid_to_end(cx: &mut TestAppContext, s: &support::ShellWindow, grid: &ScrollHandle) {
+    for _ in 0..400 {
+        if grid.offset().y <= -grid.max_offset().y {
+            return;
+        }
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::PROFILES_GRID, ScrollDelta::Lines(point(0., -3.)), cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    }
+    panic!("the grid never reached its end");
+}
+
+// Wheeled to the last profile, the lead is either all in view (`lead_stays`) or all scrolled
+// away, never cut by the header, and the last card ends at the page's bottom padding.
+fn assert_wheeled_to_end(w: f32, h: f32, lead_stays: bool, cx: &mut TestAppContext) {
+    let env = support::env();
+    let found = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    let s = support::shell_window(cx, &env, found);
+    resize(cx, &s, w, h);
+    let (page, cards) = profiles_page(cx, &s, 24);
+    let grid = cx.update(|cx| page.read(cx).grid_scroll());
+    wheel_grid_to_end(cx, &s, &grid);
+    let (area, lead) = (
+        bounds(cx, s.win, ids::page(Page::Profiles)),
+        bounds(cx, s.win, ids::PROFILES_LEAD),
+    );
+    if lead_stays {
+        assert!(
+            lead.top() >= area.top(),
+            "at {w}x{h} the lead {lead:?} is cut by {area:?}"
+        );
+    } else {
+        assert!(
+            lead.bottom() <= area.top(),
+            "at {w}x{h} the lead {lead:?} still shows in {area:?}"
+        );
+    }
+    let last = drawn(cx, &s, &cards)
+        .into_iter()
+        .map(|b| b.bottom())
+        .fold(px(0.), Pixels::max);
+    let floor = area.bottom() - CONTENT_PADDING;
+    assert!(
+        last <= floor + px(1.) && last >= floor - GRID_GAP - px(1.),
+        "at {w}x{h} the last card ends at {last:?}, not at the padding above {:?}",
+        area.bottom()
+    );
+}
+
+// Too short for the lead and a card row, the whole page scrolls: the lead leaves entirely.
+#[gpui_kit::test]
+fn at_800x600_wheeling_the_grid_scrolls_the_lead_wholly_away(cx: &mut TestAppContext) {
+    assert_wheeled_to_end(800., 600., false, cx);
+}
+
+// At a common size the page fits, so the lead stays and only the grid scrolls.
+#[gpui_kit::test]
+fn at_1280x800_wheeling_the_grid_keeps_the_lead_whole(cx: &mut TestAppContext) {
+    assert_wheeled_to_end(1280., 800., true, cx);
 }
