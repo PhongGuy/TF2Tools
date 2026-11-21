@@ -80,6 +80,14 @@ gpui_kit::actions!(
     ]
 );
 
+gpui_kit::actions!(
+    profiles,
+    [
+        /// Asks to close the profile editor, as its Cancel button does.
+        ProfileEditorCancel
+    ]
+);
+
 /// The Shift+arrow nudge step in HUD units.
 pub const NUDGE_FAR: i32 = 10;
 
@@ -88,6 +96,9 @@ pub const HUD_MAKER_CONTEXT: &str = "HudMaker";
 
 /// The key context on the Crosshair Maker page root.
 pub const MAKER_CONTEXT: &str = "CrosshairMaker";
+
+/// The key context on the profile editor's root.
+pub const PROFILE_EDITOR_CONTEXT: &str = "ProfileEditor";
 
 /// The keys for `ToggleSidebar`, v5's Ctrl+B (Cmd+B on macOS).
 pub const TOGGLE_SIDEBAR_KEYS: &str = "secondary-b";
@@ -139,6 +150,7 @@ pub fn bind(cx: &mut App) {
         // "?" arrives as Shift+/ on most layouts and as the bare character on others.
         KeyBinding::new("shift-/", ShowHudShortcuts, hud),
         KeyBinding::new("?", ShowHudShortcuts, hud),
+        KeyBinding::new("escape", ProfileEditorCancel, Some(PROFILE_EDITOR_CONTEXT)),
     ];
     cx.bind_keys(keys);
 }

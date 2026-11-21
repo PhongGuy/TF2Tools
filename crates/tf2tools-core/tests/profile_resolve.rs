@@ -8,13 +8,13 @@ use common::{
     LibraryEnv, count, gb, import_hud_as, import_png_as, import_wav_as, library_env, sql,
 };
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, LibraryKind, MissingKind, Profile,
-    ProfileCrosshairRef, ProfileDraft, ProfileError, ProfileId, Provenance,
+    CrosshairRef, DraftCrosshair, DraftItem, LibraryKind, MissingKind, Profile,
+    ProfileCrosshairRef, ProfileDraft, ProfileError, ProfileId, Provenance, SlotMode,
 };
 
 fn hud_profile(env: &LibraryEnv, folder: &str, provenance: Provenance) -> Profile {
     let hud = import_hud_as(env, folder, provenance);
-    let draft = ProfileDraft::new("P").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft = ProfileDraft::new("P").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let p = env.lib.create_profile(&draft).unwrap();
     env.lib.delete_hud(hud.id()).unwrap();
     p
@@ -31,12 +31,15 @@ fn a_profile_whose_items_exist_has_nothing_missing() {
     let hit = import_wav_as(&env, "Ding", Provenance::Local);
     let dot = import_png_as(&env, "Dot", Provenance::Local);
     let draft = ProfileDraft::new("P")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_crosshairs(vec![DraftCrosshair::Set {
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            None,
+        )))
+        .with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Library(dot.id().clone()),
-        }]);
+        }]));
     let p = env.lib.create_profile(&draft).unwrap();
     assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
 }
@@ -48,7 +51,7 @@ fn a_deleted_local_item_is_missing() {
     let missing = env.lib.missing_items(p.id()).unwrap();
     assert_eq!(missing.len(), 1);
     assert_eq!(missing[0].kind(), &MissingKind::Hud);
-    assert_eq!(missing[0].name(), p.hud().unwrap().name());
+    assert_eq!(missing[0].name(), p.hud().as_set().unwrap().name());
     assert_eq!(missing[0].provenance(), &Provenance::Local);
 }
 
@@ -56,7 +59,7 @@ fn a_deleted_local_item_is_missing() {
 fn a_row_whose_folder_vanished_is_missing() {
     let env = library_env();
     let hud = import_hud_as(&env, "budhud", Provenance::Local);
-    let draft = ProfileDraft::new("P").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft = ProfileDraft::new("P").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let p = env.lib.create_profile(&draft).unwrap();
     fs::remove_dir_all(hud_dir(&env, "budhud")).unwrap();
     let missing = env.lib.missing_items(p.id()).unwrap();
@@ -71,8 +74,11 @@ fn a_redownload_with_the_same_gamebanana_id_rejoins_and_rewrites_the_folder() {
     import_hud_as(&env, "budhud-v2", gb(42));
     assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
     let after = env.lib.profile(p.id()).unwrap();
-    assert_eq!(after.hud().unwrap().folder_name(), "budhud-v2");
-    assert_eq!(after.hud().unwrap().name(), p.hud().unwrap().name());
+    assert_eq!(after.hud().as_set().unwrap().folder_name(), "budhud-v2");
+    assert_eq!(
+        after.hud().as_set().unwrap().name(),
+        p.hud().as_set().unwrap().name()
+    );
 }
 
 #[test]
@@ -85,7 +91,7 @@ fn a_curated_hud_rejoins_by_its_store_hud_id() {
     import_hud_as(&env, "rayshud-main", curated);
     assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
     let after = env.lib.profile(p.id()).unwrap();
-    assert_eq!(after.hud().unwrap().folder_name(), "rayshud-main");
+    assert_eq!(after.hud().as_set().unwrap().folder_name(), "rayshud-main");
 }
 
 #[test]
@@ -100,6 +106,7 @@ fn duplicate_gamebanana_ids_pick_the_newest_row_whose_folder_exists() {
             .profile(p.id())
             .unwrap()
             .hud()
+            .as_set()
             .unwrap()
             .folder_name()
             .to_owned()
@@ -118,9 +125,11 @@ fn sounds_and_crosshairs_rejoin_by_gamebanana_id_and_the_rest_are_missing_in_ord
     let dot = import_png_as(&env, "Dot", gb(91));
     let ring = import_png_as(&env, "Ring", Provenance::Local);
     let draft = ProfileDraft::new("P")
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             DraftCrosshair::Set {
                 weapon_script: "tf_weapon_scattergun".into(),
                 crosshair: CrosshairRef::Library(ring.id().clone()),
@@ -133,7 +142,7 @@ fn sounds_and_crosshairs_rejoin_by_gamebanana_id_and_the_rest_are_missing_in_ord
                 weapon_script: "tf_weapon_minigun".into(),
                 crosshair: CrosshairRef::Builtin("no_such_builtin".into()),
             },
-        ]);
+        ]));
     let p = env.lib.create_profile(&draft).unwrap();
     env.lib.delete_sound(hit.id(), None).unwrap();
     env.lib.delete_sound(kill.id(), None).unwrap();
@@ -155,9 +164,19 @@ fn sounds_and_crosshairs_rejoin_by_gamebanana_id_and_the_rest_are_missing_in_ord
     );
     assert_eq!(missing[1].name(), ring.folder_name());
     let after = env.lib.profile(p.id()).unwrap();
-    assert_eq!(after.hitsound().unwrap().folder_name(), hit2.folder_name());
+    assert_eq!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .unwrap()
+            .folder_name(),
+        hit2.folder_name()
+    );
     let rocket = after
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .find(|c| c.weapon_script() == "tf_weapon_rocketlauncher")
         .unwrap();
@@ -177,9 +196,12 @@ fn a_resolve_that_rewrites_several_items_stamps_the_profile_once() {
     let dot = import_png_as(&env, "Dot", gb(91));
     let ring = import_png_as(&env, "Ring", gb(92));
     let draft = ProfileDraft::new("P")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_crosshairs(vec![
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            None,
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             DraftCrosshair::Set {
                 weapon_script: "tf_weapon_scattergun".into(),
                 crosshair: CrosshairRef::Library(dot.id().clone()),
@@ -188,7 +210,7 @@ fn a_resolve_that_rewrites_several_items_stamps_the_profile_once() {
                 weapon_script: "tf_weapon_rocketlauncher".into(),
                 crosshair: CrosshairRef::Library(ring.id().clone()),
             },
-        ]);
+        ]));
     let p = env.lib.create_profile(&draft).unwrap();
     env.lib.delete_hud(hud.id()).unwrap();
     env.lib.delete_sound(hit.id(), None).unwrap();
@@ -210,11 +232,21 @@ fn a_resolve_that_rewrites_several_items_stamps_the_profile_once() {
     assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
     assert_eq!(count(&env.dir, "stamps"), 1);
     let after = env.lib.profile(p.id()).unwrap();
-    assert_eq!(after.hud().unwrap().folder_name(), "budhud-v2");
-    assert_eq!(after.hitsound().unwrap().folder_name(), hit2.folder_name());
+    assert_eq!(after.hud().as_set().unwrap().folder_name(), "budhud-v2");
+    assert_eq!(
+        after
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .unwrap()
+            .folder_name(),
+        hit2.folder_name()
+    );
     let folder = |script: &str| {
         after
             .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
             .iter()
             .find(|c| c.weapon_script() == script)
             .unwrap()
@@ -246,4 +278,27 @@ fn missing_items_of_an_unknown_profile_is_not_found() {
         env.lib.missing_items(&ProfileId::new("gone")),
         Err(ProfileError::NotFound { .. })
     ));
+}
+
+#[test]
+fn a_builtin_the_catalog_lacks_is_missing_only_when_checked_against_it() {
+    let env = library_env();
+    let draft = ProfileDraft::new("P").with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
+        weapon_script: "tf_weapon_scattergun".into(),
+        crosshair: CrosshairRef::Builtin("gone".into()),
+    }]));
+    let p = env.lib.create_profile(&draft).unwrap();
+    assert!(env.lib.missing_items(p.id()).unwrap().is_empty());
+    let missing = env
+        .lib
+        .missing_items_for_apply(p.id(), &common::builtin_catalog())
+        .unwrap();
+    assert_eq!(missing.len(), 1);
+    assert_eq!(
+        missing[0].kind(),
+        &MissingKind::Crosshair {
+            weapon_script: "tf_weapon_scattergun".into()
+        }
+    );
+    assert_eq!(missing[0].name(), "gone");
 }

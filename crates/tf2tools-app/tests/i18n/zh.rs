@@ -318,7 +318,7 @@ fn the_crosshair_position_reads_in_each_languages_order() {
 fn joined_lists_take_the_language_separator() {
     use gpui_kit::SharedString;
     use tf2tools_app::pages::addons::model::movement_on_text;
-    use tf2tools_app::pages::profiles::model::activated_description;
+    use tf2tools_app::pages::profiles::model::{ApplyOutcome, outcome_toast};
     let installed: Vec<SharedString> = vec!["A".into(), "B".into()];
     let keys = vec!["w".to_owned(), "s".to_owned()];
     for (lang, sep) in [("en", ", "), ("zh-CN", "、")] {
@@ -329,7 +329,11 @@ fn joined_lists_take_the_language_separator() {
             "{lang}"
         );
         assert_eq!(i18n::separated(&["a"]), "a", "{lang}");
-        let toast = activated_description(&installed, &[]);
+        let toast = outcome_toast(&ApplyOutcome {
+            kept: installed.clone(),
+            ..Default::default()
+        })
+        .2;
         assert!(toast.contains(&format!("A{sep}B")), "{lang}: {toast}");
         let line = movement_on_text(&keys, &[], false);
         assert!(line.contains(&format!("W{sep}S")), "{lang}: {line}");
@@ -419,4 +423,35 @@ fn code_built_label_value_lines_take_the_language_colon() {
             "{lang}: {charges}"
         );
     }
+}
+
+#[test]
+fn profile_toasts_end_each_sentence_with_a_chinese_full_stop() {
+    use tf2tools_app::pages::profiles::model::{
+        ApplyOutcome, modules_foreign, modules_no_catalog, outcome_toast,
+    };
+    use tf2tools_core::{ApplySkipReason, ApplyStep};
+    let _guard = LocaleGuard::switch("zh-CN");
+    let warned = ApplyOutcome {
+        kept: vec!["x".into()],
+        skipped_steps: vec![
+            (ApplyStep::Graphics, ApplySkipReason::MastercomfigNotManaged),
+            (ApplyStep::Addons, ApplySkipReason::MastercomfigNotInstalled),
+        ],
+        ..ApplyOutcome::default()
+    };
+    let (_, _, warning) = outcome_toast(&warned);
+    for reason in [modules_no_catalog(), modules_foreign()] {
+        let failed = ApplyOutcome {
+            failed: vec![(ApplyStep::Graphics, reason.to_string())],
+            ..ApplyOutcome::default()
+        };
+        let (_, _, error) = outcome_toast(&failed);
+        let plain = error.replace("modules.cfg", "");
+        assert!(!plain.contains('.') && error.ends_with('。'), "{error}");
+    }
+    assert!(
+        !warning.contains('.') && warning.ends_with('。'),
+        "{warning}"
+    );
 }

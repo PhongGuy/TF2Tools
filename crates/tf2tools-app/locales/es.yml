@@ -640,81 +640,124 @@ store_grid:
     filters: "Prueba a ajustar tu búsqueda o tus filtros."
 
 profiles:
-  crosshairs: { one: "%{count} mira", other: "%{count} miras" }
   weapons: { one: "%{count} arma", other: "%{count} armas" }
-  search: "Buscar perfiles..."
   not_applied: "Cambios aún sin aplicar"
-  default_name: "Perfil %{n}"
+  lead: "Un perfil cambia toda tu configuración de una vez: HUD, sonidos, miras, gráficos y add-ons. Uno nuevo empieza como copia de lo que tienes ahora."
   no_tf2: "Indica la carpeta de TF2 en Ajustes para activar perfiles."
   part:
+    sounds: "Sonidos"
+    graphics: "Gráficos"
+    addons: "Add-ons"
     crosshairs: "Miras"
     item: "Objeto"
-  heading:
-    active: "Perfil activo"
-    library: "Tus perfiles"
   badge:
     active: "Activo"
   button:
-    activate: "Activar"
-    activating: "Activando..."
-    edit: "Editar perfil"
-    delete: "Eliminar perfil"
+    apply: "Aplicar"
+    edit: "Editar"
     new: "Nuevo perfil"
-    start_empty: "Empezar vacío"
-    more_ways: "Más formas de crear un perfil"
+  mode: { set: "Fijar", none: "Ninguno", leave: "Dejar como está" }
+  slot:
+    hud: { help: "El HUD que instala este perfil.", leave: "Aplicar este perfil no tocará tu HUD.", none: "Usa el HUD propio de TF2: se quita cualquier HUD personalizado." }
+    sounds: { help: "Sonido de impacto y de muerte.", leave: "Aplicar este perfil no tocará tus sonidos.", none: "Usa los sonidos propios de TF2: se quitan los sonidos de impacto y de muerte personalizados." }
+    crosshairs: { help: "Una mira por arma, elegida igual que en la página Miras.", leave: "Aplicar este perfil no tocará tus miras.", none: "Usa la mira por defecto de TF2 en todas las armas." }
+    graphics: { help: "Un preset de mastercomfig y tus cambios sobre él.", leave: "Aplicar este perfil no tocará tus gráficos.", none: "Quita mastercomfig, así TF2 usa sus propios ajustes de vídeo." }
+    addons: { help: "Qué add-ons están activados.", leave: "Aplicar este perfil no tocará tus add-ons.", none: "Desactiva todos los add-ons." }
   card:
-    empty: "Perfil vacío"
-    empty_vanilla: "Perfil vacío (vanilla)"
+    leave: "Se queda como está"
+    hud_none: "El HUD propio de TF2"
+    sounds: "Impacto: %{hit}, baja: %{kill}"
+    tf2_default: "Predeterminado de TF2"
+    sounds_none: "Sonidos predeterminados de TF2"
+    crosshairs: { one: "%{count} mira de arma", other: "%{count} miras de arma" }
+    crosshairs_none: "Miras predeterminadas de TF2"
+    graphics: { one: "%{preset}, %{count} cambio", other: "%{preset}, %{count} cambios" }
+    graphics_as_is: "%{preset} tal cual"
+    graphics_none: "mastercomfig desactivado"
+    addons_only_one: "Solo %{list}"
+    addons_only: { one: "Solo estos %{count}: %{list}", other: "Solo estos %{count}: %{list}" }
+    addons_on: "Activa %{list}"
+    addons_nothing: "No activa ningún add-on"
+    addons_none: "Todos los add-ons desactivados"
+  note:
+    sounds: "%{hit} y %{kill}"
+    graphics: { one: "%{preset} con %{count} cambio", other: "%{preset} con %{count} cambios" }
+    addons: { one: "%{count} add-on activo", other: "%{count} add-ons activos" }
+    tail: "Ponle un nombre y guárdalo, o cambia lo que deba ser distinto."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "Un HUD que TF2Tools no instaló"
+    crosshairs_default: "Las de TF2"
+    no_mastercomfig: "Sin mastercomfig"
+    outside_mastercomfig: "Un mastercomfig que TF2Tools no instaló"
+    mastercomfig_removed: "mastercomfig quitado"
+    addons_on: { one: "%{count} activo", other: "%{count} activos" }
+    turns_on: "Activa %{list}"
+    turns_off: "desactiva %{list}"
+    turns_off_only: "Desactiva %{list}"
+    both: "%{on}; %{off}"
+    movement: "%{text}, cambia tus teclas de movimiento"
+    left: "Se queda como está: %{list}."
+    missing_keeps: "Falta %{name}; se queda %{kept}"
+    missing_none: "Falta %{name}; ahí no hay nada instalado"
+    missing_other_hud: "el HUD que tienes ahora"
+  apply:
+    title: "¿Cambiar a %{name}?"
+    intro: "Esto cambia ahora. Todo lo demás se queda como está."
+    nothing: "Esto ya coincide con lo que tienes ahora. Aplicarlo lo marca como tu perfil activo."
+    ok: "Aplicar %{name}"
   empty:
     title: "Aún no hay perfiles"
     body: "Guarda tu configuración actual como perfil para cambiar rápido entre configuraciones."
-    no_match_title: "No se encontraron perfiles"
-    no_match_body: "Prueba con otro término de búsqueda."
-  no_active:
-    title: "Ningún perfil activo"
-    body: "Activa un perfil para aplicar una colección guardada de personalizaciones."
   missing:
-    title: "Objetos que faltan"
-    body: "Algunos objetos de \"%{name}\" ya no están en tu biblioteca."
-    install: "Instalar igualmente (omitir los que faltan)"
     redownload: "Volver a descargar"
     local: "Importación local: no se puede volver a descargar"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "MIRA"
-      item: "OBJETO"
   editor:
-    back: "Volver a perfiles"
-    clear: "Vaciar"
-    unknown: "Desconocido"
-    missing_crosshair: "%{name} (falta)"
-    slot:
-      none: "Ninguno"
-      default_crosshairs: "Miras predeterminadas"
-      missing: "Falta: %{name}"
-    empty:
-      huds: "Aún no hay HUDs en tu biblioteca"
-      browse_huds: "Explorar la tienda de HUDs"
-      sounds: "Aún no hay sonidos en tu biblioteca"
-      browse_sounds: "Explorar la tienda de sonidos"
-      no_match: "Sin resultados"
+    header_label: "Editor de perfiles"
+    modes_label: "Qué hace este perfil con %{slot}"
+    crumb_new: "Nuevo perfil"
+    name: "Nombre"
+    name_placeholder: "Ponle nombre a este perfil"
+    save: "Guardar"
+    delete: "Eliminar perfil"
+    name_blank: "Ponle un nombre a este perfil"
+    pick_hud: "Elige un HUD o elige Ninguno"
+    loading: "Leyendo lo que tienes ahora…"
+    note_title: "Rellenado con lo que tienes ahora"
+    hud_empty: "Aún no hay HUDs en tu biblioteca."
+    xh_everywhere: "Poner en todas las armas"
+    xh_on: { one: "En %{count} arma", other: "En %{count} armas" }
+    xh_pick_first: "Elige una mira y luego haz clic en un arma"
+    gfx_settings: "Ajustes"
+    gfx_settings_help: "La lista de la página de Gráficos, guardada en este perfil."
+    gfx_copy: "Copiar de la página de Gráficos"
+    gfx_copy_none: "Instala mastercomfig primero en la página de Gráficos"
+    gfx_no_catalog: "Abre la página de Gráficos una vez para elegir ajustes"
+    addons_only: "Solo estos"
+    addons_only_on: "Los add-ons que no estén activados aquí se desactivan al aplicar."
+    addons_only_off: "Los add-ons activados aquí se activan; el resto se queda como está."
+    addons_need_graphics: "Los add-ons necesitan mastercomfig, y Gráficos está en Ninguno"
+    addons_empty: "Aún no hay add-ons de mastercomfig en tu biblioteca."
+    addons_store: "Abrir la Tienda de add-ons"
   toast:
-    created_from_setup: "Perfil creado a partir de tu configuración actual"
-    created_empty: "Perfil vacío creado"
+    saved: "%{name} guardado."
+    saved_active: "%{name} guardado. Aplícalo para usar los cambios."
     deleted: "Perfil eliminado"
-    activated: "Perfil \"%{name}\" activado"
-    applied: "Perfil \"%{name}\" aplicado"
-    cleared: "Se quitaron todas las personalizaciones"
-    installed: "Instalado: %{list}"
-    nothing_new: "No se instaló nada nuevo"
-    kept: "%{lead}. Se mantuvo lo que tenías para: %{list} (no están en tu biblioteca)"
     failed_steps: "No se pudo colocar esto: %{steps}. Asegúrate de que TF2 esté cerrado y de que TF2Tools pueda escribir en tu carpeta de TF2, y vuelve a intentarlo."
-    activate_failed: "No se pudo activar el perfil"
     missing: "Faltan algunos objetos"
+    applied_line: "%{name} aplicado. TF2 lo usará la próxima vez que se inicie."
+    apply_failed: "No se pudo aplicar %{name}"
+    kept_only: "Se mantuvo lo que tenías para: %{list} (no están en tu biblioteca)"
+    skipped: "%{part} se quedó como estaba: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig no está instalado, así que instálalo primero en la página de Gráficos"
+    not_managed: "TF2Tools no instaló tu mastercomfig, así que toma el control en la página de Gráficos primero"
+    addons_need_base: "los add-ons necesitan mastercomfig, que no está instalado"
+  modules:
+    no_catalog: "Abre la página de Gráficos una vez para que TF2Tools pueda leer los ajustes de tu mastercomfig"
+    foreign: "Tu modules.cfg no lo escribió TF2Tools; abre la página de Gráficos para reemplazarlo"
   activity:
-    saved_current: "Configuración actual guardada como perfil: %{name}"
-    created: "Perfil creado: %{name}"
+    saved: "Perfil guardado: %{name}"
     deleted: "Perfil eliminado: %{name}"
     failed: "No se pudo activar el perfil: %{name}"
     activated: "Perfil activado: %{name}"
@@ -805,14 +848,11 @@ confirm:
   delete_profile:
     title: "Eliminar perfil"
     body: "¿Seguro que quieres eliminar \"%{name}\"?"
+    active: "Es tu perfil activo. Tu juego se queda como está."
   clear_profile_crosshairs:
     title: "Quitar miras"
     body: "¿Quitar todas las miras de este perfil?"
     ok: "Quitar todas"
-  activate_empty:
-    title: "Activar perfil vacío"
-    body: "Este perfil no tiene personalizaciones. Al activarlo se quitarán todos los HUDs, sonidos y miras instalados."
-    ok: "Activar igualmente"
   tf2_running:
     title: "TF2 está abierto"
     body: "TF2 está abierto; los cambios se aplican tras reiniciarlo."
@@ -2650,9 +2690,6 @@ messages:
       newer_database: "Tu biblioteca se guardó con un TF2Tools más nuevo. Instala el último TF2Tools desde la página de versiones para abrirla."
   profiles:
     name_taken: "Ya tienes un perfil llamado %{name}. Elige otro nombre."
-    hud_gone: "Ese HUD ya no está en tu biblioteca"
-    sound_gone: "Ese sonido ya no está en tu biblioteca"
-    crosshair_gone: "Esa mira ya no está en tu biblioteca"
   mastercomfig:
     no_release: "GitHub no tiene ahora mismo una versión de mastercomfig que TF2Tools pueda instalar. Inténtalo de nuevo más tarde."
     foreign_modules_cfg: "TF2 tiene un modules.cfg que TF2Tools no escribió, así que TF2Tools no lo tocó."
@@ -2848,7 +2885,6 @@ messages:
     remove_failed: "No se pudo quitar"
     load_library: "No se pudo cargar la biblioteca"
     save_profile: "No se pudo guardar el perfil"
-    load_profile: "No se pudo cargar el perfil"
     open_profile: "No se pudo abrir el perfil"
     load_profiles: "No se pudieron cargar los perfiles"
     create_profile: "No se pudo crear el perfil"

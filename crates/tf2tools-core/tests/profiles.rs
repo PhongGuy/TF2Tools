@@ -13,7 +13,7 @@ fn a_v5_profile_reads_with_its_raw_references() {
     seed_v5_profile(&env);
     let p = env.lib.profile(&ProfileId::new(V5_ID)).unwrap();
     assert_eq!(p.name(), "Comp");
-    let hud = p.hud().unwrap();
+    let hud = p.hud().as_set().unwrap();
     assert_eq!((hud.folder_name(), hud.name()), ("rayshud", "rayshud"));
     assert_eq!(
         hud.provenance(),
@@ -21,12 +21,14 @@ fn a_v5_profile_reads_with_its_raw_references() {
             hud_id: "rayshud".into()
         }
     );
-    let hit = p.hitsound().unwrap();
+    let hit = p.sounds().as_set().and_then(|s| s.hit.as_ref()).unwrap();
     assert_eq!((hit.folder_name(), hit.name()), ("ding-1a2b3c4d", "Ding"));
     assert_eq!(hit.provenance(), &gb(7001));
-    assert!(p.killsound().is_none());
+    assert!(p.sounds().as_set().and_then(|s| s.kill.as_ref()).is_none());
     let crosshairs: Vec<_> = p
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .map(|c| (c.weapon_script(), c.crosshair().clone(), c.store_gb_id()))
         .collect();

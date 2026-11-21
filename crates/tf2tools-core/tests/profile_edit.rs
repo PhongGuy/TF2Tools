@@ -7,8 +7,8 @@ use common::{
     library_env, seed_v5_profile, set_setting, sql,
 };
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudId, ProfileCrosshairRef, ProfileDraft,
-    ProfileError, ProfileId, Provenance,
+    CrosshairRef, DraftCrosshair, DraftItem, HudId, ProfileCrosshairRef, ProfileDraft,
+    ProfileError, ProfileId, Provenance, SlotMode,
 };
 
 /// Every v5 column but name and updated_at, plus the crosshair rows, as one JSON text.
@@ -52,8 +52,11 @@ fn editing_with_every_slot_kept_round_trips_the_v5_columns() {
     assert_eq!(updated.name(), "Comp 2");
     assert_eq!(v5_columns(&env, V5_ID), before);
     assert_ne!(updated.updated_at(), "2025-03-01T10:00:00+00:00");
-    assert_eq!(updated.hud(), p.hud());
-    assert_eq!(updated.crosshairs(), p.crosshairs());
+    assert_eq!(updated.hud().as_set(), p.hud().as_set());
+    assert_eq!(
+        updated.crosshairs().as_set().map_or(&[][..], Vec::as_slice),
+        p.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+    );
 }
 
 #[test]
@@ -64,10 +67,12 @@ fn create_writes_folder_names_names_and_provenance() {
     let kill = import_wav_as(&env, "Bell", gb(77));
     let dot = import_png_as(&env, "Dot", gb(91));
     let draft = ProfileDraft::new("  Main  ")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             set(
                 "tf_weapon_scattergun",
                 CrosshairRef::Builtin("cpma_9".into()),
@@ -76,15 +81,29 @@ fn create_writes_folder_names_names_and_provenance() {
                 "tf_weapon_rocketlauncher",
                 CrosshairRef::Library(dot.id().clone()),
             ),
-        ]);
+        ]));
     let p = env.lib.create_profile(&draft).unwrap();
     assert_eq!(p.name(), "Main");
     assert_eq!(p.id().as_str().len(), 36);
     assert_eq!(p.created_at().len(), 32);
-    assert_eq!(p.hud().unwrap().folder_name(), hud.folder_name());
-    assert_eq!(p.hud().unwrap().provenance(), &gb(42));
-    assert_eq!(p.hitsound().unwrap().provenance(), &Provenance::Local);
-    assert_eq!(p.killsound().unwrap().name(), "Bell");
+    assert_eq!(p.hud().as_set().unwrap().folder_name(), hud.folder_name());
+    assert_eq!(p.hud().as_set().unwrap().provenance(), &gb(42));
+    assert_eq!(
+        p.sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .unwrap()
+            .provenance(),
+        &Provenance::Local
+    );
+    assert_eq!(
+        p.sounds()
+            .as_set()
+            .and_then(|s| s.kill.as_ref())
+            .unwrap()
+            .name(),
+        "Bell"
+    );
     assert_eq!(env.lib.profile(p.id()).unwrap(), p);
 
     let conn = sql(&env.dir);
@@ -172,13 +191,16 @@ fn create_refuses_a_blank_name_an_unknown_item_and_a_bad_weapon_script() {
         env.lib.create_profile(&ProfileDraft::new("   ")),
         Err(ProfileError::EmptyName)
     ));
-    let unknown = ProfileDraft::new("x").with_hud(DraftSlot::Item(HudId::new("nope")));
+    let unknown =
+        ProfileDraft::new("x").with_hud(SlotMode::Set(DraftItem::Pick(HudId::new("nope"))));
     assert!(matches!(
         env.lib.create_profile(&unknown),
         Err(ProfileError::ItemNotFound { .. })
     ));
-    let bad = ProfileDraft::new("x")
-        .with_crosshairs(vec![set("../evil", CrosshairRef::Builtin("cpma_9".into()))]);
+    let bad = ProfileDraft::new("x").with_crosshairs(SlotMode::Set(vec![set(
+        "../evil",
+        CrosshairRef::Builtin("cpma_9".into()),
+    )]));
     assert!(matches!(
         env.lib.create_profile(&bad),
         Err(ProfileError::InvalidWeaponScript { .. })
@@ -187,14 +209,23 @@ fn create_refuses_a_blank_name_an_unknown_item_and_a_bad_weapon_script() {
 }
 
 #[test]
-fn keep_on_create_is_an_empty_slot() {
+fn a_none_hud_on_create_stores_no_hud() {
     let env = library_env();
     let p = env
         .lib
-        .create_profile(&ProfileDraft::new("Bare").with_hud(DraftSlot::Keep))
+        .create_profile(&ProfileDraft::new("Bare").with_hud(SlotMode::None))
         .unwrap();
-    assert!(p.hud().is_none() && p.hitsound().is_none() && p.killsound().is_none());
-    assert!(p.crosshairs().is_empty());
+    assert!(
+        p.hud().as_set().is_none()
+            && p.sounds().as_set().and_then(|s| s.hit.as_ref()).is_none()
+            && p.sounds().as_set().and_then(|s| s.kill.as_ref()).is_none()
+    );
+    assert!(
+        p.crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .is_empty()
+    );
 }
 
 #[test]
@@ -204,31 +235,54 @@ fn update_replaces_slots_and_keep_preserves_a_dangling_reference() {
     let kill = import_wav_as(&env, "Bell", Provenance::Local);
     let id = ProfileId::new(V5_ID);
     let p = env.lib.profile(&id).unwrap();
-    let rocket = p.crosshairs()[0].clone();
+    let rocket = p.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].clone();
     let draft = ProfileDraft::from_profile(&p)
-        .with_hitsound(DraftSlot::Empty)
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![
+        .with_sounds(SlotMode::Set((
+            None,
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             DraftCrosshair::Keep(rocket.clone()),
             set(
                 "tf_weapon_scattergun",
                 CrosshairRef::Builtin("cpma_10".into()),
             ),
-        ]);
+        ]));
     let update = env.lib.update_profile(&id, &draft).unwrap();
     let updated = update.profile();
-    assert_eq!(updated.hud(), p.hud());
-    assert!(updated.hitsound().is_none());
+    assert_eq!(updated.hud().as_set(), p.hud().as_set());
+    assert!(
+        updated
+            .sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .is_none()
+    );
     assert_eq!(
-        updated.killsound().unwrap().folder_name(),
+        updated
+            .sounds()
+            .as_set()
+            .and_then(|s| s.kill.as_ref())
+            .unwrap()
+            .folder_name(),
         kill.folder_name()
     );
-    assert_eq!(updated.crosshairs()[0], rocket);
     assert_eq!(
-        updated.crosshairs()[1].crosshair(),
+        updated.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0],
+        rocket
+    );
+    assert_eq!(
+        updated.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[1].crosshair(),
         &ProfileCrosshairRef::Builtin("cpma_10".into())
     );
-    assert_eq!(updated.crosshairs().len(), 2);
+    assert_eq!(
+        updated
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice)
+            .len(),
+        2
+    );
     let hit_folder: Option<String> = sql(&env.dir)
         .query_row(
             "SELECT hitsound_folder_name FROM profiles WHERE id = ?1",
@@ -315,19 +369,23 @@ fn a_weapon_set_twice_in_a_draft_keeps_the_last() {
     let env = library_env();
     let p = env
         .lib
-        .create_profile(&ProfileDraft::new("Twice").with_crosshairs(vec![
-            set(
-                "tf_weapon_scattergun",
-                CrosshairRef::Builtin("cpma_9".into()),
-            ),
-            set(
-                "tf_weapon_scattergun",
-                CrosshairRef::Builtin("cpma_1".into()),
-            ),
-        ]))
+        .create_profile(
+            &ProfileDraft::new("Twice").with_crosshairs(SlotMode::Set(vec![
+                set(
+                    "tf_weapon_scattergun",
+                    CrosshairRef::Builtin("cpma_9".into()),
+                ),
+                set(
+                    "tf_weapon_scattergun",
+                    CrosshairRef::Builtin("cpma_1".into()),
+                ),
+            ])),
+        )
         .unwrap();
     let crosshairs: Vec<_> = p
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .map(|c| (c.weapon_script(), c.crosshair().clone()))
         .collect();
@@ -381,9 +439,15 @@ fn an_update_keeps_crosshair_rows_of_an_unknown_source() {
     let id = ProfileId::new(V5_ID);
     let p = env.lib.profile(&id).unwrap();
     // v6 cannot read the unknown row, so the draft never mentions it.
-    assert_eq!(p.crosshairs().len(), 2);
+    assert_eq!(
+        p.crosshairs().as_set().map_or(&[][..], Vec::as_slice).len(),
+        2
+    );
     env.lib
-        .update_profile(&id, &ProfileDraft::from_profile(&p).with_crosshairs(vec![]))
+        .update_profile(
+            &id,
+            &ProfileDraft::from_profile(&p).with_crosshairs(SlotMode::Set(vec![])),
+        )
         .unwrap();
     assert_eq!(
         crosshair_sources(&env, V5_ID),
@@ -393,10 +457,10 @@ fn an_update_keeps_crosshair_rows_of_an_unknown_source() {
     env.lib
         .update_profile(
             &id,
-            &ProfileDraft::from_profile(&p).with_crosshairs(vec![set(
+            &ProfileDraft::from_profile(&p).with_crosshairs(SlotMode::Set(vec![set(
                 "tf_weapon_minigun",
                 CrosshairRef::Builtin("cpma_9".into()),
-            )]),
+            )])),
         )
         .unwrap();
     assert_eq!(

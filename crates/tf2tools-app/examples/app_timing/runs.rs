@@ -10,8 +10,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tf2tools_app::timing::Case;
 use tf2tools_core::{
-    CrosshairRef, DataDir, Database, DraftCrosshair, DraftSlot, Library, ProfileDraft, Provenance,
-    TfClass, weapons,
+    CrosshairRef, DataDir, Database, DraftCrosshair, DraftItem, Library, ProfileDraft, Provenance,
+    SlotMode, TfClass, weapons,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,8 +163,8 @@ pub fn seed_m4(tpl: &Path, logs: usize) -> Result<M4Counts, String> {
             })
             .collect();
         let draft = ProfileDraft::new(name)
-            .with_hud(DraftSlot::Item(hud.id().clone()))
-            .with_crosshairs(assigned);
+            .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+            .with_crosshairs(SlotMode::Set(assigned));
         library
             .create_profile(&draft)
             .map_err(ctx("create profile"))?;
@@ -754,12 +754,15 @@ mod tests {
         let profiles = lib.profiles().unwrap();
         let names: Vec<_> = profiles.iter().map(|p| p.name().to_owned()).collect();
         assert_eq!(names, ["Timing A", "Timing B"]);
-        assert!(
-            profiles
-                .iter()
-                .all(|p| p.hud().is_some() && !p.crosshairs().is_empty())
-        );
-        assert_ne!(profiles[0].hud(), profiles[1].hud());
+        assert!(profiles.iter().all(|p| {
+            p.hud().as_set().is_some()
+                && !p
+                    .crosshairs()
+                    .as_set()
+                    .map_or(&[][..], Vec::as_slice)
+                    .is_empty()
+        }));
+        assert_ne!(profiles[0].hud().as_set(), profiles[1].hud().as_set());
     }
 
     #[test]

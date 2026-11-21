@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use tf2tools_core::{
     CrosshairRef, DataDir, Database, HudFiles, HudModel, HudStatus, Library, MissingKind, PartKey,
-    Platform, Provenance, SoundKind, Tf2Install,
+    Platform, Provenance, SlotMode, SoundKind, Tf2Install,
 };
 use tf2tools_pilot::seed::{EMPTY_STORE_VAR, seed, seed_with};
 
@@ -135,13 +135,30 @@ fn the_seed_has_its_profiles_with_competitive_active() {
     let names: Vec<_> = profiles.iter().map(|p| p.name().to_owned()).collect();
     assert_eq!(names, ["Arena", "Casual", "Competitive", "Vanilla"]);
     let profiles = &profiles[1..];
-    let comp = &profiles[1];
+    let (casual, comp, vanilla) = (&profiles[0], &profiles[1], &profiles[2]);
     assert_eq!(lib.active_profile().unwrap().as_ref(), Some(comp.id()));
-    assert_eq!(comp.hud().map(|h| h.folder_name()), Some("rayshud"));
-    assert_eq!(comp.crosshairs().len(), 2);
-    assert_eq!(profiles[0].hud().map(|h| h.folder_name()), Some("flawhud"));
-    assert!(profiles[0].killsound().is_none());
-    assert!(profiles[2].hud().is_none() && profiles[2].crosshairs().is_empty());
+    assert_eq!(
+        comp.hud().as_set().map(|h| h.folder_name()),
+        Some("rayshud")
+    );
+    assert_eq!(comp.crosshairs().as_set().map(Vec::len), Some(2));
+    assert_eq!(comp.graphics(), &SlotMode::Leave);
+    assert_eq!(comp.addons(), &SlotMode::Leave);
+    assert_eq!(
+        casual.hud().as_set().map(|h| h.folder_name()),
+        Some("flawhud")
+    );
+    let SlotMode::Set(sounds) = casual.sounds() else {
+        panic!("{:?}", casual.sounds())
+    };
+    assert!(sounds.kill.is_none());
+    assert_eq!(casual.crosshairs(), &SlotMode::None);
+    assert_eq!(casual.graphics(), &SlotMode::Leave);
+    assert_eq!(vanilla.hud(), &SlotMode::None);
+    assert_eq!(vanilla.sounds(), &SlotMode::None);
+    assert_eq!(vanilla.crosshairs(), &SlotMode::None);
+    assert_eq!(vanilla.graphics(), &SlotMode::None);
+    assert_eq!(vanilla.addons(), &SlotMode::None);
     let tf2 = Tf2Install::from_path(&game).unwrap();
     assert!(tf2.custom_dir().join("rayshud").is_dir());
 }

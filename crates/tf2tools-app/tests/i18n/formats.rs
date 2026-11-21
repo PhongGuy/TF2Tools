@@ -326,7 +326,7 @@ fn logs_tf_sentences_read_in_russian() {
 fn library_and_store_counts_read_in_russian() {
     use tf2tools_app::pages::maps::model::count_label;
     use tf2tools_app::pages::profiles::editor_model::weapon_count;
-    use tf2tools_app::pages::profiles::model::crosshair_count;
+    use tf2tools_app::pages::profiles::editor_model::weapon_crosshairs;
     use tf2tools_app::store_grid::count_text;
     use tf2tools_core::StoreKind;
     let _guard = LocaleGuard::switch("ru");
@@ -344,9 +344,9 @@ fn library_and_store_counts_read_in_russian() {
     assert_eq!(count_text(StoreKind::GameBananaHuds, 2, 3), "2 из 3 HUD");
     let curated = tf2tools_app::pages::hud_store::curated::count_label(2, 304);
     assert_eq!(curated, "2 из 304 HUD");
-    assert_eq!(crosshair_count(1), "1 прицел");
-    assert_eq!(crosshair_count(3), "3 прицела");
-    assert_eq!(crosshair_count(5), "5 прицелов");
+    assert_eq!(weapon_crosshairs(1), "1 прицел для оружия");
+    assert_eq!(weapon_crosshairs(3), "3 прицела для оружия");
+    assert_eq!(weapon_crosshairs(5), "5 прицелов для оружия");
     assert_eq!(weapon_count(1), "1 оружие");
     assert_eq!(weapon_count(2), "2 оружия");
     assert_eq!(weapon_count(5), "5 оружий");

@@ -267,7 +267,7 @@ fn every_store_card_lights_up_with_the_card_hover_fill() {
 // The Graphics rows' segments take their checked look from the pill the preset shares.
 #[test]
 fn graphics_segments_use_the_shared_pill_look() {
-    let source = include_str!("../src/pages/graphics/settings.rs");
+    let source = include_str!("../src/pages/graphics/rows.rs");
     assert!(source.contains("pill::segment_look(") && source.contains("pill::row_track("));
 }
 

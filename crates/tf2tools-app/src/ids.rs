@@ -19,6 +19,8 @@ pub const SIDEBAR_TOGGLE: &str = "sidebar-toggle";
 pub const SIDEBAR_GROUPS: &str = "sidebar-groups";
 pub const HEADER: &str = "header";
 pub const HEADER_TITLE: &str = "header-title";
+/// The header row's stand-in for the title while a page has put its own view there.
+pub const HEADER_SLOT: &str = "header-slot";
 /// The header's own row, left of any window buttons the title bar draws on this platform.
 pub const HEADER_ROW: &str = "header-row";
 pub const TF2_BADGE: &str = "tf2-badge";
@@ -914,88 +916,126 @@ pub const GRAPHICS_SHOW_ALL: &str = "graphics-show-all";
 /// The category rail, a column beside the list or a chip row above it when narrow.
 pub const GRAPHICS_RAIL: &str = "graphics-rail";
 
+/// The Profiles page's lead line above the card grid.
+pub const PROFILES_LEAD: &str = "profiles-lead";
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
-/// The Active Profile card.
-pub const PROFILES_ACTIVE: &str = "profiles-active";
-/// The active profile's name.
-pub const PROFILES_ACTIVE_NAME: &str = "profiles-active-name";
-/// The Active Profile card's "Active" badge.
-pub const PROFILES_ACTIVE_BADGE: &str = "profiles-active-badge";
-/// The active profile's HUD badge.
-pub const PROFILES_ACTIVE_HUD: &str = "profiles-active-hud";
-/// The active profile's hitsound badge.
-pub const PROFILES_ACTIVE_HITSOUND: &str = "profiles-active-hitsound";
-/// The active profile's killsound badge.
-pub const PROFILES_ACTIVE_KILLSOUND: &str = "profiles-active-killsound";
-/// The active profile's crosshair count badge.
-pub const PROFILES_ACTIVE_CROSSHAIRS: &str = "profiles-active-crosshairs";
-/// "Empty profile" on the Active Profile card.
-pub const PROFILES_ACTIVE_EMPTY: &str = "profiles-active-empty";
-/// The card shown when no profile is active.
-pub const PROFILES_NO_ACTIVE: &str = "profiles-no-active";
 /// The Profiles page's card grid.
 pub const PROFILES_GRID: &str = "profiles-grid";
-/// The box the Profiles page's grid fills, under the "Your Profiles" row.
+/// The box the Profiles page's grid fills, under the lead row.
 pub const PROFILES_LIBRARY: &str = "profiles-library";
-/// The scrolling list of missing items in the profile apply dialog.
-pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
-/// The scrollbar beside the Missing Items list.
-pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
-/// The profile search input.
-pub const PROFILES_SEARCH: &str = "profiles-search";
 /// The empty state shown when there are no profiles.
 pub const PROFILES_EMPTY: &str = "profiles-empty";
-/// Shown when the search matches no profile.
-pub const PROFILES_NO_MATCH: &str = "profiles-no-match";
-/// The Missing Items dialog.
-pub const PROFILES_MISSING_DIALOG: &str = "profiles-missing-dialog";
-/// The Missing Items dialog's title, "Missing Items".
-pub const PROFILES_MISSING_TITLE: &str = "profiles-missing-title";
-/// The Missing Items dialog's description.
-pub const PROFILES_MISSING_DESCRIPTION: &str = "profiles-missing-description";
-/// The Missing Items dialog's Cancel button.
-pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
-/// The Missing Items dialog's "Install Anyway (skip missing)" button.
-pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
-/// The New profile main button, which saves the current setup as a new profile.
+/// The Apply summary dialog's root, title, intro, bordered rows box, "nothing changes" note,
+/// "Stays as it is" line and its two buttons.
+pub const PROFILE_APPLY_DIALOG: &str = "profile-apply-dialog";
+pub const PROFILE_APPLY_TITLE: &str = "profile-apply-title";
+pub const PROFILE_APPLY_INTRO: &str = "profile-apply-intro";
+pub const PROFILE_APPLY_ROWS: &str = "profile-apply-rows";
+/// The scrollbar beside the summary's rows once they outgrow their box.
+pub const PROFILE_APPLY_ROWS_SCROLLBAR: &str = "profile-apply-rows-scrollbar";
+pub const PROFILE_APPLY_NOTHING: &str = "profile-apply-nothing";
+pub const PROFILE_APPLY_LEFT: &str = "profile-apply-left";
+pub const PROFILE_APPLY_CANCEL: &str = "profile-apply-cancel";
+pub const PROFILE_APPLY_OK: &str = "profile-apply-ok";
+/// The New profile main button, which opens an unsaved draft of the current setup.
 pub const PROFILES_NEW: &str = "profiles-new";
-/// The New split button's wrapper; the caret inside it is the kit's fixed "popup" id.
-pub const PROFILES_NEW_MENU: &str = "profiles-new-menu";
-/// The New button and its caret, the kit's split button inside `PROFILES_NEW_MENU`.
-pub const PROFILES_NEW_SPLIT: &str = "profiles-new-split";
-/// The New menu's "Start empty" item.
-pub const PROFILES_NEW_EMPTY: &str = "profiles-new-empty";
-/// The empty page's New button.
-pub const PROFILES_EMPTY_NEW: &str = "profiles-empty-new";
-/// The empty page's "Start empty" button.
-pub const PROFILES_EMPTY_START_EMPTY: &str = "profiles-empty-start-empty";
 /// The profile editor's root.
 pub const PROFILE_EDITOR: &str = "profile-editor";
-/// The editor's Back button, which returns to the grid.
-pub const PROFILE_EDITOR_BACK: &str = "profile-editor-back";
+/// The line New profile shows while it reads the current setup for its draft.
+pub const PROFILE_EDITOR_LOADING: &str = "profile-editor-loading";
+/// The header crumb's root, labelled as the profile editor.
+pub const PROFILE_EDITOR_HEADER: &str = "profile-editor-header";
+/// The header crumb's "Profiles" link, which asks to close the editor.
+pub const PROFILE_EDITOR_CRUMB: &str = "profile-editor-crumb";
+/// The header crumb's profile name, or "New profile" while the name is blank.
+pub const PROFILE_EDITOR_CRUMB_NAME: &str = "profile-editor-crumb-name";
+/// The header's Cancel button.
+pub const PROFILE_EDITOR_CANCEL: &str = "profile-editor-cancel";
+/// The header's Save button.
+pub const PROFILE_EDITOR_SAVE: &str = "profile-editor-save";
 /// The editor's name field.
 pub const PROFILE_EDITOR_NAME: &str = "profile-editor-name";
-/// The line under the name field when another profile has that name.
-pub const PROFILE_EDITOR_NAME_TAKEN: &str = "profile-editor-name-taken";
-/// The editor's Activate button.
-pub const PROFILE_EDITOR_ACTIVATE: &str = "profile-editor-activate";
-/// The editor's "Active" badge, shown when the open profile is active.
-pub const PROFILE_EDITOR_ACTIVE_BADGE: &str = "profile-editor-active-badge";
-/// The editor's Delete button.
+/// The line under the name field saying why Save is off.
+pub const PROFILE_EDITOR_NAME_ERROR: &str = "profile-editor-name-error";
+/// The new draft's note on what it copied.
+pub const PROFILE_EDITOR_NOTE: &str = "profile-editor-note";
+/// The editor's scrolling body.
+pub const PROFILE_EDITOR_BODY: &str = "profile-editor-body";
+/// The editor body's scrollbar.
+pub const PROFILE_EDITOR_SCROLLBAR: &str = "profile-editor-scrollbar";
+/// The Delete profile button at the editor's foot.
 pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
-/// The note that an edit deactivated the profile, so its changes are not in the game yet.
-pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
-/// The HUD picker's card grid.
-pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
-/// The HUD slot card's picture area, drawn while the slot holds a HUD.
-pub const PROFILE_SLOT_HUD_SHOT: &str = "profile-slot-hud-shot";
-/// The HUD slot card's picture, once it has loaded.
-pub const PROFILE_SLOT_HUD_IMAGE: &str = "profile-slot-hud-image";
-/// The sound picker's list.
-pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
-/// The sound picker list's scrollbar.
-pub const PROFILE_PICKER_SOUNDS_SCROLLBAR: &str = "profile-picker-sounds-scrollbar";
+
+/// The editor's slot rail: a column beside the cards, or a row above them when narrow.
+pub const PROFILE_RAIL: &str = "profile-rail";
+
+/// A slot's rail link: "profile-rail:<slot>".
+pub fn profile_rail(slot: &str) -> ElementId {
+    keyed("profile-rail", slot)
+}
+
+/// A rail link's Set, None or Left as is badge: "profile-rail-badge:<slot>".
+pub fn profile_rail_badge(slot: &str) -> ElementId {
+    keyed("profile-rail-badge", slot)
+}
+
+/// A slot card's help line: "profile-slot-help:<slot>".
+pub fn profile_slot_help(slot: &str) -> ElementId {
+    keyed("profile-slot-help", slot)
+}
+
+/// A slot's Set / None / Leave radio group: "profile-slot-modes:<slot>".
+pub fn profile_slot_modes(slot: &str) -> ElementId {
+    keyed("profile-slot-modes", slot)
+}
+
+/// One segment of a slot's mode control: "profile-slot-mode:<slot>:<mode>".
+pub fn profile_slot_mode(slot: &str, mode: &str) -> ElementId {
+    keyed("profile-slot-mode", &format!("{slot}:{mode}"))
+}
+
+/// The line a None or Leave slot shows in place of its body: "profile-slot-text:<slot>".
+pub fn profile_slot_text(slot: &str) -> ElementId {
+    keyed("profile-slot-text", slot)
+}
+
+/// The HUD Set body's line when the library has no HUDs.
+pub const PROFILE_HUD_EMPTY: &str = "profile-hud-empty";
+/// The empty HUD body's link to the HUDs page.
+pub const PROFILE_HUDS_LINK: &str = "profile-huds-link";
+/// The Sounds Set body's Hitsound select.
+pub const PROFILE_SOUND_HIT: &str = "profile-sound-hit";
+/// The Sounds Set body's Killsound select.
+pub const PROFILE_SOUND_KILL: &str = "profile-sound-kill";
+/// The Hitsound row's play button.
+pub const PROFILE_SOUND_HIT_PLAY: &str = "profile-sound-hit-play";
+/// The Killsound row's play button.
+pub const PROFILE_SOUND_KILL_PLAY: &str = "profile-sound-kill-play";
+/// The spinner in the Hitsound play button while its sound loads.
+pub const PROFILE_SOUND_HIT_PLAY_SPINNER: &str = "profile-sound-hit-play-spinner";
+/// The spinner in the Killsound play button while its sound loads.
+pub const PROFILE_SOUND_KILL_PLAY_SPINNER: &str = "profile-sound-kill-play-spinner";
+/// The Crosshairs Set body's "Put on every weapon" button.
+pub const PROFILE_XH_EVERYWHERE: &str = "profile-xh-everywhere";
+/// The Crosshairs Set body's line naming the picked crosshair and how many weapons show it.
+pub const PROFILE_XH_SELECTION: &str = "profile-xh-selection";
+/// The Graphics Set body's "Copy from the Graphics page" button.
+pub const PROFILE_GFX_COPY: &str = "profile-gfx-copy";
+/// The Graphics Set body's Settings card, whose header holds Copy.
+pub const PROFILE_GFX_SETTINGS: &str = "profile-gfx-settings";
+/// The Graphics Set body's line while no settings catalogue is cached.
+pub const PROFILE_GFX_NO_CATALOG: &str = "profile-gfx-no-catalog";
+/// The Add-ons Set body's "Only these" switch.
+pub const PROFILE_ADDONS_ONLY: &str = "profile-addons-only";
+/// The "Only these" row's title, which flips its switch.
+pub const PROFILE_ADDONS_ONLY_NAME: &str = "profile-addons-only-name";
+/// The Add-ons card's line while Graphics is None.
+pub const PROFILE_ADDONS_NEED_GRAPHICS: &str = "profile-addons-need-graphics";
+/// The Add-ons Set body's line when the library has no add-ons.
+pub const PROFILE_ADDONS_EMPTY: &str = "profile-addons-empty";
+/// The empty Add-ons body's link to the Addon Store.
+pub const PROFILE_ADDONS_STORE: &str = "profile-addons-store";
 
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
@@ -1344,67 +1384,50 @@ pub fn addon_busy(name: &AddonName) -> ElementId {
 // The kinds of the Profiles page's per-card ids, each keyed by the profile id, and of the
 // Missing Items dialog's per-row ids, keyed by the row's index.
 const PROFILE_CARD: &str = "profile-card";
-const PROFILE_ACTIVE_BADGE: &str = "profile-active-badge";
-const PROFILE_HUD: &str = "profile-hud";
-const PROFILE_HITSOUND: &str = "profile-hitsound";
-const PROFILE_KILLSOUND: &str = "profile-killsound";
-const PROFILE_CROSSHAIRS: &str = "profile-crosshairs";
-const PROFILE_EMPTY: &str = "profile-empty";
-const PROFILE_ACTIVATE: &str = "profile-activate";
-const PROFILE_EDIT: &str = "profile-edit";
-const PROFILE_DELETE: &str = "profile-delete";
-const MISSING_ITEM: &str = "missing-item";
-const MISSING_REDOWNLOAD: &str = "missing-redownload";
-const MISSING_LOCAL: &str = "missing-local";
 
 /// A profile card, keyed by the profile id: "profile-card:<id>".
 pub fn profile_card(id: &ProfileId) -> ElementId {
     keyed(PROFILE_CARD, id.as_str())
 }
 
-/// A card's "Active" badge, keyed by the profile id: "profile-active-badge:<id>".
-pub fn profile_active_badge(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_ACTIVE_BADGE, id.as_str())
+/// A card's 16:9 picture area, keyed by the profile id: "profile-card-picture:<id>".
+pub fn profile_card_picture(id: &ProfileId) -> ElementId {
+    keyed("profile-card-picture", id.as_str())
 }
 
-/// A card's HUD badge, keyed by the profile id: "profile-hud:<id>".
-pub fn profile_hud(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_HUD, id.as_str())
+/// The HUD image inside a card's picture: "profile-card-image:<id>".
+pub fn profile_card_image(id: &ProfileId) -> ElementId {
+    keyed("profile-card-image", id.as_str())
 }
 
-/// A card's hitsound badge, keyed by the profile id: "profile-hitsound:<id>".
-pub fn profile_hitsound(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_HITSOUND, id.as_str())
+/// A card's "Active" pill over its picture: "profile-card-active:<id>".
+pub fn profile_card_active(id: &ProfileId) -> ElementId {
+    keyed("profile-card-active", id.as_str())
 }
 
-/// A card's killsound badge, keyed by the profile id: "profile-killsound:<id>".
-pub fn profile_killsound(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_KILLSOUND, id.as_str())
+/// A card's name: "profile-card-name:<id>".
+pub fn profile_card_name(id: &ProfileId) -> ElementId {
+    keyed("profile-card-name", id.as_str())
 }
 
-/// A card's crosshair count badge, keyed by the profile id: "profile-crosshairs:<id>".
-pub fn profile_crosshairs(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_CROSSHAIRS, id.as_str())
+/// One slot's line on a card: "profile-card-line:<id>:<slot>".
+pub fn profile_card_line(id: &ProfileId, slot: &str) -> ElementId {
+    keyed("profile-card-line", &format!("{}:{slot}", id.as_str()))
 }
 
-/// A card's "Empty profile" text, keyed by the profile id: "profile-empty:<id>".
-pub fn profile_empty(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_EMPTY, id.as_str())
+/// A card's Apply button: "profile-card-apply:<id>".
+pub fn profile_card_apply(id: &ProfileId) -> ElementId {
+    keyed("profile-card-apply", id.as_str())
 }
 
-/// A card's Activate button, keyed by the profile id: "profile-activate:<id>".
-pub fn profile_activate(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_ACTIVATE, id.as_str())
+/// A summary row, labelled "<label>: <from> → <to>": "profile-apply-row:<key>".
+pub fn profile_apply_row(key: &str) -> ElementId {
+    keyed("profile-apply-row", key)
 }
 
-/// A card's Edit button, keyed by the profile id: "profile-edit:<id>".
-pub fn profile_edit(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_EDIT, id.as_str())
-}
-
-/// A card's Delete button, keyed by the profile id: "profile-delete:<id>".
-pub fn profile_delete(id: &ProfileId) -> ElementId {
-    keyed(PROFILE_DELETE, id.as_str())
+/// A card's Edit button: "profile-card-edit:<id>".
+pub fn profile_card_edit(id: &ProfileId) -> ElementId {
+    keyed("profile-card-edit", id.as_str())
 }
 
 /// An editor slot row, keyed by the slot: "profile-slot:<slot>".
@@ -1412,74 +1435,41 @@ pub fn profile_slot(slot: &str) -> ElementId {
     keyed("profile-slot", slot)
 }
 
-/// An editor slot's clear button: "profile-slot-clear:<slot>".
-pub fn profile_slot_clear(slot: &str) -> ElementId {
-    keyed("profile-slot-clear", slot)
-}
-
-/// A sound slot's play button: "profile-slot-play:<slot>".
-pub fn profile_slot_play(slot: &str) -> ElementId {
-    keyed("profile-slot-play", slot)
-}
-
-/// A slot's missing-item note: "profile-slot-missing:<slot>".
-pub fn profile_slot_missing(slot: &str) -> ElementId {
-    keyed("profile-slot-missing", slot)
-}
-
-/// A slot's picker: "profile-picker:<slot>".
-pub fn profile_picker(slot: &str) -> ElementId {
-    keyed("profile-picker", slot)
-}
-
-/// A picker's search field: "profile-picker-search:<slot>".
-pub fn profile_picker_search(slot: &str) -> ElementId {
-    keyed("profile-picker-search", slot)
-}
-
-/// A picker's empty-library note: "profile-picker-empty:<slot>".
-pub fn profile_picker_empty(slot: &str) -> ElementId {
-    keyed("profile-picker-empty", slot)
-}
-
-/// A picker's note that its search matches nothing: "profile-picker-no-match:<slot>".
-pub fn profile_picker_no_match(slot: &str) -> ElementId {
-    keyed("profile-picker-no-match", slot)
-}
-
-/// An empty picker's button to the store: "profile-picker-store:<slot>".
-pub fn profile_picker_store(slot: &str) -> ElementId {
-    keyed("profile-picker-store", slot)
-}
-
-/// A HUD card in the picker, keyed by folder: "profile-pick-hud:<folder>".
+/// A HUD tile in the HUD Set body, keyed by folder: "profile-pick-hud:<folder>".
 pub fn profile_pick_hud(folder: &str) -> ElementId {
     keyed("profile-pick-hud", folder)
 }
 
-/// A sound row in a sound slot's picker: "profile-pick-sound:<slot>:<folder>".
-pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
-    keyed("profile-pick-sound", &format!("{slot}:{folder}"))
+/// A HUD tile's picture area, keyed by folder: "profile-hud-shot:<folder>".
+pub fn profile_hud_shot(folder: &str) -> ElementId {
+    keyed("profile-hud-shot", folder)
 }
 
-/// A picker sound row's play button: "profile-pick-play:<folder>".
-pub fn profile_pick_play(folder: &str) -> ElementId {
-    keyed("profile-pick-play", folder)
+/// A HUD tile's picture, keyed by folder: "profile-hud-image:<folder>".
+pub fn profile_hud_image(folder: &str) -> ElementId {
+    keyed("profile-hud-image", folder)
 }
 
-/// A Missing Items row, keyed by its index: "missing-item:<ix>".
-pub fn missing_item(ix: usize) -> ElementId {
-    keyed(MISSING_ITEM, &ix.to_string())
+/// An add-on row's name, which flips its switch: "profile-addon-name:<asset>".
+pub fn profile_addon_name(name: &str) -> ElementId {
+    keyed("profile-addon-name", name)
 }
 
-/// A row's Re-download button, keyed by its index: "missing-redownload:<ix>".
-pub fn missing_redownload(ix: usize) -> ElementId {
-    keyed(MISSING_REDOWNLOAD, &ix.to_string())
+/// An add-on's switch in the Add-ons Set body, keyed by asset name: "profile-addon:<asset>".
+pub fn profile_addon(name: &str) -> ElementId {
+    keyed("profile-addon", name)
 }
 
-/// A row's "Local import" note, keyed by its index: "missing-local:<ix>".
-pub fn missing_local(ix: usize) -> ElementId {
-    keyed(MISSING_LOCAL, &ix.to_string())
+/// A missing item's Re-download button on its summary row, keyed like the row:
+/// "profile-apply-redownload:<key>".
+pub fn profile_apply_redownload(key: &str) -> ElementId {
+    keyed("profile-apply-redownload", key)
+}
+
+/// A missing local import's "can't re-download" note on its summary row:
+/// "profile-apply-local:<key>".
+pub fn profile_apply_local(key: &str) -> ElementId {
+    keyed("profile-apply-local", key)
 }
 
 /// A header sync ring, keyed by the store's slug: "sync-ring:<slug>".
@@ -3523,4 +3513,29 @@ pub fn storage_slug(kind: StorageKind) -> &'static str {
 /// One Storage card row, labelled with its name and size.
 pub fn settings_storage(kind: StorageKind) -> ElementId {
     keyed("settings-storage", storage_slug(kind))
+}
+
+/// Which ids a shared widget draws under: the page's own, or a host's prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct IdScope(Option<&'static str>);
+
+impl IdScope {
+    /// The page's own ids, unchanged.
+    pub const PAGE: Self = Self(None);
+    /// The Profiles editor's hosted crosshair board and picker.
+    pub const PROFILE_CROSSHAIRS: Self = Self(Some("profile-xh"));
+    /// The Profiles editor's hosted Graphics choices.
+    pub const PROFILE_GRAPHICS: Self = Self(Some("profile-gfx"));
+
+    /// Swaps a named id's first word (the text before the first `-`) for this scope's
+    /// prefix, or puts the prefix in front when there is no `-`. Other id kinds pass through.
+    pub fn id(self, id: impl Into<ElementId>) -> ElementId {
+        let id = id.into();
+        if let (Some(prefix), ElementId::Name(name)) = (self.0, &id) {
+            let rest = name.split_once('-').map_or(&**name, |(_, rest)| rest);
+            ElementId::Name(format!("{prefix}-{rest}").into())
+        } else {
+            id
+        }
+    }
 }

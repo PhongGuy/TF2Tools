@@ -78,7 +78,9 @@ The logs.tf page shows your competitive stats from logs.tf. Paste your Steam pro
 
 ### Profiles
 
-Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
+Save your whole setup as a profile, for example one for competitive and one for casual, and switch it all at once. A profile holds your HUD, hitsound and killsound, crosshairs, mastercomfig graphics and add-ons. For each of them, choose **Set** to put your pick on, **None** to go back to TF2's own, or **Leave as is** to keep whatever you have when you switch.
+
+**New profile** starts from what you have installed now, and nothing is saved until you press **Save**. Before a profile goes on, TF2Tools shows what will change. If something the profile needs is gone from your library, it says so there, and for a HUD, sound or crosshair from a store it links to the store page so you can get it again.
 
 You can also add a HUD or a sound to a profile from its card with **Add to profile**, or send the selected crosshair to a profile from the Crosshairs page and pick its weapons there.
 

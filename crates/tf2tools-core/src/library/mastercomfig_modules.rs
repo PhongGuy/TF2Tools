@@ -262,6 +262,12 @@ impl Choices {
         Self { preset, modules }
     }
 
+    /// The same module choices over `preset`, kept verbatim: no catalog, so none is dropped
+    /// for now equalling the new preset's value. The profile editor's preset switch uses it.
+    pub fn with_preset(&self, preset: Preset) -> Choices {
+        Self::from_saved(preset, self.modules.clone())
+    }
+
     /// The preset the choices sit on.
     pub fn preset(&self) -> Preset {
         self.preset

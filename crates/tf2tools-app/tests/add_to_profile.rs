@@ -5,12 +5,12 @@ use crate::support;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::ids;
-use tf2tools_app::pages::profiles::editor_model::Slot;
+use tf2tools_app::pages::profiles::editor_model::{Mode, SlotKind};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairEntry, CrosshairRef, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
-    RgbaImage, SoundEntry, Tf2Install, rgba_to_vtf,
+    CrosshairEntry, CrosshairRef, DraftItem, HudEntry, Profile, ProfileDraft, Provenance,
+    RgbaImage, SlotMode, SoundEntry, Tf2Install, rgba_to_vtf,
 };
 
 fn found(env: &support::Env) -> Tf2State {
@@ -90,7 +90,7 @@ fn picking_a_profile_sets_its_hud(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Added rayshud to Bravo");
     let saved = reload(&s, &b);
     assert_eq!(
-        saved.hud().map(|h| h.folder_name()),
+        saved.hud().as_set().map(|h| h.folder_name()),
         Some(hud.folder_name())
     );
     assert_eq!(reload(&s, &a), a);
@@ -104,14 +104,17 @@ fn a_pick_names_the_hud_it_replaced(cx: &mut TestAppContext) {
     seed_hud(&s, &env, "rayshud");
     let p = profile(
         &s,
-        ProfileDraft::new("Comp").with_hud(DraftSlot::Item(old.id().clone())),
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(old.id().clone()))),
     );
     open_huds(cx, &s);
     support::click_id(cx, s.win, ids::hud_add_to_profile("rayshud"));
     support::click_id(cx, s.win, ids::hud_profile_pick(p.id()));
     toast_is(cx, &s, "Added rayshud to Comp (replaced toonhud)");
     assert_eq!(
-        reload(&s, &p).hud().map(|h| h.folder_name().to_owned()),
+        reload(&s, &p)
+            .hud()
+            .as_set()
+            .map(|h| h.folder_name().to_owned()),
         Some("rayshud".to_owned())
     );
 }
@@ -193,7 +196,10 @@ fn a_killsound_pick_keeps_the_hitsound(cx: &mut TestAppContext) {
     let bell = seed_sound(&s, &env, "bell");
     let p = profile(
         &s,
-        ProfileDraft::new("Comp").with_hitsound(DraftSlot::Item(ding.id().clone())),
+        ProfileDraft::new("Comp").with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(ding.id().clone())),
+            None,
+        ))),
     );
     open_sounds(cx, &s);
     support::click_id(cx, s.win, ids::sound_add_to_profile(bell.folder_name()));
@@ -201,11 +207,11 @@ fn a_killsound_pick_keeps_the_hitsound(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Added bell to Comp as its killsound");
     let saved = reload(&s, &p);
     assert_eq!(
-        sound_id(saved.killsound()),
+        sound_id(saved.sounds().as_set().and_then(|s| s.kill.as_ref())),
         Some(bell.folder_name().to_owned())
     );
     assert_eq!(
-        sound_id(saved.hitsound()),
+        sound_id(saved.sounds().as_set().and_then(|s| s.hit.as_ref())),
         Some(ding.folder_name().to_owned())
     );
 }
@@ -218,7 +224,10 @@ fn a_hitsound_pick_names_the_sound_it_replaced(cx: &mut TestAppContext) {
     let bell = seed_sound(&s, &env, "bell");
     let p = profile(
         &s,
-        ProfileDraft::new("Comp").with_hitsound(DraftSlot::Item(ding.id().clone())),
+        ProfileDraft::new("Comp").with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(ding.id().clone())),
+            None,
+        ))),
     );
     open_sounds(cx, &s);
     support::click_id(cx, s.win, ids::sound_add_to_profile(bell.folder_name()));
@@ -226,10 +235,10 @@ fn a_hitsound_pick_names_the_sound_it_replaced(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Added bell to Comp as its hitsound (replaced ding)");
     let saved = reload(&s, &p);
     assert_eq!(
-        sound_id(saved.hitsound()),
+        sound_id(saved.sounds().as_set().and_then(|s| s.hit.as_ref())),
         Some(bell.folder_name().to_owned())
     );
-    assert_eq!(saved.killsound(), None);
+    assert_eq!(saved.sounds().as_set().and_then(|s| s.kill.as_ref()), None);
 }
 
 #[gpui_kit::test]
@@ -314,7 +323,7 @@ fn open_crosshairs(cx: &mut TestAppContext, s: &support::ShellWindow) {
 }
 
 /// Picks profile `p` from the selection panel's menu and checks the Profiles page opened `p`'s
-/// editor on its Crosshairs slot with `crosshair` picked and nothing saved.
+/// editor with its Crosshairs slot Set, `crosshair` picked on its board and nothing saved.
 fn pick_opens_editor(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
@@ -337,20 +346,25 @@ fn pick_opens_editor(
     });
     support::settle(cx, s.win);
     let editor = cx.update(|cx| page.read(cx).editor()).expect("the editor");
-    let (id, slot, picked) = cx.update(|cx| {
+    let (id, mode, picked) = cx.update(|cx| {
         let e = editor.read(cx);
         (
-            e.id().clone(),
-            e.selected(),
+            e.profile_id().cloned(),
+            e.draft().mode(SlotKind::Crosshairs),
             e.picker().read(cx).selected().cloned(),
         )
     });
-    assert_eq!(&id, p.id(), "the picked profile's editor");
-    assert_eq!(slot, Slot::Crosshairs, "on the Crosshairs slot");
+    assert_eq!(id.as_ref(), Some(p.id()), "the picked profile's editor");
+    assert_eq!(mode, Mode::Set, "its Crosshairs slot Set");
     assert_eq!(picked, Some(crosshair), "with the crosshair picked");
+    let board = ids::IdScope::PROFILE_CROSSHAIRS.id(ids::CROSSHAIRS_BOARD);
+    assert!(support::present(cx, s.win, board), "on the board");
     assert_eq!(
-        reload(s, p).crosshairs(),
-        p.crosshairs(),
+        reload(s, p)
+            .crosshairs()
+            .as_set()
+            .map_or(&[][..], Vec::as_slice),
+        p.crosshairs().as_set().map_or(&[][..], Vec::as_slice),
         "nothing saved yet"
     );
 }

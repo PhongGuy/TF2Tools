@@ -9,7 +9,7 @@ use gpui_kit::{
 };
 use tf2tools_core::Preset;
 
-use super::GraphicsPage;
+use super::GraphicsChoicesEditor;
 use super::model::{preset_label, preset_line};
 use super::pill;
 use crate::i18n::tr;
@@ -20,16 +20,12 @@ use crate::widgets::labelled;
 // The ranked presets in the order the scale reads, fewest effects first.
 const RANKED: [Preset; 4] = [Preset::Low, Preset::Medium, Preset::High, Preset::Ultra];
 
-impl GraphicsPage {
-    // A card holding the heading and the current preset's line, then the ranked four as one
-    // pill over the frames-to-looks scale, with Custom in its own pill beside it; on a narrow
-    // page Custom wraps under the four instead.
-    pub(super) fn presets(
-        &self,
-        current: Preset,
-        narrow: bool,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
+impl GraphicsChoicesEditor {
+    /// A card holding the heading and the current preset's line, then the ranked four as one
+    /// pill over the frames-to-looks scale, with Custom in its own pill beside it; on a narrow
+    /// page Custom wraps under the four instead.
+    pub fn presets_card(&self, narrow: bool, cx: &mut Context<Self>) -> AnyElement {
+        let current = self.choices.preset();
         let theme = cx.theme();
         let (border, muted, accent) = (theme.border, theme.muted_foreground, theme.sidebar_primary);
         let head = h_flex()
@@ -39,12 +35,12 @@ impl GraphicsPage {
             .gap_y_1()
             .child(labelled(
                 div().text_sm().font_weight(FontWeight::SEMIBOLD),
-                ids::GRAPHICS_PRESET_HEADING,
+                self.scope.id(ids::GRAPHICS_PRESET_HEADING),
                 tr!("graphics.preset.heading"),
             ))
             .child(labelled(
                 div().text_sm().text_color(muted),
-                ids::GRAPHICS_PRESET_LINE,
+                self.scope.id(ids::GRAPHICS_PRESET_LINE),
                 preset_line(current),
             ));
         let ranked = pill::track(cx).w_full().children(
@@ -54,7 +50,7 @@ impl GraphicsPage {
         );
         // The rule warms from the border grey to the accent as the presets grow richer.
         let scale = h_flex()
-            .id(ids::GRAPHICS_PRESET_SCALE)
+            .id(self.scope.id(ids::GRAPHICS_PRESET_SCALE))
             .test_support()
             .gap(px(10.))
             .text_xs()
@@ -84,7 +80,7 @@ impl GraphicsPage {
             .child(column)
             .child(custom);
         card_frame(cx)
-            .id(ids::GRAPHICS_PRESETS)
+            .id(self.scope.id(ids::GRAPHICS_PRESETS))
             .test_support()
             .flex()
             .flex_col()
@@ -96,22 +92,22 @@ impl GraphicsPage {
     }
 
     // One preset segment, checked when it is the current preset. Picking the checked one
-    // again does nothing; any other runs the preset pick, a tab stop for Enter and Space.
+    // again does nothing; any other proposes the preset, a tab stop for Enter and Space.
     fn segment(&self, preset: Preset, current: Preset, cx: &mut Context<Self>) -> Toggle {
         let checked = preset == current;
         let entity = cx.entity().downgrade();
-        let toggle = Toggle::new(ids::graphics_preset(preset))
+        let toggle = Toggle::new(self.scope.id(ids::graphics_preset(preset)))
             .label(preset_label(preset))
             .tooltip(preset_label(preset))
             .checked(checked)
-            .disabled(self.busy)
+            .disabled(self.disabled)
             .h(px(32.))
             .flex_shrink_0()
-            .on_click(move |&next, window, cx| {
+            .on_click(move |&next, _, cx| {
                 if !next {
                     return;
                 }
-                let _ = entity.update(cx, |page, cx| page.pick(preset, window, cx));
+                let _ = entity.update(cx, |editor, cx| editor.propose_preset(preset, cx));
             });
         pill::segment_look(toggle, checked, cx)
     }

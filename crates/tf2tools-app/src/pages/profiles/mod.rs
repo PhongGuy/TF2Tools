@@ -1,38 +1,46 @@
-//! The Profiles page: saved setups of HUD, sounds and crosshairs, activated in one go.
+//! The Profiles page: saved whole setups (HUD, sounds, crosshairs, graphics, add-ons), applied
+//! in one go.
 
-pub mod editor;
+pub mod draft_editor;
+mod draft_slots;
 pub mod editor_model;
 pub mod model;
 pub mod probe;
 
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _, DropdownButton};
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::PopupMenuItem;
-use gpui_kit::component::tag::Tag;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    WeakEntity, Window, div, px, transparent_black,
+    AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, EventEmitter,
+    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, canvas, div, px,
 };
 
 use tf2tools_core::{
-    ApplyProfileError, ApplyProfileReport, ApplyStep, CrosshairRef, ExternalHud, LogLevel,
-    MissingItem, MissingKind, NewLogEntry, Profile, ProfileDraft, ProfileError, ProfileId,
-    StoreKind, Tf2Install,
+    AddonName, ApplyProfileError, ApplyProfileReport, ApplyStep, Choices, CrosshairRef,
+    ExternalHud, LogLevel, MastercomfigStatus, MissingItem, MissingKind, NewLogEntry, Profile,
+    ProfileError, ProfileId, StoreKind, Tf2Install,
 };
 
-use self::editor::ProfileEditor;
-use self::editor_model::{Slot, next_profile_name};
+use self::draft_editor::{EditorEvent, ProfileDraftEditor};
+use self::editor_model::{
+    Draft, Mode, SlotKind, Summary, SummaryRow, card_lines, left_line, mark_missing, summary,
+};
+use self::model::ApplyOutcome;
 use self::probe::Tf2Probe;
-use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, no_tf2_warning};
+use super::addons;
+use super::common::{ORANGE_500, SM_ICON_PX, card_frame, no_tf2_warning};
+use super::graphics::jobs::{self, ModulesFailure};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
 use crate::font_check::active_hud;
@@ -40,38 +48,70 @@ use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_apply_profile, describe_profile};
-use crate::pages::huds::blocked_description;
+use crate::pages::huds::{card_images, top_rounded_picture};
+use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, ask_external};
 use crate::shell::font_check::ask_about_fonts;
+use crate::shell::header_slot::HeaderSlot;
+use crate::shell::leave;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
-use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
-use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::DialogFrame;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
-use crate::widgets::{label_or_named, labelled};
 
-/// A card's height: the name row, two wrapped rows of badges and the button footer.
-const CARD_HEIGHT: Pixels = px(196.);
-// The Activate label's room beside Edit and Delete on a two-column card at 800 px.
-const ACTIVATE_LABEL_BUDGET: Pixels = px(60.);
-// The grid never gets shorter than one card row; a short window scrolls the page.
-const LIBRARY_MIN_HEIGHT: Pixels = CARD_HEIGHT;
-// Narrower than this, the search box wraps onto its own row instead of shrinking.
-const SEARCH_MIN_WIDTH: Pixels = px(160.);
+/// A card below its 16:9 picture: padding, the name, five slot lines, the buttons and the border
+/// (12 + 20 + 10 + 5 x 20 + 4 x 6 + 10 + 36 + 14 + 2).
+pub const CARD_BODY_HEIGHT: Pixels = px(228.);
+// The mock's `minmax(250px, 1fr)` columns.
+const MIN_CARD_WIDTH: Pixels = px(250.);
+// The lead line's flex basis; narrower than this beside New profile, the button wraps under it.
+const LEAD_BASIS: Pixels = px(280.);
+const SLOT_ICON: Pixels = px(14.);
+// The mock's card radius; the picture rounds its top corners to match, since gpui never
+// clips a child to its parent's rounding.
+const CARD_RADIUS: Pixels = px(12.);
+// The Apply summary dialog and its rows' label column.
+const SUMMARY_WIDTH: Pixels = px(520.);
+const SUMMARY_LABEL_WIDTH: Pixels = px(96.);
+// The summary's rows scroll past this, so a long list of missing crosshairs still fits 800x600.
+const SUMMARY_ROWS_MAX: Pixels = px(320.);
+// How much of the next card row the grid's floor shows, so a one-column window reads as a list.
+const NEXT_ROW_PEEK: Pixels = px(48.);
+
+// A lone column's picture stops here, so at 800x600 the first card fits whole under the lead.
+const SINGLE_COLUMN_PICTURE_MAX: Pixels = px(124.);
+
+// The card picture's height at cell width `w`: 16:9, capped when the grid is one column.
+fn picture_height(w: Pixels, columns: usize) -> Pixels {
+    let height = w * (9. / 16.);
+    if columns == 1 && height > SINGLE_COLUMN_PICTURE_MAX {
+        SINGLE_COLUMN_PICTURE_MAX
+    } else {
+        height
+    }
+}
+
+// A card's height at cell width `w`: the picture plus the fixed body.
+fn card_height(w: Pixels, columns: usize) -> Pixels {
+    picture_height(w, columns) + CARD_BODY_HEIGHT
+}
 
 /// The editor's empty pickers ask for a store page by event.
 impl EventEmitter<NavigateTo> for ProfilesPage {}
 
-// What the page shows: its grid of profiles, or one profile open in the editor (with its id,
-// readable while the editor itself is being updated).
+// What the page shows: its grid of profiles, or one draft open in the editor, with the page's
+// subscription to it.
 enum View {
     Grid,
-    Editor(Entity<ProfileEditor>, ProfileId),
+    Editor {
+        editor: Entity<ProfileDraftEditor>,
+        _events: Subscription,
+    },
 }
 
 /// The Profiles page. Built fresh on each visit; it reloads on TF2 state and library changes.
@@ -82,13 +122,25 @@ pub struct ProfilesPage {
     loaded: bool,
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
-    search: Entity<InputState>,
+    /// Card picture URLs by HUD library folder, from the last load.
+    hud_images: Rc<HashMap<String, String>>,
+    /// Add-on display names by asset name, from the last load.
+    addon_names: Rc<HashMap<String, String>>,
+    /// The cards the grid last drew, whose pictures the page asks for.
+    visible: Range<usize>,
+    image_viewer: String,
     busy: bool,
+    /// New profile is reading the current setup for its draft.
+    opening: bool,
     activating: Option<ProfileId>,
+    /// The part of `activating` that does work; idle while one of its dialogs waits.
+    applying: Option<ProfileId>,
     view: View,
     grid: CardGrid,
     /// The page's own scroll, which moves only in a window too short for the page.
     scroll: ScrollHandle,
+    /// Last frame's library top within the scrolled content and the page's height.
+    library_at: Rc<Cell<(Pixels, Pixels)>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -98,12 +150,27 @@ impl ProfilesPage {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
         let events = LibraryEvents::global(cx);
         let library = cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| page.reload(cx));
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("profiles.search")));
-        // The grid filters from the input's value at render, so each edit just redraws.
-        let search_changed = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                cx.notify();
-            }
+        // The crumb belongs to this page's editor, so it goes when the page does.
+        let crumb = cx.on_release(|_, cx| {
+            HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::Profiles, cx));
+        });
+        let mut subscriptions = vec![tf2, library, crumb];
+        // HUD pictures redraw the cards as they land; the page's wants go when it does.
+        let image_viewer = format!("profiles-page:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
+        let mut grid = CardGrid::new(ids::PROFILES_GRID).with_min_card_width(MIN_CARD_WIDTH);
+        let this = cx.entity().downgrade();
+        grid.on_visible(move |range, cx| {
+            let _ = this.update(cx, |page, cx| {
+                page.visible = range;
+                page.want_images(cx);
+            });
         });
         let mut page = Self {
             win: window.window_handle(),
@@ -111,13 +178,19 @@ impl ProfilesPage {
             active: None,
             loaded: false,
             load_generation: 0,
-            search,
+            hud_images: Rc::default(),
+            addon_names: Rc::default(),
+            visible: 0..0,
+            image_viewer,
             busy: false,
+            opening: false,
             activating: None,
+            applying: None,
             view: View::Grid,
-            grid: CardGrid::new(ids::PROFILES_GRID),
+            grid,
             scroll: ScrollHandle::new(),
-            _subscriptions: vec![tf2, library, search_changed],
+            library_at: Rc::default(),
+            _subscriptions: subscriptions,
         };
         page.reload(cx);
         page
@@ -128,7 +201,7 @@ impl ProfilesPage {
         self.loaded
     }
 
-    /// Every profile from the last load, in `profiles()` order (unfiltered).
+    /// Every profile from the last load, in `profiles()` order.
     pub fn profiles(&self) -> &[Profile] {
         &self.profiles
     }
@@ -138,11 +211,7 @@ impl ProfilesPage {
         self.active.as_ref()
     }
 
-    pub fn search_input(&self) -> &Entity<InputState> {
-        &self.search
-    }
-
-    /// The page's own scroll handle, which moves the active card, search and grid together.
+    /// The page's own scroll handle, which moves the lead row and the grid together.
     pub fn page_scroll(&self) -> ScrollHandle {
         self.scroll.clone()
     }
@@ -157,14 +226,19 @@ impl ProfilesPage {
         model::taken_by(&self.profiles, name, except).map(|p| p.name().to_owned())
     }
 
-    /// True while a create, Delete or an activate runs.
+    /// True while New profile reads the setup, a Delete or an activate runs.
     pub fn is_busy(&self) -> bool {
-        self.busy || self.activating.is_some()
+        self.busy || self.opening || self.activating.is_some()
     }
 
     /// The profile whose activate flow is running, from the click until it ends.
     pub fn activating(&self) -> Option<&ProfileId> {
         self.activating.as_ref()
+    }
+
+    /// The profile whose Apply button spins: its activate is working, not waiting on a dialog.
+    pub fn applying(&self) -> Option<&ProfileId> {
+        self.applying.as_ref()
     }
 
     /// Shows the editor for `id` in place of the grid; does nothing while `is_busy()` or for an
@@ -179,8 +253,8 @@ impl ProfilesPage {
         self.show_editor(profile, window, cx);
     }
 
-    /// Opens the editor for `id` on its Crosshairs slot with `crosshair` picked, saving nothing;
-    /// a profile that can't be read toasts its error and leaves the grid.
+    /// Opens `id` with `crosshair` selected; a None or Leave Crosshairs slot becomes Set. Saves
+    /// nothing; a profile that can't be read toasts its error and leaves the grid.
     // Reads the one profile at once rather than waiting for the page's first load.
     pub fn open_with_crosshair(
         &mut self,
@@ -198,68 +272,203 @@ impl ProfilesPage {
         };
         self.show_editor(profile, window, cx);
         if let Some(editor) = self.editor() {
-            editor.update(cx, |editor, cx| {
-                editor.select(Slot::Crosshairs, cx);
-                let picker = editor.picker().clone();
-                picker.update(cx, |picker, cx| picker.select(Some(crosshair), cx));
+            editor.update(cx, |e, cx| {
+                e.set_mode(SlotKind::Crosshairs, Mode::Set, cx);
+                (e.picker.clone()).update(cx, |picker, cx| picker.select(Some(crosshair), cx));
             });
         }
     }
 
-    // Opens the editor on a profile already in hand, such as one just created.
+    // Opens the editor on a draft of a profile already in hand, its crumb in the header.
     fn show_editor(&mut self, profile: Profile, window: &mut Window, cx: &mut Context<Self>) {
-        let (page, active, id) = (
-            cx.entity().downgrade(),
-            self.active.clone(),
-            profile.id().clone(),
-        );
-        let editor = cx.new(|cx| ProfileEditor::new(profile, page, active, window, cx));
-        self.view = View::Editor(editor, id);
+        let names = Rc::clone(&self.addon_names);
+        let addon_name = move |name: &AddonName| {
+            names
+                .get(name.as_str())
+                .cloned()
+                .unwrap_or_else(|| model::missing_addon_name(name))
+        };
+        let draft = Draft::from_profile(&profile, &addon_name);
+        self.show_draft(Some(profile), draft, window, cx);
+    }
+
+    // Opens the editor on `draft`, of `saved` or of a new profile, its crumb in the header; the
+    // leave guard asks about it until it closes.
+    fn show_draft(
+        &mut self,
+        saved: Option<Profile>,
+        draft: Draft,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let page = cx.entity().downgrade();
+        leave::register_profiles(page.clone(), cx);
+        let editor = cx.new(|cx| {
+            let mut editor = ProfileDraftEditor::new(saved, draft, window, cx);
+            editor.set_page(page);
+            editor
+        });
+        let events = cx.subscribe_in(&editor, window, |page, _, event, window, cx| {
+            page.editor_event(event, window, cx)
+        });
+        let crumb = editor.read(cx).crumb();
+        HeaderSlot::global(cx).update(cx, |slot, cx| slot.set(Page::Profiles, crumb, cx));
+        self.view = View::Editor {
+            editor,
+            _events: events,
+        };
         cx.notify();
     }
 
+    // Saved toasts and closes; Close asks first when the draft has changes; Deleted closes.
+    fn editor_event(&mut self, event: &EditorEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            EditorEvent::Close => self.request_close(window, cx),
+            EditorEvent::Saved {
+                profile,
+                deactivated,
+            } => {
+                let name = profile.name();
+                let (kind, title) = if *deactivated {
+                    (
+                        ToastKind::Info,
+                        tr!("profiles.toast.saved_active", name = name),
+                    )
+                } else {
+                    (ToastKind::Success, tr!("profiles.toast.saved", name = name))
+                };
+                toast(window, cx, kind, title, SharedString::default());
+                self.close_editor(cx);
+            }
+            EditorEvent::Deleted(_) => self.close_editor(cx),
+        }
+    }
+
     /// The open editor, while the page shows one.
-    pub fn editor(&self) -> Option<Entity<ProfileEditor>> {
+    pub fn editor(&self) -> Option<Entity<ProfileDraftEditor>> {
         match &self.view {
-            View::Editor(editor, _) => Some(editor.clone()),
+            View::Editor { editor, .. } => Some(editor.clone()),
             View::Grid => None,
         }
     }
 
+    /// True with no editor open, or one whose draft has no changes.
+    pub fn can_leave(&self, cx: &App) -> bool {
+        self.editor().is_none_or(|e| !e.read(cx).is_dirty())
+    }
+
+    /// Hands focus back to the open editor, so Esc reaches it after the leave prompt's
+    /// Keep editing.
+    pub fn reclaim_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(editor) = self.editor() {
+            editor.update(cx, |e, cx| e.reclaim_focus(window, cx));
+        }
+    }
+
+    /// Cancel, Esc and the crumb: closes at once when clean, else asks Confirm::discard_changes.
+    pub fn request_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        if !editor.read(cx).is_dirty() {
+            return self.close_editor(cx);
+        }
+        let answer = confirm(Confirm::discard_changes(), window, cx);
+        cx.spawn(async move |page, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                let _ = page.update(cx, |page, cx| {
+                    // Only the editor the prompt was about; a later one stays open.
+                    if page.editor().as_ref() == Some(&editor) {
+                        page.close_editor(cx);
+                    }
+                });
+            }
+        })
+        .detach();
+    }
+
+    // Drops the editor and its crumb without a reload.
+    fn drop_editor(&mut self, cx: &mut Context<Self>) {
+        self.view = View::Grid;
+        leave::forget_maker(cx);
+        HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::Profiles, cx));
+        cx.notify();
+    }
+
     /// Back to the grid; reloads.
     pub fn close_editor(&mut self, cx: &mut Context<Self>) {
-        self.view = View::Grid;
+        self.drop_editor(cx);
         self.reload(cx);
     }
 
     /// Starts the activate flow for `id` unless a save, delete or activate runs; does nothing
     /// without TF2.
-    // One future per click chains v5's empty confirm, the TF2-running confirm and the apply;
+    pub fn activate(&mut self, id: ProfileId, _window: &mut Window, cx: &mut Context<Self>) {
+        self.start_activate(id, true, cx);
+    }
+
+    /// `activate` with its Apply summary already answered yes; the timing harness drives
+    /// applies this way, since no one is there to confirm.
+    pub fn activate_confirmed(&mut self, id: ProfileId, cx: &mut Context<Self>) {
+        self.start_activate(id, false, cx);
+    }
+
+    // One future per click chains the Apply summary, the TF2-running confirm and the apply;
     // `activating` is cleared once the chain ends, at whichever step it stopped.
-    pub fn activate(&mut self, id: ProfileId, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_activate(&mut self, id: ProfileId, ask: bool, cx: &mut Context<Self>) {
         if self.is_busy() {
             return;
         }
         let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
             return;
         };
-        let Some(profile) = self.profiles.iter().find(|p| p.id() == &id) else {
+        let Some(name) = self.profiles.iter().find(|p| p.id() == &id) else {
             return;
         };
-        let empty_answer =
-            model::is_empty(profile).then(|| confirm(Confirm::activate_empty(), window, cx));
+        let name = name.name().to_owned();
         self.activating = Some(id.clone());
         cx.notify();
+        let reading = ask.then(|| {
+            let (id, tf2) = (id.clone(), tf2.clone());
+            run_blocking(cx, move |s| summary_job(s, &id, &tf2))
+        });
         let probe = Tf2Probe::get(cx);
         let win = self.win;
         cx.spawn(async move |page, cx| {
+            // The button spins only while the flow works, never while a dialog waits on the user.
+            let spin = |on: bool, cx: &mut AsyncApp| {
+                let _ = page.update(cx, |page, cx| {
+                    page.applying = on.then(|| id.clone());
+                    cx.notify();
+                });
+            };
             let flow = async {
-                if let Some(answer) = empty_answer
-                    && !answer.recv().await.unwrap_or(false)
-                {
-                    return;
+                // The summary asks before the TF2 probe, so a cancelled summary never probes.
+                if let Some(reading) = reading {
+                    let answer = match reading.await {
+                        Ok((name, summary)) => cx.update(|cx| {
+                            let target = (id.clone(), tf2.clone());
+                            win.update(cx, |_, window, cx| {
+                                apply_summary_dialog(&name, summary, target, window, cx)
+                            })
+                        }),
+                        Err(err) => {
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| toast_error(window, cx, &err))
+                            });
+                            return;
+                        }
+                    };
+                    let Ok(answer) = answer else {
+                        return;
+                    };
+                    if !answer.recv().await.unwrap_or(false) {
+                        return;
+                    }
                 }
+                spin(true, cx);
                 if cx.background_spawn(async move { probe() }).await {
+                    spin(false, cx);
                     let Ok(answer) = cx.update(|cx| {
                         win.update(cx, |_, window, cx| {
                             confirm(Confirm::tf2_running(), window, cx)
@@ -270,33 +479,18 @@ impl ProfilesPage {
                     if !answer.recv().await.unwrap_or(false) {
                         return;
                     }
+                    spin(true, cx);
                 }
-                // A missing item asks first; "Install Anyway" re-runs the apply skipping it,
-                // without the earlier confirms.
-                let mut skip_missing = false;
+                // The summary showed what is missing, so the apply skips whatever still is.
                 let mut plan = ExternalPlan::default();
                 loop {
                     let (id, applying_tf2, applying_plan) = (id.clone(), tf2.clone(), plan.clone());
                     let applying = cx.update(|cx| {
                         run_blocking(cx, move |s| {
-                            apply_job(s, &id, &applying_tf2, skip_missing, &applying_plan)
+                            apply_job(s, &id, &applying_tf2, &applying_plan)
                         })
                     });
                     let done = applying.await;
-                    if !skip_missing && let Ok(Activation::Missing { profile, items }) = &done {
-                        let Ok(answer) = cx.update(|cx| {
-                            win.update(cx, |_, window, cx| {
-                                missing_items_dialog(profile.name(), items, window, cx)
-                            })
-                        }) else {
-                            return;
-                        };
-                        if answer.recv().await != Ok(MissingAnswer::InstallAnyway) {
-                            return;
-                        }
-                        skip_missing = true;
-                        continue;
-                    }
                     // HUDs the library cannot put back ask next, and the re-run does as told.
                     if let Ok(Activation::External(huds)) = &done {
                         let (action, huds) = (HudAction::ActivateProfile, huds.clone());
@@ -306,16 +500,36 @@ impl ProfilesPage {
                         plan = next;
                         continue;
                     }
+                    // The modules phase runs inside the flow, so `activating` still holds it alone.
                     let tf2 = tf2.clone();
-                    let _ = cx.update(|cx| {
-                        win.update(cx, |_, window, cx| announce(done, tf2, window, cx))
-                    });
+                    match done {
+                        Ok(Activation::Applied {
+                            report,
+                            hud_folder,
+                            note,
+                        }) => {
+                            let outcome = finish_apply(&report, note, &tf2, cx).await;
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| {
+                                    announce(&outcome, hud_folder, tf2, window, cx)
+                                })
+                            });
+                        }
+                        refused => {
+                            let _ = cx.update(|cx| {
+                                win.update(cx, |_, window, cx| {
+                                    announce_refusal(refused, &name, window, cx)
+                                })
+                            });
+                        }
+                    }
                     return;
                 }
             };
             flow.await;
             let _ = page.update(cx, |page, cx| {
                 page.activating = None;
+                page.applying = None;
                 cx.notify();
             });
         })
@@ -327,17 +541,28 @@ impl ProfilesPage {
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         self.load_generation += 1;
         let generation = self.load_generation;
-        let open_at_start = match &self.view {
-            View::Editor(_, id) => Some(id.clone()),
-            View::Grid => None,
-        };
         let loading = run_blocking(cx, |s| {
             let failed = |e: ProfileError| {
                 describe_profile(&e).into_op(tr!("messages.action.load_profiles"))
             };
             let profiles = s.library.profiles().map_err(failed)?;
             let active = s.library.active_profile().map_err(failed)?;
-            Ok((profiles, active))
+            // Pictures and add-on names only dress the cards, so a failed read leaves them out.
+            let images = s
+                .library
+                .list_huds()
+                .map(|huds| card_images(s, &huds))
+                .unwrap_or_default();
+            let names = s.library.list_addons(None).map_or_else(
+                |_| HashMap::new(),
+                |addons| {
+                    addons
+                        .iter()
+                        .map(|a| (a.name().as_str().to_owned(), a.display_name().to_owned()))
+                        .collect()
+                },
+            );
+            Ok((profiles, active, images, names))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -347,19 +572,12 @@ impl ProfilesPage {
                     if page.load_generation != generation {
                         return false;
                     }
-                    if let Ok((profiles, active)) = &loaded {
+                    if let Ok((profiles, active, images, names)) = &loaded {
                         page.profiles = profiles.as_slice().into();
                         page.active = active.clone();
-                        // A profile deleted here or elsewhere takes its open editor with it.
-                        if let View::Editor(_, open) = &page.view
-                            && model::load_closes_editor(
-                                open_at_start.as_ref(),
-                                open,
-                                profiles.iter().map(Profile::id),
-                            )
-                        {
-                            page.view = View::Grid;
-                        }
+                        page.hud_images = Rc::new(images.clone());
+                        page.addon_names = Rc::new(names.clone());
+                        page.want_images(cx);
                     }
                     page.loaded = true;
                     cx.notify();
@@ -403,99 +621,79 @@ impl ProfilesPage {
         .detach();
     }
 
-    /// Makes "Profile N" from what is installed (`from_installed`, needs TF2) or empty, writes
-    /// the create row, toasts, and opens the editor on it with the name focused and selected.
-    /// A NameTaken from a race retries once with the next free name. Does nothing while busy.
-    pub fn new_profile(
-        &mut self,
-        from_installed: bool,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    /// Reads current_setup and list_addons off the UI thread, then opens an unsaved draft from
+    /// Draft::from_current; a failure toasts and opens nothing. Does nothing while busy or
+    /// without TF2.
+    pub fn new_profile(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if self.is_busy() {
             return;
         }
-        let tf2 = match tf2_state(cx).read(cx).install() {
-            Some(tf2) if from_installed => Some(tf2.clone()),
-            None if from_installed => return,
-            _ => None,
+        let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
+            return;
         };
-        let name = next_profile_name(&self.profiles);
-        self.busy = true;
+        self.opening = true;
         cx.notify();
-        let creating = run_blocking(cx, move |s| {
-            let create = |name: &str| match &tf2 {
-                Some(tf2) => s.library.save_current_profile(name, tf2),
-                None => s.library.create_profile(&ProfileDraft::new(name)),
+        let reading = run_blocking(cx, move |s| {
+            let setup = s
+                .library
+                .current_setup(&tf2)
+                .map_err(|e| describe_profile(&e).into_op(tr!("messages.action.create_profile")))?;
+            // Display names only dress the add-on rows, so a failed read falls back to asset names.
+            let names: HashMap<AddonName, String> = s
+                .library
+                .list_addons(None)
+                .map(|addons| {
+                    addons
+                        .iter()
+                        .map(|a| (a.name().clone(), a.display_name().to_owned()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let addon_name = |name: &AddonName| {
+                names
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| model::missing_addon_name(name))
             };
-            let failed = |e: ProfileError| {
-                describe_profile(&e).into_op(tr!("messages.action.create_profile"))
-            };
-            let profile = match create(&name) {
-                Err(ProfileError::NameTaken { .. }) => {
-                    let all = s.library.profiles().map_err(failed)?;
-                    create(&next_profile_name(&all))
-                }
-                made => made,
-            }
-            .map_err(failed)?;
-            let name = profile.name();
-            let (action, message) = match tf2 {
-                Some(_) => (
-                    "save_current",
-                    tr!("profiles.activity.saved_current", name = name),
-                ),
-                None => ("create", tr!("profiles.activity.created", name = name)),
-            };
-            let entry = NewLogEntry::new(LogLevel::Info, "profile", action, message);
-            activity::write(s, &entry);
-            Ok(profile)
+            Ok(Draft::from_current(&setup, &addon_name))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
-            let done = creating.await;
+            let done = reading.await;
             let _ = cx.update(|cx| {
                 win.update(cx, |_, window, cx| {
-                    let profile = match done {
-                        Ok(profile) => profile,
-                        Err(err) => return toast_error(window, cx, &err),
-                    };
-                    let title = if from_installed {
-                        tr!("profiles.toast.created_from_setup")
-                    } else {
-                        tr!("profiles.toast.created_empty")
-                    };
-                    toast(
-                        window,
-                        cx,
-                        ToastKind::Success,
-                        title,
-                        SharedString::default(),
-                    );
-                    // The reload follows the editor in this same update, so no load that
-                    // started before the create can land after it as the newest.
                     let _ = page.update(cx, |page, cx| {
-                        page.busy = false;
-                        page.show_editor(profile, window, cx);
-                        page.reload(cx);
-                        // Deferred so the click that started the create cannot take focus back.
-                        if let Some(editor) = page.editor() {
-                            window.defer(cx, move |window, cx| {
-                                editor.update(cx, |e, cx| e.focus_name(window, cx));
-                            });
+                        page.opening = false;
+                        cx.notify();
+                        match done {
+                            Ok(draft) => {
+                                page.show_draft(None, draft, window, cx);
+                                // Deferred so the click on New profile cannot take focus back.
+                                if let Some(editor) = page.editor() {
+                                    window.defer(cx, move |window, cx| {
+                                        editor.update(cx, |e, cx| e.focus_name(window, cx));
+                                    });
+                                }
+                            }
+                            Err(err) => toast_error(window, cx, &err),
                         }
                     });
                 })
             });
-            // A failed create, or a window gone meanwhile, still frees the page.
+            // A window gone meanwhile still frees the page.
             let _ = page.update(cx, |page, cx| {
-                if page.busy {
-                    page.busy = false;
-                    page.reload(cx);
+                if page.opening {
+                    page.opening = false;
+                    cx.notify();
                 }
             });
         })
         .detach();
+    }
+
+    /// True while New profile reads the current setup, with `PROFILE_EDITOR_LOADING` shown.
+    pub fn is_opening(&self) -> bool {
+        self.opening
     }
 
     /// Opens v5's delete confirm for `id`, then removes it on yes; does nothing while `is_busy()`.
@@ -509,13 +707,19 @@ impl ProfilesPage {
         if self.is_busy() {
             return;
         }
-        let answer = confirm(Confirm::delete_profile(name), window, cx);
+        let active = self.active.as_ref() == Some(&id);
+        let answer = confirm(Confirm::delete_profile(name, active), window, cx);
         let message = tr!("profiles.activity.deleted", name = name).to_string();
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
                 return;
             }
             let _ = page.update(cx, |page, cx| {
+                // The deleted profile's draft goes with it; the run below reloads the list.
+                let open = page.editor().map(|e| e.read(cx).profile_id().cloned());
+                if open.flatten().as_ref() == Some(&id) {
+                    page.drop_editor(cx);
+                }
                 page.run(
                     move |s| {
                         s.library.delete_profile(&id).map_err(|e| {
@@ -533,44 +737,320 @@ impl ProfilesPage {
         .detach();
     }
 
-    // The profiles the grid shows, as indices into `profiles`: those the search matches.
-    fn shown(&self, cx: &App) -> Vec<usize> {
-        let query = self.search.read(cx).value();
-        (0..self.profiles.len())
-            .filter(|&ix| model::matches(self.profiles[ix].name(), &query))
-            .collect()
-    }
-
-    fn active_profile(&self) -> Option<&Profile> {
-        let id = self.active.as_ref()?;
-        self.profiles.iter().find(|p| p.id() == id)
+    // Asks for the HUD pictures of the cards in the grid's last drawn range.
+    fn want_images(&mut self, cx: &mut Context<Self>) {
+        let Some(images) = RemoteImages::global(cx) else {
+            return;
+        };
+        let end = self.visible.end.min(self.profiles.len());
+        let keys: Vec<ImageKey> = self.profiles[self.visible.start.min(end)..end]
+            .iter()
+            .filter_map(|p| self.hud_images.get(model::hud_item(p)?.folder_name()))
+            .map(|url| ImageKey::card(url))
+            .collect();
+        images.update(cx, |images, cx| images.want(&self.image_viewer, keys, cx));
     }
 }
 
-// The activate job's result: `OpError` cannot carry the missing items, so `Missing` is a value.
+// The activate job's result: `OpError` cannot carry the unnamed HUDs, so `External` is a value.
 enum Activation {
     Applied {
-        profile: Profile,
-        report: ApplyProfileReport,
+        // Boxed since the report carries a whole profile and dwarfs the other variants.
+        report: Box<ApplyProfileReport>,
         hud_folder: Option<String>,
         /// What the toast adds about the HUDs kept or removed on the way.
         note: Option<String>,
     },
-    Missing {
-        profile: Profile,
-        items: Vec<MissingItem>,
-    },
     External(Vec<ExternalHud>),
 }
 
-// Reads the profile, carries out `plan`, applies it and writes the activate row for an applied
-// report; a missing item or an unnamed HUD in the way touches nothing, so it becomes a value
-// with no row.
+// Reads the profile, what is installed now, what is missing and the add-on display names, and
+// words the summary; add-on names only dress the rows, so a failed list falls back to asset names.
+fn summary_job(
+    s: &Services,
+    id: &ProfileId,
+    tf2: &Tf2Install,
+) -> Result<(String, Summary), OpError> {
+    let failed =
+        |e: ProfileError| describe_profile(&e).into_op(tr!("messages.action.activate_profile"));
+    let profile = s.library.profile(id).map_err(failed)?;
+    let current = s.library.current_setup(tf2).map_err(failed)?;
+    let names: HashMap<AddonName, String> = s
+        .library
+        .list_addons(None)
+        .map(|addons| {
+            addons
+                .iter()
+                .map(|a| (a.name().clone(), a.display_name().to_owned()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let addon_name = |name: &AddonName| {
+        names
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| model::missing_addon_name(name))
+    };
+    let missing = s
+        .library
+        .missing_items_for_apply(id, &s.builtins)
+        .map_err(failed)?;
+    let mut summary = summary(&profile, &current, &addon_name);
+    mark_missing(&mut summary, &missing, &current);
+    Ok((profile.name().to_owned(), summary))
+}
+
+// Opens the Apply summary over the page: what changes, what is missing and stays, or that nothing
+// does, and the slots left alone. Only "Apply <name>" answers true; Cancel, Escape, Enter and
+// closing answer false. A library change while it is open (a finished Re-download) reads the
+// summary again, so a downloaded item's row turns into its change.
+fn apply_summary_dialog(
+    name: &str,
+    summary: Summary,
+    (id, tf2): (ProfileId, Tf2Install),
+    window: &mut Window,
+    cx: &mut App,
+) -> async_channel::Receiver<bool> {
+    let (tx, rx) = async_channel::bounded(1);
+    let title: SharedString = tr!("profiles.apply.title", name = name);
+    let ok_label: SharedString = tr!("profiles.apply.ok", name = name);
+    let shown = cx.new(|_| summary);
+    let win = window.window_handle();
+    let events = LibraryEvents::global(cx);
+    let weak = shown.downgrade();
+    // Held by the dialog's builder, so the refresh stops when the dialog goes away.
+    let refresh = cx.subscribe(&events, move |_, _: &LibraryChanged, cx| {
+        let (id, tf2, weak) = (id.clone(), tf2.clone(), weak.clone());
+        let reading = run_blocking(cx, move |s| summary_job(s, &id, &tf2));
+        cx.spawn(async move |cx| {
+            if let Ok((_, summary)) = reading.await {
+                let _ = weak.update(cx, |shown, cx| {
+                    *shown = summary;
+                    cx.notify();
+                });
+                let _ = cx.update(|cx| win.update(cx, |_, window, _| window.refresh()));
+            }
+        })
+        .detach();
+    });
+    // The rows' scroll position outlives the builder, which runs every frame.
+    let rows_scroll = ScrollHandle::new();
+    window.defer(cx, move |window, cx| {
+        let frame = DialogFrame::new(SUMMARY_WIDTH);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            let _ = &refresh;
+            let summary = shown.read(cx).clone();
+            // The builder runs every frame, so each handler clones what it captures.
+            let answer = |said: bool| {
+                let tx = tx.clone();
+                move |_: &_, _: &mut Window, _: &mut App| {
+                    let _ = tx.try_send(said);
+                    true
+                }
+            };
+            let button = |id: &'static str, said: bool| {
+                let tx = tx.clone();
+                Button::new(id).on_click(move |_, window, cx| {
+                    let _ = tx.try_send(said);
+                    window.close_dialog(cx);
+                })
+            };
+            let theme = cx.theme();
+            let (muted, border) = (theme.muted_foreground, theme.border);
+            let changes = if summary.rows.is_empty() {
+                let nothing: SharedString = tr!("profiles.apply.nothing");
+                div()
+                    .id(ids::PROFILE_APPLY_NOTHING)
+                    .aria_label(nothing.clone())
+                    .test_support()
+                    .text_sm()
+                    .child(nothing)
+                    .into_any_element()
+            } else {
+                let last = summary.rows.len() - 1;
+                // The bar sits in the box padding, so the rows keep their width.
+                scroll_beside(
+                    ids::PROFILE_APPLY_ROWS_SCROLLBAR,
+                    &rows_scroll,
+                    v_flex()
+                        .id(ids::PROFILE_APPLY_ROWS)
+                        .track_scroll(&rows_scroll)
+                        .test_support()
+                        .max_h(SUMMARY_ROWS_MAX)
+                        .overflow_y_scroll()
+                        .border_1()
+                        .border_color(border)
+                        .rounded_md()
+                        .children(
+                            summary
+                                .rows
+                                .iter()
+                                .enumerate()
+                                .map(|(ix, row)| summary_row(row, ix < last, cx)),
+                        ),
+                )
+                .into_any_element()
+            };
+            let left = left_line(&summary.left).map(|line| {
+                let line = SharedString::from(line);
+                div()
+                    .id(ids::PROFILE_APPLY_LEFT)
+                    .aria_label(line.clone())
+                    .test_support()
+                    .text_sm()
+                    .text_color(muted)
+                    .child(line)
+            });
+            frame
+                .apply(dialog, &*window, &*cx)
+                .on_ok(answer(false))
+                .on_cancel(answer(false))
+                .child(
+                    frame.measure(
+                        v_flex()
+                            .id(ids::PROFILE_APPLY_DIALOG)
+                            .test_support()
+                            .gap_4()
+                            .child(
+                                v_flex()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .id(ids::PROFILE_APPLY_TITLE)
+                                            .aria_label(title.clone())
+                                            .test_support()
+                                            .text_lg()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(title.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .id(ids::PROFILE_APPLY_INTRO)
+                                            .aria_label(tr!("profiles.apply.intro"))
+                                            .test_support()
+                                            .text_sm()
+                                            .text_color(muted)
+                                            .child(tr!("profiles.apply.intro")),
+                                    ),
+                            )
+                            .child(changes)
+                            .children(left)
+                            .child(
+                                h_flex()
+                                    .justify_end()
+                                    .gap_2()
+                                    .child(
+                                        button(ids::PROFILE_APPLY_CANCEL, false)
+                                            .ghost()
+                                            .label(tr!("confirm.cancel")),
+                                    )
+                                    .child(
+                                        button(ids::PROFILE_APPLY_OK, true)
+                                            .primary()
+                                            .label(ok_label.clone()),
+                                    ),
+                            ),
+                    ),
+                )
+        });
+    });
+    rx
+}
+
+// One summary row: the slot label in a fixed column, then "from → to"; a rule under all but the
+// last row. A missing item's row reads its sentence beside a warning, then offers Re-download
+// for a store item (the store detail stacks over the summary) or says a local import can't.
+fn summary_row(row: &SummaryRow, rule: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let (muted, border) = (theme.muted_foreground, theme.border);
+    let text = row.text();
+    let body = match &row.missing {
+        None => div()
+            .flex_1()
+            .min_w_0()
+            .child(text.clone())
+            .into_any_element(),
+        Some(item) => h_flex()
+            .flex_1()
+            .min_w_0()
+            .gap_2()
+            .justify_between()
+            .child(
+                h_flex()
+                    .min_w_0()
+                    .gap_2()
+                    .child(
+                        Icon::new(IconName::TriangleAlert)
+                            .with_size(Size::Size(px(16.)))
+                            .text_color(gpui_kit::rgb(ORANGE_500)),
+                    )
+                    .child(div().min_w_0().child(text.clone())),
+            )
+            .child(missing_action(&row.key, item, muted))
+            .into_any_element(),
+    };
+    h_flex()
+        .id(ids::profile_apply_row(&row.key))
+        .aria_label(format!("{}: {text}", row.label))
+        .test_support()
+        .gap_3()
+        .px_3()
+        .py_2()
+        .text_sm()
+        .when(rule, |r| r.border_b_1().border_color(border))
+        .child(
+            div()
+                .w(SUMMARY_LABEL_WIDTH)
+                .flex_none()
+                .text_color(muted)
+                .child(row.label.clone()),
+        )
+        .child(body)
+        .into_any_element()
+}
+
+// A missing row's Re-download, which opens the item's store detail, or v5's local-import note.
+fn missing_action(key: &str, item: &MissingItem, muted: gpui_kit::Hsla) -> AnyElement {
+    let Some((kind, id)) = model::redownload_target(item.kind(), item.provenance()) else {
+        let local = tr!("profiles.missing.local");
+        return div()
+            .id(ids::profile_apply_local(key))
+            .aria_label(local.clone())
+            .test_support()
+            .flex_none()
+            .text_xs()
+            .text_color(muted)
+            .child(local)
+            .into_any_element();
+    };
+    let body = if kind == StoreKind::CuratedHuds {
+        curated_body
+    } else {
+        gamebanana_body
+    };
+    let detail = DetailItem {
+        kind,
+        id,
+        name: item.name().to_owned(),
+        in_library: false,
+    };
+    Button::new(ids::profile_apply_redownload(key))
+        .outline()
+        .small()
+        .icon(IconName::Download)
+        .label(tr!("profiles.missing.redownload"))
+        .on_click(move |_, window, cx| {
+            open_detail(detail.clone(), body(), window, cx);
+        })
+        .into_any_element()
+}
+
+// Reads the profile, carries out `plan` and applies it, skipping missing items; an unnamed HUD
+// in the way touches nothing, so it becomes a value. `finish_apply` writes the activity row.
 fn apply_job(
     s: &Services,
     id: &ProfileId,
     tf2: &Tf2Install,
-    skip_missing: bool,
     plan: &ExternalPlan,
 ) -> Result<Activation, OpError> {
     fn failed() -> SharedString {
@@ -583,399 +1063,173 @@ fn apply_job(
     let discard = plan.prepare(s, tf2, failed())?;
     let applied = s
         .library
-        .apply_profile_discarding(id, tf2, &s.builtins, skip_missing, discard);
+        .apply_profile_discarding(id, tf2, &s.builtins, true, discard);
     let report = match applied {
         Ok(report) => report,
-        Err(ApplyProfileError::Missing(items)) => {
-            return Ok(Activation::Missing { profile, items });
-        }
         Err(ApplyProfileError::ExternalHuds(huds)) => return Ok(Activation::External(huds)),
         Err(e) => return Err(describe_apply_profile(&e).into_op(failed())),
     };
-    let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
-    let details = model::report_details(report.applied(), &skipped, report.failed());
-    let name = profile.name();
-    let (level, message) = if !report.failed().is_empty() {
-        (
-            LogLevel::Error,
-            tr!("profiles.activity.failed", name = name),
-        )
-    } else if skipped.is_empty() {
-        (
-            LogLevel::Info,
-            tr!("profiles.activity.activated", name = name),
-        )
-    } else {
-        // Missing items were left as they were, so the profile is applied, not active.
-        (
-            LogLevel::Info,
-            tr!("profiles.activity.applied", name = name),
-        )
-    };
-    let entry = NewLogEntry::new(level, "profile", "activate", message).with_details(details);
-    activity::write(s, &entry);
     let hud_step_ran = report.applied().contains(&ApplyStep::Hud);
     if hud_step_ran {
         plan.log_discarded(s);
     }
     // An apply that put a HUD in place names its folder, so the font check can claim it at once.
-    let hud_folder = (profile.hud().is_some() && hud_step_ran)
+    let hud_folder = (model::hud_item(&profile).is_some() && hud_step_ran)
         .then(|| active_hud(s, tf2))
         .flatten();
     Ok(Activation::Applied {
-        profile,
-        report,
+        report: Box::new(report),
         hud_folder,
         note: plan.note().filter(|_| hud_step_ran),
     })
 }
 
-// Toasts the activate outcome; an applied report (failed steps or not) changed tf/custom, so
-// it also tells every library page to reload.
-fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Window, cx: &mut App) {
-    // An apply that put a HUD in place checks that HUD's fonts once the toast is up.
-    let hud_folder = match &done {
-        Ok(Activation::Applied { hud_folder, .. }) => hud_folder.clone(),
-        _ => None,
-    };
-    match done {
-        Ok(Activation::Applied {
-            profile,
-            report,
-            note,
-            ..
-        }) if report.failed().is_empty() => {
-            let title = model::success_title(profile.name(), !report.skipped().is_empty());
-            // A HUD kept out of its expected folder warns as a plain HUD install does.
-            match report.hud_blocked_name() {
-                Some(blocked) => toast(
-                    window,
-                    cx,
-                    ToastKind::Warning,
-                    title,
-                    blocked_description(blocked),
-                ),
-                None => {
-                    let installed = model::installed_parts(&profile, &report);
-                    let kinds: Vec<MissingKind> =
-                        report.skipped().iter().map(|m| m.kind().clone()).collect();
-                    let kept = model::kept_parts(&kinds);
-                    let mut description = model::activated_description(&installed, &kept);
-                    if let Some(note) = note {
-                        description = format!("{description}. {note}");
-                    }
-                    toast(window, cx, ToastKind::Success, title, description)
-                }
-            }
-            LibraryEvents::changed(cx);
-        }
-        Ok(Activation::Applied { report, .. }) => {
-            let description = model::failed_description(report.failed());
-            toast(
-                window,
-                cx,
-                ToastKind::Error,
-                tr!("profiles.toast.activate_failed"),
-                description,
-            );
-            LibraryEvents::changed(cx);
-        }
-        // Both are answered in the flow; a refusal that reaches here changed nothing.
-        Ok(Activation::Missing { .. } | Activation::External(_)) => toast(
-            window,
-            cx,
-            ToastKind::Error,
-            tr!("profiles.toast.activate_failed"),
-            tr!("profiles.toast.missing"),
-        ),
-        Err(err) => toast_error(window, cx, &err),
+// Finishes an applied report: Graphics' module choices, the active mark and the one activity
+// row, all off the UI thread. Without a modules phase, core already marked it by the same rule.
+async fn finish_apply(
+    report: &ApplyProfileReport,
+    note: Option<String>,
+    tf2: &Tf2Install,
+    cx: &mut AsyncApp,
+) -> ApplyOutcome {
+    let mut failed = report.failed().to_vec();
+    let modules = report.pending_modules().cloned();
+    if let Some(choices) = modules.clone()
+        && let Some(reason) = modules_phase(choices, tf2.clone(), cx).await
+    {
+        failed.push((ApplyStep::Graphics, reason));
     }
+    // Missing items the player chose to skip still leave the applied profile Active.
+    let clean = failed.is_empty() && report.skipped_steps().is_empty();
+    let active = if modules.is_some() && clean {
+        // An edit saved meanwhile moves `updated_at`, and then core leaves it inactive.
+        let profile = report.profile().clone();
+        let marking = cx.update(|cx| {
+            run_blocking(cx, move |s| {
+                Ok(matches!(s.library.mark_profile_active(&profile), Ok(true)))
+            })
+        });
+        marking.await.unwrap_or(false)
+    } else {
+        clean && modules.is_none()
+    };
+    let movement = match report.movement().cloned() {
+        Some(keys) => {
+            let probe = cx.update(|cx| Tf2Probe::get(cx));
+            let running = cx.background_spawn(async move { probe() }).await;
+            Some(addons::movement_line(&keys, running))
+        }
+        None => (report.binds_restored() || report.movement_off())
+            .then(|| addons::model::movement_off().to_string()),
+    };
+    let kinds: Vec<MissingKind> = report.skipped().iter().map(|m| m.kind().clone()).collect();
+    let outcome = ApplyOutcome {
+        name: report.profile().name().to_owned(),
+        active,
+        failed,
+        skipped_steps: report.skipped_steps().to_vec(),
+        kept: model::kept_parts(&kinds),
+        blocked: report.hud_blocked_name().map(str::to_owned),
+        movement,
+        note,
+    };
+    let entry = activity_entry(report, &outcome);
+    let writing = cx.update(|cx| {
+        run_blocking(cx, move |s| {
+            activity::write(s, &entry);
+            Ok(())
+        })
+    });
+    let _ = writing.await;
+    outcome
+}
+
+// Applies `choices` as the Graphics page saves them, against the cached settings catalogue of
+// the installed release; the reason it could not, if any.
+async fn modules_phase(choices: Choices, tf2: Tf2Install, cx: &mut AsyncApp) -> Option<String> {
+    let reading_tf2 = tf2.clone();
+    let reading = cx.update(|cx| {
+        run_blocking(cx, move |s| {
+            Ok(match s.library.mastercomfig_status(&reading_tf2) {
+                Ok(MastercomfigStatus::Managed { version, .. }) => {
+                    s.store.cached_mastercomfig_catalog(&version)
+                }
+                _ => None,
+            })
+        })
+    });
+    let Some(catalog) = reading.await.ok().flatten() else {
+        return Some(model::modules_no_catalog().to_string());
+    };
+    let applying =
+        cx.update(|cx| jobs::apply_modules(tf2, Arc::new(catalog), choices, false, false, cx));
+    match applying.await {
+        Ok(_) => None,
+        Err(ModulesFailure::Foreign) => Some(model::modules_foreign().to_string()),
+        Err(ModulesFailure::Op(e)) => Some(e.description().to_string()),
+    }
+}
+
+// The activate row: activated when the game now matches, applied when nothing failed, failed
+// otherwise; its details name the final failed steps.
+fn activity_entry(report: &ApplyProfileReport, outcome: &ApplyOutcome) -> NewLogEntry {
+    let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
+    let details = model::report_details(report.applied(), &skipped, &outcome.failed);
+    let name = outcome.name.as_str();
+    let (level, message) = if outcome.active {
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.activated", name = name),
+        )
+    } else if outcome.failed.is_empty() {
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.applied", name = name),
+        )
+    } else {
+        (
+            LogLevel::Error,
+            tr!("profiles.activity.failed", name = name),
+        )
+    };
+    NewLogEntry::new(level, "profile", "activate", message).with_details(details)
+}
+
+// Toasts the outcome and tells every library page to reload, since tf/custom changed; an apply
+// that put a HUD in place then checks that HUD's fonts.
+fn announce(
+    outcome: &ApplyOutcome,
+    hud_folder: Option<String>,
+    tf2: Tf2Install,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let (kind, title, description) = model::outcome_toast(outcome);
+    toast(window, cx, kind, title, description);
+    LibraryEvents::changed(cx);
     if let Some(folder) = hud_folder {
         ask_about_fonts(window.window_handle(), tf2, folder, cx);
     }
 }
 
-// The Missing Items dialog's answer; Re-download opens the store detail and answers nothing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MissingAnswer {
-    Cancel,
-    InstallAnyway,
-}
-
-// Opens v5's Missing Items dialog over the page. Cancel, Escape and Enter answer `Cancel`; the
-// receiver errs if the dialog goes away unanswered, which the flow also reads as a cancel.
-fn missing_items_dialog(
-    profile_name: &str,
-    items: &[MissingItem],
+// A refusal or error that reached the end of the flow changed nothing; unnamed HUDs are
+// answered in the flow, so those only arrive here when that went wrong.
+fn announce_refusal(
+    done: Result<Activation, OpError>,
+    name: &str,
     window: &mut Window,
     cx: &mut App,
-) -> async_channel::Receiver<MissingAnswer> {
-    let (tx, rx) = async_channel::bounded(1);
-    let description: SharedString = tr!("profiles.missing.body", name = profile_name);
-    let items: Rc<[MissingItem]> = items.into();
-    // The list's scroll position outlives the builder, which runs every frame.
-    let list_scroll = ScrollHandle::new();
-    window.defer(cx, move |window, cx| {
-        let frame = DialogFrame::new(DIALOG_WIDTH);
-        window.open_dialog(cx, move |dialog, window, cx| {
-            // The builder runs every frame, so each handler clones what it captures.
-            let answer = |reply: MissingAnswer| {
-                let tx = tx.clone();
-                move |_: &_, _: &mut Window, _: &mut App| {
-                    let _ = tx.try_send(reply);
-                    true
-                }
-            };
-            let button = |id: &'static str, reply: MissingAnswer| {
-                let tx = tx.clone();
-                Button::new(id).on_click(move |_, window, cx| {
-                    let _ = tx.try_send(reply);
-                    window.close_dialog(cx);
-                })
-            };
-            let muted = cx.theme().muted_foreground;
-            let rows = items
-                .iter()
-                .enumerate()
-                .map(|(ix, item)| missing_row(ix, item, cx))
-                .collect::<Vec<_>>();
-            frame
-                .apply(dialog, &*window, &*cx)
-                .close_button(false)
-                .on_ok(answer(MissingAnswer::Cancel))
-                .on_cancel(answer(MissingAnswer::Cancel))
-                .child(
-                    frame.measure(
-                        v_flex()
-                            .id(ids::PROFILES_MISSING_DIALOG)
-                            .test_support()
-                            .gap_4()
-                            // v5's dialog header: title and description 8 px apart.
-                            .child(
-                                v_flex()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .id(ids::PROFILES_MISSING_TITLE)
-                                            .aria_label(tr!("profiles.missing.title"))
-                                            .test_support()
-                                            .text_lg()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .child(tr!("profiles.missing.title")),
-                                    )
-                                    .child(
-                                        div()
-                                            .id(ids::PROFILES_MISSING_DESCRIPTION)
-                                            .aria_label(description.clone())
-                                            .test_support()
-                                            .text_sm()
-                                            .text_color(muted)
-                                            .child(description.clone()),
-                                    ),
-                            )
-                            // The bar sits in the box padding, so the rows keep their width.
-                            .child(scroll_beside(
-                                ids::PROFILES_MISSING_LIST_SCROLLBAR,
-                                &list_scroll,
-                                v_flex()
-                                    .id(ids::PROFILES_MISSING_LIST)
-                                    .track_scroll(&list_scroll)
-                                    .test_support()
-                                    .gap_3()
-                                    .max_h(px(256.))
-                                    .overflow_y_scroll()
-                                    .children(rows),
-                            ))
-                            .child(
-                                h_flex()
-                                    .justify_end()
-                                    .gap_2()
-                                    .child(
-                                        button(ids::PROFILES_MISSING_CANCEL, MissingAnswer::Cancel)
-                                            .outline()
-                                            .label(tr!("confirm.cancel")),
-                                    )
-                                    .child(
-                                        button(
-                                            ids::PROFILES_MISSING_INSTALL,
-                                            MissingAnswer::InstallAnyway,
-                                        )
-                                        .primary()
-                                        .label(tr!("profiles.missing.install")),
-                                    ),
-                            ),
-                    ),
-                )
-        });
-    });
-    rx
-}
-
-// One bordered Missing Items row: the warning, the name over its kind, and Re-download for a
-// store item (the store detail stacks over this dialog) or v5's local-import note.
-fn missing_row(ix: usize, item: &MissingItem, cx: &App) -> AnyElement {
-    let orange: gpui_kit::Hsla = gpui_kit::rgb(ORANGE_500).into();
-    let muted = cx.theme().muted_foreground;
-    let kind = model::kind_label(item.kind());
-    let action = match model::redownload_target(item.kind(), item.provenance()) {
-        Some((kind, id)) => {
-            let body = if kind == StoreKind::CuratedHuds {
-                curated_body
-            } else {
-                gamebanana_body
-            };
-            let detail = DetailItem {
-                kind,
-                id,
-                name: item.name().to_owned(),
-                in_library: false,
-            };
-            Button::new(ids::missing_redownload(ix))
-                .outline()
-                .icon(IconName::Download)
-                .label(tr!("profiles.missing.redownload"))
-                .on_click(move |_, window, cx| {
-                    open_detail(detail.clone(), body(), window, cx);
-                })
-                .into_any_element()
-        }
-        None => {
-            let local = tr!("profiles.missing.local");
-            div()
-                .id(ids::missing_local(ix))
-                .aria_label(local.clone())
-                .test_support()
-                .text_xs()
-                .text_color(muted)
-                .child(local)
-                .into_any_element()
-        }
-    };
-    h_flex()
-        .id(ids::missing_item(ix))
-        .aria_label(format!("{} ({kind})", item.name()))
-        .test_support()
-        .justify_between()
-        .gap_2()
-        .p_3()
-        .rounded(cx.theme().radius_lg)
-        .border_1()
-        .border_color(cx.theme().border)
-        .child(
-            h_flex()
-                .gap_2()
-                .child(
-                    Icon::new(IconName::TriangleAlert)
-                        .with_size(Size::Size(px(16.)))
-                        .text_color(orange),
-                )
-                .child(
-                    v_flex()
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(item.name().to_owned()),
-                        )
-                        .child(div().text_xs().text_color(muted).child(kind)),
-                ),
-        )
-        .child(action)
-        .into_any_element()
-}
-
-// A badge led by its size-3 icon, as v5 draws a profile's slots on both kinds of card.
-fn icon_badge(
-    id: impl Into<gpui_kit::ElementId>,
-    tag: Tag,
-    border: gpui_kit::Hsla,
-    icon: IconName,
-    text: impl Into<SharedString>,
-) -> impl IntoElement {
-    let tag = tag
-        .gap_1()
-        .child(Icon::new(icon).with_size(Size::Size(px(12.))));
-    badge_of(id, tag, border, text)
-}
-
-// v5's "Active Profile" card: the name with its "Active" badge, then a badge per filled slot,
-// or "Empty profile (vanilla)" when the profile fills none.
-fn active_card(profile: &Profile, cx: &App) -> AnyElement {
-    let theme = cx.theme();
-    let muted = theme.muted_foreground;
-    let mut badges = h_flex().flex_wrap().gap_2();
-    if model::is_empty(profile) {
-        badges = badges.child(labelled(
-            div().text_sm().text_color(muted),
-            ids::PROFILES_ACTIVE_EMPTY,
-            tr!("profiles.card.empty_vanilla"),
-        ));
-    } else {
-        let slots = [
-            (
-                ids::PROFILES_ACTIVE_HUD,
-                IconName::Paintbrush,
-                profile.hud(),
-            ),
-            (
-                ids::PROFILES_ACTIVE_HITSOUND,
-                IconName::Volume2,
-                profile.hitsound(),
-            ),
-            (
-                ids::PROFILES_ACTIVE_KILLSOUND,
-                IconName::Volume2,
-                profile.killsound(),
-            ),
-        ];
-        for (id, icon, item) in slots {
-            if let Some(item) = item {
-                badges = badges.child(icon_badge(
-                    id,
-                    Tag::secondary(),
-                    transparent_black(),
-                    icon,
-                    item.name().to_owned(),
-                ));
-            }
-        }
-        if !profile.crosshairs().is_empty() {
-            badges = badges.child(icon_badge(
-                ids::PROFILES_ACTIVE_CROSSHAIRS,
-                Tag::secondary(),
-                transparent_black(),
-                IconName::Crosshair,
-                model::crosshair_count(profile.crosshairs().len()),
-            ));
-        }
+) {
+    match done {
+        Err(err) => toast_error(window, cx, &err),
+        Ok(_) => toast(
+            window,
+            cx,
+            ToastKind::Error,
+            tr!("profiles.toast.apply_failed", name = name),
+            tr!("profiles.toast.missing"),
+        ),
     }
-    card_frame(cx)
-        .id(ids::PROFILES_ACTIVE)
-        .test_support()
-        .border_color(theme.primary.opacity(0.5))
-        .bg(theme.primary.opacity(0.05))
-        .p_6()
-        .child(
-            v_flex()
-                .gap_3()
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(labelled(
-                            div().font_weight(FontWeight::SEMIBOLD),
-                            ids::PROFILES_ACTIVE_NAME,
-                            profile.name().to_owned(),
-                        ))
-                        .child(badge_of(
-                            ids::PROFILES_ACTIVE_BADGE,
-                            Tag::primary(),
-                            transparent_black(),
-                            tr!("profiles.badge.active"),
-                        )),
-                )
-                .child(badges),
-        )
-        .into_any_element()
 }
 
 // v5's EmptyState inside a Card: an icon, the title and a muted description, plus any buttons.
@@ -1024,115 +1278,183 @@ fn empty_state(
         .into_any_element()
 }
 
-// What every card's buttons wait on: a TF2 folder for Activate, and no other profile action.
+// What every card's buttons wait on: a TF2 folder for Apply, and no other profile action.
 #[derive(Clone, Copy)]
 struct Gates {
     has_tf2: bool,
     busy: bool,
 }
 
-// v5's ProfileCard: the name (and "Active"), its item badges or "Empty profile", then
-// Activate, Edit (opens the editor) and Delete. A click on the body also opens the editor; the
-// buttons stop their clicks so they never reach it.
-fn profile_card(
+// What a card needs from the page besides its profile: the shared lookups and gates.
+struct CardContext {
+    hud_images: Rc<HashMap<String, String>>,
+    addon_names: Rc<HashMap<String, String>>,
+    gates: Gates,
+    applying: Option<ProfileId>,
+    page: WeakEntity<ProfilesPage>,
+}
+
+// The card's picture, `height` tall and cropped to it: the HUD's own for a Set HUD, "TF2's own
+// HUD" for None, and the bare fill for Leave or a HUD without a picture. The active card wears
+// its pill on top.
+fn card_picture(
     profile: &Profile,
     active: bool,
-    Gates { has_tf2, busy }: Gates,
-    activating: Option<&ProfileId>,
-    page: &WeakEntity<ProfilesPage>,
-    window: &Window,
+    height: Pixels,
+    ctx: &CardContext,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
     let id = profile.id();
-    let on_activate = {
-        let (page, id) = (page.clone(), id.clone());
-        move |_: &_, window: &mut Window, cx: &mut App| {
-            cx.stop_propagation();
-            let _ = page.update(cx, |page, cx| page.activate(id.clone(), window, cx));
+    let picture = match profile.hud().as_set() {
+        Some(hud) => {
+            let key = ctx
+                .hud_images
+                .get(hud.folder_name())
+                .map(|url| ImageKey::card(url));
+            let mut area = top_rounded_picture(
+                ids::profile_card_picture(id),
+                ids::profile_card_image(id),
+                key.as_ref(),
+                CARD_RADIUS,
+                cx,
+            );
+            // The shared area's 16:9 ratio outranks a height in layout, so it gives way here.
+            area.style().aspect_ratio = None;
+            area.h(height).into_any_element()
+        }
+        None => {
+            let area = div()
+                .id(ids::profile_card_picture(id))
+                .test_support()
+                .flex()
+                .items_center()
+                .justify_center()
+                .w_full()
+                .h(height)
+                .rounded_t(CARD_RADIUS)
+                .bg(theme.muted);
+            match Mode::of(profile.hud()) {
+                Mode::None => {
+                    let text = tr!("profiles.card.hud_none");
+                    area.aria_label(text.clone())
+                        .text_sm()
+                        .text_color(theme.muted_foreground)
+                        .child(text)
+                        .into_any_element()
+                }
+                Mode::Set | Mode::Leave => area.into_any_element(),
+            }
         }
     };
-    let this_one = activating == Some(id);
-    let activate = Button::new(ids::profile_activate(id))
-        .primary()
-        .px(SM_ICON_PX)
-        .icon(IconName::Play);
-    // Only the idle label goes icon-only when it outgrows its room; the busy and active
-    // labels keep their text as before.
-    let activate = match (this_one, active) {
-        (true, _) => activate.label(tr!("profiles.button.activating")),
-        (false, true) => activate.label(tr!("profiles.badge.active")),
-        (false, false) => label_or_named(
-            activate,
-            tr!("profiles.button.activate"),
-            ACTIVATE_LABEL_BUDGET,
-            window,
-            cx,
-        ),
+    // The pill is drawn light on dark, the theme's foreground under its background.
+    let pill = active.then(|| {
+        let text = tr!("profiles.badge.active");
+        h_flex()
+            .id(ids::profile_card_active(id))
+            .aria_label(text.clone())
+            .test_support()
+            .absolute()
+            .top_2()
+            .left_2()
+            .px_2()
+            .py_0p5()
+            .rounded_full()
+            .bg(theme.foreground)
+            .text_color(theme.background)
+            .gap(px(6.))
+            .text_xs()
+            .font_weight(FontWeight::SEMIBOLD)
+            .child(
+                Icon::new(IconName::Check)
+                    .with_size(Size::Size(px(12.)))
+                    .text_color(theme.background),
+            )
+            .child(text)
+    });
+    div()
+        .relative()
+        .flex_none()
+        .w_full()
+        .border_b_1()
+        .border_color(theme.border)
+        .child(picture)
+        .children(pill)
+        .into_any_element()
+}
+
+// One slot's line: its icon and the card text, muted and italic when the slot is left alone.
+fn card_line(id: &ProfileId, slot: SlotKind, text: String, left: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let icon = match slot {
+        SlotKind::Hud => IconName::Paintbrush,
+        SlotKind::Sounds => IconName::Volume2,
+        SlotKind::Crosshairs => IconName::Crosshair,
+        SlotKind::Graphics => IconName::Gauge,
+        SlotKind::Addons => IconName::Puzzle,
     };
+    h_flex()
+        .id(ids::profile_card_line(id, slot.key()))
+        .aria_label(text.clone())
+        .test_support()
+        .h(px(20.))
+        .gap_2()
+        .min_w_0()
+        .text_size(px(13.))
+        .when(left, |line| {
+            line.italic().text_color(theme.muted_foreground)
+        })
+        .child(
+            Icon::new(icon)
+                .with_size(Size::Size(SLOT_ICON))
+                .text_color(theme.muted_foreground),
+        )
+        .child(div().flex_1().min_w_0().truncate().child(text))
+        .into_any_element()
+}
+
+// The mock's profile card: the picture, the name, a line per slot, then Apply (inactive cards
+// only) and Edit. A click on the body opens the editor; the buttons stop their clicks first.
+fn profile_card(
+    profile: &Profile,
+    active: bool,
+    picture: Pixels,
+    ctx: &CardContext,
+    cx: &App,
+) -> AnyElement {
+    let theme = cx.theme();
+    let id = profile.id();
+    let Gates { has_tf2, busy } = ctx.gates;
     let on_edit = {
-        let (page, id) = (page.clone(), id.clone());
+        let (page, id) = (ctx.page.clone(), id.clone());
         move |_: &_, window: &mut Window, cx: &mut App| {
             cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.open_editor(id.clone(), window, cx));
         }
     };
-    let on_delete = {
-        let (page, id, name) = (page.clone(), id.clone(), profile.name().to_owned());
-        move |_: &_, window: &mut Window, cx: &mut App| {
-            cx.stop_propagation();
-            let _ = page.update(cx, |page, cx| page.delete(id.clone(), &name, window, cx));
-        }
+    let apply = (!active).then(|| {
+        let (page, id) = (ctx.page.clone(), id.clone());
+        Button::new(ids::profile_card_apply(&id))
+            .primary()
+            .label(tr!("profiles.button.apply"))
+            .loading(ctx.applying.as_ref() == Some(&id))
+            .disabled(!has_tf2 || busy)
+            .on_click(move |_, window, cx| {
+                cx.stop_propagation();
+                let _ = page.update(cx, |page, cx| page.activate(id.clone(), window, cx));
+            })
+    });
+    let names = Rc::clone(&ctx.addon_names);
+    let addon_name = move |name: &AddonName| {
+        names
+            .get(name.as_str())
+            .cloned()
+            .unwrap_or_else(|| model::missing_addon_name(name))
     };
-    let outline = || Tag::secondary().outline().text_color(theme.foreground);
-    let mut badges = h_flex().flex_wrap().gap_1p5();
-    if model::is_empty(profile) {
-        badges = badges.child(labelled(
-            div().text_xs().text_color(theme.muted_foreground),
-            ids::profile_empty(id),
-            tr!("profiles.card.empty"),
-        ));
-    } else {
-        let slots = [
-            (ids::profile_hud(id), IconName::Paintbrush, profile.hud()),
-            (
-                ids::profile_hitsound(id),
-                IconName::Volume2,
-                profile.hitsound(),
-            ),
-            (
-                ids::profile_killsound(id),
-                IconName::Volume2,
-                profile.killsound(),
-            ),
-        ];
-        for (badge_id, icon, item) in slots {
-            if let Some(item) = item {
-                badges = badges.child(icon_badge(
-                    badge_id,
-                    outline(),
-                    theme.border,
-                    icon,
-                    item.name().to_owned(),
-                ));
-            }
-        }
-        if !profile.crosshairs().is_empty() {
-            badges = badges.child(icon_badge(
-                ids::profile_crosshairs(id),
-                outline(),
-                theme.border,
-                IconName::Crosshair,
-                model::crosshair_count(profile.crosshairs().len()),
-            ));
-        }
-    }
+    let lines = card_lines(profile, &addon_name)
+        .into_iter()
+        .map(|line| card_line(id, line.slot, line.text, line.left, cx));
     let hover = crate::theme::card_hover(theme);
-    let border = if active {
-        theme.primary.opacity(0.5)
-    } else {
-        theme.border
-    };
     card_frame(cx)
         .id(ids::profile_card(id))
         .accessibility_id(ids::profile_card(id).to_string())
@@ -1144,220 +1466,190 @@ fn profile_card(
         .size_full()
         .flex()
         .flex_col()
-        .border_color(border)
-        .p_6()
-        .gap_3()
+        .overflow_hidden()
+        .rounded(CARD_RADIUS)
+        .border_color(if active {
+            theme.foreground
+        } else {
+            theme.border
+        })
+        .child(card_picture(profile, active, picture, ctx, cx))
         .child(
-            h_flex()
-                .gap_2()
-                .min_w_0()
+            v_flex()
+                .flex_1()
+                .min_h_0()
+                .px_4()
+                .pt_3()
+                .pb(px(14.))
                 .child(
                     div()
+                        .id(ids::profile_card_name(id))
+                        .aria_label(profile.name().to_owned())
+                        .test_support()
+                        .h(px(20.))
                         .truncate()
+                        .text_size(px(15.))
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(profile.name().to_owned()),
                 )
-                .children(active.then(|| {
-                    badge_of(
-                        ids::profile_active_badge(id),
-                        Tag::primary(),
-                        transparent_black(),
-                        tr!("profiles.badge.active"),
-                    )
-                })),
-        )
-        .child(badges)
-        .child(
-            h_flex()
-                .mt_auto()
-                .gap_2()
+                .child(v_flex().mt(px(10.)).gap(px(6.)).children(lines))
                 .child(
-                    activate
-                        .loading(this_one)
-                        .disabled(active || !has_tf2 || busy)
-                        .on_click(on_activate),
-                )
-                .child(
-                    Button::new(ids::profile_edit(id))
-                        .outline()
-                        .icon(IconName::Pencil)
-                        .named(tr!("profiles.button.edit"))
-                        .disabled(busy)
-                        .on_click(on_edit),
-                )
-                .child(
-                    Button::new(ids::profile_delete(id))
-                        .outline()
-                        .icon(IconName::Trash)
-                        .named(tr!("profiles.button.delete"))
-                        .disabled(busy)
-                        .on_click(on_delete),
+                    h_flex().mt_auto().gap_2().children(apply).child(
+                        Button::new(ids::profile_card_edit(id))
+                            .outline()
+                            .label(tr!("profiles.button.edit"))
+                            .disabled(busy)
+                            .on_click(on_edit),
+                    ),
                 ),
         )
         .into_any_element()
 }
 
 impl ProfilesPage {
-    // The "Your Profiles" row, then the grid of matching profiles or v5's empty states.
+    // The lead line beside New profile, then the library box: the empty state or the grid.
     fn library(&self, has_tf2: bool, busy: bool, cx: &mut Context<Self>) -> impl IntoElement {
-        let shown = self.shown(cx);
+        let columns = self.grid.columns();
         let body = if !self.loaded {
             None
         } else if self.profiles.is_empty() {
-            let actions = h_flex()
-                .gap_2()
-                .child(
-                    Button::new(ids::PROFILES_EMPTY_NEW)
-                        .primary()
-                        .px(SM_ICON_PX)
-                        .icon(IconName::Plus)
-                        .label(tr!("profiles.button.new"))
-                        .disabled(!has_tf2 || busy)
-                        .on_click(
-                            cx.listener(|page, _, window, cx| page.new_profile(true, window, cx)),
-                        ),
-                )
-                .child(
-                    Button::new(ids::PROFILES_EMPTY_START_EMPTY)
-                        .outline()
-                        .px(SM_ICON_PX)
-                        .label(tr!("profiles.button.start_empty"))
-                        .disabled(busy)
-                        .on_click(
-                            cx.listener(|page, _, window, cx| page.new_profile(false, window, cx)),
-                        ),
-                )
-                .into_any_element();
             Some(empty_state(
                 ids::PROFILES_EMPTY,
                 IconName::PackageOpen,
                 tr!("profiles.empty.title"),
                 tr!("profiles.empty.body"),
-                Some(actions),
-                cx,
-            ))
-        } else if shown.is_empty() {
-            Some(empty_state(
-                ids::PROFILES_NO_MATCH,
-                IconName::Search,
-                tr!("profiles.empty.no_match_title"),
-                tr!("profiles.empty.no_match_body"),
                 None,
                 cx,
             ))
         } else {
             let (profiles, active) = (Rc::clone(&self.profiles), self.active.clone());
-            let activating = self.activating.clone();
-            let page = cx.entity().downgrade();
-            Some(
-                self.grid
-                    .render(shown.len(), CARD_HEIGHT, move |ix, window, cx| {
-                        let profile = &profiles[shown[ix]];
-                        let is_active = active.as_ref() == Some(profile.id());
-                        profile_card(
-                            profile,
-                            is_active,
-                            Gates { has_tf2, busy },
-                            activating.as_ref(),
-                            &page,
-                            window,
-                            cx,
-                        )
-                    }),
-            )
+            let ctx = CardContext {
+                hud_images: Rc::clone(&self.hud_images),
+                addon_names: Rc::clone(&self.addon_names),
+                gates: Gates { has_tf2, busy },
+                applying: self.applying().cloned(),
+                page: cx.entity().downgrade(),
+            };
+            Some(self.grid.render_cells(
+                profiles.len(),
+                move |w| card_height(w, columns),
+                move |ix, w, _, cx| {
+                    let profile = &profiles[ix];
+                    let is_active = active.as_ref() == Some(profile.id());
+                    profile_card(profile, is_active, picture_height(w, columns), &ctx, cx)
+                },
+            ))
         };
-        let muted = cx.theme().muted_foreground;
-        // A narrow page wraps the search and buttons under the title, then the buttons under
-        // the search, so nothing passes the margin and the search keeps a usable width.
-        // New profile saves what is installed; its menu offers an empty one, which needs no TF2.
-        let buttons = div()
-            .id(ids::PROFILES_NEW_MENU)
-            .test_support()
-            .flex_none()
-            .child(
-                DropdownButton::new(ids::PROFILES_NEW_SPLIT)
-                    .button(
-                        Button::new(ids::PROFILES_NEW)
-                            .px(SM_ICON_PX)
-                            .icon(IconName::Plus)
-                            .label(tr!("profiles.button.new"))
-                            .disabled(!has_tf2)
-                            .when(!has_tf2, |b| b.tooltip(tr!("common.tf2_missing.title")))
-                            .on_click(cx.listener(|page, _, window, cx| {
-                                page.new_profile(true, window, cx)
-                            })),
-                    )
-                    .primary()
-                    .menu_accessibility_label(tr!("profiles.button.more_ways"))
-                    .disabled(busy)
-                    .dropdown_menu({
-                        let page = cx.entity().downgrade();
-                        move |menu, _, _| {
-                            let page = page.clone();
-                            menu.item(
-                                PopupMenuItem::element(|_, _| {
-                                    div()
-                                        .id(ids::PROFILES_NEW_EMPTY)
-                                        .test_support()
-                                        .child(tr!("profiles.button.start_empty"))
-                                })
-                                .on_click(move |_, window, cx| {
-                                    let _ =
-                                        page.update(cx, |p, cx| p.new_profile(false, window, cx));
-                                }),
-                            )
-                        }
-                    }),
-            );
+        let lead = tr!("profiles.lead");
+        // The library box's top in the scrolled content and the page's height, measured each
+        // frame; a change asks for another, since the floor below reads them.
+        let (measured, page) = (Rc::clone(&self.library_at), self.scroll.clone());
+        let watch = canvas(
+            move |bounds, window, _| {
+                let page_bounds = page.bounds();
+                let top = bounds.origin.y - page_bounds.origin.y - page.offset().y;
+                let at = (top, page_bounds.size.height);
+                if measured.get() != at {
+                    measured.set(at);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
         v_flex()
             .flex_1()
             .gap_4()
             .child(
                 h_flex()
+                    .w_full()
                     .flex_wrap()
-                    .justify_between()
+                    .items_center()
                     .gap_4()
                     .child(
                         div()
-                            .flex_none()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr!("profiles.heading.library")),
+                            .id(ids::PROFILES_LEAD)
+                            .aria_label(lead.clone())
+                            .test_support()
+                            .flex_1()
+                            .flex_basis(LEAD_BASIS)
+                            .min_w_0()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(lead),
                     )
                     .child(
-                        h_flex()
-                            .flex_wrap()
-                            .justify_end()
-                            .gap_3()
-                            .child(
-                                div()
-                                    .id(ids::PROFILES_SEARCH)
-                                    .test_support()
-                                    .flex_grow(1.)
-                                    .w(px(256.))
-                                    .min_w(SEARCH_MIN_WIDTH)
-                                    .child(
-                                        Input::new(&self.search)
-                                            .h_9()
-                                            .prefix(Icon::new(IconName::Search).text_color(muted)),
-                                    ),
-                            )
-                            .child(buttons),
+                        Button::new(ids::PROFILES_NEW)
+                            .primary()
+                            .flex_none()
+                            .h(px(36.))
+                            .px(SM_ICON_PX)
+                            .icon(IconName::Plus)
+                            .label(tr!("profiles.button.new"))
+                            .disabled(!has_tf2 || busy)
+                            .when(!has_tf2, |b| b.tooltip(tr!("common.tf2_missing.title")))
+                            .on_click(
+                                cx.listener(|page, _, window, cx| page.new_profile(window, cx)),
+                            ),
                     ),
             )
             .child(
                 div()
                     .id(ids::PROFILES_LIBRARY)
                     .test_support()
+                    .relative()
                     .flex_1()
-                    .min_h(LIBRARY_MIN_HEIGHT)
+                    .min_h(self.library_floor(columns))
+                    .child(watch)
                     .children(body),
             )
+    }
+
+    // One card row and the top of the next at least. A window too short for that under the lead
+    // fills the page with the library, so the page scrolls the lead wholly away, never halfway.
+    fn library_floor(&self, columns: usize) -> Pixels {
+        let floor = self.grid.row_height_for(|w| card_height(w, columns)) + NEXT_ROW_PEEK;
+        let (top, height) = self.library_at.get();
+        if height > px(0.) && height - top - CONTENT_PADDING < floor {
+            floor.max(height - CONTENT_PADDING)
+        } else {
+            floor
+        }
     }
 }
 
 impl Render for ProfilesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The editor takes the place of the list and scrolls its own body.
+        if let View::Editor { editor, .. } = &self.view {
+            return div()
+                .id(ids::page(Page::Profiles))
+                .test_support()
+                .size_full()
+                .child(editor.clone())
+                .into_any_element();
+        }
+        if self.opening {
+            let reading = tr!("profiles.editor.loading");
+            return div()
+                .id(ids::page(Page::Profiles))
+                .test_support()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(
+                    div()
+                        .id(ids::PROFILE_EDITOR_LOADING)
+                        .aria_label(reading.clone())
+                        .test_support()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(reading),
+                )
+                .into_any_element();
+        }
         let state = tf2_state(cx).read(cx);
         let has_tf2 = state.install().is_some();
         let missing = matches!(state, Tf2State::Missing { .. });
@@ -1372,44 +1664,10 @@ impl Render for ProfilesPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning);
-        // The editor takes the place of the Active Profile card and the library.
-        let content = if let View::Editor(editor, _) = &self.view {
-            content.child(editor.clone())
-        } else {
-            content.children(self.grid_view(has_tf2, busy, cx))
-        };
-        scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content).size_full()
-    }
-}
-
-impl ProfilesPage {
-    // The Active Profile card over the library.
-    fn grid_view(&self, has_tf2: bool, busy: bool, cx: &mut Context<Self>) -> [AnyElement; 2] {
-        let active = match self.active_profile() {
-            Some(profile) => active_card(profile, cx),
-            None => empty_state(
-                ids::PROFILES_NO_ACTIVE,
-                IconName::Layers,
-                tr!("profiles.no_active.title"),
-                tr!("profiles.no_active.body"),
-                None,
-                cx,
-            ),
-        };
-        [
-            v_flex()
-                .flex_none()
-                .gap_3()
-                .child(
-                    div()
-                        .text_lg()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(tr!("profiles.heading.active")),
-                )
-                .child(active)
-                .into_any_element(),
-            self.library(has_tf2, busy, cx).into_any_element(),
-        ]
+            .children(warning)
+            .child(self.library(has_tf2, busy, cx));
+        scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content)
+            .size_full()
+            .into_any_element()
     }
 }

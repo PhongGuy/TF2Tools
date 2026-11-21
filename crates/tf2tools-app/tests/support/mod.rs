@@ -47,6 +47,7 @@ pub mod logstf;
 pub mod maker_page;
 pub mod maps;
 pub mod packed;
+pub mod profiles;
 pub mod scroll;
 pub mod update_fake;
 pub mod update_feed;
@@ -271,6 +272,20 @@ pub fn click_id(cx: &mut TestAppContext, win: AnyWindowHandle, id: impl Into<Ele
     settle(cx, win);
     cx.update_window(win, |_, w, cx| w.click(id, cx)).unwrap();
     settle(cx, win);
+}
+
+/// Clicks a card's Apply, waits for the summary, then confirms it.
+pub fn click_apply(cx: &mut TestAppContext, win: AnyWindowHandle, id: &tf2tools_core::ProfileId) {
+    click_id(cx, win, tf2tools_app::ids::profile_card_apply(id));
+    confirm_apply_summary(cx, win);
+}
+
+/// Waits for the Apply summary an activate opened, then confirms it.
+pub fn confirm_apply_summary(cx: &mut TestAppContext, win: AnyWindowHandle) {
+    wait_real(cx, "the Apply summary", |cx| {
+        present(cx, win, tf2tools_app::ids::PROFILE_APPLY_OK)
+    });
+    click_id(cx, win, tf2tools_app::ids::PROFILE_APPLY_OK);
 }
 
 /// The open dialog's own X. Scoped to the dialog, since the Windows title bar also has a "close".

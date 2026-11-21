@@ -8,8 +8,8 @@ use common::{
     vpk_bytes, write_file,
 };
 use tf2tools_core::{
-    AddonName, ApplyProfileError, CrosshairRef, DraftSlot, InstallError, ProfileDraft, Provenance,
-    ReinstallError, SoundKind,
+    AddonName, ApplyProfileError, CrosshairRef, DraftItem, InstallError, ProfileDraft, Provenance,
+    ReinstallError, SlotMode, SoundKind,
 };
 
 /// Moves the whole game folder away, as a player moving their Steam library would.
@@ -124,7 +124,8 @@ fn installing_an_addon_into_a_moved_game_fails_and_creates_nothing() {
 fn applying_a_profile_to_a_moved_game_fails_and_creates_nothing() {
     let env = library_env();
     let hud = import_hud_as(&env, "rayshud", Provenance::Local);
-    let draft = ProfileDraft::new("Mine").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Mine").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let profile = env.lib.create_profile(&draft).unwrap();
     move_game_away(&env);
     let result = env

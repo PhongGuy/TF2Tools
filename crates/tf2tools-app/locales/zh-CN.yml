@@ -639,81 +639,124 @@ store_grid:
     filters: "试试调整搜索或筛选条件。"
 
 profiles:
-  crosshairs: { other: "%{count} 个准星" }
   weapons: { other: "%{count} 件武器" }
-  search: "搜索配置文件…"
   not_applied: "更改尚未应用"
-  default_name: "配置文件 %{n}"
+  lead: "配置文件可一次切换整套设置：HUD、音效、准星、画面和插件。新建的配置文件会复制当前的设置。"
   no_tf2: "请在设置中指定 TF2 文件夹以激活配置文件。"
   part:
+    sounds: "音效"
+    graphics: "图形"
+    addons: "插件"
     crosshairs: "准星"
     item: "物品"
-  heading:
-    active: "当前配置文件"
-    library: "我的配置文件"
   badge:
     active: "使用中"
   button:
-    activate: "激活"
-    activating: "正在激活…"
-    edit: "编辑配置文件"
-    delete: "删除配置文件"
+    apply: "应用"
+    edit: "编辑"
     new: "新建配置文件"
-    start_empty: "从空白开始"
-    more_ways: "更多创建配置文件的方式"
+  mode: { set: "设置", none: "无", leave: "保持不变" }
+  slot:
+    hud: { help: "此配置文件安装的 HUD。", leave: "应用此配置文件不会改动你的 HUD。", none: "使用 TF2 自带的 HUD：移除任何自定义 HUD。" }
+    sounds: { help: "命中音效和击杀音效。", leave: "应用此配置文件不会改动你的音效。", none: "使用 TF2 自带的音效：移除自定义的命中和击杀音效。" }
+    crosshairs: { help: "每把武器一个准星，设置方式和准星页面相同。", leave: "应用此配置文件不会改动你的准星。", none: "所有武器都使用 TF2 的默认准星。" }
+    graphics: { help: "一个 mastercomfig 预设以及你对它的改动。", leave: "应用此配置文件不会改动你的图形设置。", none: "移除 mastercomfig，让 TF2 使用自己的视频设置。" }
+    addons: { help: "哪些插件处于开启状态。", leave: "应用此配置文件不会改动你的插件。", none: "关闭所有插件。" }
   card:
-    empty: "空配置文件"
-    empty_vanilla: "空配置文件（原版）"
+    leave: "保持不变"
+    hud_none: "TF2 自带 HUD"
+    sounds: "命中：%{hit}，击杀：%{kill}"
+    tf2_default: "TF2 默认"
+    sounds_none: "TF2 默认音效"
+    crosshairs: { other: "%{count} 个武器准星" }
+    crosshairs_none: "TF2 默认准星"
+    graphics: { other: "%{preset}，%{count} 项改动" }
+    graphics_as_is: "%{preset}，未改动"
+    graphics_none: "关闭 mastercomfig"
+    addons_only_one: "仅 %{list}"
+    addons_only: { other: "仅这 %{count} 个：%{list}" }
+    addons_on: "开启 %{list}"
+    addons_nothing: "不开启任何插件"
+    addons_none: "关闭所有插件"
+  note:
+    sounds: "%{hit}和%{kill}"
+    graphics: { other: "%{preset}，%{count} 项改动" }
+    addons: { other: "%{count} 个插件" }
+    tail: "起个名字并保存，或修改需要不同的地方。"
+    copied: "%{parts}。%{tail}"
+  summary:
+    other_hud: "非 TF2Tools 安装的 HUD"
+    crosshairs_default: "TF2 默认"
+    no_mastercomfig: "未安装 mastercomfig"
+    outside_mastercomfig: "非 TF2Tools 安装的 mastercomfig"
+    mastercomfig_removed: "移除 mastercomfig"
+    addons_on: { other: "已开启 %{count} 个" }
+    turns_on: "开启 %{list}"
+    turns_off: "关闭 %{list}"
+    turns_off_only: "关闭 %{list}"
+    both: "%{on}；%{off}"
+    movement: "%{text}，会改变移动按键"
+    left: "保持不变：%{list}。"
+    missing_keeps: "%{name} 已缺失；保留 %{kept}"
+    missing_none: "%{name} 已缺失；这里没有安装任何内容"
+    missing_other_hud: "你当前的 HUD"
+  apply:
+    title: "切换到 %{name}？"
+    intro: "以下内容会立即更改，其他保持不变。"
+    nothing: "这与你当前的设置一致。应用后会将其标记为当前配置。"
+    ok: "应用 %{name}"
   empty:
     title: "还没有配置文件"
     body: "将当前设置保存为配置文件，即可在不同配置之间快速切换。"
-    no_match_title: "未找到配置文件"
-    no_match_body: "试试其他搜索词。"
-  no_active:
-    title: "没有使用中的配置文件"
-    body: "激活一个配置文件，即可应用已保存的一组自定义内容。"
   missing:
-    title: "缺失的物品"
-    body: "“%{name}”中的部分物品已不在库中。"
-    install: "仍然安装（跳过缺失项）"
     redownload: "重新下载"
     local: "本地导入，无法重新下载"
-    kind:
-      hitsound: "命中音效"
-      killsound: "击杀音效"
-      crosshair: "准星"
-      item: "物品"
   editor:
-    back: "返回配置文件"
-    clear: "清除"
-    unknown: "未知"
-    missing_crosshair: "%{name}（缺失）"
-    slot:
-      none: "无"
-      default_crosshairs: "默认准星"
-      missing: "缺失：%{name}"
-    empty:
-      huds: "库中还没有 HUD"
-      browse_huds: "浏览 HUD 商店"
-      sounds: "库中还没有音效"
-      browse_sounds: "浏览音效商店"
-      no_match: "无匹配项"
+    header_label: "配置文件编辑器"
+    modes_label: "此配置文件如何处理%{slot}"
+    crumb_new: "新建配置文件"
+    name: "名称"
+    name_placeholder: "为这个配置文件命名"
+    save: "保存"
+    delete: "删除配置文件"
+    name_blank: "给这个配置文件起个名字"
+    pick_hud: "选择一个 HUD，或选择“无”"
+    loading: "正在读取你当前的设置…"
+    note_title: "已按你当前的设置填好"
+    hud_empty: "你的库里还没有 HUD。"
+    xh_everywhere: "用于所有武器"
+    xh_on: { other: "用于 %{count} 把武器" }
+    xh_pick_first: "先选一个准星，再点击一把武器"
+    gfx_settings: "设置"
+    gfx_settings_help: "图形页面的列表，保存到此配置文件。"
+    gfx_copy: "从图形页面复制"
+    gfx_copy_none: "请先在图形页面安装 mastercomfig"
+    gfx_no_catalog: "先打开一次图形页面再选择设置"
+    addons_only: "仅限这些"
+    addons_only_on: "应用时，这里没有开启的插件会被关闭。"
+    addons_only_off: "这里开启的插件会被开启；其余的保持原样。"
+    addons_need_graphics: "插件需要 mastercomfig，而图形设为了无"
+    addons_empty: "你的库里还没有 mastercomfig 插件。"
+    addons_store: "打开插件商店"
   toast:
-    created_from_setup: "已根据当前设置创建配置文件"
-    created_empty: "已创建空配置文件"
+    saved: "%{name} 已保存。"
+    saved_active: "%{name} 已保存。应用它以使用这些更改。"
     deleted: "配置文件已删除"
-    activated: "配置文件“%{name}”已激活"
-    applied: "配置文件“%{name}”已应用"
-    cleared: "已清除所有自定义内容"
-    installed: "已安装：%{list}"
-    nothing_new: "没有安装新内容"
-    kept: "%{lead}。以下项目保留了原有内容：%{list}（库中缺失）"
     failed_steps: "无法放置以下内容：%{steps}。请确保 TF2 已关闭且 TF2Tools 可以写入 TF2 文件夹，然后重试。"
-    activate_failed: "激活配置文件失败"
     missing: "部分物品缺失"
+    applied_line: "已应用 %{name}。TF2 下次启动时生效。"
+    apply_failed: "无法应用 %{name}"
+    kept_only: "以下项目保留了原有内容：%{list}（库中缺失）。"
+    skipped: "%{part}保持不变：%{reason}。"
+  skip:
+    graphics_not_installed: "未安装 mastercomfig，请先在图形页面安装"
+    not_managed: "你的 mastercomfig 不是由 TF2Tools 安装的，请先在图形页面接管"
+    addons_need_base: "插件需要 mastercomfig，但它尚未安装"
+  modules:
+    no_catalog: "请打开一次图形页面，让 TF2Tools 读取你的 mastercomfig 设置。"
+    foreign: "你的 modules.cfg 不是由 TF2Tools 写入的；请打开图形页面替换它。"
   activity:
-    saved_current: "已将当前设置保存为配置文件：%{name}"
-    created: "已创建配置文件：%{name}"
+    saved: "已保存配置文件：%{name}"
     deleted: "已删除配置文件：%{name}"
     failed: "激活配置文件失败：%{name}"
     activated: "已激活配置文件：%{name}"
@@ -804,14 +847,11 @@ confirm:
   delete_profile:
     title: "删除配置文件"
     body: "确定要删除“%{name}”吗？"
+    active: "这是你当前启用的配置文件。游戏保持原样。"
   clear_profile_crosshairs:
     title: "清除准星"
     body: "要移除此配置文件中的所有准星吗？"
     ok: "全部清除"
-  activate_empty:
-    title: "激活空配置文件"
-    body: "此配置文件没有任何自定义内容。激活后将移除所有已安装的 HUD、音效和准星。"
-    ok: "仍然激活"
   tf2_running:
     title: "TF2 正在运行"
     body: "TF2 正在运行；更改将在重启游戏后生效。"
@@ -2649,9 +2689,6 @@ messages:
       newer_database: "库由更新版本的 TF2Tools 保存。请从发布页面安装最新的 TF2Tools 以打开它。"
   profiles:
     name_taken: "已有名为 %{name} 的配置文件。请换一个名称。"
-    hud_gone: "该 HUD 已不在库中"
-    sound_gone: "该音效已不在库中"
-    crosshair_gone: "该准星已不在库中"
   mastercomfig:
     no_release: "GitHub 上目前没有 TF2Tools 可安装的 mastercomfig 版本。请稍后重试。"
     foreign_modules_cfg: "TF2 中有一个并非由 TF2Tools 写入的 modules.cfg，因此 TF2Tools 未改动它。"
@@ -2847,7 +2884,6 @@ messages:
     remove_failed: "移除失败"
     load_library: "加载库失败"
     save_profile: "保存配置文件失败"
-    load_profile: "加载配置文件失败"
     open_profile: "打开配置文件失败"
     load_profiles: "加载配置文件失败"
     create_profile: "创建配置文件失败"

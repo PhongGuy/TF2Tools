@@ -12,7 +12,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_detail::{DetailItem, open_detail};
 use tf2tools_core::{
-    DraftSlot, GbId, Preset, ProfileDraft, Provenance, StoreItemId, StoreKind, Tf2Install,
+    DraftItem, GbId, Preset, ProfileDraft, Provenance, SlotMode, StoreItemId, StoreKind, Tf2Install,
 };
 
 // A short silent stereo WAV the library imports as a sound.
@@ -118,7 +118,9 @@ fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, pyro, "9.0.0", &vpk, false);
     s.services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone())))
+        .create_profile(
+            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
+        )
         .unwrap();
     support::seed_gb_huds(&env, &[(7, "FlawHUD")]);
     support::seed_sounds(&env, &[(1, "Ding", "hitsound", None)]);

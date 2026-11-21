@@ -30,12 +30,21 @@ fn save_current_reads_the_installed_state_from_disk() {
 
     let p = env.lib.save_current_profile(" Now ", &env.tf2).unwrap();
     assert_eq!(p.name(), "Now");
-    assert_eq!(p.hud().unwrap().folder_name(), hud.folder_name());
-    assert_eq!(p.hud().unwrap().provenance(), &gb(42));
-    assert_eq!(p.hitsound().unwrap().folder_name(), hit.folder_name());
-    assert!(p.killsound().is_none());
+    assert_eq!(p.hud().as_set().unwrap().folder_name(), hud.folder_name());
+    assert_eq!(p.hud().as_set().unwrap().provenance(), &gb(42));
+    assert_eq!(
+        p.sounds()
+            .as_set()
+            .and_then(|s| s.hit.as_ref())
+            .unwrap()
+            .folder_name(),
+        hit.folder_name()
+    );
+    assert!(p.sounds().as_set().and_then(|s| s.kill.as_ref()).is_none());
     let refs: Vec<_> = p
         .crosshairs()
+        .as_set()
+        .map_or(&[][..], Vec::as_slice)
         .iter()
         .map(|c| c.crosshair().clone())
         .collect();
@@ -57,7 +66,7 @@ fn an_unmanaged_or_ambiguous_hud_leaves_the_slot_empty() {
     let custom = env.tf2.custom_dir();
     write_file(&custom.join("foreign/info.vdf"), b"x");
     let p = env.lib.save_current_profile("One", &env.tf2).unwrap();
-    assert!(p.hud().is_none());
+    assert!(p.hud().as_set().is_none());
 
     let hud = import_hud_as(&env, "budhud", Provenance::Local);
     let named = env.lib.external_huds(&env.tf2).unwrap();
@@ -66,7 +75,7 @@ fn an_unmanaged_or_ambiguous_hud_leaves_the_slot_empty() {
         .unwrap();
     write_file(&custom.join("second/info.vdf"), b"x");
     let p = env.lib.save_current_profile("Two", &env.tf2).unwrap();
-    assert!(p.hud().is_none());
+    assert!(p.hud().as_set().is_none());
 }
 
 #[test]
@@ -79,7 +88,7 @@ fn a_foreign_sound_file_is_not_saved() {
         b"not ours",
     );
     let p = env.lib.save_current_profile("Mine", &env.tf2).unwrap();
-    assert!(p.hitsound().is_none());
+    assert!(p.sounds().as_set().and_then(|s| s.hit.as_ref()).is_none());
 }
 
 #[test]
@@ -91,7 +100,7 @@ fn a_deleted_installed_sound_is_gone_from_the_game_and_the_saved_profile() {
         .unwrap();
     env.lib.delete_sound(hit.id(), Some(&env.tf2)).unwrap();
     let p = env.lib.save_current_profile("After", &env.tf2).unwrap();
-    assert!(p.hitsound().is_none());
+    assert!(p.sounds().as_set().and_then(|s| s.hit.as_ref()).is_none());
     let scan = env.lib.installed_sounds(&env.tf2).unwrap();
     assert_eq!(scan.slot(SoundKind::Hitsound).active(), None);
 }

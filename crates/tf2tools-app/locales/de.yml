@@ -640,81 +640,124 @@ store_grid:
     filters: "Versuche, deine Suche oder Filter anzupassen."
 
 profiles:
-  crosshairs: { one: "%{count} Fadenkreuz", other: "%{count} Fadenkreuze" }
   weapons: { one: "%{count} Waffe", other: "%{count} Waffen" }
-  search: "Profile suchen..."
   not_applied: "Änderungen noch nicht angewendet"
-  default_name: "Profil %{n}"
+  lead: "Ein Profil wechselt dein ganzes Setup auf einmal: HUD, Sounds, Fadenkreuze, Grafik und Add-ons. Ein neues startet als Kopie dessen, was du gerade hast."
   no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um Profile zu aktivieren."
   part:
+    sounds: "Sounds"
+    graphics: "Grafik"
+    addons: "Add-ons"
     crosshairs: "Fadenkreuze"
     item: "Eintrag"
-  heading:
-    active: "Aktives Profil"
-    library: "Deine Profile"
   badge:
     active: "Aktiv"
   button:
-    activate: "Aktivieren"
-    activating: "Wird aktiviert..."
-    edit: "Profil bearbeiten"
-    delete: "Profil löschen"
+    apply: "Anwenden"
+    edit: "Bearbeiten"
     new: "Neues Profil"
-    start_empty: "Leer beginnen"
-    more_ways: "Weitere Wege, ein Profil zu erstellen"
+  mode: { set: "Festlegen", none: "Keine", leave: "So lassen" }
+  slot:
+    hud: { help: "Das HUD, das dieses Profil installiert.", leave: "Dieses Profil lässt dein HUD beim Anwenden in Ruhe.", none: "Nutzt das HUD von TF2: ein eigenes HUD wird entfernt." }
+    sounds: { help: "Treffer- und Kill-Sound.", leave: "Dieses Profil lässt deine Sounds beim Anwenden in Ruhe.", none: "Nutzt die Sounds von TF2: eigene Treffer- und Kill-Sounds werden entfernt." }
+    crosshairs: { help: "Ein Fadenkreuz pro Waffe, so festgelegt wie auf der Seite Fadenkreuze.", leave: "Dieses Profil lässt deine Fadenkreuze beim Anwenden in Ruhe.", none: "Nutzt auf jeder Waffe das Standard-Fadenkreuz von TF2." }
+    graphics: { help: "Ein mastercomfig-Preset und deine Änderungen daran.", leave: "Dieses Profil lässt deine Grafik beim Anwenden in Ruhe.", none: "Entfernt mastercomfig, sodass TF2 seine eigenen Videoeinstellungen nutzt." }
+    addons: { help: "Welche Add-ons an sind.", leave: "Dieses Profil lässt deine Add-ons beim Anwenden in Ruhe.", none: "Schaltet alle Add-ons aus." }
   card:
-    empty: "Leeres Profil"
-    empty_vanilla: "Leeres Profil (Vanilla)"
+    leave: "Bleibt, wie es ist"
+    hud_none: "Das HUD von TF2"
+    sounds: "Treffer: %{hit}, Kill: %{kill}"
+    tf2_default: "TF2-Standard"
+    sounds_none: "TF2-Standardsounds"
+    crosshairs: { one: "%{count} Waffenfadenkreuz", other: "%{count} Waffenfadenkreuze" }
+    crosshairs_none: "TF2-Standardfadenkreuze"
+    graphics: { one: "%{preset}, %{count} Änderung", other: "%{preset}, %{count} Änderungen" }
+    graphics_as_is: "%{preset} unverändert"
+    graphics_none: "mastercomfig aus"
+    addons_only_one: "Nur %{list}"
+    addons_only: { one: "Nur diese %{count}: %{list}", other: "Nur diese %{count}: %{list}" }
+    addons_on: "Schaltet %{list} ein"
+    addons_nothing: "Schaltet keine Add-ons ein"
+    addons_none: "Alle Add-ons aus"
+  note:
+    sounds: "%{hit} und %{kill}"
+    graphics: { one: "%{preset} mit %{count} Änderung", other: "%{preset} mit %{count} Änderungen" }
+    addons: { one: "%{count} Add-on", other: "%{count} Add-ons" }
+    tail: "Gib ihm einen Namen und speichere, oder ändere, was anders sein soll."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "Ein HUD, das TF2Tools nicht installiert hat"
+    crosshairs_default: "TF2-Standard"
+    no_mastercomfig: "Kein mastercomfig"
+    outside_mastercomfig: "Ein mastercomfig, das TF2Tools nicht installiert hat"
+    mastercomfig_removed: "mastercomfig entfernt"
+    addons_on: { one: "%{count} an", other: "%{count} an" }
+    turns_on: "Schaltet %{list} ein"
+    turns_off: "schaltet %{list} aus"
+    turns_off_only: "Schaltet %{list} aus"
+    both: "%{on}; %{off}"
+    movement: "%{text}, ändert deine Bewegungstasten"
+    left: "Bleibt, wie es ist: %{list}."
+    missing_keeps: "%{name} fehlt; %{kept} bleibt"
+    missing_none: "%{name} fehlt; dort ist nichts installiert"
+    missing_other_hud: "dein aktuelles HUD"
+  apply:
+    title: "Zu %{name} wechseln?"
+    intro: "Das ändert sich jetzt. Alles andere bleibt, wie es ist."
+    nothing: "Das passt schon zu dem, was du jetzt hast. Anwenden macht es zu deinem aktiven Profil."
+    ok: "%{name} anwenden"
   empty:
     title: "Noch keine Profile"
     body: "Speichere dein aktuelles Setup als Profil, um schnell zwischen Konfigurationen zu wechseln."
-    no_match_title: "Keine Profile gefunden"
-    no_match_body: "Probiere einen anderen Suchbegriff."
-  no_active:
-    title: "Kein aktives Profil"
-    body: "Aktiviere ein Profil, um eine gespeicherte Sammlung von Anpassungen anzuwenden."
   missing:
-    title: "Fehlende Einträge"
-    body: "Einige Einträge in „%{name}“ sind nicht mehr in deiner Bibliothek."
-    install: "Trotzdem installieren (Fehlende überspringen)"
     redownload: "Erneut herunterladen"
     local: "Lokaler Import — kein erneuter Download möglich"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "FADENKREUZ"
-      item: "EINTRAG"
   editor:
-    back: "Zurück zu den Profilen"
-    clear: "Leeren"
-    unknown: "Unbekannt"
-    missing_crosshair: "%{name} (fehlt)"
-    slot:
-      none: "Keine"
-      default_crosshairs: "Standard-Fadenkreuze"
-      missing: "Fehlt: %{name}"
-    empty:
-      huds: "Noch keine HUDs in deiner Bibliothek"
-      browse_huds: "HUD-Shop durchsuchen"
-      sounds: "Noch keine Sounds in deiner Bibliothek"
-      browse_sounds: "Sound-Shop durchsuchen"
-      no_match: "Keine Treffer"
+    header_label: "Profil-Editor"
+    modes_label: "Was dieses Profil mit %{slot} macht"
+    crumb_new: "Neues Profil"
+    name: "Name"
+    name_placeholder: "Gib diesem Profil einen Namen"
+    save: "Speichern"
+    delete: "Profil löschen"
+    name_blank: "Gib diesem Profil einen Namen"
+    pick_hud: "Wähle ein HUD oder „Keine“"
+    loading: "Lese, was du gerade hast…"
+    note_title: "Ausgefüllt mit dem, was du gerade hast"
+    hud_empty: "Noch keine HUDs in deiner Bibliothek."
+    xh_everywhere: "Auf jede Waffe legen"
+    xh_on: { one: "Auf %{count} Waffe", other: "Auf %{count} Waffen" }
+    xh_pick_first: "Wähle ein Fadenkreuz und klicke dann auf eine Waffe"
+    gfx_settings: "Einstellungen"
+    gfx_settings_help: "Die Liste der Grafik-Seite, in diesem Profil gespeichert."
+    gfx_copy: "Von der Grafik-Seite übernehmen"
+    gfx_copy_none: "Installiere zuerst mastercomfig auf der Grafik-Seite"
+    gfx_no_catalog: "Öffne einmal die Grafik-Seite, um Einstellungen zu wählen"
+    addons_only: "Nur diese"
+    addons_only_on: "Add-ons, die hier nicht eingeschaltet sind, werden beim Anwenden ausgeschaltet."
+    addons_only_off: "Add-ons, die hier eingeschaltet sind, werden eingeschaltet; der Rest bleibt, wie er ist."
+    addons_need_graphics: "Add-ons brauchen mastercomfig, und Grafik steht auf Keine"
+    addons_empty: "Noch keine mastercomfig-Add-ons in deiner Bibliothek."
+    addons_store: "Add-on-Shop öffnen"
   toast:
-    created_from_setup: "Profil aus deinem aktuellen Setup erstellt"
-    created_empty: "Leeres Profil erstellt"
+    saved: "%{name} gespeichert."
+    saved_active: "%{name} gespeichert. Wende es an, um die Änderungen zu nutzen."
     deleted: "Profil gelöscht"
-    activated: "Profil „%{name}“ aktiviert"
-    applied: "Profil „%{name}“ angewendet"
-    cleared: "Alle Anpassungen entfernt"
-    installed: "Installiert: %{list}"
-    nothing_new: "Nichts Neues installiert"
-    kept: "%{lead}. Bisheriges behalten für: %{list} (fehlt in deiner Bibliothek)"
     failed_steps: "Konnte nicht eingerichtet werden: %{steps}. Stell sicher, dass TF2 geschlossen ist und TF2Tools in deinen TF2-Ordner schreiben darf, und versuch es dann erneut."
-    activate_failed: "Profil konnte nicht aktiviert werden"
     missing: "Einige Einträge fehlen"
+    applied_line: "%{name} angewendet. TF2 übernimmt es beim nächsten Start."
+    apply_failed: "%{name} konnte nicht angewendet werden"
+    kept_only: "Bisheriges behalten für: %{list} (fehlt in deiner Bibliothek)"
+    skipped: "%{part} blieb unverändert: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig ist nicht installiert, installiere es zuerst auf der Grafik-Seite"
+    not_managed: "TF2Tools hat dein mastercomfig nicht installiert, übernimm es zuerst auf der Grafik-Seite"
+    addons_need_base: "Add-ons brauchen mastercomfig, das nicht installiert ist"
+  modules:
+    no_catalog: "Öffne einmal die Grafik-Seite, damit TF2Tools die Einstellungen deines mastercomfig lesen kann"
+    foreign: "Deine modules.cfg stammt nicht von TF2Tools; öffne die Grafik-Seite, um sie zu ersetzen"
   activity:
-    saved_current: "Aktuelles Setup als Profil gespeichert: %{name}"
-    created: "Profil erstellt: %{name}"
+    saved: "Profil gespeichert: %{name}"
     deleted: "Profil gelöscht: %{name}"
     failed: "Profil konnte nicht aktiviert werden: %{name}"
     activated: "Profil aktiviert: %{name}"
@@ -805,14 +848,11 @@ confirm:
   delete_profile:
     title: "Profil löschen"
     body: "Möchtest du „%{name}“ wirklich löschen?"
+    active: "Es ist dein aktives Profil. Dein Spiel bleibt, wie es ist."
   clear_profile_crosshairs:
     title: "Fadenkreuze entfernen"
     body: "Alle Fadenkreuze aus diesem Profil entfernen?"
     ok: "Alle entfernen"
-  activate_empty:
-    title: "Leeres Profil aktivieren"
-    body: "Dieses Profil hat keine Anpassungen. Wenn du es aktivierst, werden alle installierten HUDs, Sounds und Fadenkreuze entfernt."
-    ok: "Trotzdem aktivieren"
   tf2_running:
     title: "TF2 läuft"
     body: "TF2 läuft; Änderungen werden nach einem Neustart wirksam."
@@ -2650,9 +2690,6 @@ messages:
       newer_database: "Deine Bibliothek wurde von einer neueren TF2Tools-Version gespeichert. Installiere die neueste Version von TF2Tools von der Release-Seite, um sie zu öffnen."
   profiles:
     name_taken: "Du hast bereits ein Profil namens %{name}. Wähle einen anderen Namen."
-    hud_gone: "Dieses HUD ist nicht mehr in deiner Bibliothek"
-    sound_gone: "Dieser Sound ist nicht mehr in deiner Bibliothek"
-    crosshair_gone: "Dieses Fadenkreuz ist nicht mehr in deiner Bibliothek"
   mastercomfig:
     no_release: "GitHub hat gerade kein mastercomfig-Release, das sich mit TF2Tools installieren lässt. Versuch es später erneut."
     foreign_modules_cfg: "TF2 hat eine modules.cfg, die nicht von TF2Tools stammt, daher hat TF2Tools sie nicht angerührt."
@@ -2848,7 +2885,6 @@ messages:
     remove_failed: "Entfernen fehlgeschlagen"
     load_library: "Laden der Bibliothek fehlgeschlagen"
     save_profile: "Speichern des Profils fehlgeschlagen"
-    load_profile: "Laden des Profils fehlgeschlagen"
     open_profile: "Öffnen des Profils fehlgeschlagen"
     load_profiles: "Laden der Profile fehlgeschlagen"
     create_profile: "Erstellen des Profils fehlgeschlagen"

@@ -11,7 +11,9 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::font_check::ask_about_fonts;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{DraftSlot, HudEntry, LibraryKind, ProfileDraft, Provenance, Tf2Install};
+use tf2tools_core::{
+    DraftItem, HudEntry, LibraryKind, ProfileDraft, Provenance, SlotMode, Tf2Install,
+};
 
 use support::fonts::{FONTS, FakeFontHost, font_hud_zip_bytes, write_font_hud};
 
@@ -242,10 +244,11 @@ fn a_profile_with_a_hud_checks_its_fonts(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window_fonts(cx, &env, found(&env), host(&env, &[]));
     let hud = seed(&s, &env, "fonthud");
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     wait_dialog(cx, &s);
     let description = support::label_of(cx, s.win, ids::HUD_FONTS_DESCRIPTION).unwrap();
     assert!(
@@ -268,12 +271,11 @@ fn a_profile_without_a_hud_checks_nothing(cx: &mut TestAppContext) {
         .create_profile(&ProfileDraft::new("Vanilla"))
         .unwrap();
     open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(vanilla.id()));
-    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_apply(cx, s.win, vanilla.id());
     support::wait_real(cx, "the activate toast", |cx| {
         support::toast_labels(cx, s.win)
             .iter()
-            .any(|l| l.starts_with("Profile \"Vanilla\""))
+            .any(|l| l.starts_with("Vanilla applied."))
     });
     assert_eq!(started(cx), 0);
 }

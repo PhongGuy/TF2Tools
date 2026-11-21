@@ -642,81 +642,124 @@ store_grid:
     filters: "Essayez de modifier votre recherche ou vos filtres."
 
 profiles:
-  crosshairs: { one: "%{count} viseur", other: "%{count} viseurs" }
   weapons: { one: "%{count} arme", other: "%{count} armes" }
-  search: "Rechercher des profils..."
   not_applied: "Modifications pas encore appliquées"
-  default_name: "Profil %{n}"
+  lead: "Un profil change toute votre configuration d'un coup\u00A0: HUD, sons, viseurs, graphismes et add-ons. Un nouveau profil part d'une copie de ce que vous avez maintenant."
   no_tf2: "Indiquez le dossier de TF2 dans les Paramètres pour activer des profils."
   part:
+    sounds: "Sons"
+    graphics: "Graphismes"
+    addons: "Add-ons"
     crosshairs: "Viseurs"
     item: "Objet"
-  heading:
-    active: "Profil actif"
-    library: "Vos profils"
   badge:
     active: "Actif"
   button:
-    activate: "Activer"
-    activating: "Activation..."
-    edit: "Modifier le profil"
-    delete: "Supprimer le profil"
+    apply: "Appliquer"
+    edit: "Modifier"
     new: "Nouveau profil"
-    start_empty: "Partir de zéro"
-    more_ways: "Autres façons de créer un profil"
+  mode: { set: "Définir", none: "Aucun", leave: "Laisser tel quel" }
+  slot:
+    hud: { help: "Le HUD que ce profil installe.", leave: "Appliquer ce profil ne touchera pas à ton HUD.", none: "Utilise le HUD de TF2\u00A0: tout HUD personnalisé est retiré." }
+    sounds: { help: "Son de touche et son de kill.", leave: "Appliquer ce profil ne touchera pas à tes sons.", none: "Utilise les sons de TF2\u00A0: les sons de touche et de kill personnalisés sont retirés." }
+    crosshairs: { help: "Un viseur par arme, choisi comme sur la page Viseurs.", leave: "Appliquer ce profil ne touchera pas à tes viseurs.", none: "Utilise le viseur par défaut de TF2 sur chaque arme." }
+    graphics: { help: "Un preset mastercomfig et tes changements dessus.", leave: "Appliquer ce profil ne touchera pas à tes graphismes.", none: "Retire mastercomfig, pour que TF2 utilise ses propres réglages vidéo." }
+    addons: { help: "Quels add-ons sont activés.", leave: "Appliquer ce profil ne touchera pas à tes add-ons.", none: "Désactive tous les add-ons." }
   card:
-    empty: "Profil vide"
-    empty_vanilla: "Profil vide (jeu de base)"
+    leave: "Laissé tel quel"
+    hud_none: "Le HUD de TF2"
+    sounds: "Touche\u00A0: %{hit}, élimination\u00A0: %{kill}"
+    tf2_default: "Par défaut de TF2"
+    sounds_none: "Sons par défaut de TF2"
+    crosshairs: { one: "%{count} viseur d'arme", other: "%{count} viseurs d'arme" }
+    crosshairs_none: "Viseurs par défaut de TF2"
+    graphics: { one: "%{preset}, %{count} modification", other: "%{preset}, %{count} modifications" }
+    graphics_as_is: "%{preset} tel quel"
+    graphics_none: "mastercomfig désactivé"
+    addons_only_one: "Seulement %{list}"
+    addons_only: { one: "Seulement ces %{count}\u00A0: %{list}", other: "Seulement ces %{count}\u00A0: %{list}" }
+    addons_on: "Active %{list}"
+    addons_nothing: "N'active aucun add-on"
+    addons_none: "Tous les add-ons désactivés"
+  note:
+    sounds: "%{hit} et %{kill}"
+    graphics: { one: "%{preset} avec %{count} modification", other: "%{preset} avec %{count} modifications" }
+    addons: { one: "%{count} add-on activé", other: "%{count} add-ons activés" }
+    tail: "Donne-lui un nom et enregistre, ou change ce qui doit être différent."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "Un HUD que TF2Tools n'a pas installé"
+    crosshairs_default: "Ceux de TF2"
+    no_mastercomfig: "Pas de mastercomfig"
+    outside_mastercomfig: "Un mastercomfig que TF2Tools n'a pas installé"
+    mastercomfig_removed: "mastercomfig retiré"
+    addons_on: { one: "%{count} activé", other: "%{count} activés" }
+    turns_on: "Active %{list}"
+    turns_off: "désactive %{list}"
+    turns_off_only: "Désactive %{list}"
+    both: "%{on}\u00A0; %{off}"
+    movement: "%{text}, change tes touches de déplacement"
+    left: "Reste tel quel\u00A0: %{list}."
+    missing_keeps: "%{name} est manquant\u00A0; %{kept} reste"
+    missing_none: "%{name} est manquant\u00A0; rien n'est installé à sa place"
+    missing_other_hud: "votre HUD actuel"
+  apply:
+    title: "Passer à %{name}\u00A0?"
+    intro: "Ceci change maintenant. Tout le reste reste tel quel."
+    nothing: "Cela correspond déjà à ce que tu as maintenant. L'appliquer en fait ton profil actif."
+    ok: "Appliquer %{name}"
   empty:
     title: "Aucun profil pour l'instant"
     body: "Enregistrez votre configuration actuelle comme profil pour passer vite d'une configuration à l'autre."
-    no_match_title: "Aucun profil trouvé"
-    no_match_body: "Essayez un autre terme de recherche."
-  no_active:
-    title: "Aucun profil actif"
-    body: "Activez un profil pour appliquer un ensemble enregistré de personnalisations."
   missing:
-    title: "Objets manquants"
-    body: "Certains objets de «\u00A0%{name}\u00A0» ne sont plus dans votre bibliothèque."
-    install: "Installer quand même (sans les manquants)"
     redownload: "Retélécharger"
     local: "Import local — impossible de retélécharger"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "VISEUR"
-      item: "OBJET"
   editor:
-    back: "Retour aux profils"
-    clear: "Effacer"
-    unknown: "Inconnu"
-    missing_crosshair: "%{name} (manquant)"
-    slot:
-      none: "Aucun"
-      default_crosshairs: "Viseurs par défaut"
-      missing: "Manquant\u00A0: %{name}"
-    empty:
-      huds: "Aucun HUD dans votre bibliothèque"
-      browse_huds: "Parcourir le Magasin de HUD"
-      sounds: "Aucun son dans votre bibliothèque"
-      browse_sounds: "Parcourir le Magasin de sons"
-      no_match: "Aucun résultat"
+    header_label: "Éditeur de profil"
+    modes_label: "Ce que ce profil fait de %{slot}"
+    crumb_new: "Nouveau profil"
+    name: "Nom"
+    name_placeholder: "Nomme ce profil"
+    save: "Enregistrer"
+    delete: "Supprimer le profil"
+    name_blank: "Donne un nom à ce profil"
+    pick_hud: "Choisis un HUD, ou choisis Aucun"
+    loading: "Lecture de ce que vous avez en ce moment…"
+    note_title: "Rempli avec ce que vous avez en ce moment"
+    hud_empty: "Aucun HUD dans votre bibliothèque pour l'instant."
+    xh_everywhere: "Mettre sur toutes les armes"
+    xh_on: { one: "Sur %{count} arme", other: "Sur %{count} armes" }
+    xh_pick_first: "Choisissez un viseur, puis cliquez sur une arme"
+    gfx_settings: "Paramètres"
+    gfx_settings_help: "La liste de la page Graphismes, enregistrée dans ce profil."
+    gfx_copy: "Copier depuis la page Graphismes"
+    gfx_copy_none: "Installez d'abord mastercomfig sur la page Graphismes"
+    gfx_no_catalog: "Ouvrez une fois la page Graphismes pour choisir les réglages"
+    addons_only: "Uniquement ceux-ci"
+    addons_only_on: "Les add-ons non activés ici sont désactivés quand vous appliquez."
+    addons_only_off: "Les add-ons activés ici sont activés\u00A0; les autres restent tels quels."
+    addons_need_graphics: "Les add-ons ont besoin de mastercomfig, et Graphismes est sur Aucun"
+    addons_empty: "Aucun add-on mastercomfig dans votre bibliothèque pour l'instant."
+    addons_store: "Ouvrir le Magasin d'add-ons"
   toast:
-    created_from_setup: "Profil créé à partir de votre configuration actuelle"
-    created_empty: "Profil vide créé"
+    saved: "%{name} enregistré."
+    saved_active: "%{name} enregistré. Applique-le pour utiliser les changements."
     deleted: "Profil supprimé"
-    activated: "Profil «\u00A0%{name}\u00A0» activé"
-    applied: "Profil «\u00A0%{name}\u00A0» appliqué"
-    cleared: "Toutes les personnalisations ont été retirées"
-    installed: "Installé\u00A0: %{list}"
-    nothing_new: "Rien de nouveau installé"
-    kept: "%{lead}. Configuration existante conservée pour\u00A0: %{list} (introuvables dans votre bibliothèque)"
     failed_steps: "Impossible de mettre en place\u00A0: %{steps}. Vérifiez que TF2 est fermé et que TF2Tools peut écrire dans votre dossier TF2, puis réessayez."
-    activate_failed: "Impossible d'activer le profil"
     missing: "Certains objets sont manquants"
+    applied_line: "%{name} appliqué. TF2 le prendra en compte au prochain lancement."
+    apply_failed: "Impossible d'appliquer %{name}"
+    kept_only: "Configuration existante conservée pour\u00A0: %{list} (introuvables dans votre bibliothèque)"
+    skipped: "%{part} est resté tel quel\u00A0: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig n'est pas installé, installez-le d'abord sur la page Graphismes"
+    not_managed: "TF2Tools n'a pas installé votre mastercomfig, prenez-le d'abord en charge sur la page Graphismes"
+    addons_need_base: "les add-ons ont besoin de mastercomfig, qui n'est pas installé"
+  modules:
+    no_catalog: "Ouvrez une fois la page Graphismes pour que TF2Tools puisse lire les paramètres de votre mastercomfig"
+    foreign: "Votre modules.cfg n'a pas été écrit par TF2Tools\u00A0; ouvrez la page Graphismes pour le remplacer"
   activity:
-    saved_current: "Configuration actuelle enregistrée comme profil\u00A0: %{name}"
-    created: "Profil créé\u00A0: %{name}"
+    saved: "Profil enregistré\u00A0: %{name}"
     deleted: "Profil supprimé\u00A0: %{name}"
     failed: "Échec de l'activation du profil\u00A0: %{name}"
     activated: "Profil activé\u00A0: %{name}"
@@ -807,14 +850,11 @@ confirm:
   delete_profile:
     title: "Supprimer le profil"
     body: "Voulez-vous vraiment supprimer «\u00A0%{name}\u00A0»\u00A0?"
+    active: "C'est votre profil actif. Votre jeu reste tel quel."
   clear_profile_crosshairs:
     title: "Retirer les viseurs"
     body: "Retirer tous les viseurs de ce profil\u00A0?"
     ok: "Tout retirer"
-  activate_empty:
-    title: "Activer un profil vide"
-    body: "Ce profil n'a aucune personnalisation. L'activer retirera tous les HUD, sons et viseurs installés."
-    ok: "Activer quand même"
   tf2_running:
     title: "TF2 est lancé"
     body: "TF2 est lancé\u00A0; les changements prendront effet après un redémarrage."
@@ -2652,9 +2692,6 @@ messages:
       newer_database: "Votre bibliothèque a été enregistrée par une version plus récente de TF2Tools. Installez la dernière version de TF2Tools depuis la page des versions pour l'ouvrir."
   profiles:
     name_taken: "Vous avez déjà un profil nommé %{name}. Choisissez un autre nom."
-    hud_gone: "Ce HUD n'est plus dans votre bibliothèque"
-    sound_gone: "Ce son n'est plus dans votre bibliothèque"
-    crosshair_gone: "Ce viseur n'est plus dans votre bibliothèque"
   mastercomfig:
     no_release: "GitHub n'a pour l'instant aucune version de mastercomfig que TF2Tools puisse installer. Réessayez plus tard."
     foreign_modules_cfg: "TF2 contient un modules.cfg que TF2Tools n'a pas écrit, donc TF2Tools n'y a pas touché."
@@ -2850,7 +2887,6 @@ messages:
     remove_failed: "Échec du retrait"
     load_library: "Impossible de charger la bibliothèque"
     save_profile: "Impossible d'enregistrer le profil"
-    load_profile: "Impossible de charger le profil"
     open_profile: "Impossible d'ouvrir le profil"
     load_profiles: "Impossible de charger les profils"
     create_profile: "Impossible de créer le profil"

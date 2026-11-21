@@ -1,27 +1,31 @@
 //! v5's crosshair picker: a search row with the selection's swatch over one virtualized list
-//! of the builtin group then the library group. The profile editor hosts the list; the
-//! Crosshairs page hosts its gallery mode, a virtualized grid of large tiles under source chips,
-//! which leaves the swatch to the page's large preview.
+//! of the builtin group then the library group. The Crosshairs page hosts its gallery mode, a
+//! virtualized grid of large tiles under source chips, which leaves the swatch to the page's
+//! large preview. The profile editor hosts the strip: the same tiles in one sideways row.
 
 use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use gpui_component::{VirtualListScrollHandle, h_virtual_list};
 use gpui_kit::assets::IconName;
+use gpui_kit::component::button::Button;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{ActiveTheme as _, Icon, h_flex, v_flex};
+use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, AppContext as _, Context, Entity, FontWeight, ImageSource,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    UniformListScrollHandle, WeakEntity, Window, canvas, div, img, px, rgb, uniform_list,
+    AnyElement, App, AppContext as _, Context, ElementId, Entity, EventEmitter, FontWeight,
+    ImageSource, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, UniformListScrollHandle, WeakEntity, Window, canvas, div, img, px, rgb,
+    size, uniform_list,
 };
 
 use tf2tools_core::{BuiltinCrosshairs, CrosshairEntry, CrosshairFormat, CrosshairRef};
 
 use crate::i18n::tr;
-use crate::ids;
+use crate::ids::{self, IdScope};
 use crate::previews::{CrosshairPreviews, Preview};
 use crate::services::Services;
 use crate::widgets::labelled;
@@ -32,9 +36,18 @@ const ROW_HEIGHT: Pixels = px(28.);
 
 /// A gallery tile's width and height, the gap between tiles, and its drawing's black square.
 const TILE_WIDTH: Pixels = px(88.);
-const TILE_HEIGHT: Pixels = px(106.);
-const TILE_GAP: Pixels = px(8.);
+const TILE_HEIGHT: Pixels = px(TILE_HEIGHT_PX);
+const TILE_GAP: Pixels = px(TILE_GAP_PX);
 const TILE_SQUARE: Pixels = px(80.);
+/// The raw sizes behind `TILE_HEIGHT` and `TILE_GAP`, since `Pixels` has no const arithmetic.
+const TILE_HEIGHT_PX: f32 = 106.;
+const TILE_GAP_PX: f32 = 8.;
+/// The strip's tile row: one tile with a gap above and below.
+const STRIP_ROW_HEIGHT: Pixels = px(TILE_HEIGHT_PX + TILE_GAP_PX * 2.);
+
+/// Asked by the strip's Import button; the host runs the import.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImportCrosshair;
 
 /// Which group the gallery shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -92,6 +105,12 @@ pub struct CrosshairPicker {
     fill: bool,
     /// The Crosshairs page's grid of tiles in place of the list.
     gallery: bool,
+    /// The profile editor's one sideways row of tiles in place of the list.
+    strip: bool,
+    /// Every id the picker draws goes through this, so a host can draw it under its own ids.
+    scope: IdScope,
+    /// The strip's Import button spins.
+    importing: bool,
     source: Source,
     /// The gallery grid's painted width, which sets its columns.
     width: Rc<Cell<Pixels>>,
@@ -100,9 +119,12 @@ pub struct CrosshairPicker {
     previews: Entity<CrosshairPreviews>,
     search: Entity<InputState>,
     list: UniformListScrollHandle,
+    row: VirtualListScrollHandle,
     _previews: Subscription,
     _search: Subscription,
 }
+
+impl EventEmitter<ImportCrosshair> for CrosshairPicker {}
 
 impl CrosshairPicker {
     /// Needs the `Services` global. Starts with an empty library and no selection. Compact is
@@ -135,12 +157,16 @@ impl CrosshairPicker {
             compact,
             fill: false,
             gallery: false,
+            strip: false,
+            scope: IdScope::PAGE,
+            importing: false,
             source: Source::All,
             width: Rc::new(Cell::new(px(300.))),
             disabled: false,
             previews,
             search,
             list: UniformListScrollHandle::new(),
+            row: VirtualListScrollHandle::new(),
             _previews: observe_previews,
             _search: search_changed,
         }
@@ -153,6 +179,22 @@ impl CrosshairPicker {
             gallery: true,
             ..Self::new(false, window, cx)
         }
+    }
+
+    /// The profile editor's strip: one line of search, source chips and Import over one
+    /// horizontally scrolling, virtualized row of gallery tiles. Ids carry `scope`.
+    pub fn strip(scope: IdScope, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self {
+            strip: true,
+            scope,
+            ..Self::new(false, window, cx)
+        }
+    }
+
+    /// Spins the strip's Import button.
+    pub fn set_importing(&mut self, importing: bool, cx: &mut Context<Self>) {
+        self.importing = importing;
+        cx.notify();
     }
 
     /// Shows only one group, or both.
@@ -203,9 +245,13 @@ impl CrosshairPicker {
         &self.search
     }
 
-    /// The list's scroll handle; its offset is what the list drew.
+    /// The list's scroll handle, or the strip's row's; its offset is what the list drew.
     pub fn scroll(&self) -> ScrollHandle {
-        self.list.0.borrow().base_handle.clone()
+        if self.strip {
+            self.row.base_handle().clone()
+        } else {
+            self.list.0.borrow().base_handle.clone()
+        }
     }
 
     /// The catalog's display name for a builtin, the library's name otherwise.
@@ -266,49 +312,58 @@ impl CrosshairPicker {
         let library = Rc::clone(&self.library);
         let selected = self.selected.clone();
         let previews = self.previews.clone();
+        let scope = self.scope;
         // The right padding keeps the options clear of the scrollbar's track.
-        let list = uniform_list(ids::CROSSHAIRS_LIST, rows.len(), move |range, _, cx| {
-            range
-                .map(|ix| match rows[ix] {
-                    Row::BuiltinHeader(n) => {
-                        header(ids::CROSSHAIRS_GROUP_BUILTIN, builtin_label(n), cx)
-                    }
-                    Row::LibraryHeader(n) => {
-                        header(ids::CROSSHAIRS_GROUP_LIBRARY, library_label(n), cx)
-                    }
-                    Row::Builtin(i) => {
-                        let b = &builtins.all()[i];
-                        let crosshair = CrosshairRef::Builtin(b.name().to_owned());
-                        let id = ids::crosshair_builtin(b.name());
-                        let name = b.display_name().to_owned();
-                        option(
-                            id,
-                            name,
-                            crosshair,
-                            selected.as_ref(),
-                            &previews,
-                            &picker,
+        let list = uniform_list(
+            scope.id(ids::CROSSHAIRS_LIST),
+            rows.len(),
+            move |range, _, cx| {
+                range
+                    .map(|ix| match rows[ix] {
+                        Row::BuiltinHeader(n) => header(
+                            scope.id(ids::CROSSHAIRS_GROUP_BUILTIN),
+                            builtin_label(n),
                             cx,
-                        )
-                    }
-                    Row::Library(i) => {
-                        let c = &library[i];
-                        let crosshair = CrosshairRef::Library(c.id().clone());
-                        let id = ids::crosshair_library(c.folder_name());
-                        let name = c.name().to_owned();
-                        option(
-                            id,
-                            name,
-                            crosshair,
-                            selected.as_ref(),
-                            &previews,
-                            &picker,
+                        ),
+                        Row::LibraryHeader(n) => header(
+                            scope.id(ids::CROSSHAIRS_GROUP_LIBRARY),
+                            library_label(n),
                             cx,
-                        )
-                    }
-                })
-                .collect()
-        })
+                        ),
+                        Row::Builtin(i) => {
+                            let b = &builtins.all()[i];
+                            let crosshair = CrosshairRef::Builtin(b.name().to_owned());
+                            let id = scope.id(ids::crosshair_builtin(b.name()));
+                            let name = b.display_name().to_owned();
+                            option(
+                                id,
+                                name,
+                                crosshair,
+                                selected.as_ref(),
+                                &previews,
+                                &picker,
+                                cx,
+                            )
+                        }
+                        Row::Library(i) => {
+                            let c = &library[i];
+                            let crosshair = CrosshairRef::Library(c.id().clone());
+                            let id = scope.id(ids::crosshair_library(c.folder_name()));
+                            let name = c.name().to_owned();
+                            option(
+                                id,
+                                name,
+                                crosshair,
+                                selected.as_ref(),
+                                &previews,
+                                &picker,
+                                cx,
+                            )
+                        }
+                    })
+                    .collect()
+            },
+        )
         .track_scroll(&self.list)
         .test_support()
         .map(|list| {
@@ -320,7 +375,7 @@ impl CrosshairPicker {
         })
         .p_1()
         .pr(BAR_WIDTH);
-        let area = scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, list);
+        let area = scroll_area(scope.id(ids::CROSSHAIRS_LIST_SCROLLBAR), &self.list, list);
         if self.fill {
             div()
                 .flex_1()
@@ -357,7 +412,7 @@ impl CrosshairPicker {
     // A source chip: the active one filled, hidden when its group has no match.
     fn chip(
         &self,
-        id: &'static str,
+        id: ElementId,
         label: String,
         source: Source,
         cx: &mut Context<Self>,
@@ -370,7 +425,7 @@ impl CrosshairPicker {
             (gpui_kit::transparent_black(), theme.muted_foreground)
         };
         div()
-            .id(id)
+            .id(self.scope.id(id))
             .aria_label(SharedString::from(label.clone()))
             .test_support()
             .px_2()
@@ -396,40 +451,9 @@ impl CrosshairPicker {
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
         let query = self.search.read(cx).value().to_lowercase();
         let (tiles, builtins, library) = self.tiles(&query);
-        let mut chips = vec![
-            self.chip(
-                ids::CROSSHAIRS_GROUP_ALL,
-                tr!("widgets.crosshair_picker.all").to_string(),
-                Source::All,
-                cx,
-            )
-            .into_any_element(),
-        ];
-        if builtins > 0 {
-            let label = builtin_label(builtins);
-            chips.push(
-                self.chip(ids::CROSSHAIRS_GROUP_BUILTIN, label, Source::Builtin, cx)
-                    .into_any_element(),
-            );
-        }
-        if library > 0 {
-            let label = library_label(library);
-            chips.push(
-                self.chip(ids::CROSSHAIRS_GROUP_LIBRARY, label, Source::Library, cx)
-                    .into_any_element(),
-            );
-        }
+        let chips = self.chips(builtins, library, cx);
         let body = if tiles.is_empty() {
-            v_flex()
-                .flex_1()
-                .items_center()
-                .justify_center()
-                .child(labelled(
-                    div().text_sm().text_color(muted),
-                    ids::CROSSHAIRS_NO_MATCH,
-                    tr!("widgets.crosshair_picker.no_match"),
-                ))
-                .into_any_element()
+            self.no_match(muted)
         } else {
             self.grid(tiles.into(), cx)
         };
@@ -450,6 +474,164 @@ impl CrosshairPicker {
             )
             .child(h_flex().flex_wrap().gap_1().px_2().pt_2().children(chips))
             .child(body)
+            .into_any_element()
+    }
+
+    // The source chips: All, then each group that has a match, with its count.
+    fn chips(&self, builtins: usize, library: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let mut chips = vec![
+            self.chip(
+                ids::CROSSHAIRS_GROUP_ALL.into(),
+                tr!("widgets.crosshair_picker.all").to_string(),
+                Source::All,
+                cx,
+            )
+            .into_any_element(),
+        ];
+        if builtins > 0 {
+            let label = builtin_label(builtins);
+            chips.push(
+                self.chip(
+                    ids::CROSSHAIRS_GROUP_BUILTIN.into(),
+                    label,
+                    Source::Builtin,
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        if library > 0 {
+            let label = library_label(library);
+            chips.push(
+                self.chip(
+                    ids::CROSSHAIRS_GROUP_LIBRARY.into(),
+                    label,
+                    Source::Library,
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        chips
+    }
+
+    // The muted line shown when the search hides every tile.
+    fn no_match(&self, muted: gpui_kit::Hsla) -> AnyElement {
+        v_flex()
+            .flex_1()
+            .items_center()
+            .justify_center()
+            .child(labelled(
+                div().text_sm().text_color(muted),
+                self.scope.id(ids::CROSSHAIRS_NO_MATCH),
+                tr!("widgets.crosshair_picker.no_match"),
+            ))
+            .into_any_element()
+    }
+
+    // The profile editor's strip: search, chips and Import on one line over one sideways row
+    // of the gallery's tiles, or the no-match line at the row's height so the strip keeps its
+    // size while the player types.
+    fn render_strip(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let query = self.search.read(cx).value().to_lowercase();
+        let (tiles, builtins, library) = self.tiles(&query);
+        let chips = self.chips(builtins, library, cx);
+        let importing = self.importing;
+        let import = Button::new(self.scope.id(ids::CROSSHAIRS_IMPORT))
+            .outline()
+            .small()
+            .icon(IconName::Upload)
+            .label(if importing {
+                tr!("crosshairs_page.button.importing")
+            } else {
+                tr!("crosshairs_page.button.import")
+            })
+            .loading(importing)
+            .disabled(self.disabled)
+            .on_click(cx.listener(|_, _, _, cx| cx.emit(ImportCrosshair)));
+        let body = if tiles.is_empty() {
+            div()
+                .h(STRIP_ROW_HEIGHT)
+                .flex()
+                .child(self.no_match(muted))
+                .into_any_element()
+        } else {
+            self.row(tiles.into(), cx)
+        };
+        v_flex()
+            .w_full()
+            .rounded(radius)
+            .border_1()
+            .border_color(border)
+            .overflow_hidden()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .border_b_1()
+                    .border_color(border)
+                    .child(self.search_box(muted))
+                    .child(h_flex().flex_none().gap_1().children(chips))
+                    .child(import),
+            )
+            .child(body)
+            .into_any_element()
+    }
+
+    // The strip's tile row, with its sideways scrollbar drawn under the tiles. `h_virtual_list`
+    // builds only the tiles in view. Its height is set, since the list fills its parent and the
+    // strip's parent gives it none.
+    fn row(&self, tiles: Rc<[Row]>, cx: &mut Context<Self>) -> AnyElement {
+        let sizes = Rc::new(vec![size(TILE_WIDTH + TILE_GAP, TILE_HEIGHT); tiles.len()]);
+        let picker = cx.entity().downgrade();
+        let scope = self.scope;
+        let list = h_virtual_list(
+            cx.entity(),
+            scope.id(ids::CROSSHAIRS_LIST),
+            sizes,
+            move |this, range, _, cx| {
+                range
+                    .map(|ix| {
+                        let (id, name, crosshair) =
+                            tile_parts(this.scope, &this.builtins, &this.library, tiles[ix]);
+                        let selected = this.selected.as_ref();
+                        let tile = tile_element(
+                            id,
+                            name,
+                            crosshair,
+                            selected,
+                            &this.previews,
+                            &picker,
+                            cx,
+                        );
+                        div().flex_none().pr(TILE_GAP).child(tile)
+                    })
+                    .collect()
+            },
+        )
+        .track_scroll(&self.row)
+        .w_full()
+        .h(STRIP_ROW_HEIGHT)
+        .p(TILE_GAP)
+        .pr_0();
+        v_flex()
+            .w_full()
+            .child(list)
+            .child(
+                div()
+                    .id(scope.id(ids::CROSSHAIRS_LIST_SCROLLBAR))
+                    .relative()
+                    .w_full()
+                    .h(BAR_WIDTH)
+                    .child(
+                        Scrollbar::horizontal(self.row.base_handle())
+                            .mode(ScrollbarMode::Always)
+                            .viewport_from_layout(),
+                    ),
+            )
             .into_any_element()
     }
 
@@ -476,33 +658,14 @@ impl CrosshairPicker {
         let library = Rc::clone(&self.library);
         let selected = self.selected.clone();
         let previews = self.previews.clone();
-        let list = uniform_list(ids::CROSSHAIRS_LIST, rows, move |range, _, cx| {
+        let scope = self.scope;
+        let list = uniform_list(scope.id(ids::CROSSHAIRS_LIST), rows, move |range, _, cx| {
             range
                 .map(|row| {
                     let start = row * columns;
                     let end = (start + columns).min(tiles.len());
                     let cells = tiles[start..end].iter().map(|tile| {
-                        let (id, name, crosshair) = match *tile {
-                            Row::Library(i) => {
-                                let c = &library[i];
-                                (
-                                    ids::crosshair_library(c.folder_name()),
-                                    c.name().to_owned(),
-                                    CrosshairRef::Library(c.id().clone()),
-                                )
-                            }
-                            Row::Builtin(i) => {
-                                let b = &builtins.all()[i];
-                                (
-                                    ids::crosshair_builtin(b.name()),
-                                    b.display_name().to_owned(),
-                                    CrosshairRef::Builtin(b.name().to_owned()),
-                                )
-                            }
-                            Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
-                                unreachable!("the gallery holds no headers")
-                            }
-                        };
+                        let (id, name, crosshair) = tile_parts(scope, &builtins, &library, *tile);
                         tile_element(
                             id,
                             name,
@@ -531,14 +694,16 @@ impl CrosshairPicker {
         div()
             .flex_1()
             .min_h_0()
-            .child(scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, grid).size_full())
+            .child(
+                scroll_area(scope.id(ids::CROSSHAIRS_LIST_SCROLLBAR), &self.list, grid).size_full(),
+            )
             .into_any_element()
     }
 
     // The search input, inert while disabled.
     fn search_box(&self, muted: gpui_kit::Hsla) -> impl IntoElement {
         div()
-            .id(ids::CROSSHAIRS_SEARCH)
+            .id(self.scope.id(ids::CROSSHAIRS_SEARCH))
             .test_support()
             .flex_1()
             .min_w_0()
@@ -558,7 +723,7 @@ impl CrosshairPicker {
         let preview = self.previews.read(cx).preview(selected, cx);
         Some(
             div()
-                .id(ids::CROSSHAIRS_SWATCH)
+                .id(self.scope.id(ids::CROSSHAIRS_SWATCH))
                 .aria_label(name)
                 .test_support()
                 .flex_none()
@@ -580,6 +745,9 @@ impl Render for CrosshairPicker {
         if self.gallery {
             return self.render_gallery(cx);
         }
+        if self.strip {
+            return self.render_strip(cx);
+        }
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
         let query = self.search.read(cx).value().to_lowercase();
@@ -594,7 +762,7 @@ impl Render for CrosshairPicker {
                 .justify_center()
                 .child(labelled(
                     div().text_sm().text_color(muted),
-                    ids::CROSSHAIRS_NO_MATCH,
+                    self.scope.id(ids::CROSSHAIRS_NO_MATCH),
                     tr!("widgets.crosshair_picker.no_match"),
                 ))
                 .into_any_element()
@@ -645,7 +813,7 @@ fn library_label(count: usize) -> String {
 }
 
 // A group header row, labelled with its text and count.
-fn header(id: &'static str, text: String, cx: &App) -> AnyElement {
+fn header(id: ElementId, text: String, cx: &App) -> AnyElement {
     labelled(
         div()
             .h(ROW_HEIGHT)
@@ -718,6 +886,36 @@ fn option(
         )
         .child(div().min_w_0().truncate().text_sm().child(name))
         .into_any_element()
+}
+
+// A gallery tile's scoped id, its name and the crosshair it picks.
+fn tile_parts(
+    scope: IdScope,
+    builtins: &BuiltinCrosshairs,
+    library: &[CrosshairEntry],
+    tile: Row,
+) -> (ElementId, String, CrosshairRef) {
+    match tile {
+        Row::Library(i) => {
+            let c = &library[i];
+            (
+                scope.id(ids::crosshair_library(c.folder_name())),
+                c.name().to_owned(),
+                CrosshairRef::Library(c.id().clone()),
+            )
+        }
+        Row::Builtin(i) => {
+            let b = &builtins.all()[i];
+            (
+                scope.id(ids::crosshair_builtin(b.name())),
+                b.display_name().to_owned(),
+                CrosshairRef::Builtin(b.name().to_owned()),
+            )
+        }
+        Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
+            unreachable!("the gallery holds no headers")
+        }
+    }
 }
 
 // A gallery tile: the crosshair at its in-game size on a black square, ringed in the theme's

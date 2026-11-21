@@ -21,10 +21,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use tf2tools_core::{
-    AddonProfile, AddonSection, BuiltinCrosshairs, CrosshairEntry, DataDir, Database,
-    DownloadError, DownloadProgress, Endpoints, GbAddonDownload, GbAddonFetchError, GbId, HudEntry,
-    Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry, StoreClient, StoreConfig,
-    StoreFile, StoreItemId, StoreKind, Tf2Install,
+    AddonName, AddonProfile, AddonSection, BuiltinCrosshairs, Choices, CrosshairEntry, DataDir,
+    Database, DownloadError, DownloadProgress, Endpoints, GbAddonDownload, GbAddonFetchError, GbId,
+    HudEntry, Library, LibraryEntry, ModuleCatalog, ModuleChoice, Preset, Provenance, SoundEntry,
+    StoreClient, StoreConfig, StoreFile, StoreItemId, StoreKind, Tf2Install,
 };
 use wiremock::MockServer;
 use wiremock::matchers::{method, path};
@@ -267,11 +267,29 @@ const M20_TABLES: &str = "
         ON store_gb_maps(gamemode_id, date_added DESC, gb_id DESC);
 ";
 
+/// The add-on table and profile slot columns migration 23 adds, as the schema should hold them.
+const M23_PROFILE_SLOTS: &str = "
+    CREATE TABLE profile_addons (
+        profile_id TEXT NOT NULL,
+        addon_name TEXT NOT NULL,
+        PRIMARY KEY (profile_id, addon_name),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    );
+    ALTER TABLE profiles ADD COLUMN hud_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN sounds_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN crosshairs_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN graphics_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN addons_mode TEXT NOT NULL DEFAULT 'leave';
+    ALTER TABLE profiles ADD COLUMN graphics_preset TEXT;
+    ALTER TABLE profiles ADD COLUMN graphics_modules TEXT;
+    ALTER TABLE profiles ADD COLUMN addons_only INTEGER NOT NULL DEFAULT 0;
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
 /// tables, migration 16's weapon rows, migration 17's HUD checks, migration 18's damage taken, migration 19's
-/// nicknames and migration 20's GameBanana maps:
-/// the schema v6 opens to.
+/// nicknames, migration 20's GameBanana maps, migration 21's log opened time and migration 23's
+/// profile slots: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
@@ -284,6 +302,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M19_COLUMNS).unwrap();
     conn.execute_batch(M20_TABLES).unwrap();
     conn.execute_batch(M21_COLUMNS).unwrap();
+    conn.execute_batch(M23_PROFILE_SLOTS).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
@@ -1024,18 +1043,21 @@ pub fn builtin_catalog() -> BuiltinCrosshairs {
 
 pub const V5_PROFILE_ID: &str = "9b2f6c1e-0000-4000-8000-000000000001";
 
-/// A profile exactly as v5 writes it; its HUD and library crosshair are not in this library.
+/// A profile exactly as v5 writes it, with the modes migration 24 gives it; its HUD and
+/// library crosshair are not in this library.
 pub fn seed_v5_profile(env: &LibraryEnv) {
     sql(&env.dir)
         .execute_batch(
             "INSERT INTO profiles (id, name, hud_folder_name, hud_name, hud_source,
                  hud_store_gb_id, hud_store_hud_id, hitsound_folder_name, hitsound_name,
                  hitsound_source, hitsound_store_gb_id, killsound_folder_name, killsound_name,
-                 killsound_source, killsound_store_gb_id, created_at, updated_at)
+                 killsound_source, killsound_store_gb_id, created_at, updated_at,
+                 hud_mode, sounds_mode, crosshairs_mode)
              VALUES ('9b2f6c1e-0000-4000-8000-000000000001', 'Comp', 'rayshud', 'rayshud',
                  'hud-db', NULL, 'rayshud', 'ding-1a2b3c4d', 'Ding', 'gamebanana', 7001,
                  NULL, NULL, NULL, NULL,
-                 '2025-03-01T10:00:00+00:00', '2025-03-01T10:00:00+00:00');
+                 '2025-03-01T10:00:00+00:00', '2025-03-01T10:00:00+00:00',
+                 'set', 'set', 'set');
              INSERT INTO profile_crosshair_assignments
                  (profile_id, weapon_script, crosshair_source, crosshair_ref, crosshair_store_gb_id)
              VALUES ('9b2f6c1e-0000-4000-8000-000000000001', 'tf_weapon_scattergun',
@@ -1071,4 +1093,40 @@ pub const MC_PRESET_MODULES: &[u8] = include_bytes!("../fixtures/mastercomfig/pr
 /// The fixture catalog, tagged 9.100.1.
 pub fn module_catalog() -> ModuleCatalog {
     ModuleCatalog::parse("9.100.1", MC_MODULES, MC_PRESET_MODULES).expect("fixture catalog")
+}
+
+pub const FLAT_ADDON: &str = "mastercomfig-addon-flat-mouse.vpk";
+pub const PYRO_ADDON: &str = "mastercomfig-addon-no-pyroland.vpk";
+pub const NULL_ADDON: &str = "mastercomfig-addon-null-canceling-movement.vpk";
+
+/// Imports a minimal mastercomfig add-on VPK named `asset` into the library.
+pub fn import_addon_as(env: &LibraryEnv, asset: &str) -> AddonName {
+    let name = AddonName::new(asset).expect("a valid add-on name");
+    let bytes = vpk_bytes(&[("cfg/addons/x.cfg", b"echo".as_slice())]);
+    let path = write_file(&env.tmp.path().join("dl").join(asset), &bytes);
+    env.lib
+        .import_addon(&path, &name, "1")
+        .expect("import add-on");
+    name
+}
+
+/// Puts a 9.100.1 `mastercomfig-base.vpk` in `tf/custom`; with a preset, also records it as
+/// TF2Tools-managed on that preset, as an install leaves it.
+pub fn place_mastercomfig(env: &LibraryEnv, managed_preset: Option<&str>) {
+    write_file(
+        &env.tf2.custom_dir().join("mastercomfig-base.vpk"),
+        &mastercomfig_base("9.100.1"),
+    );
+    if let Some(preset) = managed_preset {
+        set_mastercomfig_state(&env.dir, "9.100.1", preset);
+    }
+}
+
+/// Low with fpscap 144 and motion blur high, both away from Low's own values.
+pub fn low_choices() -> Choices {
+    let catalog = module_catalog();
+    let mut choices = Choices::new(Preset::Low);
+    choices.set(&catalog, "fpscap", ModuleChoice::Value("144".into()));
+    choices.set(&catalog, "motion_blur", ModuleChoice::Value("high".into()));
+    choices
 }

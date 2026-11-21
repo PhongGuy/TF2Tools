@@ -22,7 +22,7 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    DraftSlot, InstalledSounds, LibraryError, LogLevel, NewLogEntry, ProfileDraft, ProfileError,
+    DraftItem, InstalledSounds, LibraryError, LogLevel, NewLogEntry, ProfileDraft, ProfileError,
     ProfileId, Provenance, SoundEntry, SoundFormat, SoundKind,
 };
 
@@ -35,7 +35,7 @@ use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     describe_import, describe_library, describe_profile, describe_tf2_install,
 };
-use crate::pages::profiles::model::not_applied;
+use crate::pages::profiles::model::{not_applied, sound as profile_sound, sounds_with};
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -385,17 +385,11 @@ impl SoundsPage {
                     describe_profile(&e).into_op(tr!("messages.action.add_to_profile"))
                 };
                 let before = s.library.profile(&id).map_err(failed)?;
-                let draft = ProfileDraft::from_profile(&before);
-                let slot = DraftSlot::Item(sound_id);
-                let (draft, old) = match kind {
-                    SoundKind::Hitsound => (draft.with_hitsound(slot), before.hitsound()),
-                    SoundKind::Killsound | _ => (draft.with_killsound(slot), before.killsound()),
-                };
+                let sounds = sounds_with(&before, kind, Some(DraftItem::Pick(sound_id)));
+                let draft = ProfileDraft::from_profile(&before).with_sounds(sounds);
+                let old = profile_sound(&before, kind);
                 let update = s.library.update_profile(&id, &draft).map_err(failed)?;
-                let after = match kind {
-                    SoundKind::Hitsound => update.profile().hitsound(),
-                    SoundKind::Killsound | _ => update.profile().killsound(),
-                };
+                let after = profile_sound(update.profile(), kind);
                 let replaced = old
                     .filter(|old| Some(old.folder_name()) != after.map(|a| a.folder_name()))
                     .map(|old| old.name());
@@ -821,23 +815,6 @@ pub(crate) fn sound_title(sound: &SoundEntry) -> Div {
                 .child(sound.name().to_owned()),
         )
         .children(vpk)
-}
-
-/// The ghost play button: Play, or Stop while `playing`, named for both.
-pub(crate) fn play_button(id: impl Into<ElementId>, playing: bool) -> Button {
-    Button::new(id)
-        .ghost()
-        .px(SM_ICON_PX)
-        .icon(if playing {
-            IconName::Square
-        } else {
-            IconName::Play
-        })
-        .named(if playing {
-            tr!("sounds.button.stop")
-        } else {
-            tr!("sounds.button.play")
-        })
 }
 
 /// Gives `button` its face for the player's `state` of its sound: Play, Stop while playing, and

@@ -117,20 +117,21 @@ fn delete_addon_reads_like_v5() {
 
 #[test]
 fn the_profile_confirms_read_like_v5() {
-    let delete = Confirm::delete_profile("Competitive");
+    let delete = Confirm::delete_profile("Comp", false);
     assert_eq!(delete.title.as_ref(), "Delete Profile");
     assert_eq!(
         delete.description.as_ref(),
-        "Are you sure you want to delete \"Competitive\"? This cannot be undone."
+        "Are you sure you want to delete \"Comp\"? This cannot be undone."
     );
     assert_eq!(delete.confirm_label.as_ref(), "Delete");
-    let empty = Confirm::activate_empty();
-    assert_eq!(empty.title.as_ref(), "Activate Empty Profile");
-    assert_eq!(
-        empty.description.as_ref(),
-        "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
+    let active = Confirm::delete_profile("Comp", true);
+    assert!(
+        active
+            .description
+            .ends_with("It's your active profile. Your game stays as it is."),
+        "{}",
+        active.description
     );
-    assert_eq!(empty.confirm_label.as_ref(), "Activate Anyway");
     let running = Confirm::tf2_running();
     assert_eq!(running.title.as_ref(), "TF2 is running");
     assert_eq!(

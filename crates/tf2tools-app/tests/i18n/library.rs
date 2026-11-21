@@ -19,8 +19,8 @@ use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::pages::huds::copy_name;
 use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
-use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
-use tf2tools_app::pages::profiles::model::{crosshair_count, not_applied};
+use tf2tools_app::pages::profiles::editor_model::weapon_crosshairs;
+use tf2tools_app::pages::profiles::model::not_applied;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::pages::sounds::SoundsPage;
 use tf2tools_app::services::Tf2State;
@@ -31,8 +31,8 @@ use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
-    AddonSection, DraftSlot, GbId, ProfileDraft, Provenance, SoundKind, StoreKind, SyncError,
-    Tf2Install, TfClass, WeaponSlot,
+    AddonSection, DraftItem, GbId, ProfileDraft, Provenance, SlotMode, SoundKind, StoreKind,
+    SyncError, Tf2Install, TfClass, WeaponSlot,
 };
 
 use crate::LocaleGuard;
@@ -464,19 +464,15 @@ fn profile_card_fits_at_800(cx: &mut TestAppContext, lang: &str) {
     let _page = open_profiles(cx, &s);
     let id = comp.id();
     let card = support::bounds_of(cx, s.win, ids::profile_card(id)).unwrap();
-    for button in [
-        ids::profile_activate(id),
-        ids::profile_edit(id),
-        ids::profile_delete(id),
-    ] {
+    for button in [ids::profile_card_apply(id), ids::profile_card_edit(id)] {
         let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
         assert_inside(&format!("{lang} {button:?}"), b, card);
     }
     if lang == "ru" {
         assert_eq!(
-            support::label_of(cx, s.win, ids::profile_activate(id)).as_deref(),
-            Some("Включить"),
-            "Activate keeps its name"
+            support::label_of(cx, s.win, ids::profile_card_apply(id)).as_deref(),
+            Some("Применить"),
+            "Apply keeps its name"
         );
     }
 }
@@ -511,7 +507,7 @@ fn the_chinese_profile_card_fits_at_800(cx: &mut TestAppContext) {
     profile_card_fits_at_800(cx, "zh-CN");
 }
 
-// The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
+// The Apply summary calls a missing local import "Свой", as the HUD card's badge does.
 #[gpui_kit::test]
 fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
@@ -523,17 +519,22 @@ fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
         .library
         .import_hud(&archive, Provenance::Local)
         .unwrap();
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::wait_real(cx, "the Apply summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
     });
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_local(0)).as_deref(),
+        support::label_of(cx, s.win, ids::profile_apply_local("hud")).as_deref(),
         Some("Свой файл — скачать снова нельзя")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_apply_row("hud")).as_deref(),
+        Some("HUD: budhud отсутствует; на этом месте ничего не установлено")
     );
 }
 
@@ -1135,8 +1136,8 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
         Some("Профилей пока нет")
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_NO_ACTIVE).as_deref(),
-        Some("Нет активного профиля")
+        support::label_of(cx, s.win, ids::PROFILES_NEW).as_deref(),
+        Some("Новый профиль")
     );
     let comp = s
         .services
@@ -1145,7 +1146,8 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
         .unwrap();
     support::click_id(cx, s.win, ids::nav(Page::Settings));
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_delete(comp.id()));
+    support::click_id(cx, s.win, ids::profile_card_edit(comp.id()));
+    support::profiles::click_delete(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
         Some("Удалить профиль")
@@ -1158,92 +1160,17 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Профиль удалён");
 }
 
-// At the 800x600 minimum the editor's Crosshairs picker keeps every bulk button in `lang`
-// inside it, for the class with the longest class name in `lang` too.
-fn bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext, lang: &str) {
-    let _guard = LocaleGuard::switch(lang);
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let comp = s
-        .services
-        .library
-        .create_profile(&ProfileDraft::new("Competitive"))
-        .unwrap();
-    let page = open_profiles(cx, &s);
-    let id = comp.id().clone();
-    cx.update_window(s.win, |_, window, cx| {
-        page.update(cx, |p, cx| p.open_editor(id, window, cx))
-    })
-    .unwrap();
-    let editor = cx.update(|cx| page.read(cx).editor()).expect("an editor");
-    support::wait_real(cx, "the editor's queue", |cx| {
-        cx.update(|cx| editor.read(cx).is_idle())
-    });
-    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
-    cx.simulate_window_resize(
-        s.win,
-        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
-    );
-    support::settle(cx, s.win);
-    let longest = TfClass::ALL
-        .into_iter()
-        .max_by_key(|c| names::class_name(*c).chars().count())
-        .unwrap();
-    for class in [TfClass::Scout, longest] {
-        support::click_id(cx, s.win, ids::class_tab(&class.name().to_lowercase()));
-        support::settle(cx, s.win);
-        let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
-        for bulk in [
-            ids::CROSSHAIRS_BULK_ALL,
-            ids::CROSSHAIRS_BULK_PRIMARY,
-            ids::CROSSHAIRS_BULK_SECONDARY,
-            ids::CROSSHAIRS_BULK_MELEE,
-        ] {
-            let b = support::bounds_of(cx, s.win, bulk).unwrap();
-            assert!(
-                b.left() >= picker.left() && b.right() <= picker.right(),
-                "{lang} {class:?}: {bulk} {b:?} runs past the picker {picker:?}"
-            );
-        }
-    }
-}
-
-#[gpui_kit::test]
-fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "ru");
-}
-
-#[gpui_kit::test]
-fn the_portuguese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "pt-BR");
-}
-
-#[gpui_kit::test]
-fn the_spanish_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "es");
-}
-
-#[gpui_kit::test]
-fn the_german_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "de");
-}
-
-#[gpui_kit::test]
-fn the_french_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "fr");
-}
-
-#[gpui_kit::test]
-fn the_chinese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    bulk_buttons_fit_the_narrow_picker(cx, "zh-CN");
-}
-
 #[test]
 fn profile_texts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
     assert_eq!(
-        [1, 2, 5, 21].map(crosshair_count),
-        ["1 прицел", "2 прицела", "5 прицелов", "21 прицел"]
+        [1, 2, 5, 21].map(weapon_crosshairs),
+        [
+            "1 прицел для оружия",
+            "2 прицела для оружия",
+            "5 прицелов для оружия",
+            "21 прицел для оружия"
+        ]
     );
     assert_eq!(not_applied(), "Изменения ещё не применены");
     assert_eq!(
@@ -1254,29 +1181,10 @@ fn profile_texts_read_in_russian() {
             "Продолжить"
         ]
     );
-    let env = support::env();
-    let services = support::services(&env, support::no_steam());
-    assert_eq!(next_profile_name(&[]), "Профиль 1");
-    for name in ["профиль 1", "Profile 2"] {
-        services
-            .library
-            .create_profile(&ProfileDraft::new(name))
-            .unwrap();
-    }
-    assert_eq!(
-        next_profile_name(&services.library.profiles().unwrap()),
-        "Профиль 2"
-    );
-    let labels: Vec<String> = Slot::ALL.iter().map(|s| s.label().to_string()).collect();
-    assert_eq!(labels, ["HUD", "Хитсаунд", "Килсаунд", "Прицелы"]);
-    assert_eq!(slot_text(&SlotState::Empty, Slot::Hud), "Нет");
-    assert_eq!(
-        slot_text(&SlotState::Empty, Slot::Crosshairs),
-        "Стандартные прицелы"
-    );
-    assert_eq!(
-        slot_text(&SlotState::Missing("budhud".into()), Slot::Hud),
-        "Отсутствует: budhud"
+    assert!(
+        Confirm::delete_profile("Comp", true)
+            .description
+            .ends_with("Это ваш активный профиль. Игра останется как есть.")
     );
     assert_eq!(
         texts(&Confirm::clear_profile_crosshairs())[..3],

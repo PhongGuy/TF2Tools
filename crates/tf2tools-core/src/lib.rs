@@ -95,15 +95,16 @@ pub use hud_maker::{NewPicture, PictureTarget, picture_id, picture_material};
 pub use hud_maker::{background_corners, corner_radius, paints_background};
 pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
-    AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
-    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud,
-    GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus,
-    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud,
-    MakeTarget, MastercomfigStatus, MissingItem, MissingKind, MoveDirection, MovementKeys,
-    PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
-    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
-    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
-    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplySkipReason, ApplyStep, Assignment,
+    CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef, CurrentSetup, DraftCrosshair,
+    DraftItem, ExternalHud, GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId,
+    HudInstall, HudStatus, InstalledCrosshairs, InstalledSound, InstalledSounds, Library,
+    LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem, MissingKind, MoveDirection,
+    MovementKeys, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileAddons,
+    ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileGraphics, ProfileId, ProfileItem,
+    ProfileSounds, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason,
+    SkippedAssignment, SlotMode, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
+    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,

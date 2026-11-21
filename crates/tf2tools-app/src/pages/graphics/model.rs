@@ -14,7 +14,7 @@ use tf2tools_core::{
 
 use crate::i18n::mastercomfig::{choice_label, module_label_by_name};
 use crate::i18n::tr;
-use crate::ids;
+use crate::ids::{self, IdScope};
 use crate::local_messages::{LocalFailure, game_moved, library_open, tf2_write};
 use crate::store_messages::library_update;
 
@@ -137,9 +137,9 @@ pub fn update_to(card: &StatusCard) -> Option<&str> {
     }
 }
 
-// A dotted numeric version as numbers, so 9.100.1 sorts after 9.99.3; a leading "v" is
-// ignored and None means some part isn't a number.
-fn version_parts(tag: &str) -> Option<Vec<u64>> {
+/// A dotted numeric version as numbers, so 9.100.1 sorts after 9.99.3; a leading "v" is
+/// ignored and None means some part isn't a number.
+pub(crate) fn version_parts(tag: &str) -> Option<Vec<u64>> {
     let tag = tag.strip_prefix('v').unwrap_or(tag);
     tag.split('.').map(|part| part.parse().ok()).collect()
 }
@@ -283,6 +283,11 @@ impl SelectItem for ValueOption {
 
 /// A row's Select entries: Let TF2 decide first, then each value in catalog order.
 pub fn value_options(module: &ComfigModule) -> Vec<ValueOption> {
+    scoped_value_options(module, IdScope::PAGE)
+}
+
+/// `value_options` with each entry's id drawn under `scope`.
+pub fn scoped_value_options(module: &ComfigModule, scope: IdScope) -> Vec<ValueOption> {
     std::iter::once(ModuleChoice::NotSet)
         .chain(
             module
@@ -291,7 +296,7 @@ pub fn value_options(module: &ComfigModule) -> Vec<ValueOption> {
                 .map(|v| ModuleChoice::Value(v.value().to_owned())),
         )
         .map(|choice| ValueOption {
-            id: ids::graphics_value(module.name(), &choice),
+            id: scope.id(ids::graphics_value(module.name(), &choice)),
             label: choice_label(module, &choice),
             choice,
         })

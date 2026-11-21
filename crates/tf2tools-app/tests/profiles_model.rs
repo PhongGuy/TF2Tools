@@ -1,12 +1,14 @@
 use crate::support;
 
 use gpui_kit::{SharedString, TestAppContext};
+use tf2tools_app::pages::profiles::model::{ApplyOutcome, modules_no_catalog, outcome_toast};
 use tf2tools_app::pages::profiles::model::{
-    activated_description, crosshair_count, failed_description, kept_parts, kind_label,
-    load_closes_editor, matches, redownload_target, report_details, step_label, success_title,
+    failed_description, kept_parts, redownload_target, report_details, step_label,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
-use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
+use tf2tools_app::shell::toast::ToastKind;
+use tf2tools_core::ApplySkipReason;
+use tf2tools_core::{ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
 
 fn parts(names: &[&'static str]) -> Vec<SharedString> {
     names.iter().map(|&n| n.into()).collect()
@@ -20,63 +22,13 @@ fn gb(id: u64) -> Provenance {
 }
 
 #[test]
-fn the_crosshair_badge_counts() {
-    assert_eq!(crosshair_count(1), "1 crosshair");
-    assert_eq!(crosshair_count(3), "3 crosshairs");
-}
-
-#[test]
-fn search_ignores_case_and_surrounding_space() {
-    assert!(matches("Competitive", "comp"));
-    assert!(matches("Competitive", "  PETIT "));
-    assert!(matches("Competitive", ""));
-    assert!(matches("Competitive", "   "));
-    assert!(!matches("Competitive", "casual"));
-}
-
-#[test]
-fn steps_and_kinds_have_v5_s_labels() {
+fn steps_have_v5_s_labels() {
     assert_eq!(step_label(ApplyStep::Hud), "HUD");
     assert_eq!(step_label(ApplyStep::Hitsound), "Hitsound");
     assert_eq!(step_label(ApplyStep::Killsound), "Killsound");
     assert_eq!(step_label(ApplyStep::Crosshairs), "Crosshairs");
-    assert_eq!(kind_label(&MissingKind::Hud), "HUD");
-    assert_eq!(kind_label(&MissingKind::Hitsound), "HITSOUND");
-    assert_eq!(kind_label(&MissingKind::Killsound), "KILLSOUND");
-    let crosshair = MissingKind::Crosshair {
-        weapon_script: "tf_weapon_scattergun".into(),
-    };
-    assert_eq!(kind_label(&crosshair), "CROSSHAIR");
-}
-
-#[test]
-fn the_activated_toast_reads_like_v5() {
-    assert_eq!(
-        activated_description(&parts(&["HUD", "Hitsound", "Killsound", "Crosshairs"]), &[]),
-        "Installed: HUD, Hitsound, Killsound, Crosshairs"
-    );
-    assert_eq!(
-        activated_description(&[], &[]),
-        "All customizations cleared"
-    );
-}
-
-#[test]
-fn an_apply_with_skips_names_what_it_kept() {
-    assert_eq!(
-        activated_description(&parts(&["Hitsound"]), &parts(&["HUD"])),
-        "Installed: Hitsound. Kept what you had for: HUD (missing from your library)"
-    );
-    assert_eq!(
-        activated_description(&[], &parts(&["HUD", "Crosshairs"])),
-        "Nothing new installed. Kept what you had for: HUD, Crosshairs (missing from your library)"
-    );
-}
-
-#[test]
-fn a_skip_makes_the_title_say_applied_not_activated() {
-    assert_eq!(success_title("Comp", false), "Profile \"Comp\" activated");
-    assert_eq!(success_title("Comp", true), "Profile \"Comp\" applied");
+    assert_eq!(step_label(ApplyStep::Graphics), "Graphics");
+    assert_eq!(step_label(ApplyStep::Addons), "Add-ons");
 }
 
 #[test]
@@ -185,14 +137,107 @@ fn the_default_probe_scans_the_proc_root_and_can_be_pinned(cx: &mut TestAppConte
     assert!(cx.update(|cx| Tf2Probe::get(cx))());
 }
 
-// An editor opened after a load started, such as one on a just-created profile, may be newer
-// than what the load read, so only one already open then can be closed by its result.
+const APPLIED: &str = "Comp applied. TF2 picks it up the next time it starts.";
+
+fn outcome(active: bool) -> ApplyOutcome {
+    ApplyOutcome {
+        name: "Comp".into(),
+        active,
+        ..ApplyOutcome::default()
+    }
+}
+
 #[test]
-fn a_load_closes_only_an_editor_open_when_it_started_and_missing_from_it() {
-    let (made, other) = (ProfileId::new("made"), ProfileId::new("other"));
-    assert!(!load_closes_editor(None, &made, [&other]));
-    assert!(load_closes_editor(Some(&made), &made, [&other]));
-    assert!(!load_closes_editor(Some(&made), &made, [&other, &made]));
-    // The editor open now replaced the one open at the start, so the load predates it.
-    assert!(!load_closes_editor(Some(&other), &made, [&other]));
+fn a_clean_apply_is_one_success_line() {
+    assert_eq!(
+        outcome_toast(&outcome(true)),
+        (ToastKind::Success, APPLIED.into(), String::new())
+    );
+}
+
+#[test]
+fn outcome_toast_warns_when_the_profile_stayed_inactive() {
+    let (kind, title, description) = outcome_toast(&outcome(false));
+    assert_eq!(
+        (kind, title.as_str(), description.as_str()),
+        (ToastKind::Warning, APPLIED, "")
+    );
+}
+
+#[test]
+fn kept_items_and_skipped_steps_follow_as_sentences() {
+    let mut o = outcome(false);
+    o.kept = parts(&["HUD"]);
+    o.skipped_steps = vec![(
+        ApplyStep::Graphics,
+        ApplySkipReason::MastercomfigNotInstalled,
+    )];
+    let (kind, title, description) = outcome_toast(&o);
+    assert_eq!((kind, title.as_str()), (ToastKind::Warning, APPLIED));
+    assert_eq!(
+        description,
+        "Kept what you had for: HUD (missing from your library). Graphics was left as it is: mastercomfig isn't installed, so install it on the Graphics page first."
+    );
+    let mut o = outcome(false);
+    o.skipped_steps = vec![
+        (ApplyStep::Graphics, ApplySkipReason::MastercomfigNotManaged),
+        (ApplyStep::Addons, ApplySkipReason::MastercomfigNotInstalled),
+    ];
+    assert_eq!(
+        outcome_toast(&o).2,
+        "Graphics was left as it is: TF2Tools didn't install your mastercomfig, so take it over on the Graphics page first. Add-ons was left as it is: add-ons need mastercomfig, which isn't installed."
+    );
+}
+
+#[test]
+fn the_movement_line_and_the_note_end_the_description() {
+    let mut o = outcome(true);
+    o.movement = Some("Your movement keys are back to normal.".into());
+    o.note = Some("A copy of manual is in your library.".into());
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Warning,
+            APPLIED.into(),
+            "Your movement keys are back to normal. A copy of manual is in your library.".into()
+        )
+    );
+}
+
+#[test]
+fn a_hud_kept_out_of_its_folder_warns_after_the_kept_line() {
+    let mut o = outcome(true);
+    o.blocked = Some("m0rehud".into());
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Warning,
+            APPLIED.into(),
+            "A folder named m0rehud is already in your custom folder, so parts of this HUD may not show. Move or rename that folder and install again.".into()
+        )
+    );
+    o.kept = parts(&["Hitsound"]);
+    assert!(outcome_toast(&o).2.starts_with(
+        "Kept what you had for: Hitsound (missing from your library). A folder named m0rehud"
+    ));
+}
+
+#[test]
+fn a_failure_names_its_steps_and_the_graphics_reason() {
+    let mut o = outcome(false);
+    o.name = "Potato".into();
+    o.failed = vec![(ApplyStep::Graphics, modules_no_catalog().to_string())];
+    assert_eq!(
+        outcome_toast(&o),
+        (
+            ToastKind::Error,
+            "Couldn't apply Potato".into(),
+            "Graphics: Open the Graphics page once so TF2Tools can read your mastercomfig's settings.".into()
+        )
+    );
+    o.failed.insert(0, (ApplyStep::Hud, "denied".into()));
+    assert_eq!(
+        outcome_toast(&o).2,
+        "Couldn't put these in place: HUD. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again. Graphics: Open the Graphics page once so TF2Tools can read your mastercomfig's settings."
+    );
 }

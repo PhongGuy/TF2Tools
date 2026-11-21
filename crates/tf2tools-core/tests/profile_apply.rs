@@ -10,8 +10,8 @@ use common::{
     library_env, set_setting, setting, sql, tree, write_file,
 };
 use tf2tools_core::{
-    ApplyProfileError, ApplyStep, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingKind,
-    Profile, ProfileDraft, ProfileError, ProfileId, Provenance, SoundKind,
+    ApplyProfileError, ApplyStep, CrosshairRef, DraftCrosshair, DraftItem, HudId, MissingKind,
+    Profile, ProfileDraft, ProfileError, ProfileId, Provenance, SlotMode, SoundKind,
 };
 
 const UI: &str = "tf2tools-sounds/sound/ui";
@@ -37,16 +37,18 @@ fn full_profile() -> (LibraryEnv, Profile) {
     let kill = import_wav_as(&env, "Bell", Provenance::Local);
     let dot = import_png_as(&env, "Dot", Provenance::Local);
     let draft = ProfileDraft::new("Full")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             builtin("tf_weapon_scattergun", "cpma_9"),
             DraftCrosshair::Set {
                 weapon_script: "tf_weapon_rocketlauncher".into(),
                 crosshair: CrosshairRef::Library(dot.id().clone()),
             },
-        ]);
+        ]));
     let profile = env.lib.create_profile(&draft).unwrap();
     (env, profile)
 }
@@ -125,7 +127,7 @@ fn missing_items_stop_the_apply_and_touch_nothing() {
 }
 
 #[test]
-fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
+fn skip_missing_leaves_the_installed_hud_and_still_activates() {
     let (env, p) = full_profile();
     let hud_id = env.lib.list_huds().unwrap()[0].id().clone();
     env.lib.delete_hud(&hud_id).unwrap();
@@ -150,15 +152,17 @@ fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
     assert!(report.failed().is_empty());
     assert!(custom.join("otherhud/info.vdf").is_file());
     assert!(custom.join(UI).join("hitsound.wav").is_file());
-    assert_eq!(setting(&env.dir, "active_profile_id").as_deref(), Some(""));
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 #[test]
 fn a_none_hud_still_asks_about_a_hand_placed_hud_when_another_item_is_skipped() {
     let env = library_env();
     let hit = import_wav_as(&env, "Ding", Provenance::Local);
-    let draft = ProfileDraft::new("P").with_hitsound(DraftSlot::Item(hit.id().clone()));
+    let draft = ProfileDraft::new("P").with_sounds(SlotMode::Set((
+        Some(DraftItem::Pick(hit.id().clone())),
+        None,
+    )));
     let p = env.lib.create_profile(&draft).unwrap();
     env.lib.delete_sound(hit.id(), None).unwrap();
     let custom = env.tf2.custom_dir();
@@ -186,7 +190,10 @@ fn skip_missing_keeps_a_missing_sound_and_still_clears_a_none_slot() {
     let hud = import_hud_as(&env, "rayshud", Provenance::Local);
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     // The profile wants "Ding" as hitsound and no killsound and no HUD.
-    let draft = ProfileDraft::new("P").with_hitsound(DraftSlot::Item(hit.id().clone()));
+    let draft = ProfileDraft::new("P").with_sounds(SlotMode::Set((
+        Some(DraftItem::Pick(hit.id().clone())),
+        None,
+    )));
     let p = env.lib.create_profile(&draft).unwrap();
     env.lib.delete_sound(hit.id(), None).unwrap();
     env.lib
@@ -210,17 +217,17 @@ fn skip_missing_keeps_a_missing_sound_and_still_clears_a_none_slot() {
     assert_eq!(std::fs::read(&hitsound).unwrap(), kept);
     assert!(!custom.join(UI).join("killsound.wav").exists());
     assert!(!custom.join("rayshud").exists());
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 #[test]
 fn a_skipped_crosshair_keeps_that_weapons_assignment_and_others_follow_the_profile() {
     let env = library_env();
-    let draft = ProfileDraft::new("X").with_crosshairs(vec![
+    let draft = ProfileDraft::new("X").with_crosshairs(SlotMode::Set(vec![
         builtin("tf_weapon_scattergun", "no_such_builtin"),
         builtin("tf_weapon_rocketlauncher", "cpma_9"),
         builtin("tf_weapon_minigun", "no_such_builtin"),
-    ]);
+    ]));
     let p = env.lib.create_profile(&draft).unwrap();
     let kept = CrosshairRef::Builtin("cpma_9".into());
     env.lib.assign("tf_weapon_scattergun", &kept).unwrap();
@@ -253,7 +260,7 @@ fn a_skipped_crosshair_keeps_that_weapons_assignment_and_others_follow_the_profi
         assigned(&env),
         ["tf_weapon_rocketlauncher", "tf_weapon_scattergun"]
     );
-    assert_eq!(env.lib.active_profile().unwrap(), None);
+    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
 }
 
 // Needs a read-only directory, which `chmod` only makes on unix.
@@ -264,9 +271,15 @@ fn one_failing_step_is_reported_and_the_rest_still_apply() {
     let hud = import_hud_as(&env, "rayshud", Provenance::Local);
     let hit = import_wav_as(&env, "Ding", Provenance::Local);
     let draft = ProfileDraft::new("P")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_crosshairs(vec![builtin("tf_weapon_scattergun", "cpma_9")]);
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            None,
+        )))
+        .with_crosshairs(SlotMode::Set(vec![builtin(
+            "tf_weapon_scattergun",
+            "cpma_9",
+        )]));
     let p = env.lib.create_profile(&draft).unwrap();
     set_setting(&env.dir, "active_profile_id", "other");
     let custom = env.tf2.custom_dir();
@@ -418,7 +431,8 @@ fn assert_edit_deactivates(env: &LibraryEnv, p: &Profile, edit: ProfileDraft) {
 fn changing_the_hud_of_the_active_profile_ends_its_active_state() {
     let (env, p) = active_profile();
     let other = import_hud_as(&env, "budhud", Provenance::Local);
-    let draft = ProfileDraft::from_profile(&p).with_hud(DraftSlot::Item(other.id().clone()));
+    let draft =
+        ProfileDraft::from_profile(&p).with_hud(SlotMode::Set(DraftItem::Pick(other.id().clone())));
     assert_edit_deactivates(&env, &p, draft);
     assert!(env.tf2.custom_dir().join("rayshud/info.vdf").is_file());
 }
@@ -426,7 +440,7 @@ fn changing_the_hud_of_the_active_profile_ends_its_active_state() {
 #[test]
 fn emptying_the_hud_of_the_active_profile_ends_its_active_state() {
     let (env, p) = active_profile();
-    let draft = ProfileDraft::from_profile(&p).with_hud(DraftSlot::Empty);
+    let draft = ProfileDraft::from_profile(&p).with_hud(SlotMode::None);
     assert_edit_deactivates(&env, &p, draft);
 }
 
@@ -434,7 +448,13 @@ fn emptying_the_hud_of_the_active_profile_ends_its_active_state() {
 fn changing_the_hitsound_of_the_active_profile_ends_its_active_state() {
     let (env, p) = active_profile();
     let other = import_wav_as(&env, "Pop", Provenance::Local);
-    let draft = ProfileDraft::from_profile(&p).with_hitsound(DraftSlot::Item(other.id().clone()));
+    let draft = ProfileDraft::from_profile(&p).with_sounds(SlotMode::Set((
+        Some(DraftItem::Pick(other.id().clone())),
+        p.sounds()
+            .as_set()
+            .and_then(|s| s.kill.clone())
+            .map(DraftItem::Keep),
+    )));
     assert_edit_deactivates(&env, &p, draft);
 }
 
@@ -442,7 +462,13 @@ fn changing_the_hitsound_of_the_active_profile_ends_its_active_state() {
 fn changing_the_killsound_of_the_active_profile_ends_its_active_state() {
     let (env, p) = active_profile();
     let other = import_wav_as(&env, "Pop", Provenance::Local);
-    let draft = ProfileDraft::from_profile(&p).with_killsound(DraftSlot::Item(other.id().clone()));
+    let draft = ProfileDraft::from_profile(&p).with_sounds(SlotMode::Set((
+        p.sounds()
+            .as_set()
+            .and_then(|s| s.hit.clone())
+            .map(DraftItem::Keep),
+        Some(DraftItem::Pick(other.id().clone())),
+    )));
     assert_edit_deactivates(&env, &p, draft);
 }
 
@@ -450,10 +476,10 @@ fn changing_the_killsound_of_the_active_profile_ends_its_active_state() {
 fn changing_a_crosshair_of_the_active_profile_ends_its_active_state() {
     let (env, p) = active_profile();
     // The same two weapons, so only the scattergun's crosshair can tell the setups apart.
-    let draft = ProfileDraft::from_profile(&p).with_crosshairs(vec![
-        DraftCrosshair::Keep(p.crosshairs()[0].clone()),
+    let draft = ProfileDraft::from_profile(&p).with_crosshairs(SlotMode::Set(vec![
+        DraftCrosshair::Keep(p.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].clone()),
         builtin("tf_weapon_scattergun", "cpma_1"),
-    ]);
+    ]));
     assert_edit_deactivates(&env, &p, draft);
 }
 
@@ -461,10 +487,10 @@ fn changing_a_crosshair_of_the_active_profile_ends_its_active_state() {
 fn moving_a_crosshair_to_another_weapon_ends_the_active_state() {
     let (env, p) = active_profile();
     // The sniper rifle sorts where the scattergun did, so only the weapon name differs.
-    let draft = ProfileDraft::from_profile(&p).with_crosshairs(vec![
-        DraftCrosshair::Keep(p.crosshairs()[0].clone()),
+    let draft = ProfileDraft::from_profile(&p).with_crosshairs(SlotMode::Set(vec![
+        DraftCrosshair::Keep(p.crosshairs().as_set().map_or(&[][..], Vec::as_slice)[0].clone()),
         builtin("tf_weapon_sniperrifle", "cpma_9"),
-    ]);
+    ]));
     assert_edit_deactivates(&env, &p, draft);
 }
 
@@ -486,20 +512,34 @@ fn saving_the_same_items_again_keeps_the_profile_active() {
     let sound = |folder: &str| {
         let sounds = env.lib.list_sounds().unwrap();
         let found = sounds.iter().find(|s| s.folder_name() == folder).unwrap();
-        DraftSlot::Item(found.id().clone())
+        Some(DraftItem::Pick(found.id().clone()))
     };
     let library = env.lib.list_crosshairs().unwrap();
     let draft = ProfileDraft::from_profile(&p)
-        .with_hud(DraftSlot::Item(huds[0].id().clone()))
-        .with_hitsound(sound(p.hitsound().unwrap().folder_name()))
-        .with_killsound(sound(p.killsound().unwrap().folder_name()))
-        .with_crosshairs(vec![
+        .with_hud(SlotMode::Set(DraftItem::Pick(huds[0].id().clone())))
+        .with_sounds(SlotMode::Set((
+            sound(
+                p.sounds()
+                    .as_set()
+                    .and_then(|s| s.hit.as_ref())
+                    .unwrap()
+                    .folder_name(),
+            ),
+            sound(
+                p.sounds()
+                    .as_set()
+                    .and_then(|s| s.kill.as_ref())
+                    .unwrap()
+                    .folder_name(),
+            ),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![
             builtin("tf_weapon_scattergun", "cpma_9"),
             DraftCrosshair::Set {
                 weapon_script: "tf_weapon_rocketlauncher".into(),
                 crosshair: CrosshairRef::Library(library[0].id().clone()),
             },
-        ]);
+        ]));
     let update = env.lib.update_profile(p.id(), &draft).unwrap();
     assert!(!update.deactivated());
     assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
@@ -508,7 +548,8 @@ fn saving_the_same_items_again_keeps_the_profile_active() {
 #[test]
 fn a_refused_edit_keeps_the_profile_active() {
     let (env, p) = active_profile();
-    let draft = ProfileDraft::from_profile(&p).with_hud(DraftSlot::Item(HudId::new("gone")));
+    let draft =
+        ProfileDraft::from_profile(&p).with_hud(SlotMode::Set(DraftItem::Pick(HudId::new("gone"))));
     assert!(matches!(
         env.lib.update_profile(p.id(), &draft),
         Err(ProfileError::ItemNotFound { .. })
@@ -522,8 +563,8 @@ fn assert_failed_write_rolls_back(table: &str) {
     let (env, p) = active_profile();
     let other = import_hud_as(&env, "budhud", Provenance::Local);
     let draft = ProfileDraft::from_profile(&p)
-        .with_hud(DraftSlot::Item(other.id().clone()))
-        .with_crosshairs(vec![builtin("tf_weapon_minigun", "cpma_1")]);
+        .with_hud(SlotMode::Set(DraftItem::Pick(other.id().clone())))
+        .with_crosshairs(SlotMode::Set(vec![builtin("tf_weapon_minigun", "cpma_1")]));
     sql(&env.dir)
         .execute_batch(&format!(
             "CREATE TRIGGER no_inserts BEFORE INSERT ON {table}
@@ -569,7 +610,7 @@ fn editing_another_profile_leaves_the_active_one_alone() {
     let (env, p) = active_profile();
     let other = env.lib.create_profile(&ProfileDraft::new("Other")).unwrap();
     let hud = env.lib.list_huds().unwrap()[0].id().clone();
-    let draft = ProfileDraft::from_profile(&other).with_hud(DraftSlot::Item(hud));
+    let draft = ProfileDraft::from_profile(&other).with_hud(SlotMode::Set(DraftItem::Pick(hud)));
     let update = env.lib.update_profile(other.id(), &draft).unwrap();
     assert!(!update.deactivated());
     assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
@@ -579,7 +620,8 @@ fn editing_another_profile_leaves_the_active_one_alone() {
 fn an_edited_profile_activates_again_with_the_new_hud() {
     let (env, p) = active_profile();
     let other = import_hud_as(&env, "budhud", Provenance::Local);
-    let draft = ProfileDraft::from_profile(&p).with_hud(DraftSlot::Item(other.id().clone()));
+    let draft =
+        ProfileDraft::from_profile(&p).with_hud(SlotMode::Set(DraftItem::Pick(other.id().clone())));
     assert_edit_deactivates(&env, &p, draft);
     let report = env
         .lib

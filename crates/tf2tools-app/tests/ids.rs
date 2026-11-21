@@ -185,62 +185,68 @@ fn addon_ids_are_keyed_by_asset() {
 #[test]
 fn profile_ids_are_keyed_by_profile_id() {
     let id = ProfileId::new("1700000000000-ab12");
-    for (el, kind) in [
-        (ids::profile_card(&id), "profile-card"),
-        (ids::profile_active_badge(&id), "profile-active-badge"),
-        (ids::profile_hud(&id), "profile-hud"),
-        (ids::profile_hitsound(&id), "profile-hitsound"),
-        (ids::profile_killsound(&id), "profile-killsound"),
-        (ids::profile_crosshairs(&id), "profile-crosshairs"),
-        (ids::profile_empty(&id), "profile-empty"),
-        (ids::profile_activate(&id), "profile-activate"),
-        (ids::profile_edit(&id), "profile-edit"),
-        (ids::profile_delete(&id), "profile-delete"),
-    ] {
-        assert_eq!(name(el), format!("{kind}:1700000000000-ab12"));
-    }
-    assert_eq!(name(ids::missing_item(0)), "missing-item:0");
-    assert_eq!(name(ids::missing_redownload(2)), "missing-redownload:2");
-    assert_eq!(name(ids::missing_local(1)), "missing-local:1");
+    assert_eq!(
+        name(ids::profile_card(&id)),
+        "profile-card:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_apply_redownload("hud")),
+        "profile-apply-redownload:hud"
+    );
+    assert_eq!(
+        name(ids::profile_apply_local("crosshair:tf_weapon_scattergun")),
+        "profile-apply-local:crosshair:tf_weapon_scattergun"
+    );
     assert_eq!(
         [
             ids::PROFILES_NO_TF2,
-            ids::PROFILES_ACTIVE,
-            ids::PROFILES_ACTIVE_NAME,
-            ids::PROFILES_ACTIVE_BADGE,
-            ids::PROFILES_ACTIVE_HUD,
-            ids::PROFILES_ACTIVE_HITSOUND,
-            ids::PROFILES_ACTIVE_KILLSOUND,
-            ids::PROFILES_ACTIVE_CROSSHAIRS,
-            ids::PROFILES_ACTIVE_EMPTY,
-            ids::PROFILES_NO_ACTIVE,
-            ids::PROFILES_SEARCH,
             ids::PROFILES_EMPTY,
-            ids::PROFILES_NO_MATCH,
-            ids::PROFILES_MISSING_DIALOG,
-            ids::PROFILES_MISSING_DESCRIPTION,
-            ids::PROFILES_MISSING_CANCEL,
-            ids::PROFILES_MISSING_INSTALL,
+            ids::PROFILE_APPLY_DIALOG,
+            ids::PROFILE_APPLY_TITLE,
+            ids::PROFILE_APPLY_INTRO,
+            ids::PROFILE_APPLY_ROWS,
+            ids::PROFILE_APPLY_ROWS_SCROLLBAR,
+            ids::PROFILE_APPLY_NOTHING,
+            ids::PROFILE_APPLY_LEFT,
+            ids::PROFILE_APPLY_CANCEL,
+            ids::PROFILE_APPLY_OK,
         ],
         [
             "profiles-no-tf2",
-            "profiles-active",
-            "profiles-active-name",
-            "profiles-active-badge",
-            "profiles-active-hud",
-            "profiles-active-hitsound",
-            "profiles-active-killsound",
-            "profiles-active-crosshairs",
-            "profiles-active-empty",
-            "profiles-no-active",
-            "profiles-search",
             "profiles-empty",
-            "profiles-no-match",
-            "profiles-missing-dialog",
-            "profiles-missing-description",
-            "profiles-missing-cancel",
-            "profiles-missing-install",
+            "profile-apply-dialog",
+            "profile-apply-title",
+            "profile-apply-intro",
+            "profile-apply-rows",
+            "profile-apply-rows-scrollbar",
+            "profile-apply-nothing",
+            "profile-apply-left",
+            "profile-apply-cancel",
+            "profile-apply-ok",
         ]
+    );
+    assert_eq!(name(ids::profile_apply_row("hud")), "profile-apply-row:hud");
+    for (el, want) in [
+        (ids::profile_card_picture(&id), "profile-card-picture:"),
+        (ids::profile_card_image(&id), "profile-card-image:"),
+        (ids::profile_card_active(&id), "profile-card-active:"),
+        (ids::profile_card_name(&id), "profile-card-name:"),
+        (ids::profile_card_apply(&id), "profile-card-apply:"),
+        (ids::profile_card_edit(&id), "profile-card-edit:"),
+    ] {
+        assert_eq!(name(el), format!("{want}1700000000000-ab12"));
+    }
+    assert_eq!(
+        name(ids::profile_card_line(&id, "hud")),
+        "profile-card-line:1700000000000-ab12:hud"
+    );
+    assert_eq!(
+        [
+            ids::PROFILES_LEAD,
+            ids::PROFILES_LIBRARY,
+            ids::PROFILES_GRID
+        ],
+        ["profiles-lead", "profiles-library", "profiles-grid"]
     );
 }
 
@@ -371,19 +377,19 @@ fn the_grid_and_list_ids_are_stable() {
     assert_eq!(ids::HUDS_LIBRARY, "huds-library");
     assert_eq!(ids::SOUNDS_GRID, "sounds-grid");
     assert_eq!(ids::PROFILES_GRID, "profiles-grid");
-    assert_eq!(ids::PROFILES_MISSING_LIST, "profiles-missing-list");
     assert_eq!(ids::ADDON_STORE_INFO_TEXT, "addon-store-info-text");
     assert_eq!(ids::SOUND_STORE_CARD_TARGET, "sound-card");
 }
 
 // ids.rs is the one place element ids are spelt, so pilot QA and tests read them from there.
 fn literal_ids_in(dir: &std::path::Path, hits: &mut Vec<String>) {
-    const LITERALS: [&str; 7] = [
+    const LITERALS: [&str; 8] = [
         "\"sound-card\"",
         "\"huds-grid\"",
         "\"sounds-grid\"",
         "\"profiles-grid\"",
-        "\"profiles-missing-list\"",
+        "\"profile-apply-rows-scrollbar\"",
+        "\"profile-editor-scrollbar\"",
         "\"addon-store-info-text\"",
         "\"payload-check\"",
     ];
@@ -661,91 +667,97 @@ fn situation_switch_ids_name_each_switch() {
 
 #[test]
 fn profile_editor_ids_are_stable() {
+    use tf2tools_app::ids::IdScope;
+    let consts = [
+        (ids::PROFILES_NEW, "profiles-new"),
+        (ids::PROFILE_EDITOR, "profile-editor"),
+        (ids::PROFILE_EDITOR_LOADING, "profile-editor-loading"),
+        (ids::PROFILE_EDITOR_HEADER, "profile-editor-header"),
+        (ids::PROFILE_EDITOR_CRUMB, "profile-editor-crumb"),
+        (ids::PROFILE_EDITOR_CRUMB_NAME, "profile-editor-crumb-name"),
+        (ids::PROFILE_EDITOR_CANCEL, "profile-editor-cancel"),
+        (ids::PROFILE_EDITOR_SAVE, "profile-editor-save"),
+        (ids::PROFILE_EDITOR_NAME, "profile-editor-name"),
+        (ids::PROFILE_EDITOR_NAME_ERROR, "profile-editor-name-error"),
+        (ids::PROFILE_EDITOR_NOTE, "profile-editor-note"),
+        (ids::PROFILE_EDITOR_BODY, "profile-editor-body"),
+        (ids::PROFILE_EDITOR_SCROLLBAR, "profile-editor-scrollbar"),
+        (ids::PROFILE_EDITOR_DELETE, "profile-editor-delete"),
+        (ids::PROFILE_RAIL, "profile-rail"),
+        (ids::PROFILE_HUD_EMPTY, "profile-hud-empty"),
+        (ids::PROFILE_HUDS_LINK, "profile-huds-link"),
+        (ids::PROFILE_SOUND_HIT, "profile-sound-hit"),
+        (ids::PROFILE_SOUND_KILL, "profile-sound-kill"),
+        (ids::PROFILE_SOUND_HIT_PLAY, "profile-sound-hit-play"),
+        (ids::PROFILE_SOUND_KILL_PLAY, "profile-sound-kill-play"),
+        (
+            ids::PROFILE_SOUND_HIT_PLAY_SPINNER,
+            "profile-sound-hit-play-spinner",
+        ),
+        (
+            ids::PROFILE_SOUND_KILL_PLAY_SPINNER,
+            "profile-sound-kill-play-spinner",
+        ),
+        (ids::PROFILE_XH_EVERYWHERE, "profile-xh-everywhere"),
+        (ids::PROFILE_XH_SELECTION, "profile-xh-selection"),
+        (ids::PROFILE_GFX_COPY, "profile-gfx-copy"),
+        (ids::PROFILE_GFX_SETTINGS, "profile-gfx-settings"),
+        (ids::PROFILE_GFX_NO_CATALOG, "profile-gfx-no-catalog"),
+        (ids::PROFILE_ADDONS_ONLY, "profile-addons-only"),
+        (ids::PROFILE_ADDONS_ONLY_NAME, "profile-addons-only-name"),
+        (
+            ids::PROFILE_ADDONS_NEED_GRAPHICS,
+            "profile-addons-need-graphics",
+        ),
+        (ids::PROFILE_ADDONS_EMPTY, "profile-addons-empty"),
+        (ids::PROFILE_ADDONS_STORE, "profile-addons-store"),
+    ];
+    for (id, want) in consts {
+        assert_eq!(id, want);
+    }
     for (el, want) in [
-        (ids::profile_slot("hud"), "profile-slot:hud"),
+        (ids::profile_rail("hud"), "profile-rail:hud"),
         (
-            ids::profile_slot_clear("crosshairs"),
-            "profile-slot-clear:crosshairs",
+            ids::profile_rail_badge("addons"),
+            "profile-rail-badge:addons",
         ),
+        (ids::profile_slot("sounds"), "profile-slot:sounds"),
         (
-            ids::profile_slot_play("hitsound"),
-            "profile-slot-play:hitsound",
+            ids::profile_slot_help("graphics"),
+            "profile-slot-help:graphics",
         ),
+        (ids::profile_slot_modes("hud"), "profile-slot-modes:hud"),
         (
-            ids::profile_slot_missing("killsound"),
-            "profile-slot-missing:killsound",
+            ids::profile_slot_mode("crosshairs", "leave"),
+            "profile-slot-mode:crosshairs:leave",
         ),
-        (ids::profile_picker("hud"), "profile-picker:hud"),
-        (
-            ids::profile_picker_search("hud"),
-            "profile-picker-search:hud",
-        ),
-        (
-            ids::profile_picker_empty("hitsound"),
-            "profile-picker-empty:hitsound",
-        ),
-        (ids::profile_picker_store("hud"), "profile-picker-store:hud"),
-        (
-            ids::profile_picker_no_match("hud"),
-            "profile-picker-no-match:hud",
-        ),
+        (ids::profile_slot_text("hud"), "profile-slot-text:hud"),
         (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
+        (ids::profile_hud_shot("rayshud"), "profile-hud-shot:rayshud"),
         (
-            ids::profile_pick_sound("killsound", "bell"),
-            "profile-pick-sound:killsound:bell",
+            ids::profile_hud_image("rayshud"),
+            "profile-hud-image:rayshud",
         ),
-        (ids::profile_pick_play("bell"), "profile-pick-play:bell"),
+        (
+            ids::profile_addon("mastercomfig-addon-flat-mouse.vpk"),
+            "profile-addon:mastercomfig-addon-flat-mouse.vpk",
+        ),
+        (ids::profile_addon_name("a.vpk"), "profile-addon-name:a.vpk"),
         (
             ids::weapon_clear("tf_weapon_bat"),
             "weapon-clear:tf_weapon_bat",
         ),
+        (
+            IdScope::PROFILE_CROSSHAIRS.id(ids::CROSSHAIRS_BOARD_EVERYTHING),
+            "profile-xh-board-everything",
+        ),
+        (
+            IdScope::PROFILE_GRAPHICS.id(ids::graphics_change("fpscap")),
+            "profile-gfx-change:fpscap",
+        ),
     ] {
         assert_eq!(name(el), want);
     }
-    assert_eq!(
-        [
-            ids::PROFILES_NEW,
-            ids::PROFILES_NEW_MENU,
-            ids::PROFILES_NEW_SPLIT,
-            ids::PROFILES_NEW_EMPTY,
-            ids::PROFILES_EMPTY_NEW,
-            ids::PROFILES_EMPTY_START_EMPTY,
-            ids::PROFILE_EDITOR,
-            ids::PROFILE_EDITOR_BACK,
-            ids::PROFILE_EDITOR_NAME,
-            ids::PROFILE_EDITOR_NAME_TAKEN,
-            ids::PROFILE_EDITOR_ACTIVATE,
-            ids::PROFILE_EDITOR_ACTIVE_BADGE,
-            ids::PROFILE_EDITOR_DELETE,
-            ids::PROFILE_EDITOR_NOT_APPLIED,
-            ids::PROFILE_PICKER_GRID,
-            ids::PROFILE_PICKER_SOUNDS,
-            ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
-            ids::PROFILE_SLOT_HUD_SHOT,
-            ids::PROFILE_SLOT_HUD_IMAGE,
-        ],
-        [
-            "profiles-new",
-            "profiles-new-menu",
-            "profiles-new-split",
-            "profiles-new-empty",
-            "profiles-empty-new",
-            "profiles-empty-start-empty",
-            "profile-editor",
-            "profile-editor-back",
-            "profile-editor-name",
-            "profile-editor-name-taken",
-            "profile-editor-activate",
-            "profile-editor-active-badge",
-            "profile-editor-delete",
-            "profile-editor-not-applied",
-            "profile-picker-grid",
-            "profile-picker-sounds",
-            "profile-picker-sounds-scrollbar",
-            "profile-slot-hud-shot",
-            "profile-slot-hud-image",
-        ]
-    );
 }
 
 #[test]
@@ -830,5 +842,39 @@ fn the_storage_card_ids_carry_the_kind_slug() {
             "settings-storage:store-data",
             "settings-storage:image-cache",
         ]
+    );
+}
+
+#[test]
+fn profile_card_ids_are_keyed_by_profile_id_and_slot() {
+    let id = ProfileId::new("1700000000000-ab12");
+    assert_eq!(ids::PROFILES_LEAD, "profiles-lead");
+    assert_eq!(
+        name(ids::profile_card_picture(&id)),
+        "profile-card-picture:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_image(&id)),
+        "profile-card-image:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_active(&id)),
+        "profile-card-active:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_name(&id)),
+        "profile-card-name:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_line(&id, "graphics")),
+        "profile-card-line:1700000000000-ab12:graphics"
+    );
+    assert_eq!(
+        name(ids::profile_card_apply(&id)),
+        "profile-card-apply:1700000000000-ab12"
+    );
+    assert_eq!(
+        name(ids::profile_card_edit(&id)),
+        "profile-card-edit:1700000000000-ab12"
     );
 }

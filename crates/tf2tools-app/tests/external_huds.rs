@@ -14,8 +14,8 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::external_huds::{HudAction, dialog_text, names_text};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    DraftSlot, ExternalHud, GbId, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
-    ReinstallError, Tf2Install,
+    DraftItem, ExternalHud, GbId, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
+    ReinstallError, SlotMode, Tf2Install,
 };
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -573,7 +573,8 @@ fn library_huds_are_never_asked_about(cx: &mut TestAppContext) {
 }
 
 fn hud_profile(s: &support::ShellWindow, hud: &HudEntry) -> Profile {
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     s.services.library.create_profile(&draft).unwrap()
 }
 
@@ -585,7 +586,7 @@ fn a_profile_asks_and_cancel_changes_nothing(cx: &mut TestAppContext) {
     let comp = hud_profile(&s, &hud);
     place(&env, "manual");
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     wait_dialog(cx, &s);
     assert!(
         support::label_of(cx, s.win, ids::EXTERNAL_HUDS_DESCRIPTION)
@@ -609,7 +610,7 @@ fn a_profile_keeps_a_copy_then_applies(cx: &mut TestAppContext) {
     let comp = hud_profile(&s, &hud);
     place(&env, "manual");
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     wait_dialog(cx, &s);
     support::click_id(cx, s.win, ids::EXTERNAL_HUDS_KEEP);
     let toast = wait_toast(cx, &s);
@@ -626,9 +627,7 @@ fn a_profile_keeps_a_copy_then_applies(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
-    cx: &mut TestAppContext,
-) {
+fn applying_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let gone = seed(&s, &env, "budhud");
@@ -636,16 +635,15 @@ fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
     s.services.library.delete_hud(gone.id()).unwrap();
     place(&env, "manual");
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
+    support::click_apply(cx, s.win, comp.id());
     // The skipped HUD step removes nothing, so the player is not asked about their HUD.
     wait_toast(cx, &s);
     assert!(!support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG));
     assert!(intact(&env, "manual"));
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
 }
 
 /// Real `ExternalHud`s can only come from a scan, so the words are checked on a scratch tree.

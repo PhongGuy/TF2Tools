@@ -52,6 +52,12 @@ pub fn columns_for_store(width: Pixels, max: usize) -> usize {
     columns.min(max.max(1))
 }
 
+/// Columns of at least `min` across `width`, GRID_GAP apart; never fewer than one. This is the
+/// column count of CSS `repeat(auto-fill, minmax(min, 1fr))`.
+pub fn columns_for_min(width: Pixels, min: Pixels) -> usize {
+    (((width + GRID_GAP) / (min + GRID_GAP)).floor() as usize).max(1)
+}
+
 // One whole-pixel cell of `columns` across `width`, gaps between them.
 fn cell_width(width: Pixels, columns: usize) -> Pixels {
     ((width - GRID_GAP * (columns - 1) as f32) / columns as f32).floor()
@@ -90,6 +96,8 @@ pub struct CardGrid {
     width: Rc<Cell<Pixels>>,
     /// `Some(max)` lays out on the store breakpoints, capped at `max` columns.
     store_max: Option<usize>,
+    /// `Some(min)` lays out as many columns of at least `min` as fit, ahead of `store_max`.
+    min_card_width: Option<Pixels>,
     card_height: Rc<Cell<Pixels>>,
     /// The row range of uniform_list's last range call this frame, as `(start, end)`.
     rendered: Rc<Cell<(usize, usize)>>,
@@ -119,6 +127,7 @@ impl CardGrid {
             // Before the first paint, assume the narrowest three-column width.
             width: Rc::new(Cell::new(px(1024.) - SHELL_CHROME_WIDTH)),
             store_max: None,
+            min_card_width: None,
             card_height: Rc::new(Cell::new(px(0.))),
             rendered: Rc::new(Cell::new((0, 0))),
             hooks: Rc::new(Hooks::default()),
@@ -131,6 +140,14 @@ impl CardGrid {
         Self { foot, ..self }
     }
 
+    /// This grid laid out in as many columns of at least `min` as its width fits.
+    pub fn with_min_card_width(self, min: Pixels) -> Self {
+        Self {
+            min_card_width: Some(min),
+            ..self
+        }
+    }
+
     /// A grid on the store breakpoints (up to 4 columns), capped at `max_columns`.
     pub fn store(id: impl Into<SharedString>, max_columns: usize) -> Self {
         Self {
@@ -139,11 +156,13 @@ impl CardGrid {
         }
     }
 
-    /// Columns at the last measured width (3 before the first paint).
+    /// Columns at the last measured width (3 on the breakpoints before the first paint).
     pub fn columns(&self) -> usize {
-        match self.store_max {
-            Some(max) => columns_for_store(self.width.get(), max),
-            None => columns_for(self.width.get()),
+        let width = self.width.get();
+        match (self.min_card_width, self.store_max) {
+            (Some(min), _) => columns_for_min(width, min),
+            (None, Some(max)) => columns_for_store(width, max),
+            (None, None) => columns_for(width),
         }
     }
 

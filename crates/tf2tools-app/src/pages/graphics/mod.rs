@@ -1,11 +1,13 @@
 //! The Graphics page: mastercomfig's status, the graphics preset picker and the settings list.
 
+pub mod editor;
 pub mod jobs;
 pub mod model;
 mod picture_panel;
 pub mod pictures;
-mod pill;
+pub(crate) mod pill;
 mod presets;
+mod rows;
 mod settings;
 mod status;
 pub mod view;
@@ -13,28 +15,22 @@ pub mod view;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::select::{SelectEvent, SelectState};
-use gpui_kit::component::slider::{SliderEvent, SliderState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::slider::SliderState;
+use gpui_kit::component::v_flex;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    Window, div, px,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, InteractiveElement as _,
+    IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, px,
 };
-use tf2tools_core::{
-    Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, ModuleChoice, Preset,
-};
+use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
-use crate::i18n::{counted_plural, tr};
-use crate::ids;
+use crate::i18n::tr;
+use crate::ids::{self, IdScope};
 use crate::local_messages::describe_store_status;
-use crate::pages::common::{card_frame, no_tf2_warning};
+use crate::pages::common::no_tf2_warning;
 use crate::pages::profiles::probe::Tf2Probe;
-use crate::remote_images::{ImageKey, RemoteImages};
+use crate::remote_images::ImageKey;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -42,24 +38,22 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
 use crate::widgets::scroll::scroll_area;
-use crate::widgets::{Named as _, labelled};
+use editor::ValueSelect;
 use jobs::{ModulesFailure, save_failed};
 use model::{
-    SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
-    dropped_note, foreign_modules_cfg, own_modules_cfg_kept, preset_label, shown_choice,
-    status_card, value_options,
+    SettingsNote, StatusCard, describe_apply, describe_remove, describe_take_over, dropped_note,
+    foreign_modules_cfg, own_modules_cfg_kept, preset_label, status_card,
 };
 use pictures::PictureIndex;
 use view::Filter;
+
+pub use editor::{ChoicesEdit, GraphicsChoicesEditor};
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
 
 /// A finished action's toast, if it has one: (kind, title, description).
 type Outcome = Option<(ToastKind, SharedString, SharedString)>;
-
-/// A settings row's value picker.
-type ValueSelect = Entity<SelectState<Vec<ValueOption>>>;
 
 /// What one load read off the UI thread.
 struct Loaded {
@@ -97,10 +91,8 @@ pub struct GraphicsPage {
     choices: Option<Choices>,
     /// The settings list's catalog, always for the managed install's version.
     catalog: Option<Arc<ModuleCatalog>>,
-    /// One Select per Select row of the catalog, built when the catalog arrives.
+    /// The editor's Selects, mirrored on each of its notifies.
     selects: BTreeMap<String, ValueSelect>,
-    /// Each Select's pick handler, rebuilt with the Selects.
-    select_subscriptions: Vec<Subscription>,
     /// Why there is no catalog yet; None before a fetch is asked.
     note: Option<SettingsNote>,
     /// The version whose catalog this visit already asked GitHub for.
@@ -116,18 +108,18 @@ pub struct GraphicsPage {
     scroll: ScrollHandle,
     /// The bundled setting pictures, once read off the UI thread.
     pictures: Option<Arc<PictureIndex>>,
-    /// The image keys the last frame asked for.
+    /// The editor's image wants, copied after each frame asks for them.
     wanted: Vec<ImageKey>,
-    /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
-    image_viewer: String,
-    /// The module whose pictures are open; at most one row's at a time.
+    /// The editor's open row and zoom, mirrored on each of its notifies.
     open_row: Option<String>,
-    /// How far across the compare view the preset's picture shows, 0 to 100.
-    wipe: Entity<SliderState>,
-    /// Whether the compare view shows the crops; one switch for the whole page.
     zoom: bool,
+    /// The editor's wipe slider, held from construction.
+    wipe: Entity<SliderState>,
     /// The shell's remembered answer to whether TF2 runs; drawing never probes processes.
     tf2_running: bool,
+    /// The presets card, changes strip, settings rows and their pictures, fed the shown choices
+    /// and proposing edits.
+    editor: Entity<GraphicsChoicesEditor>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -146,24 +138,29 @@ impl GraphicsPage {
                 cx.notify();
             }
         });
-        let wipe = cx.new(|_| {
-            SliderState::new()
-                .min(0.)
-                .max(100.)
-                .step(1.)
-                .default_value(50.)
+        let editor = cx.new(|cx| {
+            GraphicsChoicesEditor::new(IdScope::PAGE, Choices::new(Preset::Medium), window, cx)
         });
-        let wiped = cx.subscribe(&wipe, |_, _, _: &SliderEvent, cx| cx.notify());
-        let mut subscriptions = vec![tf2, searched, wiped];
-        // Pictures redraw the page as they land, and the page's wants go with it.
-        let image_viewer = format!("graphics:{}", cx.entity_id());
-        if let Some(images) = RemoteImages::global(cx) {
-            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
-            let released = image_viewer.clone();
-            subscriptions.push(cx.on_release(move |_, cx| {
-                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
-            }));
-        }
+        // The editor only proposes; a preset runs the pick and any other edit is saved.
+        let edits = cx.subscribe_in(
+            &editor,
+            window,
+            |page, _, edit: &ChoicesEdit, window, cx| match edit {
+                ChoicesEdit::Preset(preset) => page.pick(*preset, window, cx),
+                ChoicesEdit::Modules { to, .. } => page.change_to(to.clone(), cx),
+            },
+        );
+        // The page hands out the editor's live Selects and pictures state, so it copies them
+        // on every change.
+        let mirrored = cx.observe(&editor, |page, editor, cx| {
+            let editor = editor.read(cx);
+            page.selects = editor.selects.clone();
+            page.open_row = editor.open_row().map(str::to_owned);
+            page.zoom = editor.zoom();
+            cx.notify();
+        });
+        let wipe = editor.read(cx).wipe_state().clone();
+        let subscriptions = vec![tf2, searched, edits, mirrored];
         let mut page = Self {
             win: window.window_handle(),
             status: None,
@@ -176,7 +173,6 @@ impl GraphicsPage {
             choices: None,
             catalog: None,
             selects: BTreeMap::new(),
-            select_subscriptions: Vec::new(),
             note: None,
             asked: None,
             search,
@@ -186,11 +182,11 @@ impl GraphicsPage {
             scroll: ScrollHandle::new(),
             pictures: None,
             wanted: Vec::new(),
-            image_viewer,
             open_row: None,
-            wipe,
             zoom: false,
+            wipe,
             tf2_running: false,
+            editor,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -219,6 +215,11 @@ impl GraphicsPage {
     /// The image keys the last frame asked the image cache for.
     pub fn wanted_images(&self) -> &[ImageKey] {
         &self.wanted
+    }
+
+    /// The page's own editor, for tests and for nothing else.
+    pub fn choices_editor(&self) -> &Entity<GraphicsChoicesEditor> {
+        &self.editor
     }
 
     /// The settings search box's state.
@@ -257,24 +258,6 @@ impl GraphicsPage {
     /// Whether the compare view shows the zoomed crops.
     pub fn zoom(&self) -> bool {
         self.zoom
-    }
-
-    // Opens `module`'s pictures, closing any other row's, or closes them when already open.
-    // A freshly opened row starts with the wipe in the middle.
-    fn toggle_pictures(&mut self, module: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.open_row = if self.open_row.as_deref() == Some(module) {
-            None
-        } else {
-            self.wipe
-                .update(cx, |wipe, cx| wipe.set_value(50., window, cx));
-            Some(module.to_owned())
-        };
-        cx.notify();
-    }
-
-    fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
-        self.zoom = !self.zoom;
-        cx.notify();
     }
 
     fn set_changed_only(&mut self, on: bool, cx: &mut Context<Self>) {
@@ -523,10 +506,10 @@ impl GraphicsPage {
         );
     }
 
-    // Saves the choices `edit` makes from the saved ones; an edit that changes nothing does
-    // nothing. Only a change to the override VPKs waits for TF2 to close. A player's own
-    // modules.cfg is replaced only after they agree; the page stays busy while asking.
-    fn change(&mut self, edit: impl FnOnce(&mut Choices, &ModuleCatalog), cx: &mut Context<Self>) {
+    // Saves `new` in place of the shown choices; choices equal to them do nothing. Only a
+    // change to the override VPKs waits for TF2 to close. A player's own modules.cfg is
+    // replaced only after they agree; the page stays busy while asking.
+    fn change_to(&mut self, new: Choices, cx: &mut Context<Self>) {
         let Some(catalog) = self.catalog.clone() else {
             return;
         };
@@ -534,8 +517,6 @@ impl GraphicsPage {
             return;
         }
         let old = self.shown_against();
-        let mut new = old.clone();
-        edit(&mut new, &catalog);
         if new == old {
             return;
         }
@@ -619,7 +600,7 @@ impl GraphicsPage {
         job: impl std::future::Future<Output = Result<Outcome, OpError>> + 'static,
         cx: &mut Context<Self>,
     ) {
-        self.busy = true;
+        self.set_busy(true, cx);
         cx.notify();
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -703,12 +684,12 @@ impl GraphicsPage {
                                 page.sync_list(loaded.catalog.clone(), window, cx);
                             } else {
                                 // A refused pick still shows on its Select; move it back.
-                                page.show_choices(window, cx);
+                                page.sync_editor(window, cx);
                             }
                             page.loaded = true;
                             if page.settling {
                                 page.settling = false;
-                                page.busy = false;
+                                page.set_busy(false, cx);
                                 page.running = None;
                             }
                             cx.notify();
@@ -728,8 +709,8 @@ impl GraphicsPage {
     }
 
     // Keeps the list on the managed version's catalog: a version change swaps the catalog
-    // (`fresh`, the cached one or None) and rebuilds the Selects; otherwise the Selects only
-    // move to the shown values, so focus stays put. A missing catalog is fetched once.
+    // (`fresh`, the cached one or None), which rebuilds the editor's Selects; otherwise they
+    // only move to the shown values, so focus stays put. A missing catalog is fetched once.
     fn sync_list(
         &mut self,
         fresh: Option<ModuleCatalog>,
@@ -739,10 +720,8 @@ impl GraphicsPage {
         let version = self.managed_version().map(str::to_owned);
         if self.catalog.as_ref().map(|c| c.tag()) != version.as_deref() {
             self.catalog = fresh.map(Arc::new);
-            self.build_selects(window, cx);
-        } else {
-            self.show_choices(window, cx);
         }
+        self.sync_editor(window, cx);
         if let Some(tag) = version
             && self.catalog.is_none()
             && self.asked.as_deref() != Some(tag.as_str())
@@ -768,7 +747,7 @@ impl GraphicsPage {
                         match fetched {
                             Ok(catalog) => {
                                 page.catalog = Some(Arc::new(catalog));
-                                page.build_selects(window, cx);
+                                page.sync_editor(window, cx);
                             }
                             Err(note) => page.note = Some(note),
                         }
@@ -780,55 +759,6 @@ impl GraphicsPage {
         .detach();
     }
 
-    // One Select per Select row of the held catalog, each on its shown value; a pick saves it,
-    // and a cleared Select changes nothing.
-    fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.selects.clear();
-        self.select_subscriptions.clear();
-        let Some(catalog) = self.catalog.clone() else {
-            return;
-        };
-        let choices = self.shown_against();
-        let select_rows = catalog
-            .categories()
-            .iter()
-            .flat_map(|c| c.modules())
-            .filter(|m| view::control_kind(m) == view::ControlKind::Select);
-        for module in select_rows {
-            let shown = shown_choice(&catalog, &choices, module.name());
-            let options = value_options(module);
-            let select = cx.new(|cx| {
-                let mut select = SelectState::new(options, None, window, cx);
-                select.set_selected_value(&shown, window, cx);
-                select
-            });
-            let name = module.name().to_owned();
-            self.select_subscriptions.push(cx.subscribe(
-                &select,
-                move |page, _, event: &SelectEvent<Vec<ValueOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(choice)) = event {
-                        let choice = choice.clone();
-                        page.change(|c, catalog| c.set(catalog, &name, choice), cx);
-                    }
-                },
-            ));
-            self.selects.insert(module.name().to_owned(), select);
-        }
-    }
-
-    // Saves `value` for `module`, as the row's own control does.
-    fn pick_value(&mut self, module: &str, value: &str, cx: &mut Context<Self>) {
-        self.change(
-            |c, catalog| c.set(catalog, module, ModuleChoice::Value(value.to_owned())),
-            cx,
-        );
-    }
-
-    // Drops `module`'s saved choice, so the preset's value applies.
-    fn reset_module(&mut self, module: &str, cx: &mut Context<Self>) {
-        self.change(|c, _| c.reset(module), cx);
-    }
-
     // Reads the pictures' manifest and checks their files in the background, once per page.
     fn load_pictures(&mut self, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
@@ -837,79 +767,35 @@ impl GraphicsPage {
         cx.spawn(async move |page, cx| {
             let index = reading.await.unwrap_or_default();
             let _ = page.update(cx, |page, cx| {
-                page.pictures = Some(Arc::new(index));
+                let index = Arc::new(index);
+                page.pictures = Some(Arc::clone(&index));
+                page.editor
+                    .update(cx, |e, cx| e.set_pictures(Some(index), cx));
                 cx.notify();
             });
         })
         .detach();
     }
 
-    // The open row's compare pictures first, as the newest wants, then its strip, then the
-    // current thumbnail of every row with pictures; all thumbnails are wanted, not just the visible.
-    fn image_keys(&self) -> Vec<ImageKey> {
-        let (Some(index), Some(catalog)) = (self.pictures.as_deref(), self.catalog.as_deref())
-        else {
-            return Vec::new();
-        };
-        let open = self
-            .open_row
-            .as_deref()
-            .and_then(|module| self.row(module))
-            .and_then(|row| pictures::row_pictures(index, &row, self.zoom));
-        let (compared, strip) = open
-            .map(|p| (p.compare.pictures(), p.strip))
-            .unwrap_or_default();
-        let choices = self.shown_against();
-        let thumbs = catalog
-            .categories()
-            .iter()
-            .flat_map(|category| category.modules())
-            .filter(|module| index.has_pictures(module.name()))
-            .filter_map(|module| {
-                let row = view::row(catalog, &choices, module);
-                pictures::row_pictures(index, &row, false)?.thumb
-            })
-            .map(|thumb| ImageKey::card(&index.url(&thumb)));
-        compared
-            .into_iter()
-            .map(|picture| ImageKey::carousel(&index.url(&picture)))
-            .chain(strip.iter().map(|p| ImageKey::card(&index.url(&p.picture))))
-            .chain(thumbs)
-            .collect()
+    // The only writer of `busy`, so the editor's controls rest at the same moments.
+    fn set_busy(&mut self, busy: bool, cx: &mut Context<Self>) {
+        self.busy = busy;
+        self.editor.update(cx, |e, cx| e.set_disabled(busy, cx));
     }
 
-    // Records this frame's keys and, when they changed, hands them to the image cache after
-    // the draw, so no entity is updated mid-render.
-    fn want_images(&mut self, cx: &mut Context<Self>) {
-        let keys = self.image_keys();
-        if keys == self.wanted {
-            return;
-        }
-        self.wanted = keys.clone();
-        let Some(images) = RemoteImages::global(cx) else {
-            return;
-        };
-        let viewer = self.image_viewer.clone();
-        cx.defer(move |cx| images.update(cx, |images, cx| images.want(&viewer, keys, cx)));
-    }
-
-    // Drops every saved choice and keeps the preset.
-    fn reset_all(&mut self, cx: &mut Context<Self>) {
-        self.change(|c, _| c.clear(), cx);
-    }
-
-    // Moves each existing Select to its row's shown value.
-    fn show_choices(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(catalog) = &self.catalog else {
-            return;
-        };
-        let choices = self.shown_against();
-        for (name, select) in &self.selects {
-            let shown = shown_choice(catalog, &choices, name);
-            select.update(cx, |select, cx| {
-                select.set_selected_value(&shown, window, cx)
-            });
-        }
+    // Hands the editor the shown choices, and the catalog when it changed.
+    fn sync_editor(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let (choices, catalog) = (self.shown_against(), self.catalog.clone());
+        self.editor.update(cx, |e, cx| {
+            let same = match (e.catalog(), &catalog) {
+                (Some(held), Some(new)) => Arc::ptr_eq(held, new),
+                (held, new) => held.is_none() && new.is_none(),
+            };
+            if !same {
+                e.set_catalog(catalog, window, cx);
+            }
+            e.set_choices(choices, window, cx);
+        });
     }
 
     // The choices the rows show: the saved ones, else none on top of the current preset.
@@ -928,7 +814,10 @@ impl Render for GraphicsPage {
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
-        self.want_images(cx);
+        self.wanted = self.editor.update(cx, |e, cx| {
+            e.want_images(cx);
+            e.wanted_images().to_vec()
+        });
         let filter = self.filter(cx);
         let sections = self
             .catalog
@@ -945,9 +834,12 @@ impl Render for GraphicsPage {
         }
         let mut items = BTreeMap::new();
         let mut toolbar = None;
-        if let Some(preset) = self.preset() {
-            children.push(self.presets(preset, narrow, cx));
-            children.push(self.changes_strip(preset, cx));
+        if self.preset().is_some() {
+            let (presets, changes) = self.editor.update(cx, |e, cx| {
+                (e.presets_card(narrow, cx), e.changes_strip(cx))
+            });
+            children.push(presets);
+            children.push(changes);
             toolbar = settings::push(
                 self,
                 sections.as_deref(),
@@ -970,119 +862,5 @@ impl Render for GraphicsPage {
             .gap_6()
             .children(children);
         scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
-    }
-}
-
-impl GraphicsPage {
-    // The player's changes from `preset` as chips with an undo each, and Reset all; a dashed
-    // "as is" strip when there are none. Offline the chips only name the saved values, since
-    // undoing needs the catalogue.
-    fn changes_strip(&self, preset: Preset, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme();
-        let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
-        let (accent, fill) = (theme.sidebar_primary, theme.background);
-        let preset = preset_label(preset);
-        let catalog = self.catalog.as_deref();
-        let list = view::changes(catalog, &self.shown_against());
-        if list.is_empty() {
-            return labelled(
-                div()
-                    .text_sm()
-                    .text_color(muted)
-                    .py_3()
-                    .px_4()
-                    .border_1()
-                    .border_dashed()
-                    .border_color(border)
-                    .rounded(radius),
-                ids::GRAPHICS_NO_CHANGES,
-                tr!("graphics.changes.as_is", preset = preset),
-            )
-            .into_any_element();
-        }
-        let n = u64::try_from(list.len()).unwrap_or(u64::MAX);
-        let title = counted_plural(
-            "graphics.changes.title",
-            n,
-            &n.to_string(),
-            &[("preset", &preset)],
-        );
-        let editable = catalog.is_some();
-        let chips: Vec<AnyElement> = list
-            .into_iter()
-            .map(|change| {
-                let sentence = match &change.was {
-                    Some(was) => tr!(
-                        "graphics.changes.chip",
-                        name = change.label,
-                        was = was,
-                        now = change.now
-                    ),
-                    None => tr!(
-                        "graphics.changes.chip_saved",
-                        name = change.label,
-                        now = change.now
-                    ),
-                };
-                let undo = change.was.clone().filter(|_| editable).map(|was| {
-                    let module = change.module.clone();
-                    Button::new(ids::graphics_change_undo(&change.module))
-                        .ghost()
-                        .xsmall()
-                        .rounded(px(999.))
-                        .icon(IconName::X)
-                        .named(tr!("graphics.changes.undo", name = change.label, was = was))
-                        .disabled(self.busy)
-                        .on_click(cx.listener(move |page, _, _, cx| page.reset_module(&module, cx)))
-                });
-                h_flex()
-                    .id(ids::graphics_change(&change.module))
-                    .aria_label(sentence)
-                    .test_support()
-                    .h(px(28.))
-                    .gap(px(6.))
-                    .pl(px(10.))
-                    .pr_1()
-                    .text_sm()
-                    .border_1()
-                    .border_color(accent)
-                    .bg(fill)
-                    .rounded_full()
-                    .child(div().font_weight(FontWeight::MEDIUM).child(change.label))
-                    .children(
-                        change.was.map(|was| {
-                            h_flex().gap(px(6.)).text_color(muted).child(was).child("→")
-                        }),
-                    )
-                    .child(change.now)
-                    .children(undo)
-                    .into_any_element()
-            })
-            .collect();
-        let reset_all = editable.then(|| {
-            Button::new(ids::GRAPHICS_RESET_ALL)
-                .ghost()
-                .small()
-                .label(tr!("graphics.changes.reset_all"))
-                .disabled(self.busy)
-                .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx)))
-        });
-        // One wrapping row: the title, the chips, then a spacer that pushes Reset all to the end.
-        card_frame(cx)
-            .id(ids::GRAPHICS_CHANGES)
-            .aria_label(title.clone())
-            .test_support()
-            .flex()
-            .items_center()
-            .flex_wrap()
-            .gap_2()
-            .py_3()
-            .px_4()
-            .border_color(accent)
-            .child(div().mr_1().font_weight(FontWeight::SEMIBOLD).child(title))
-            .children(chips)
-            .child(div().flex_1())
-            .children(reset_all)
-            .into_any_element()
     }
 }

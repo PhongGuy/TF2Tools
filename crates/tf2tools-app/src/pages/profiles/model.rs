@@ -3,44 +3,61 @@
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    ApplyProfileReport, ApplyStep, MissingKind, Profile, ProfileId, Provenance, SoundKind,
-    StoreItemId, StoreKind,
+    AddonName, ApplySkipReason, ApplyStep, DraftItem, MissingKind, Profile, ProfileCrosshair,
+    ProfileId, ProfileItem, Provenance, SlotMode, SoundId, SoundKind, StoreItemId, StoreKind,
 };
 
 use crate::i18n::{names, tr};
+use crate::shell::toast::ToastKind;
 
 /// Shown when a save ends the profile's active state, so the game no longer matches it.
 pub fn not_applied() -> SharedString {
     tr!("profiles.not_applied")
 }
 
-/// The crosshair badge: "1 crosshair", "N crosshairs".
-pub fn crosshair_count(n: usize) -> String {
-    crate::i18n::plural("profiles.crosshairs", u64::try_from(n).unwrap_or(u64::MAX)).to_string()
+/// The HUD the profile sets, if its HUD slot is Set.
+pub(crate) fn hud_item(profile: &Profile) -> Option<&ProfileItem> {
+    profile.hud().as_set()
 }
 
-/// No HUD, no sounds and no crosshairs.
-pub fn is_empty(profile: &Profile) -> bool {
-    profile.hud().is_none()
-        && profile.hitsound().is_none()
-        && profile.killsound().is_none()
-        && profile.crosshairs().is_empty()
+/// The hitsound the profile sets; `None` when its Sounds slot is not Set or keeps TF2's own.
+pub(crate) fn hit(profile: &Profile) -> Option<&ProfileItem> {
+    profile.sounds().as_set().and_then(|s| s.hit.as_ref())
 }
 
-/// Whether a finished load closes the editor open on `open_now`: only when that editor was
-/// already open as the load started (`open_at_start`) and the loaded ids lack it.
-pub fn load_closes_editor<'a>(
-    open_at_start: Option<&ProfileId>,
-    open_now: &ProfileId,
-    loaded: impl IntoIterator<Item = &'a ProfileId>,
-) -> bool {
-    open_at_start == Some(open_now) && !loaded.into_iter().any(|id| id == open_now)
+/// The killsound the profile sets; `None` when its Sounds slot is not Set or keeps TF2's own.
+pub(crate) fn kill(profile: &Profile) -> Option<&ProfileItem> {
+    profile.sounds().as_set().and_then(|s| s.kill.as_ref())
 }
 
-/// The search rule: the trimmed query, ignoring case, is in the name; blank matches all.
-pub fn matches(name: &str, query: &str) -> bool {
-    let query = query.trim().to_lowercase();
-    query.is_empty() || name.to_lowercase().contains(&query)
+/// The sound of `kind` the profile sets.
+pub(crate) fn sound(profile: &Profile, kind: SoundKind) -> Option<&ProfileItem> {
+    match kind {
+        SoundKind::Hitsound => hit(profile),
+        SoundKind::Killsound | _ => kill(profile),
+    }
+}
+
+/// The crosshairs the profile assigns; empty unless its Crosshairs slot is Set.
+pub(crate) fn crosshair_list(profile: &Profile) -> &[ProfileCrosshair] {
+    profile.crosshairs().as_set().map_or(&[][..], Vec::as_slice)
+}
+
+/// A draft's hitsound and killsound; `None` is TF2's default.
+type DraftSounds = (Option<DraftItem<SoundId>>, Option<DraftItem<SoundId>>);
+
+/// The Sounds slot of a draft of `saved` whose `kind` side becomes `side`. The other side
+/// is the saved sound, kept, or TF2's default when the slot was not Set.
+pub(crate) fn sounds_with(
+    saved: &Profile,
+    kind: SoundKind,
+    side: Option<DraftItem<SoundId>>,
+) -> SlotMode<DraftSounds> {
+    let keep = |item: Option<&ProfileItem>| item.cloned().map(DraftItem::Keep);
+    SlotMode::Set(match kind {
+        SoundKind::Hitsound => (side, keep(kill(saved))),
+        SoundKind::Killsound | _ => (keep(hit(saved)), side),
+    })
 }
 
 /// The profile among `profiles`, other than `except`, that already has `name` (trimmed, any case).
@@ -63,70 +80,16 @@ pub fn taken_message(name: &str) -> String {
     crate::i18n::tr!("messages.profiles.name_taken", name = name).into()
 }
 
-/// "HUD", "Hitsound", "Killsound", "Crosshairs".
+/// "HUD", "Hitsound", "Killsound", "Crosshairs", "Graphics", "Add-ons".
 pub fn step_label(step: ApplyStep) -> SharedString {
     match step {
         ApplyStep::Hud => "HUD".into(),
         ApplyStep::Hitsound => names::sound_kind_name(SoundKind::Hitsound),
         ApplyStep::Killsound => names::sound_kind_name(SoundKind::Killsound),
         ApplyStep::Crosshairs => tr!("profiles.part.crosshairs"),
+        ApplyStep::Graphics => tr!("profiles.part.graphics"),
+        ApplyStep::Addons => tr!("profiles.part.addons"),
         _ => tr!("profiles.part.item"),
-    }
-}
-
-/// The Missing Items row's kind: "HUD", "HITSOUND", "KILLSOUND", "CROSSHAIR".
-pub fn kind_label(kind: &MissingKind) -> SharedString {
-    match kind {
-        MissingKind::Hud => "HUD".into(),
-        MissingKind::Hitsound => tr!("profiles.missing.kind.hitsound"),
-        MissingKind::Killsound => tr!("profiles.missing.kind.killsound"),
-        MissingKind::Crosshair { .. } => tr!("profiles.missing.kind.crosshair"),
-        _ => tr!("profiles.missing.kind.item"),
-    }
-}
-
-/// The slots the apply installed something into, in step order, as `step_label`s: a slot the
-/// profile fills, whose step is in `applied`, and that was not skipped (Crosshairs: at least one
-/// crosshair was not skipped).
-pub fn installed_parts(profile: &Profile, report: &ApplyProfileReport) -> Vec<SharedString> {
-    let skipped = |kind: &MissingKind| report.skipped().iter().any(|m| m.kind() == kind);
-    let skipped_crosshairs = report
-        .skipped()
-        .iter()
-        .filter(|m| matches!(m.kind(), MissingKind::Crosshair { .. }))
-        .count();
-    let filled = [
-        (
-            ApplyStep::Hud,
-            profile.hud().is_some() && !skipped(&MissingKind::Hud),
-        ),
-        (
-            ApplyStep::Hitsound,
-            profile.hitsound().is_some() && !skipped(&MissingKind::Hitsound),
-        ),
-        (
-            ApplyStep::Killsound,
-            profile.killsound().is_some() && !skipped(&MissingKind::Killsound),
-        ),
-        (
-            ApplyStep::Crosshairs,
-            profile.crosshairs().len() > skipped_crosshairs,
-        ),
-    ];
-    filled
-        .into_iter()
-        .filter(|(step, installed)| *installed && report.applied().contains(step))
-        .map(|(step, _)| step_label(step))
-        .collect()
-}
-
-/// The success toast's title: "activated" when the game now matches the profile, "applied"
-/// when missing items were skipped and so the profile is not marked Active.
-pub fn success_title(name: &str, skipped: bool) -> String {
-    if skipped {
-        tr!("profiles.toast.applied", name = name).into()
-    } else {
-        tr!("profiles.toast.activated", name = name).into()
     }
 }
 
@@ -148,30 +111,114 @@ pub fn kept_parts(kinds: &[MissingKind]) -> Vec<SharedString> {
     .collect()
 }
 
-/// The success toast's description: v5's "Installed: ..." or "All customizations cleared";
-/// with skipped slots, which ones kept what the player had.
-pub fn activated_description(installed: &[SharedString], kept: &[SharedString]) -> String {
-    let join = |parts: &[SharedString]| crate::i18n::separated(parts);
-    let lead: SharedString = match (installed.is_empty(), kept.is_empty()) {
-        (true, true) => return tr!("profiles.toast.cleared").into(),
-        (true, false) => tr!("profiles.toast.nothing_new"),
-        (false, _) => tr!("profiles.toast.installed", list = join(installed)),
-    };
-    if kept.is_empty() {
-        return lead.into();
-    }
-    tr!("profiles.toast.kept", lead = lead, list = join(kept)).into()
-}
-
-/// The failure toast's description, naming the failed steps only; their raw errors stay in the
-/// activate row's details.
+/// The failure toast's description: the HUD, sound and crosshair failures as one sentence
+/// naming their steps (raw errors stay in the activate row's details), then each Graphics or
+/// Add-ons failure as "<label>: <reason>.", since those reasons tell the player what to do.
 pub fn failed_description(failed: &[(ApplyStep, String)]) -> String {
+    let explained = |step: &ApplyStep| matches!(step, ApplyStep::Graphics | ApplyStep::Addons);
     let steps = failed
         .iter()
+        .filter(|(step, _)| !explained(step))
         .map(|(step, _)| step_label(*step))
         .collect::<Vec<_>>();
-    let steps = crate::i18n::separated(&steps);
-    tr!("profiles.toast.failed_steps", steps = steps).into()
+    let mut sentences = Vec::new();
+    if !steps.is_empty() {
+        let steps = crate::i18n::separated(&steps);
+        sentences.push(tr!("profiles.toast.failed_steps", steps = steps).to_string());
+    }
+    sentences.extend(
+        failed
+            .iter()
+            .filter(|(step, _)| explained(step))
+            .map(|(step, reason)| crate::i18n::labelled(step_label(*step), reason)),
+    );
+    sentences_text(sentences)
+}
+
+/// What one Apply did, gathered from the core report and the modules phase, for its toast.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ApplyOutcome {
+    pub name: String,
+    /// `mark_profile_active` returned true, so the game now matches the saved profile.
+    pub active: bool,
+    /// Core failures, then the modules phase's.
+    pub failed: Vec<(ApplyStep, String)>,
+    pub skipped_steps: Vec<(ApplyStep, ApplySkipReason)>,
+    /// `kept_parts` of the skipped missing items.
+    pub kept: Vec<SharedString>,
+    /// The folder that kept the HUD out of its place.
+    pub blocked: Option<String>,
+    pub movement: Option<String>,
+    /// The external-HUD note.
+    pub note: Option<String>,
+}
+
+/// (kind, title, description) of the one toast an Apply ends with. Any failure makes it an
+/// error; otherwise every caveat is a sentence in the description and turns it into a warning,
+/// as does a profile left inactive.
+pub fn outcome_toast(o: &ApplyOutcome) -> (ToastKind, String, String) {
+    if !o.failed.is_empty() {
+        let title = tr!("profiles.toast.apply_failed", name = o.name.as_str()).to_string();
+        return (ToastKind::Error, title, failed_description(&o.failed));
+    }
+    let mut sentences = Vec::new();
+    if !o.kept.is_empty() {
+        let list = crate::i18n::separated(&o.kept);
+        sentences.push(tr!("profiles.toast.kept_only", list = list).to_string());
+    }
+    sentences.extend(o.skipped_steps.iter().map(|(step, reason)| {
+        let (part, reason) = (step_label(*step), skip_reason(*step, *reason));
+        tr!("profiles.toast.skipped", part = part, reason = reason).to_string()
+    }));
+    sentences.extend(
+        o.blocked
+            .as_deref()
+            .map(crate::pages::huds::blocked_description),
+    );
+    sentences.extend(o.movement.iter().chain(&o.note).cloned());
+    let description = sentences_text(sentences);
+    let title = tr!("profiles.toast.applied_line", name = o.name.as_str()).to_string();
+    let kind = if o.active && description.is_empty() {
+        ToastKind::Success
+    } else {
+        ToastKind::Warning
+    };
+    (kind, title, description)
+}
+
+/// Why `step` was left as it is: Add-ons only ever wait on mastercomfig being installed.
+pub fn skip_reason(step: ApplyStep, reason: ApplySkipReason) -> SharedString {
+    match (step, reason) {
+        (ApplyStep::Addons, _) => tr!("profiles.skip.addons_need_base"),
+        (_, ApplySkipReason::MastercomfigNotManaged) => tr!("profiles.skip.not_managed"),
+        (_, ApplySkipReason::MastercomfigNotInstalled | _) => {
+            tr!("profiles.skip.graphics_not_installed")
+        }
+    }
+}
+
+/// The modules phase's failure when the mastercomfig settings catalogue was never read.
+pub fn modules_no_catalog() -> SharedString {
+    tr!("profiles.modules.no_catalog")
+}
+
+/// The modules phase's failure when modules.cfg belongs to the player, not TF2Tools.
+pub fn modules_foreign() -> SharedString {
+    tr!("profiles.modules.foreign")
+}
+
+/// Joins `sentences` with one space, giving each a closing full stop it lacks.
+fn sentences_text(sentences: Vec<String>) -> String {
+    sentences
+        .into_iter()
+        .map(|mut s| {
+            if !s.ends_with(['.', '!', '?', '\u{3002}']) {
+                s.push('.');
+            }
+            s
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The activate row's details: "Applied: A, B; Skipped: x, y; Failed: C (error)", empty parts
@@ -229,10 +276,20 @@ pub fn redownload_target(
                 MissingKind::Hud => StoreKind::GameBananaHuds,
                 MissingKind::Hitsound | MissingKind::Killsound => StoreKind::Sounds,
                 MissingKind::Crosshair { .. } => StoreKind::Crosshairs,
-                _ => return None,
+                MissingKind::Addon { .. } | _ => return None,
             };
             Some((store, StoreItemId::GameBanana(*gb_id)))
         }
         Provenance::Local | Provenance::Curated { .. } | _ => None,
+    }
+}
+
+/// The name an add-on the library no longer has shows: core's display name for its asset
+/// name, never the raw file name.
+pub(crate) fn missing_addon_name(name: &AddonName) -> String {
+    if let DraftItem::Keep(item) = DraftItem::keep_addon(name.clone()) {
+        item.name().to_owned()
+    } else {
+        name.as_str().to_owned()
     }
 }

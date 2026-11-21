@@ -196,16 +196,20 @@ impl Confirm {
         }
     }
 
-    /// v5's ProfileCard delete prompt for the profile called `name`.
-    pub fn delete_profile(name: &str) -> Self {
+    /// v5's ProfileCard delete prompt for the profile called `name`; `active` adds that the
+    /// game stays as it is.
+    pub fn delete_profile(name: &str, active: bool) -> Self {
+        let mut description = format!(
+            "{} {}",
+            tr!("confirm.delete_profile.body", name = name),
+            tr!("confirm.cannot_undo")
+        );
+        if active {
+            description = format!("{description} {}", tr!("confirm.delete_profile.active"));
+        }
         Self {
             title: tr!("confirm.delete_profile.title"),
-            description: format!(
-                "{} {}",
-                tr!("confirm.delete_profile.body", name = name),
-                tr!("confirm.cannot_undo")
-            )
-            .into(),
+            description: description.into(),
             confirm_label: tr!("confirm.delete"),
             cancel_label: tr!("confirm.cancel"),
         }
@@ -217,16 +221,6 @@ impl Confirm {
             title: tr!("confirm.clear_profile_crosshairs.title"),
             description: tr!("confirm.clear_profile_crosshairs.body"),
             confirm_label: tr!("confirm.clear_profile_crosshairs.ok"),
-            cancel_label: tr!("confirm.cancel"),
-        }
-    }
-
-    /// v5's prompt before activating a profile with no HUD, sounds or crosshairs.
-    pub fn activate_empty() -> Self {
-        Self {
-            title: tr!("confirm.activate_empty.title"),
-            description: tr!("confirm.activate_empty.body"),
-            confirm_label: tr!("confirm.activate_empty.ok"),
             cancel_label: tr!("confirm.cancel"),
         }
     }

@@ -1,12 +1,11 @@
 use crate::support;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext, px};
 use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrolls};
 use tf2tools_app::ids;
@@ -16,8 +15,8 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
-    SoundEntry, Tf2Install,
+    CrosshairRef, DraftCrosshair, DraftItem, HudEntry, Profile, ProfileDraft, ProfileId,
+    Provenance, SlotMode, SoundEntry, Tf2Install,
 };
 use tf2tools_core::{GbId, LibraryKind};
 use tf2tools_core::{LogEntry, LogLevel};
@@ -80,13 +79,15 @@ fn full_profile(s: &support::ShellWindow, env: &support::Env, name: &str) -> Pro
     let kill = seed_sound(s, env, "Bell");
     let first = s.services.builtins.all().first().unwrap().name().to_owned();
     let draft = ProfileDraft::new(name)
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()))
-        .with_killsound(DraftSlot::Item(kill.id().clone()))
-        .with_crosshairs(vec![DraftCrosshair::Set {
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            Some(DraftItem::Pick(kill.id().clone())),
+        )))
+        .with_crosshairs(SlotMode::Set(vec![DraftCrosshair::Set {
             weapon_script: "tf_weapon_scattergun".into(),
             crosshair: CrosshairRef::Builtin(first),
-        }]);
+        }]));
     s.services.library.create_profile(&draft).unwrap()
 }
 
@@ -111,20 +112,6 @@ fn open_profiles(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<Pr
     page
 }
 
-fn search(
-    cx: &mut TestAppContext,
-    s: &support::ShellWindow,
-    page: &Entity<ProfilesPage>,
-    text: &str,
-) {
-    let input = cx.update(|cx| page.read(cx).search_input().clone());
-    cx.update_window(s.win, |_, window, cx| {
-        input.update(cx, |st, cx| st.set_value(text, window, cx))
-    })
-    .unwrap();
-    support::settle(cx, s.win);
-}
-
 fn has_dialog(cx: &mut TestAppContext, s: &support::ShellWindow) -> bool {
     support::settle(cx, s.win);
     cx.update_window(s.win, |_, w, cx| w.has_active_dialog(cx))
@@ -141,149 +128,6 @@ fn profiles_is_a_real_page(cx: &mut TestAppContext) {
     assert!(!support::present(cx, s.win, ids::PLACEHOLDER_MESSAGE));
     support::click_id(cx, s.win, ids::nav(Page::Huds));
     assert!(cx.update(|cx| s.shell.read(cx).profiles_page()).is_none());
-}
-
-#[gpui_kit::test]
-fn no_profiles_shows_v5_s_empty_states(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_profiles(cx, &s);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_NO_ACTIVE).as_deref(),
-        Some("No active profile")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_EMPTY).as_deref(),
-        Some("No profiles yet")
-    );
-    assert!(support::present(cx, s.win, ids::PROFILES_EMPTY_NEW));
-    assert!(support::present(cx, s.win, ids::PROFILES_EMPTY_START_EMPTY));
-    assert!(support::present(cx, s.win, ids::PROFILES_SEARCH));
-    assert!(!support::present(cx, s.win, ids::PROFILES_NO_TF2));
-}
-
-#[gpui_kit::test]
-fn cards_show_the_name_and_item_badges(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let comp = full_profile(&s, &env, "Competitive");
-    let vanilla = empty_profile(&s, "Vanilla");
-    let page = open_profiles(cx, &s);
-    assert_eq!(cx.update(|cx| page.read(cx).profiles().len()), 2);
-    let id = comp.id();
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_card(id)).as_deref(),
-        Some("Competitive")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_hud(id)).as_deref(),
-        Some("rayshud")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_hitsound(id)).as_deref(),
-        Some("Classic Ding")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_killsound(id)).as_deref(),
-        Some("Bell")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_crosshairs(id)).as_deref(),
-        Some("1 crosshair")
-    );
-    assert!(!support::present(cx, s.win, ids::profile_empty(id)));
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_empty(vanilla.id())).as_deref(),
-        Some("Empty profile")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_activate(id)).as_deref(),
-        Some("Activate")
-    );
-    assert!(support::present(cx, s.win, ids::profile_edit(id)));
-    assert!(support::present(cx, s.win, ids::profile_delete(id)));
-    assert!(!support::present(cx, s.win, ids::profile_active_badge(id)));
-}
-
-#[gpui_kit::test]
-fn the_active_profile_heads_the_page(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let comp = full_profile(&s, &env, "Competitive");
-    let vanilla = empty_profile(&s, "Vanilla");
-    s.services
-        .library
-        .apply_profile(comp.id(), &tf2(&env), &s.services.builtins, false)
-        .unwrap();
-    let page = open_profiles(cx, &s);
-    assert_eq!(
-        cx.update(|cx| page.read(cx).active().cloned()),
-        Some(comp.id().clone())
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_ACTIVE_NAME).as_deref(),
-        Some("Competitive")
-    );
-    assert!(support::present(cx, s.win, ids::PROFILES_ACTIVE_BADGE));
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_ACTIVE_HUD).as_deref(),
-        Some("rayshud")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_ACTIVE_CROSSHAIRS).as_deref(),
-        Some("1 crosshair")
-    );
-    assert!(!support::present(cx, s.win, ids::PROFILES_NO_ACTIVE));
-    assert!(support::present(
-        cx,
-        s.win,
-        ids::profile_active_badge(comp.id())
-    ));
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_activate(comp.id())).as_deref(),
-        Some("Active")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_activate(vanilla.id())).as_deref(),
-        Some("Activate")
-    );
-}
-
-#[gpui_kit::test]
-fn an_empty_active_profile_reads_vanilla(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let vanilla = empty_profile(&s, "Vanilla");
-    s.services
-        .library
-        .apply_profile(vanilla.id(), &tf2(&env), &s.services.builtins, false)
-        .unwrap();
-    let _page = open_profiles(cx, &s);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_ACTIVE_EMPTY).as_deref(),
-        Some("Empty profile (vanilla)")
-    );
-    assert!(!support::present(cx, s.win, ids::PROFILES_ACTIVE_HUD));
-}
-
-#[gpui_kit::test]
-fn search_filters_the_cards(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let comp = empty_profile(&s, "Competitive");
-    let casual = empty_profile(&s, "Casual");
-    let page = open_profiles(cx, &s);
-    search(cx, &s, &page, "COMP");
-    assert!(support::present(cx, s.win, ids::profile_card(comp.id())));
-    assert!(!support::present(cx, s.win, ids::profile_card(casual.id())));
-    search(cx, &s, &page, "zzz");
-    assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_NO_MATCH).as_deref(),
-        Some("No profiles found")
-    );
-    assert!(!support::present(cx, s.win, ids::PROFILES_EMPTY));
-    search(cx, &s, &page, "");
-    assert!(support::present(cx, s.win, ids::profile_card(casual.id())));
 }
 
 #[gpui_kit::test]
@@ -308,6 +152,265 @@ fn a_library_change_reloads_the_page(cx: &mut TestAppContext) {
     });
 }
 
+fn lines(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    id: &tf2tools_core::ProfileId,
+) -> Vec<String> {
+    ["hud", "sounds", "crosshairs", "graphics", "addons"]
+        .map(|slot| {
+            support::label_of(cx, s.win, ids::profile_card_line(id, slot)).unwrap_or_default()
+        })
+        .to_vec()
+}
+
+#[gpui_kit::test]
+fn the_list_leads_with_its_line_and_new_profile(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_LEAD).as_deref(),
+        Some(
+            "A profile switches your whole setup at once: HUD, sounds, crosshairs, graphics and add-ons. A new one starts as a copy of what you have now."
+        )
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_NEW).as_deref(),
+        Some("New profile")
+    );
+    assert!(!support::disabled_of(cx, s.win, ids::PROFILES_NEW));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_EMPTY).as_deref(),
+        Some("No profiles yet")
+    );
+    assert!(!support::present(cx, s.win, ids::PROFILES_NO_TF2));
+}
+
+#[gpui_kit::test]
+fn each_card_shows_its_five_slots(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Competitive");
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    assert_eq!(cx.update(|cx| page.read(cx).profiles().len()), 2);
+    let id = comp.id();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card(id)).as_deref(),
+        Some("Competitive")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_name(id)).as_deref(),
+        Some("Competitive")
+    );
+    assert_eq!(
+        lines(cx, &s, id),
+        [
+            "rayshud",
+            "Hit: Classic Ding, kill: Bell",
+            "1 weapon crosshair",
+            "Left as is",
+            "Left as is"
+        ]
+    );
+    assert_eq!(
+        lines(cx, &s, vanilla.id()),
+        [
+            "TF2's own HUD",
+            "TF2 default sounds",
+            "TF2's default crosshairs",
+            "Left as is",
+            "Left as is"
+        ]
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_apply(id)).as_deref(),
+        Some("Apply")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_edit(id)).as_deref(),
+        Some("Edit")
+    );
+    assert!(!support::present(cx, s.win, ids::profile_card_active(id)));
+}
+
+#[gpui_kit::test]
+fn the_active_card_wears_the_pill_and_offers_no_apply(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let pub_ = empty_profile(&s, "Pub");
+    s.services
+        .library
+        .apply_profile(comp.id(), &tf2(&env), &s.services.builtins, false)
+        .unwrap();
+    let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref(),
+        Some("Active")
+    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_card_apply(comp.id())
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::profile_card_edit(comp.id())
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::profile_card_apply(pub_.id())
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_card_active(pub_.id())
+    ));
+}
+
+#[gpui_kit::test]
+fn the_picture_says_tf2s_own_hud_only_under_none(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let untouched = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Untouched").with_hud(tf2tools_core::SlotMode::Leave))
+        .unwrap();
+    let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_picture(vanilla.id())).as_deref(),
+        Some("TF2's own HUD")
+    );
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::profile_card_picture(untouched.id())
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_picture(untouched.id())),
+        None
+    );
+}
+
+#[gpui_kit::test]
+fn without_tf2_new_profile_and_apply_are_disabled(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let comp = empty_profile(&s, "Comp");
+    let _page = open_profiles(cx, &s);
+    assert!(support::present(cx, s.win, ids::PROFILES_NO_TF2));
+    assert!(support::disabled_of(cx, s.win, ids::PROFILES_NEW));
+    assert!(support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_card_apply(comp.id())
+    ));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_card_edit(comp.id())
+    ));
+}
+
+#[gpui_kit::test]
+fn at_800x600_the_list_fits_and_cards_keep_250_px(cx: &mut TestAppContext) {
+    use gpui_kit::size;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let pub_ = empty_profile(&s, "Pub");
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let _page = open_profiles(cx, &s);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::Profiles)).unwrap();
+    let margin = tf2tools_app::shell::CONTENT_PADDING;
+    let (lead, new) = (
+        support::bounds_of(cx, s.win, ids::PROFILES_LEAD).unwrap(),
+        support::bounds_of(cx, s.win, ids::PROFILES_NEW).unwrap(),
+    );
+    for b in [lead, new] {
+        assert!(
+            b.left() >= page.left() + margin - px(1.)
+                && b.right() <= page.right() - margin + px(1.),
+            "{b:?} past the margin of {page:?}"
+        );
+    }
+    assert!(!lead.intersects(&new), "{lead:?} and {new:?} overlap");
+    let card = support::bounds_of(cx, s.win, ids::profile_card(comp.id())).unwrap();
+    assert!(card.size.width >= px(250.), "the card is {card:?}");
+    assert!(
+        card.right() <= page.right() - margin + px(1.),
+        "{card:?} leaves {page:?}"
+    );
+    for slot in ["hud", "sounds", "crosshairs", "graphics", "addons"] {
+        let line = support::bounds_of(cx, s.win, ids::profile_card_line(comp.id(), slot)).unwrap();
+        assert!(
+            line.right() <= card.right() && line.bottom() <= card.bottom(),
+            "{slot} {line:?} leaves {card:?}"
+        );
+    }
+    for button in [
+        ids::profile_card_apply(comp.id()),
+        ids::profile_card_edit(comp.id()),
+    ] {
+        let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
+        assert!(
+            b.right() <= card.right() && b.bottom() <= card.bottom(),
+            "{button:?} {b:?} leaves {card:?}"
+        );
+    }
+    assert!(support::present(cx, s.win, ids::profile_card(pub_.id())));
+}
+
+#[gpui_kit::test]
+fn at_800x600_the_first_card_fits_under_a_capped_picture(cx: &mut TestAppContext) {
+    use gpui_kit::size;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let _pub = empty_profile(&s, "Pub");
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let _page = open_profiles(cx, &s);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::Profiles)).unwrap();
+    let card = support::bounds_of(cx, s.win, ids::profile_card(comp.id())).unwrap();
+    let picture = support::bounds_of(cx, s.win, ids::profile_card_picture(comp.id())).unwrap();
+    assert!(
+        picture.size.height <= px(180.),
+        "the picture is {picture:?}"
+    );
+    assert!(
+        card.top() >= page.top() && card.bottom() <= page.bottom(),
+        "{card:?} leaves {page:?}"
+    );
+    let edit = support::bounds_of(cx, s.win, ids::profile_card_edit(comp.id())).unwrap();
+    assert!(edit.bottom() <= card.bottom(), "{edit:?} leaves {card:?}");
+}
+
+#[gpui_kit::test]
+fn at_1280_three_cards_share_a_row(cx: &mut TestAppContext) {
+    use gpui_kit::size;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let ps = [
+        empty_profile(&s, "A"),
+        empty_profile(&s, "B"),
+        empty_profile(&s, "C"),
+    ];
+    cx.simulate_window_resize(s.win, size(px(1280.), px(860.)));
+    let _page = open_profiles(cx, &s);
+    let cards: Vec<_> = ps
+        .iter()
+        .map(|p| support::bounds_of(cx, s.win, ids::profile_card(p.id())).unwrap())
+        .collect();
+    assert!(cards.iter().all(|c| c.top() == cards[0].top()), "{cards:?}");
+    assert!(cards.iter().all(|c| c.size.width >= px(250.)), "{cards:?}");
+}
+
 fn row(e: &LogEntry) -> (&str, &str, &str) {
     (e.category(), e.action(), e.message())
 }
@@ -323,8 +426,9 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = empty_profile(&s, "Competitive");
-    let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_delete(comp.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, comp.id());
+    support::profiles::click_delete(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
         Some("Are you sure you want to delete \"Competitive\"? This cannot be undone.")
@@ -348,15 +452,16 @@ fn cancelling_delete_keeps_the_profile(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = empty_profile(&s, "Competitive");
-    let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_delete(comp.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, comp.id());
+    support::profiles::click_delete(cx, &s);
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     assert_eq!(s.services.library.profiles().unwrap().len(), 1);
     assert!(support::log_rows(&s.services).is_empty());
 }
 
 #[gpui_kit::test]
-fn deleting_the_active_profile_clears_the_active_card(cx: &mut TestAppContext) {
+fn deleting_the_active_profile_clears_the_active_mark(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let vanilla = empty_profile(&s, "Vanilla");
@@ -364,14 +469,28 @@ fn deleting_the_active_profile_clears_the_active_card(cx: &mut TestAppContext) {
         .library
         .apply_profile(vanilla.id(), &tf2(&env), &s.services.builtins, false)
         .unwrap();
-    let _page = open_profiles(cx, &s);
-    assert!(support::present(cx, s.win, ids::PROFILES_ACTIVE));
-    support::click_id(cx, s.win, ids::profile_delete(vanilla.id()));
+    let page = open_profiles(cx, &s);
+    support::profiles::edit(cx, &s, &page, vanilla.id());
+    support::profiles::click_delete(cx, &s);
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     toast_is(cx, &s, "Profile deleted");
-    support::wait_real(cx, "the reload", |cx| {
-        support::present(cx, s.win, ids::PROFILES_NO_ACTIVE)
-    });
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+}
+
+// The card's own buttons do their job only; the click stops before the card behind them.
+#[gpui_kit::test]
+fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_apply(cx, s.win, comp.id());
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
 }
 
 /// Counts `LibraryChanged` from now on; keep the subscription alive.
@@ -394,11 +513,11 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(env.game.join("tf/custom/rayshud").is_dir());
     assert_eq!(
@@ -407,13 +526,15 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     );
     support::wait_real(cx, "LibraryChanged", |_| changes.get() >= 1);
     assert_eq!(changes.get(), 1);
-    support::wait_real(cx, "the active card", |cx| {
-        support::label_of(cx, s.win, ids::PROFILES_ACTIVE_NAME).as_deref() == Some("Comp")
+    support::wait_real(cx, "the active pill", |cx| {
+        support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref()
+            == Some("Active")
     });
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_activate(comp.id())).as_deref(),
-        Some("Active")
-    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_card_apply(comp.id())
+    ));
     let rows = support::log_rows(&s.services);
     assert_eq!(rows.len(), 1);
     assert_eq!(
@@ -427,33 +548,117 @@ fn activate_applies_everything_and_marks_it_active(cx: &mut TestAppContext) {
     );
 }
 
+fn row_label(cx: &mut TestAppContext, s: &support::ShellWindow, key: &str) -> Option<String> {
+    support::label_of(cx, s.win, ids::profile_apply_row(key))
+}
+
 #[gpui_kit::test]
-fn an_empty_profile_confirms_first(cx: &mut TestAppContext) {
+fn apply_first_shows_what_changes_and_cancel_applies_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_card_apply(comp.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_TITLE).as_deref(),
+        Some("Switch to Comp?")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_INTRO).as_deref(),
+        Some("These change now. Everything else stays how it is.")
+    );
+    assert_eq!(
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: TF2's own HUD → rayshud")
+    );
+    assert_eq!(
+        row_label(cx, &s, "hitsound").as_deref(),
+        Some("Hitsound: TF2 default → Classic Ding")
+    );
+    assert_eq!(
+        row_label(cx, &s, "killsound").as_deref(),
+        Some("Killsound: TF2 default → Bell")
+    );
+    assert_eq!(
+        row_label(cx, &s, "crosshairs").as_deref(),
+        Some("Crosshairs: TF2's default → 1 weapon")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_LEFT).as_deref(),
+        Some("Stays as it is: Graphics, Add-ons.")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_OK).as_deref(),
+        Some("Apply Comp")
+    );
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
+    support::settle(cx, s.win);
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+    assert!(!env.game.join("tf/custom/rayshud").exists());
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert!(support::log_rows(&s.services).is_empty());
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+}
+
+#[gpui_kit::test]
+fn cancel_in_the_summary_applies_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let vanilla = empty_profile(&s, "Vanilla");
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(vanilla.id()));
+    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+    support::press(cx, s.win, "escape");
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::profile_card_apply(vanilla.id())
+    ));
+}
+
+#[gpui_kit::test]
+fn a_profile_that_matches_says_nothing_changes_and_still_becomes_active(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let _page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
     assert_eq!(
-        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
-        Some("Activate Empty Profile")
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_NOTHING).as_deref(),
+        Some("This already matches what you have now. Applying marks it as your active profile.")
     );
+    assert!(!support::present(cx, s.win, ids::PROFILE_APPLY_ROWS));
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    support::wait_real(cx, "the mark", |_| {
+        s.services.library.active_profile().unwrap() == Some(vanilla.id().clone())
+    });
+}
+
+#[gpui_kit::test]
+fn a_running_tf2_still_asks_after_the_summary(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let _page = open_profiles(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the running confirm", |cx| {
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref() == Some("TF2 is running")
+    });
     support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
     support::settle(cx, s.win);
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
-    assert!(support::log_rows(&s.services).is_empty());
-    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
-    support::click_id(cx, s.win, ids::profile_activate(vanilla.id()));
-    support::click_id(cx, s.win, ids::CONFIRM_OK);
-    toast_is(
-        cx,
-        &s,
-        "Profile \"Vanilla\" activated. All customizations cleared",
-    );
-    assert_eq!(
-        s.services.library.active_profile().unwrap(),
-        Some(vanilla.id().clone())
-    );
+    assert!(!env.game.join("tf/custom/rayshud").exists());
 }
 
 #[gpui_kit::test]
@@ -463,7 +668,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let page = open_profiles(cx, &s);
     cx.update(|cx| Tf2Probe::install(cx, || true));
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the TF2 warning", |cx| {
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref()
             == Some("TF2 is running; changes take effect after a restart.")
@@ -472,7 +677,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     assert!(!env.game.join("tf/custom/rayshud").exists());
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the TF2 warning", |cx| {
         support::present(cx, s.win, ids::CONFIRM_OK)
     });
@@ -480,7 +685,7 @@ fn a_running_tf2_warns_before_applying(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert!(env.game.join("tf/custom/rayshud").is_dir());
 }
@@ -501,11 +706,11 @@ fn the_tf2_probe_runs_off_the_ui_thread(cx: &mut TestAppContext) {
             false
         })
     });
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert_eq!(
         *calls.lock().unwrap(),
@@ -522,9 +727,11 @@ fn a_second_activate_while_one_runs_does_nothing(cx: &mut TestAppContext) {
     let other = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Other").with_hud(DraftSlot::Item(
-            s.services.library.list_huds().unwrap()[0].id().clone(),
-        )))
+        .create_profile(
+            &ProfileDraft::new("Other").with_hud(SlotMode::Set(DraftItem::Pick(
+                s.services.library.list_huds().unwrap()[0].id().clone(),
+            ))),
+        )
         .unwrap();
     let page = open_profiles(cx, &s);
     let (a, b) = (comp.id().clone(), other.id().clone());
@@ -539,10 +746,11 @@ fn a_second_activate_while_one_runs_does_nothing(cx: &mut TestAppContext) {
         cx.update(|cx| page.read(cx).activating().cloned()),
         Some(a.clone())
     );
+    support::confirm_apply_summary(cx, s.win);
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     support::wait_real(cx, "idle", |cx| {
         cx.update(|cx| page.read(cx).activating().is_none())
@@ -574,18 +782,17 @@ fn a_failed_step_toasts_the_steps_and_leaves_nothing_active(cx: &mut TestAppCont
         return;
     }
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     support::wait_real(cx, "the failure toast", |cx| {
-        support::label_of(cx, s.win, ids::TOAST).is_some_and(|t| {
-            t.starts_with("Failed to activate profile. Couldn't put these in place: HUD")
-        })
+        support::label_of(cx, s.win, ids::TOAST)
+            .is_some_and(|t| t.starts_with("Couldn't apply Comp. Couldn't put these in place: HUD"))
     });
     std::fs::set_permissions(&custom, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(s.services.library.active_profile().unwrap(), None);
     support::wait_real(cx, "LibraryChanged", |_| changes.get() >= 1);
     assert_eq!(changes.get(), 1);
     support::wait_real(cx, "the reload", |cx| {
-        support::present(cx, s.win, ids::PROFILES_NO_ACTIVE)
+        !support::present(cx, s.win, ids::profile_card_active(comp.id()))
     });
     let rows = support::log_rows(&s.services);
     assert_eq!(
@@ -606,9 +813,89 @@ fn activate_rests_without_tf2(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let vanilla = empty_profile(&s, "Vanilla");
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(vanilla.id()));
+    support::click_id(cx, s.win, ids::profile_card_apply(vanilla.id()));
     assert!(!has_dialog(cx, &s));
     assert!(!support::present(cx, s.win, ids::TOAST));
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+}
+
+/// Every `applying()` the page shows from now on, read at each notify; keep the subscription.
+fn record_applying(
+    cx: &mut TestAppContext,
+    page: &Entity<ProfilesPage>,
+) -> (Rc<RefCell<Vec<Option<ProfileId>>>>, gpui_kit::Subscription) {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let log = Rc::clone(&seen);
+    let sub = cx.update(|cx| {
+        cx.observe(page, move |page, cx| {
+            log.borrow_mut().push(page.read(cx).applying().cloned())
+        })
+    });
+    (seen, sub)
+}
+
+#[gpui_kit::test]
+fn apply_stays_idle_while_its_summary_waits(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let other = empty_profile(&s, "Other");
+    let page = open_profiles(cx, &s);
+    let (seen, _sub) = record_applying(cx, &page);
+    open_summary(cx, &s, comp.id());
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    // The summary still holds the one activate, so a second Apply does nothing.
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.activate(other.id().clone(), window, cx))
+    })
+    .unwrap();
+    assert_eq!(
+        cx.update(|cx| page.read(cx).activating().cloned()),
+        Some(comp.id().clone())
+    );
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
+    support::settle(cx, s.win);
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    assert!(cx.update(|cx| page.read(cx).activating().is_none()));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+}
+
+#[gpui_kit::test]
+fn apply_spins_from_the_summary_s_yes_until_the_apply_ends(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let (seen, _sub) = record_applying(cx, &page);
+    open_summary(cx, &s, comp.id());
+    assert!(seen.borrow().iter().all(Option::is_none), "{seen:?}");
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    support::wait_real(cx, "idle", |cx| {
+        cx.update(|cx| page.read(cx).activating().is_none())
+    });
+    assert!(seen.borrow().contains(&Some(comp.id().clone())), "{seen:?}");
+    assert!(cx.update(|cx| page.read(cx).applying().is_none()));
+}
+
+#[gpui_kit::test]
+fn apply_stays_idle_while_the_tf2_running_question_waits(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the running confirm", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_OK)
+    });
+    assert!(cx.update(|cx| page.read(cx).applying().is_none()));
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::settle(cx, s.win);
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
 }
 
@@ -617,38 +904,53 @@ fn profile_missing_its_hud(s: &support::ShellWindow, env: &support::Env) -> Prof
     let hud = seed_hud(s, env, "rayshud", Provenance::Local);
     let hit = seed_sound(s, env, "Classic Ding");
     let draft = ProfileDraft::new("Comp")
-        .with_hud(DraftSlot::Item(hud.id().clone()))
-        .with_hitsound(DraftSlot::Item(hit.id().clone()));
+        .with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())))
+        .with_sounds(SlotMode::Set((
+            Some(DraftItem::Pick(hit.id().clone())),
+            None,
+        )));
     let profile = s.services.library.create_profile(&draft).unwrap();
     s.services.library.delete_hud(hud.id()).unwrap();
     profile
 }
 
+/// Clicks a card's Apply and waits for its summary, without answering it.
+fn open_summary(cx: &mut TestAppContext, s: &support::ShellWindow, id: &tf2tools_core::ProfileId) {
+    support::click_id(cx, s.win, ids::profile_card_apply(id));
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
+}
+
 #[gpui_kit::test]
-fn a_missing_item_opens_the_dialog_and_touches_nothing(cx: &mut TestAppContext) {
+fn a_missing_item_shows_as_its_row_in_the_summary_and_touches_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert_eq!(
-        support::label_of(cx, s.win, ids::PROFILES_MISSING_DESCRIPTION).as_deref(),
-        Some("Some items in \"Comp\" are no longer in your library.")
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: rayshud is missing; nothing is installed there")
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_item(0)).as_deref(),
-        Some("rayshud (HUD)")
+        row_label(cx, &s, "hitsound").as_deref(),
+        Some("Hitsound: TF2 default → Classic Ding")
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::missing_local(0)).as_deref(),
+        support::label_of(cx, s.win, ids::profile_apply_local("hud")).as_deref(),
         Some("Local import — can't re-download")
     );
-    assert!(!support::present(cx, s.win, ids::missing_redownload(0)));
-    assert!(!support::present(cx, s.win, ids::missing_item(1)));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_redownload("hud")
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_APPLY_OK).as_deref(),
+        Some("Apply Comp")
+    );
     assert!(!env.game.join("tf/custom/tf2tools-sounds").exists());
     assert_eq!(s.services.library.active_profile().unwrap(), None);
     assert_eq!(changes.get(), 0);
@@ -656,42 +958,48 @@ fn a_missing_item_opens_the_dialog_and_touches_nothing(cx: &mut TestAppContext) 
 }
 
 #[gpui_kit::test]
-fn the_missing_items_header_sits_together_like_v5s(cx: &mut TestAppContext) {
+fn a_missing_hud_row_names_the_hud_that_stays(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
+    let budhud = seed_hud(&s, &env, "budhud", Provenance::Local);
+    s.services
+        .library
+        .install_hud(budhud.id(), &tf2(&env))
+        .unwrap();
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
-    let title = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_TITLE).unwrap();
-    let description = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_DESCRIPTION).unwrap();
-    let first = support::bounds_of(cx, s.win, ids::missing_item(0)).unwrap();
+    open_summary(cx, &s, comp.id());
     assert_eq!(
-        description.top() - title.bottom(),
-        px(8.),
-        "v5's gap-2 header"
-    );
-    assert_eq!(
-        first.top() - description.bottom(),
-        px(16.),
-        "v5's gap-4 content"
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: rayshud is missing; keeps budhud")
     );
 }
 
 #[gpui_kit::test]
-fn cancel_in_missing_items_changes_nothing(cx: &mut TestAppContext) {
+fn a_missing_row_sits_in_the_summary_rows(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = profile_missing_its_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, comp.id());
+    let rows = support::bounds_of(cx, s.win, ids::PROFILE_APPLY_ROWS).unwrap();
+    let hud = support::bounds_of(cx, s.win, ids::profile_apply_row("hud")).unwrap();
+    assert!(
+        hud.top() >= rows.top() && hud.bottom() <= rows.bottom(),
+        "{hud:?} outside {rows:?}"
+    );
+    assert!(!support::present(cx, s.win, "profiles-missing-dialog"));
+}
+
+#[gpui_kit::test]
+fn cancel_on_a_summary_with_a_missing_item_changes_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert!(cx.update(|cx| page.read(cx).activating().is_some()));
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_CANCEL);
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
     assert!(!has_dialog(cx, &s));
     assert!(cx.update(|cx| page.read(cx).activating().is_none()));
     assert_eq!(s.services.library.active_profile().unwrap(), None);
@@ -699,32 +1007,31 @@ fn cancel_in_missing_items_changes_nothing(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
+fn confirming_the_summary_skips_the_missing_item_without_a_second_dialog(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
     let (changes, _sub) = count_changes(cx);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
-    });
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" applied. Installed: Hitsound. Kept what you had for: HUD (missing from your library)",
+        "Comp applied. TF2 picks it up the next time it starts. Kept what you had for: HUD (missing from your library).",
     );
     assert!(!has_dialog(cx, &s));
-    // The game does not match the profile, so it is not marked Active.
-    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    // Skipping a missing item was the player's choice, so the applied profile is Active.
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
     support::wait_real(cx, "LibraryChanged", |_| changes.get() >= 1);
     assert_eq!(changes.get(), 1);
     let rows = support::log_rows(&s.services);
     assert_eq!(rows.len(), 1);
     assert_eq!(
         row(&rows[0]),
-        ("profile", "activate", "Applied profile: Comp")
+        ("profile", "activate", "Activated profile: Comp")
     );
     assert!(
         rows[0]
@@ -734,7 +1041,61 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
+fn confirming_with_a_missing_item_moves_the_active_pill_to_the_applied_profile(
+    cx: &mut TestAppContext,
+) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let pub_ = empty_profile(&s, "Pub");
+    s.services
+        .library
+        .apply_profile(pub_.id(), &tf2(&env), &s.services.builtins, false)
+        .unwrap();
+    let comp = profile_missing_its_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_card_active(pub_.id())).as_deref(),
+        Some("Active")
+    );
+    support::click_apply(cx, s.win, comp.id());
+    support::wait_real(cx, "the active pill on Comp", |cx| {
+        support::label_of(cx, s.win, ids::profile_card_active(comp.id())).as_deref()
+            == Some("Active")
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_card_active(pub_.id())
+    ));
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
+}
+
+/// "Comp" whose HUD "flawhud" came from GameBanana 4242 and is gone from the library.
+fn profile_missing_its_store_hud(s: &support::ShellWindow, env: &support::Env) -> Profile {
+    let hud = seed_hud(s, env, "flawhud", flawhud_provenance());
+    let comp = s
+        .services
+        .library
+        .create_profile(
+            &ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone()))),
+        )
+        .unwrap();
+    s.services.library.delete_hud(hud.id()).unwrap();
+    comp
+}
+
+fn flawhud_provenance() -> Provenance {
+    Provenance::GameBanana {
+        gb_id: GbId::new(4242),
+        author: "vex".into(),
+    }
+}
+
+#[gpui_kit::test]
+fn a_store_item_offers_re_download_on_its_row(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     server.mount_gb_files(
@@ -745,28 +1106,53 @@ fn a_store_item_offers_re_download(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     support::store_ready(cx, &server);
     support::seed_gb_huds(&env, &[(4242, "FlawHUD")]);
-    let gb = Provenance::GameBanana {
-        gb_id: GbId::new(4242),
-        author: "vex".into(),
-    };
-    let hud = seed_hud(&s, &env, "flawhud", gb);
-    let comp = s
-        .services
-        .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone())))
-        .unwrap();
-    s.services.library.delete_hud(hud.id()).unwrap();
+    let comp = profile_missing_its_store_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    open_summary(cx, &s, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
-        support::present(cx, s.win, ids::missing_redownload(0))
+        support::present(cx, s.win, ids::profile_apply_redownload("hud"))
     });
-    assert!(!support::present(cx, s.win, ids::missing_local(0)));
-    support::click_id(cx, s.win, ids::missing_redownload(0));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_local("hud")
+    ));
+    support::click_id(cx, s.win, ids::profile_apply_redownload("hud"));
     support::wait_real(cx, "the store detail", |cx| {
         support::present(cx, s.win, ids::STORE_DETAIL)
     });
-    assert!(support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG));
+    assert!(support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
+}
+
+// A finished download lands in the library and emits `LibraryChanged`; the summary reads again.
+#[gpui_kit::test]
+fn a_finished_re_download_refreshes_the_row_and_apply_installs_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = profile_missing_its_store_hud(&s, &env);
+    let _page = open_profiles(cx, &s);
+    open_summary(cx, &s, comp.id());
+    assert_eq!(
+        row_label(cx, &s, "hud").as_deref(),
+        Some("HUD: flawhud is missing; nothing is installed there")
+    );
+    seed_hud(&s, &env, "flawhud", flawhud_provenance());
+    cx.update(LibraryEvents::changed);
+    support::wait_real(cx, "the refreshed row", |cx| {
+        row_label(cx, &s, "hud").as_deref() == Some("HUD: TF2's own HUD → flawhud")
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_apply_redownload("hud")
+    ));
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_OK);
+    toast_is(
+        cx,
+        &s,
+        "Comp applied. TF2 picks it up the next time it starts.",
+    );
+    assert!(env.game.join("tf/custom/flawhud").is_dir());
 }
 
 #[gpui_kit::test]
@@ -775,27 +1161,17 @@ fn the_profile_buttons_are_v5_s_32_px(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let p = empty_profile(&s, "Casual");
     let _page = open_profiles(cx, &s);
-    let targets: [gpui_kit::ElementId; 4] = [
-        ids::PROFILES_NEW.into(),
-        ids::profile_activate(p.id()),
-        ids::profile_edit(p.id()),
-        ids::profile_delete(p.id()),
+    let targets: [gpui_kit::ElementId; 2] = [
+        ids::profile_card_apply(p.id()),
+        ids::profile_card_edit(p.id()),
     ];
     for id in targets {
         let b = support::bounds_of(cx, s.win, id.clone()).expect("drawn");
         assert_eq!(b.size.height, gpui_kit::px(32.), "{id:?}");
     }
-}
-
-#[gpui_kit::test]
-fn the_empty_state_buttons_are_v5_s_32_px(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_profiles(cx, &s);
-    for id in [ids::PROFILES_EMPTY_NEW, ids::PROFILES_EMPTY_START_EMPTY] {
-        let b = support::bounds_of(cx, s.win, id).expect(id);
-        assert_eq!(b.size.height, gpui_kit::px(32.), "{id}");
-    }
+    // The mock's New profile button stands taller, beside the lead line.
+    let new = support::bounds_of(cx, s.win, ids::PROFILES_NEW).expect("drawn");
+    assert_eq!(new.size.height, gpui_kit::px(36.));
 }
 
 #[gpui_kit::test]
@@ -810,59 +1186,30 @@ fn nothing_else_starts_while_an_activate_runs(cx: &mut TestAppContext) {
         page.update(cx, |p, cx| {
             p.activate(a.clone(), window, cx);
             p.delete(b.clone(), "Other", window, cx);
-            p.new_profile(true, window, cx);
-            p.new_profile(false, window, cx);
+            p.new_profile(window, cx);
             p.open_editor(b.clone(), window, cx);
         })
     })
     .unwrap();
+    // Only the first activate's summary opens: no delete confirm, no new profile.
+    support::wait_real(cx, "the summary", |cx| {
+        support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG)
+    });
     assert!(
-        !has_dialog(cx, &s),
+        !support::present(cx, s.win, ids::CONFIRM_TITLE),
         "no confirm or new profile while activating"
     );
     assert!(cx.update(|cx| page.read(cx).editor().is_none()));
+    support::confirm_apply_summary(cx, s.win);
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+        "Comp applied. TF2 picks it up the next time it starts.",
     );
     assert_eq!(s.services.library.profiles().unwrap().len(), 2);
 }
 
-// The empty state leaves once a profile exists, so its buttons are read in the frame the
-// Start empty click draws, before the executor runs the create job.
-#[gpui_kit::test]
-fn the_empty_state_buttons_render_disabled_while_a_create_runs(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let page = open_profiles(cx, &s);
-    let empty: Vec<ElementId> = vec![
-        ids::PROFILES_EMPTY_NEW.into(),
-        ids::PROFILES_EMPTY_START_EMPTY.into(),
-    ];
-    assert_eq!(
-        support::disabled_ids(cx, s.win, &empty),
-        Vec::<ElementId>::new()
-    );
-    let disabled = cx
-        .update_window(s.win, |_, w, cx| {
-            w.click(ids::PROFILES_EMPTY_START_EMPTY, cx);
-            w.render_frame(cx);
-            w.simulate_next_frame(cx);
-            empty
-                .iter()
-                .filter(|id| support::button_disabled(w, (*id).clone()))
-                .cloned()
-                .collect::<Vec<_>>()
-        })
-        .unwrap();
-    assert_eq!(disabled, empty);
-    support::wait_real(cx, "the create to end", |cx| {
-        cx.update(|cx| !page.read(cx).is_busy())
-    });
-}
-
-// The Missing Items dialog holds the activate open, so every button is read in a steady busy state.
+// The Apply summary holds the activate open, so every button is read in a steady busy state.
 #[gpui_kit::test]
 fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestAppContext) {
     let env = support::env();
@@ -872,24 +1219,19 @@ fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestApp
     let page = open_profiles(cx, &s);
     let buttons: Vec<ElementId> = vec![
         ids::PROFILES_NEW.into(),
-        ids::profile_activate(comp.id()),
-        ids::profile_edit(comp.id()),
-        ids::profile_delete(comp.id()),
-        ids::profile_activate(other.id()),
-        ids::profile_edit(other.id()),
-        ids::profile_delete(other.id()),
+        ids::profile_card_apply(comp.id()),
+        ids::profile_card_edit(comp.id()),
+        ids::profile_card_apply(other.id()),
+        ids::profile_card_edit(other.id()),
     ];
     assert_eq!(
         support::disabled_ids(cx, s.win, &buttons),
         Vec::<ElementId>::new()
     );
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     assert!(cx.update(|cx| page.read(cx).is_busy()));
     assert_eq!(support::disabled_ids(cx, s.win, &buttons), buttons);
-    support::click_id(cx, s.win, ids::PROFILES_MISSING_CANCEL);
+    support::click_id(cx, s.win, ids::PROFILE_APPLY_CANCEL);
     assert!(cx.update(|cx| !page.read(cx).is_busy()));
     assert_eq!(
         support::disabled_ids(cx, s.win, &buttons),
@@ -898,15 +1240,12 @@ fn every_profile_button_renders_disabled_while_an_activate_runs(cx: &mut TestApp
 }
 
 #[gpui_kit::test]
-fn escape_on_missing_items_answers_cancel(cx: &mut TestAppContext) {
+fn escape_on_a_summary_with_a_missing_item_answers_cancel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     support::press(cx, s.win, "escape");
     assert!(!has_dialog(cx, &s));
     support::wait_real(cx, "the flow to end", |cx| {
@@ -916,7 +1255,7 @@ fn escape_on_missing_items_answers_cancel(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppContext) {
+fn closing_the_stacked_store_detail_keeps_the_summary_open(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     server.mount_gb_files(
@@ -927,44 +1266,31 @@ fn closing_the_stacked_store_detail_keeps_missing_items_open(cx: &mut TestAppCon
     let s = support::shell_window(cx, &env, found(&env));
     support::store_ready(cx, &server);
     support::seed_gb_huds(&env, &[(4242, "FlawHUD")]);
-    let gb = Provenance::GameBanana {
-        gb_id: GbId::new(4242),
-        author: "vex".into(),
-    };
-    let hud = seed_hud(&s, &env, "flawhud", gb);
-    let comp = s
-        .services
-        .library
-        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone())))
-        .unwrap();
-    s.services.library.delete_hud(hud.id()).unwrap();
+    let comp = profile_missing_its_store_hud(&s, &env);
     let page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    open_summary(cx, &s, comp.id());
     support::wait_real(cx, "the Re-download button", |cx| {
-        support::present(cx, s.win, ids::missing_redownload(0))
+        support::present(cx, s.win, ids::profile_apply_redownload("hud"))
     });
-    support::click_id(cx, s.win, ids::missing_redownload(0));
+    support::click_id(cx, s.win, ids::profile_apply_redownload("hud"));
     support::wait_real(cx, "the store detail", |cx| {
         support::present(cx, s.win, ids::STORE_DETAIL)
     });
     support::press(cx, s.win, "escape");
     assert!(!support::present(cx, s.win, ids::STORE_DETAIL));
-    assert!(support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG));
+    assert!(support::present(cx, s.win, ids::PROFILE_APPLY_DIALOG));
     assert!(cx.update(|cx| page.read(cx).activating().is_some()));
 }
 
 #[gpui_kit::test]
-fn missing_items_is_padded_like_v5(cx: &mut TestAppContext) {
+fn a_summary_with_a_missing_item_is_padded_like_v5(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = profile_missing_its_hud(&s, &env);
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
     let b = support::dialog_box(cx, s.win);
-    let body = support::bounds_of(cx, s.win, ids::PROFILES_MISSING_DIALOG).unwrap();
+    let body = support::bounds_of(cx, s.win, ids::PROFILE_APPLY_DIALOG).unwrap();
     assert_eq!(
         body.left() - b.left(),
         gpui_kit::px(25.),
@@ -985,19 +1311,20 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
         "#base \"../../custom/m0rehud/resource/ui/base.res\"\n",
     )
     .unwrap();
-    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let draft =
+        ProfileDraft::new("Comp").with_hud(SlotMode::Set(DraftItem::Pick(hud.id().clone())));
     let comp = s.services.library.create_profile(&draft).unwrap();
     let mine = env.game.join("tf/custom/m0rehud");
     std::fs::create_dir_all(&mine).unwrap();
     std::fs::write(mine.join("notes.txt"), "mine").unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::click_apply(cx, s.win, comp.id());
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. A folder named m0rehud is already in your custom \
-         folder, so parts of this HUD may not show. Move or rename that folder and install \
-         again.",
+        "Comp applied. TF2 picks it up the next time it starts. A folder named m0rehud is \
+         already in your custom folder, so parts of this HUD may not show. Move or rename that \
+         folder and install again.",
     );
     assert!(
         env.game
@@ -1007,66 +1334,8 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
     assert_eq!(std::fs::read(mine.join("notes.txt")).unwrap(), b"mine");
 }
 
-// At the 800x600 minimum with the sidebar open, the header keeps the page's margin and a usable
-// search box (the row wraps under the title), and scrolling the page shows at least one whole
-// 196 px card row.
 #[gpui_kit::test]
-fn at_800x600_the_profiles_header_fits_and_the_cards_have_room(cx: &mut TestAppContext) {
-    use gpui_kit::size;
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    empty_profile(&s, "Comp");
-    empty_profile(&s, "Pub");
-    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
-    let _page = open_profiles(cx, &s);
-    let bounds = |cx: &mut TestAppContext, id: &'static str| {
-        support::bounds_of(cx, s.win, id).unwrap_or_else(|| panic!("no {id}"))
-    };
-    let page = support::bounds_of(cx, s.win, ids::page(Page::Profiles)).unwrap();
-    let (new, search) = (
-        bounds(cx, ids::PROFILES_NEW_MENU),
-        bounds(cx, ids::PROFILES_SEARCH),
-    );
-    let margin = tf2tools_app::shell::CONTENT_PADDING;
-    for b in [new, search] {
-        assert!(
-            b.left() >= page.left() + margin - px(1.)
-                && b.right() <= page.right() - margin + px(1.),
-            "{b:?} past the margin of {page:?}"
-        );
-    }
-    assert!(
-        search.size.width >= px(160.),
-        "the search box is {search:?}"
-    );
-    assert!(!new.intersects(&search), "{search:?} and {new:?} overlap");
-    let library = bounds(cx, ids::PROFILES_LIBRARY);
-    assert!(
-        library.size.height >= px(196.),
-        "the cards sit in a {library:?} strip"
-    );
-    // Scrolling the page to its end shows the whole card area.
-    cx.update_window(s.win, |_, w, cx| {
-        let wheel = gpui_kit::ScrollEvent {
-            position: gpui_kit::point(page.center().x, page.top() + px(80.)),
-            delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -40.)),
-            modifiers: gpui_kit::Modifiers::default(),
-            touch_phase: gpui_kit::TouchPhase::Moved,
-            source: Default::default(),
-        };
-        let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
-    })
-    .unwrap();
-    support::settle(cx, s.win);
-    let library = bounds(cx, ids::PROFILES_LIBRARY);
-    assert!(
-        library.bottom() <= page.bottom() + px(1.),
-        "{library:?} still runs past {page:?}"
-    );
-}
-
-#[gpui_kit::test]
-fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
+fn a_long_summary_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     // Builtin crosshairs the catalog does not know, each its own missing row.
@@ -1079,16 +1348,18 @@ fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext
     let comp = s
         .services
         .library
-        .create_profile(&ProfileDraft::new("Comp").with_crosshairs(crosshairs))
+        .create_profile(&ProfileDraft::new("Comp").with_crosshairs(SlotMode::Set(crosshairs)))
         .unwrap();
     let _page = open_profiles(cx, &s);
-    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
-    support::wait_real(cx, "the Missing Items dialog", |cx| {
-        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
-    });
+    open_summary(cx, &s, comp.id());
+    assert_eq!(
+        row_label(cx, &s, "crosshair:tf_weapon_probe_0").as_deref(),
+        Some("Crosshairs: gone0 is missing; nothing is installed there")
+    );
     support::dialog_box(cx, s.win);
-    let bar = ids::PROFILES_MISSING_LIST_SCROLLBAR;
-    assert_bar_beside(cx, s.win, ids::PROFILES_MISSING_LIST, bar);
-    assert_clear_of_bar(cx, s.win, ids::missing_item(0), bar);
-    assert_track_scrolls(cx, s.win, bar, ids::missing_item(0));
+    let bar = ids::PROFILE_APPLY_ROWS_SCROLLBAR;
+    let first = ids::profile_apply_row("crosshair:tf_weapon_probe_0");
+    assert_bar_beside(cx, s.win, ids::PROFILE_APPLY_ROWS, bar);
+    assert_clear_of_bar(cx, s.win, first.clone(), bar);
+    assert_track_scrolls(cx, s.win, bar, first);
 }

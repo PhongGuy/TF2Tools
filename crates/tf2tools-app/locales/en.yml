@@ -617,81 +617,124 @@ store_grid:
     filters: "Try adjusting your search or filter criteria."
 
 profiles:
-  crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
   weapons: { one: "%{count} weapon", other: "%{count} weapons" }
-  search: "Search profiles..."
   not_applied: "Changes not applied yet"
-  default_name: "Profile %{n}"
+  lead: "A profile switches your whole setup at once: HUD, sounds, crosshairs, graphics and add-ons. A new one starts as a copy of what you have now."
   no_tf2: "Set the TF2 folder in Settings to activate profiles."
   part:
+    sounds: "Sounds"
+    graphics: "Graphics"
+    addons: "Add-ons"
     crosshairs: "Crosshairs"
     item: "Item"
-  heading:
-    active: "Active Profile"
-    library: "Your Profiles"
   badge:
     active: "Active"
   button:
-    activate: "Activate"
-    activating: "Activating..."
-    edit: "Edit profile"
-    delete: "Delete profile"
+    apply: "Apply"
+    edit: "Edit"
     new: "New profile"
-    start_empty: "Start empty"
-    more_ways: "More ways to make a profile"
+  mode: { set: "Set", none: "None", leave: "Leave as is" }
+  slot:
+    hud: { help: "The HUD this profile installs.", leave: "Applying this profile won't touch your HUD.", none: "Uses TF2's own HUD: any custom HUD is taken out." }
+    sounds: { help: "Hitsound and killsound.", leave: "Applying this profile won't touch your sounds.", none: "Uses TF2's own sounds: custom hit and kill sounds are taken out." }
+    crosshairs: { help: "A crosshair per weapon, set the same way as on the Crosshairs page.", leave: "Applying this profile won't touch your crosshairs.", none: "Uses TF2's default crosshair on every weapon." }
+    graphics: { help: "A mastercomfig preset and your changes to it.", leave: "Applying this profile won't touch your graphics.", none: "Takes mastercomfig out, so TF2 uses its own video settings." }
+    addons: { help: "Which add-ons are on.", leave: "Applying this profile won't touch your add-ons.", none: "Turns every add-on off." }
   card:
-    empty: "Empty profile"
-    empty_vanilla: "Empty profile (vanilla)"
+    leave: "Left as is"
+    hud_none: "TF2's own HUD"
+    sounds: "Hit: %{hit}, kill: %{kill}"
+    tf2_default: "TF2 default"
+    sounds_none: "TF2 default sounds"
+    crosshairs: { one: "%{count} weapon crosshair", other: "%{count} weapon crosshairs" }
+    crosshairs_none: "TF2's default crosshairs"
+    graphics: { one: "%{preset}, %{count} change", other: "%{preset}, %{count} changes" }
+    graphics_as_is: "%{preset} as is"
+    graphics_none: "mastercomfig off"
+    addons_only_one: "Only %{list}"
+    addons_only: { one: "Only these %{count}: %{list}", other: "Only these %{count}: %{list}" }
+    addons_on: "Turns on %{list}"
+    addons_nothing: "Turns no add-ons on"
+    addons_none: "All add-ons off"
+  note:
+    sounds: "%{hit} and %{kill}"
+    graphics: { one: "%{preset} with %{count} change", other: "%{preset} with %{count} changes" }
+    addons: { one: "%{count} add-on", other: "%{count} add-ons" }
+    tail: "Name it and save, or change anything that should be different."
+    copied: "%{parts}. %{tail}"
+  summary:
+    other_hud: "A HUD TF2Tools didn't install"
+    crosshairs_default: "TF2's default"
+    no_mastercomfig: "No mastercomfig"
+    outside_mastercomfig: "A mastercomfig TF2Tools didn't install"
+    mastercomfig_removed: "mastercomfig removed"
+    addons_on: { one: "%{count} on", other: "%{count} on" }
+    turns_on: "Turns on %{list}"
+    turns_off: "turns off %{list}"
+    turns_off_only: "Turns off %{list}"
+    both: "%{on}; %{off}"
+    movement: "%{text}, changes your movement keys"
+    left: "Stays as it is: %{list}."
+    missing_keeps: "%{name} is missing; keeps %{kept}"
+    missing_none: "%{name} is missing; nothing is installed there"
+    missing_other_hud: "the HUD you have now"
+  apply:
+    title: "Switch to %{name}?"
+    intro: "These change now. Everything else stays how it is."
+    nothing: "This already matches what you have now. Applying marks it as your active profile."
+    ok: "Apply %{name}"
   empty:
     title: "No profiles yet"
     body: "Save your current setup as a profile to quickly switch between configurations."
-    no_match_title: "No profiles found"
-    no_match_body: "Try a different search term."
-  no_active:
-    title: "No active profile"
-    body: "Activate a profile to apply a saved collection of customizations."
   missing:
-    title: "Missing Items"
-    body: "Some items in \"%{name}\" are no longer in your library."
-    install: "Install Anyway (skip missing)"
     redownload: "Re-download"
     local: "Local import — can't re-download"
-    kind:
-      hitsound: "HITSOUND"
-      killsound: "KILLSOUND"
-      crosshair: "CROSSHAIR"
-      item: "ITEM"
   editor:
-    back: "Back to profiles"
-    clear: "Clear"
-    unknown: "Unknown"
-    missing_crosshair: "%{name} (missing)"
-    slot:
-      none: "None"
-      default_crosshairs: "Default crosshairs"
-      missing: "Missing: %{name}"
-    empty:
-      huds: "No HUDs in your library yet"
-      browse_huds: "Browse the HUD Store"
-      sounds: "No sounds in your library yet"
-      browse_sounds: "Browse the Sound Store"
-      no_match: "No matches"
+    header_label: "Profile editor"
+    modes_label: "What this profile does with %{slot}"
+    crumb_new: "New profile"
+    name: "Name"
+    name_placeholder: "Name this profile"
+    save: "Save"
+    delete: "Delete profile"
+    name_blank: "Give this profile a name"
+    pick_hud: "Pick a HUD, or choose None"
+    loading: "Reading what you have now…"
+    note_title: "Filled in from what you have now"
+    hud_empty: "No HUDs in your library yet."
+    xh_everywhere: "Put on every weapon"
+    xh_on: { one: "On %{count} weapon", other: "On %{count} weapons" }
+    xh_pick_first: "Pick a crosshair, then click a weapon"
+    gfx_settings: "Settings"
+    gfx_settings_help: "The Graphics page's list, saved to this profile."
+    gfx_copy: "Copy from the Graphics page"
+    gfx_copy_none: "Install mastercomfig on the Graphics page first"
+    gfx_no_catalog: "Open the Graphics page once to choose settings"
+    addons_only: "Only these"
+    addons_only_on: "Add-ons not switched on here are turned off when you apply."
+    addons_only_off: "Add-ons switched on here are turned on; the rest stay as they are."
+    addons_need_graphics: "Add-ons need mastercomfig, and Graphics is set to None"
+    addons_empty: "No mastercomfig add-ons in your library yet."
+    addons_store: "Open the Addon Store"
   toast:
-    created_from_setup: "Profile created from your current setup"
-    created_empty: "Empty profile created"
+    saved: "%{name} saved."
+    saved_active: "%{name} saved. Apply it to use the changes."
     deleted: "Profile deleted"
-    activated: "Profile \"%{name}\" activated"
-    applied: "Profile \"%{name}\" applied"
-    cleared: "All customizations cleared"
-    installed: "Installed: %{list}"
-    nothing_new: "Nothing new installed"
-    kept: "%{lead}. Kept what you had for: %{list} (missing from your library)"
     failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
-    activate_failed: "Failed to activate profile"
     missing: "Some items are missing"
+    applied_line: "%{name} applied. TF2 picks it up the next time it starts."
+    apply_failed: "Couldn't apply %{name}"
+    kept_only: "Kept what you had for: %{list} (missing from your library)"
+    skipped: "%{part} was left as it is: %{reason}"
+  skip:
+    graphics_not_installed: "mastercomfig isn't installed, so install it on the Graphics page first"
+    not_managed: "TF2Tools didn't install your mastercomfig, so take it over on the Graphics page first"
+    addons_need_base: "add-ons need mastercomfig, which isn't installed"
+  modules:
+    no_catalog: "Open the Graphics page once so TF2Tools can read your mastercomfig's settings"
+    foreign: "Your modules.cfg was not written by TF2Tools; open the Graphics page to replace it"
   activity:
-    saved_current: "Saved current setup as profile: %{name}"
-    created: "Created profile: %{name}"
+    saved: "Saved profile: %{name}"
     deleted: "Deleted profile: %{name}"
     failed: "Failed to activate profile: %{name}"
     activated: "Activated profile: %{name}"
@@ -782,14 +825,11 @@ confirm:
   delete_profile:
     title: "Delete Profile"
     body: "Are you sure you want to delete \"%{name}\"?"
+    active: "It's your active profile. Your game stays as it is."
   clear_profile_crosshairs:
     title: "Clear Crosshairs"
     body: "Remove all crosshairs from this profile?"
     ok: "Clear all"
-  activate_empty:
-    title: "Activate Empty Profile"
-    body: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
-    ok: "Activate Anyway"
   tf2_running:
     title: "TF2 is running"
     body: "TF2 is running; changes take effect after a restart."
@@ -2627,9 +2667,6 @@ messages:
       newer_database: "Your library was saved by a newer TF2Tools. Install the latest TF2Tools from the release page to open it."
   profiles:
     name_taken: "You already have a profile called %{name}. Pick another name."
-    hud_gone: "That HUD is no longer in your library"
-    sound_gone: "That sound is no longer in your library"
-    crosshair_gone: "That crosshair is no longer in your library"
   mastercomfig:
     no_release: "GitHub has no mastercomfig release TF2Tools can install right now. Try again later."
     foreign_modules_cfg: "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone."
@@ -2825,7 +2862,6 @@ messages:
     remove_failed: "Remove failed"
     load_library: "Failed to load library"
     save_profile: "Failed to save profile"
-    load_profile: "Failed to load profile"
     open_profile: "Failed to open the profile"
     load_profiles: "Failed to load profiles"
     create_profile: "Failed to create profile"
