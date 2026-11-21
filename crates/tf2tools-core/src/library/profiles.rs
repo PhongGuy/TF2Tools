@@ -959,6 +959,8 @@ pub enum MissingKind {
     Addon {
         /// The add-on's asset name.
         name: AddonName,
+        /// The Addon Store's cached catalog lists it, so it can be downloaded again.
+        in_store: bool,
     },
 }
 
@@ -1260,8 +1262,19 @@ pub(super) fn resolve_profile(
                 .join(name.as_str())
                 .is_file();
             if !(recorded && on_disk) {
+                // The store install reads this same catalog row, so listed means re-downloadable.
+                let in_store: bool = tx
+                    .query_row(
+                        "SELECT EXISTS (SELECT 1 FROM store_addons WHERE asset_name = ?1)",
+                        [name.as_str()],
+                        |r| r.get(0),
+                    )
+                    .map_err(resolve_db)?;
                 missing.push(MissingItem {
-                    kind: MissingKind::Addon { name: name.clone() },
+                    kind: MissingKind::Addon {
+                        name: name.clone(),
+                        in_store,
+                    },
                     name: display_info(name).0,
                     provenance: Provenance::Local,
                 });

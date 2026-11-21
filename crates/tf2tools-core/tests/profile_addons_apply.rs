@@ -5,7 +5,8 @@ use crate::common;
 
 use common::{
     FLAT_ADDON, LibraryEnv, NULL_ADDON, PYRO_ADDON, builtin_catalog, crosshair_env,
-    import_addon_as, import_hud_as, import_wav_as, library_env, place_mastercomfig, write_file,
+    import_addon_as, import_hud_as, import_wav_as, library_env, place_mastercomfig, sql,
+    write_file,
 };
 use tf2tools_core::{
     AddonName, ApplyProfileError, ApplyProfileReport, ApplySkipReason, ApplyStep, Choices,
@@ -154,7 +155,10 @@ fn a_deleted_addon_is_a_missing_item() {
     assert_eq!(missing.len(), 1, "{missing:?}");
     assert_eq!(
         missing[0].kind(),
-        &MissingKind::Addon { name: flat.clone() }
+        &MissingKind::Addon {
+            name: flat.clone(),
+            in_store: false,
+        }
     );
     assert_eq!(env.lib.missing_items(p.id()).unwrap(), missing);
     assert!(!installed(&env, &pyro), "a refused apply changes nothing");
@@ -166,6 +170,48 @@ fn a_deleted_addon_is_a_missing_item() {
     assert_eq!(report.skipped(), missing.as_slice());
     assert!(installed(&env, &pyro));
     assert_eq!(active(&env).as_ref(), Some(p.id()));
+}
+
+#[test]
+fn a_missing_addon_says_whether_the_addon_store_lists_it() {
+    let env = library_env();
+    let flat = import_addon_as(&env, FLAT_ADDON);
+    let pyro = import_addon_as(&env, PYRO_ADDON);
+    let p = addons_profile(
+        &env,
+        "Both",
+        SlotMode::Leave,
+        ticked(&[&flat, &pyro], false),
+    );
+    env.lib.delete_addon(&flat, None).unwrap();
+    env.lib.delete_addon(&pyro, None).unwrap();
+    sql(&env.dir)
+        .execute(
+            "INSERT INTO store_addons (asset_name, display_name, download_url, release_tag, fetched_at)
+             VALUES (?1, 'Flat Mouse', 'http://127.0.0.1/flat.vpk', '9.100.1', 'x')",
+            [flat.as_str()],
+        )
+        .unwrap();
+    let kinds: Vec<MissingKind> = env
+        .lib
+        .missing_items(p.id())
+        .unwrap()
+        .iter()
+        .map(|m| m.kind().clone())
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            MissingKind::Addon {
+                name: flat,
+                in_store: true,
+            },
+            MissingKind::Addon {
+                name: pyro,
+                in_store: false,
+            },
+        ]
+    );
 }
 
 #[test]

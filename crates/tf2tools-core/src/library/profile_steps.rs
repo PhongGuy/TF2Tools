@@ -119,7 +119,7 @@ impl Library {
         let is_missing = |name: &AddonName| {
             missing
                 .iter()
-                .any(|m| matches!(m.kind(), MissingKind::Addon { name: n } if n == name))
+                .any(|m| matches!(m.kind(), MissingKind::Addon { name: n, .. } if n == name))
         };
         // Installed is read from `listed`, the same fact the turn-offs above went by.
         let installed =
