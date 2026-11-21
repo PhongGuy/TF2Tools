@@ -258,6 +258,13 @@ impl GraphicsChoicesEditor {
         cx.notify();
     }
 
+    // Closes the open row's pictures, if any; notifies only when one was open.
+    pub(super) fn close_pictures(&mut self, cx: &mut Context<Self>) {
+        if self.open_row.take().is_some() {
+            cx.notify();
+        }
+    }
+
     pub(super) fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
         self.zoom = !self.zoom;
         cx.notify();

@@ -814,16 +814,28 @@ impl Render for GraphicsPage {
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
         let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
-        self.wanted = self.editor.update(cx, |e, cx| {
-            e.want_images(cx);
-            e.wanted_images().to_vec()
-        });
         let filter = self.filter(cx);
         let sections = self
             .catalog
             .as_deref()
             .filter(|_| self.preset().is_some())
             .map(|catalog| view::sections(catalog, &self.shown_against(), &filter));
+        // A row the search or "Changed only" hides takes its open pictures with it, before
+        // this frame's image wants are gathered, so it never reopens when it shows again.
+        if let (Some(sections), Some(open)) = (&sections, self.open_row.as_deref()) {
+            let shown = sections
+                .iter()
+                .flat_map(|s| &s.rows)
+                .any(|r| r.module == open);
+            if !shown {
+                self.open_row = None;
+                self.editor.update(cx, |e, cx| e.close_pictures(cx));
+            }
+        }
+        self.wanted = self.editor.update(cx, |e, cx| {
+            e.want_images(cx);
+            e.wanted_images().to_vec()
+        });
         let mut children: Vec<AnyElement> = Vec::new();
         children.extend(warning.map(IntoElement::into_any_element));
         if let Some(card) = self.card() {
