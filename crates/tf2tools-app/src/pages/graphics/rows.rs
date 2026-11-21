@@ -34,7 +34,7 @@ impl GraphicsChoicesEditor {
         narrow: bool,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
-        let row = self.row(module)?;
+        let (row, pictures) = self.built_row(module)?;
         let scope = self.scope;
         let name = row.module.as_str();
         let muted = cx.theme().muted_foreground;
@@ -79,25 +79,22 @@ impl GraphicsChoicesEditor {
                     }))
             });
         let control = match row.kind {
-            ControlKind::Switch => self.switch(&row, cx),
-            ControlKind::Segmented => self.segments(&row, cx),
-            ControlKind::Select => self.select(&row),
+            ControlKind::Switch => self.switch(row, cx),
+            ControlKind::Segmented => self.segments(row, cx),
+            ControlKind::Select => self.select(row),
         };
         // The panel compares the crops while zoom is on, the same pictures the editor wants;
         // the thumbnail and strip stay on the full pictures.
         let index = self.pictures.as_deref();
-        let pictures = index.and_then(|index| pictures::row_pictures(index, &row, false));
-        let thumb = pictures
-            .as_ref()
-            .map(|p| picture_panel::thumbnail(self, name, &row.label, p, cx));
-        let toggle = pictures.as_ref().map(|_| {
+        let thumb = pictures.map(|p| picture_panel::thumbnail(self, name, &row.label, p, cx));
+        let toggle = pictures.map(|_| {
             h_flex()
                 .ml(px(-8.))
                 .child(picture_panel::toggle(self, name, cx))
         });
         let panel = index
             .filter(|_| self.open_row() == Some(name))
-            .and_then(|index| pictures::row_pictures(index, &row, self.zoom()))
+            .and_then(|index| pictures::row_pictures(index, row, self.zoom()))
             .map(|p| picture_panel::panel(self, name, &p, cx));
         let border = cx.theme().border;
         let tint = Hsla::from(rgb(CHANGED));

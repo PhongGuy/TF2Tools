@@ -1,6 +1,8 @@
 //! The Graphics page's view-model: the catalogue and the saved choices turned into rows,
 //! changes, sections and an empty state, so rendering only reads plain data.
 
+use std::collections::BTreeMap;
+
 use gpui_kit::SharedString;
 use tf2tools_core::{Choices, ComfigModule, ModuleCatalog, ModuleChoice};
 
@@ -121,39 +123,7 @@ pub struct ChangeView {
 /// for settings the catalogue dropped (`gone`), or without a catalogue every saved choice by
 /// module name, worded from the keys alone.
 pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<ChangeView> {
-    let by_name = |(name, choice): (&String, &ModuleChoice)| ChangeView {
-        module: name.clone(),
-        label: module_label_by_name(name),
-        was: None,
-        now: choice_label_by_id(name, choice),
-        same: false,
-        gone: catalog.is_some(),
-    };
-    let Some(catalog) = catalog else {
-        return choices.modules().iter().map(by_name).collect();
-    };
-    // A newer mastercomfig can drop a saved setting; it stays listed so it can be removed.
-    let dropped = choices
-        .modules()
-        .iter()
-        .filter(|(name, _)| catalog.module(name).is_none())
-        .map(by_name);
-    catalog
-        .categories()
-        .iter()
-        .flat_map(|c| c.modules())
-        .map(|module| (module, row(catalog, choices, module)))
-        .filter(|(_, row)| row.changed)
-        .map(|(module, row)| ChangeView {
-            was: Some(choice_label(module, &row.preset_value)),
-            now: choice_label(module, &row.shown),
-            same: row.shown == row.preset_value,
-            module: row.module,
-            label: row.label,
-            gone: false,
-        })
-        .chain(dropped)
-        .collect()
+    BuiltRows::build(catalog, choices).changes
 }
 
 /// What the list shows: rows whose words hold the query, and only changed ones on request.
@@ -193,24 +163,107 @@ pub struct SectionView {
 
 /// Every category in catalogue order, each kept even when the filter leaves it empty.
 pub fn sections(catalog: &ModuleCatalog, choices: &Choices, filter: &Filter) -> Vec<SectionView> {
-    catalog
-        .categories()
-        .iter()
-        .map(|category| {
-            let all: Vec<RowView> = category
-                .modules()
-                .iter()
-                .map(|module| row(catalog, choices, module))
-                .collect();
-            SectionView {
+    BuiltRows::build(Some(catalog), choices).sections(filter)
+}
+
+/// Every row of a catalogue under one set of choices, built once so the sections, the changes
+/// strip and the pictures all read the same rows instead of each building their own.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BuiltRows {
+    /// Every category with all its rows, unfiltered.
+    all: Vec<SectionView>,
+    changes: Vec<ChangeView>,
+    /// Each module's section and row index in `all`.
+    at: BTreeMap<String, (usize, usize)>,
+}
+
+impl BuiltRows {
+    /// The rows of `catalog` under `choices`; without a catalogue only the changes, by name.
+    pub fn build(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Self {
+        let by_name = |(name, choice): (&String, &ModuleChoice)| ChangeView {
+            module: name.clone(),
+            label: module_label_by_name(name),
+            was: None,
+            now: choice_label_by_id(name, choice),
+            same: false,
+            gone: catalog.is_some(),
+        };
+        let Some(catalog) = catalog else {
+            return Self {
+                changes: choices.modules().iter().map(by_name).collect(),
+                ..Self::default()
+            };
+        };
+        let mut built = Self::default();
+        for (s, category) in catalog.categories().iter().enumerate() {
+            let mut rows = Vec::with_capacity(category.modules().len());
+            for (r, module) in category.modules().iter().enumerate() {
+                let row = row(catalog, choices, module);
+                if row.changed {
+                    built.changes.push(ChangeView {
+                        module: row.module.clone(),
+                        label: row.label.clone(),
+                        was: Some(choice_label(module, &row.preset_value)),
+                        now: choice_label(module, &row.shown),
+                        same: row.shown == row.preset_value,
+                        gone: false,
+                    });
+                }
+                built.at.insert(row.module.clone(), (s, r));
+                rows.push(row);
+            }
+            built.all.push(SectionView {
                 key: category.key().to_owned(),
                 label: category_label(category),
-                count: all.len(),
-                has_changes: all.iter().any(|r| r.changed),
-                rows: all.into_iter().filter(|r| filter.admits(r)).collect(),
-            }
-        })
-        .collect()
+                count: rows.len(),
+                has_changes: rows.iter().any(|r| r.changed),
+                rows,
+            });
+        }
+        // A newer mastercomfig can drop a saved setting; it stays listed so it can be removed.
+        let dropped = choices
+            .modules()
+            .iter()
+            .filter(|(name, _)| catalog.module(name).is_none())
+            .map(by_name);
+        built.changes.extend(dropped);
+        built
+    }
+
+    /// `module`'s row; None for a module the catalogue lacks.
+    pub fn row(&self, module: &str) -> Option<&RowView> {
+        let &(s, r) = self.at.get(module)?;
+        Some(&self.all[s].rows[r])
+    }
+
+    /// Every row in catalogue order.
+    pub fn rows(&self) -> impl Iterator<Item = &RowView> {
+        self.all.iter().flat_map(|s| &s.rows)
+    }
+
+    /// The changes strip's lines, as `changes` words them.
+    pub fn changes(&self) -> &[ChangeView] {
+        &self.changes
+    }
+
+    /// Every category, its rows cut down to the ones `filter` admits.
+    pub fn sections(&self, filter: &Filter) -> Vec<SectionView> {
+        self.all
+            .iter()
+            .map(|section| SectionView {
+                key: section.key.clone(),
+                label: section.label.clone(),
+                count: section.count,
+                has_changes: section.has_changes,
+                rows: section
+                    .rows
+                    .iter()
+                    .filter(|r| filter.admits(r))
+                    .cloned()
+                    .collect(),
+            })
+            .collect()
+    }
 }
 
 /// Why the list shows no rows.
