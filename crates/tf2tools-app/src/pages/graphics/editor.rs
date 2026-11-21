@@ -13,8 +13,9 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
-    Styled as _, Subscription, TestSupportExt as _, Window, div, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
@@ -26,6 +27,10 @@ use crate::ids::{self, IdScope};
 use crate::pages::common::card_frame;
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::widgets::{Named as _, labelled};
+
+// The chip strip's height with one row of 28 px chips. The empty strip reserves it, so the first
+// change does not push the rows below down under the pointer.
+const STRIP_HEIGHT: Pixels = px(54.);
 
 /// An edit the editor proposes to its host; the editor's own choices stay as they are.
 #[derive(Debug, Clone, PartialEq)]
@@ -354,6 +359,9 @@ impl GraphicsChoicesEditor {
         if list.is_empty() {
             return labelled(
                 div()
+                    .flex()
+                    .items_center()
+                    .min_h(STRIP_HEIGHT)
                     .text_sm()
                     .text_color(muted)
                     .py_3()

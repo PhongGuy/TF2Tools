@@ -4,7 +4,7 @@ use crate::support;
 
 use gpui_kit::{Bounds, Pixels, TestAppContext, px, size};
 use support::graphics::{
-    HEADER, found, idle, modules_cfg, open, saved, server_shell, wait_for_list,
+    HEADER, found, idle, modules_cfg, open, pick, saved, server_shell, value, wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::SettingsNote;
@@ -161,4 +161,34 @@ fn a_saved_choice_for_a_dropped_setting_shows_and_can_be_removed(cx: &mut TestAp
     idle(cx, &page);
     assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
     assert!(support::present(cx, s.win, ids::GRAPHICS_NO_CHANGES));
+}
+
+// The first change swaps the dashed "as is" strip for the chip strip; the rows below must not
+// move, or the list shifts under the pointer that made the change.
+#[gpui_kit::test]
+fn the_first_change_keeps_the_rows_where_they_were(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, "{}");
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    let empty = support::bounds_of(cx, s.win, ids::GRAPHICS_NO_CHANGES).unwrap();
+    let row_before = support::bounds_of(cx, s.win, ids::graphics_row("fpscap")).unwrap();
+    pick(cx, &s, &page, "fpscap", value("120"));
+    support::wait_real(cx, "the first change", |cx| {
+        saved(cx, &page, "fpscap").is_some()
+    });
+    idle(cx, &page);
+    support::settle(cx, s.win);
+    let strip = support::bounds_of(cx, s.win, ids::GRAPHICS_CHANGES).unwrap();
+    let row_after = support::bounds_of(cx, s.win, ids::graphics_row("fpscap")).unwrap();
+    assert_eq!(
+        empty.size.height, strip.size.height,
+        "the strip keeps its height: {empty:?} {strip:?}"
+    );
+    assert_eq!(row_before.top(), row_after.top(), "the row stays put");
 }
