@@ -50,7 +50,7 @@ pub struct RowView {
     pub shown: ModuleChoice,
     /// What the preset sets, or NotSet when it leaves the module to TF2.
     pub preset_value: ModuleChoice,
-    /// A saved choice exists and differs from the preset's value.
+    /// A saved choice exists, whether or not it equals the preset's value.
     pub changed: bool,
     /// "Preset: value", naming what the preset would set.
     pub preset_text: SharedString,
@@ -67,9 +67,9 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
     let preset_value = catalog
         .resolve(name, choices.preset())
         .map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()));
-    let changed = choices
-        .get(name)
-        .is_some_and(|saved| *saved != preset_value);
+    // Any saved choice counts, even one a later preset switch made equal to the preset: it
+    // still pins the value in modules.cfg across switches, so it keeps its Reset.
+    let changed = choices.get(name).is_some();
     let preset_name = preset_label(choices.preset());
     let preset_text = tr!(
         "graphics.row.preset_value",
@@ -112,6 +112,8 @@ pub struct ChangeView {
     pub label: SharedString,
     pub was: Option<SharedString>,
     pub now: SharedString,
+    /// The saved value equals the preset's, as after a preset switch.
+    pub same: bool,
     pub gone: bool,
 }
 
@@ -124,6 +126,7 @@ pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<Change
         label: module_label_by_name(name),
         was: None,
         now: choice_label_by_id(name, choice),
+        same: false,
         gone: catalog.is_some(),
     };
     let Some(catalog) = catalog else {
@@ -144,6 +147,7 @@ pub fn changes(catalog: Option<&ModuleCatalog>, choices: &Choices) -> Vec<Change
         .map(|(module, row)| ChangeView {
             was: Some(choice_label(module, &row.preset_value)),
             now: choice_label(module, &row.shown),
+            same: row.shown == row.preset_value,
             module: row.module,
             label: row.label,
             gone: false,
