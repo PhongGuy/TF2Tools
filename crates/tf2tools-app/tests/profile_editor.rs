@@ -391,3 +391,37 @@ fn a_short_name_in_a_wide_header_keeps_the_profiles_link(cx: &mut TestAppContext
         Some("Comp")
     );
 }
+
+// The crumb measures itself as it paints, so the first frame has no widths yet. That frame
+// must show the full header, never the most compact stage.
+#[gpui_kit::test]
+fn the_first_frame_of_the_editor_shows_the_full_header(cx: &mut TestAppContext) {
+    use gpui_kit::AppContext as _;
+    use gpui_kit::test::TestWindowExt as _;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let seeded = seed(&s, &env);
+    let comp = hud_profile(&s, "Comp", &seeded.rayshud);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(800.)));
+    let page = page(cx, &s);
+    support::settle(cx, s.win);
+    // The kit's click draws frames of its own, so the editor opens directly and exactly one
+    // frame is drawn before looking.
+    let (crumb, cancel) = cx
+        .update_window(s.win, |_, w, cx| {
+            page.update(cx, |page, cx| page.open_editor(comp.id().clone(), w, cx));
+            w.render_frame(cx);
+            let crumb = w.try_find(ids::PROFILE_EDITOR_CRUMB).is_some();
+            let cancel = w.try_find(ids::PROFILE_EDITOR_CANCEL).map(|e| e.bounds());
+            (crumb, cancel)
+        })
+        .unwrap();
+    assert!(cx.update(|cx| page.read(cx).editor().is_some()));
+    assert!(crumb, "\"Profiles /\" shows on the first frame");
+    let cancel = cancel.expect("Cancel is drawn");
+    // The icon-only Cancel is a small square; the text one is the normal 32 px tall and wider.
+    assert!(
+        cancel.size.height == px(32.) && cancel.size.width > cancel.size.height,
+        "the first frame's Cancel carries its text: {cancel:?}"
+    );
+}

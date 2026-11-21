@@ -835,47 +835,68 @@ struct EditorCrumb {
     _observe: Subscription,
 }
 
-// The painted widths that decide how much of the crumb fits. The link and the full-size buttons
-// keep their last widths while hidden, so each comes back once the row has room for it again.
+// The painted widths that decide how much of the crumb fits, None until painted. The link and
+// the full-size buttons keep their last widths while hidden, so each comes back once the row
+// has room again; a language switch forgets them all, since every label changes width.
 #[derive(Default)]
 struct CrumbFit {
-    row: Cell<Pixels>,
-    nav: Cell<Pixels>,
-    actions: Cell<Pixels>,
-    small: Cell<Pixels>,
+    locale: Cell<&'static str>,
+    row: Cell<Option<Pixels>>,
+    nav: Cell<Option<Pixels>>,
+    actions: Cell<Option<Pixels>>,
+    small: Cell<Option<Pixels>>,
 }
 
 // The space between the crumb's parts.
 const CRUMB_GAP: Pixels = px(8.);
 
 impl CrumbFit {
+    // Widths measured in another language no longer describe the labels on screen.
+    fn keep_for(&self, locale: &'static str) {
+        if self.locale.replace(locale) != locale {
+            for cell in [&self.row, &self.nav, &self.actions, &self.small] {
+                cell.set(None);
+            }
+        }
+    }
+
     // The name shrinks to nothing first, then the link gives way, then Cancel and Save drop to
-    // their small size, and last Cancel keeps only its icon.
+    // their small size, and last Cancel keeps only its icon. A width not yet painted never
+    // forces a stage, so the first frame shows the full header.
     fn compact(&self) -> bool {
-        self.actions.get() + CRUMB_GAP > self.row.get()
+        match (self.actions.get(), self.row.get()) {
+            (Some(actions), Some(row)) => actions + CRUMB_GAP > row,
+            _ => false,
+        }
     }
 
     fn icon_cancel(&self) -> bool {
-        self.compact() && self.small.get() + CRUMB_GAP > self.row.get()
+        self.compact()
+            && matches!((self.small.get(), self.row.get()),
+                (Some(small), Some(row)) if small + CRUMB_GAP > row)
     }
 
     fn shows_nav(&self) -> bool {
-        !self.compact() && self.nav.get() + self.actions.get() + CRUMB_GAP * 2. <= self.row.get()
+        !self.compact()
+            && match (self.nav.get(), self.actions.get(), self.row.get()) {
+                (Some(nav), Some(actions), Some(row)) => nav + actions + CRUMB_GAP * 2. <= row,
+                _ => true,
+            }
     }
 }
 
 // Records its parent's painted width in `cell`; a change asks for another frame, since a
 // refresh requested while drawing is dropped.
 fn width_watch(
-    cell: impl Fn(&CrumbFit) -> &Cell<Pixels> + 'static,
+    cell: impl Fn(&CrumbFit) -> &Cell<Option<Pixels>> + 'static,
     fit: &Rc<CrumbFit>,
 ) -> impl IntoElement {
     let fit = Rc::clone(fit);
     canvas(
         move |bounds, window, _| {
             let cell = cell(&fit);
-            if cell.get() != bounds.size.width {
-                cell.set(bounds.size.width);
+            if cell.get() != Some(bounds.size.width) {
+                cell.set(Some(bounds.size.width));
                 window.request_animation_frame();
             }
         },
@@ -906,6 +927,7 @@ impl Render for EditorCrumb {
             }
         };
         let fit = &self.fit;
+        fit.keep_for(crate::i18n::current());
         let (compact, icon_cancel) = (fit.compact(), fit.icon_cancel());
         let cancel = tr!("confirm.cancel");
         let nav = fit.shows_nav().then(|| {
