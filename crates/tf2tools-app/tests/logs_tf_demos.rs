@@ -4,34 +4,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui_kit::{Entity, ListOffset, TestAppContext, px};
-use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::{DemoLookup, LogsTfPage};
 use tf2tools_app::picker::{PickKind, ScriptedPicker};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, Gate, expanded, mount_held, open_log, open_page, requests_to, scroll_to_in_log,
-    serve_two_logs, shell_with_demos,
+    ARIE, DEMO_ID, DEMO_NAME, DEMO_ROUTE, Gate, assert_footer_fits, demo_footer_at_800, expanded,
+    mount_held, open_log, open_page, requests_to, scroll_to_in_log, serve_two_logs,
+    shell_with_demos, sixes_list,
 };
-
-// Log 3 is the 6v6 fixture: cp_gullywash_f9, uploaded 1792201829, 1714 s long. Log 2 is
-// koth_proside_v1, so the same list never matches it.
-const SIXES_MAP: &str = "cp_gullywash_f9";
-const SIXES_DATE: i64 = 1_792_201_829;
-const SIXES_LENGTH: u32 = 1714;
-const DEMO_ID: u64 = 777;
-const DEMO_NAME: &str = "match-20261017-2110-cp_gullywash_f9.dem";
-const DEMO_ROUTE: &str = "/files/ab/777.dem";
-
-/// A demos.tf list holding log 3's demo, its file on the demos.tf server at `base`.
-fn sixes_list(base: &str) -> Vec<u8> {
-    json!([{"id": DEMO_ID, "url": format!("{base}{DEMO_ROUTE}"), "name": DEMO_NAME,
-            "server": "serveme.tf #1", "duration": SIXES_LENGTH + 20, "map": SIXES_MAP,
-            "time": SIXES_DATE + 60, "playerCount": 12}])
-    .to_string()
-    .into_bytes()
-}
 
 fn empty_list(_: &str) -> Vec<u8> {
     b"[]".to_vec()
@@ -318,4 +300,12 @@ fn a_cancelled_save_downloads_nothing(cx: &mut TestAppContext) {
     support::settle(cx, d.s.win);
     assert!(!support::present(cx, d.s.win, ids::TOAST), "no toast");
     assert_eq!(requests_to(&d.server, DEMO_ROUTE), 0, "nothing downloaded");
+}
+
+// At 800 px the footer's five buttons outgrow one line; each must stay whole inside the panel.
+#[gpui_kit::test]
+fn the_footer_fits_an_800_px_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    let f = demo_footer_at_800(cx, &env);
+    assert_footer_fits(cx, &f.s, 3);
 }

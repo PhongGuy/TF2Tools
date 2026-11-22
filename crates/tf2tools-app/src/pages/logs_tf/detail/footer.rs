@@ -69,7 +69,9 @@ pub(super) fn footer(
     let download_page = page.clone();
     let demo_page = page.clone();
     let streaks = log.killstreaks().len();
+    // Buttons that outgrow the panel move to the next line whole; a label is never cut.
     h_flex()
+        .flex_wrap()
         .gap_2()
         .child(
             Button::new(ids::LOGSTF_CHAT_TOGGLE)

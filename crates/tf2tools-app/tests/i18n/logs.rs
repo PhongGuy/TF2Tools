@@ -27,8 +27,8 @@ use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
 use crate::support;
 use crate::support::logstf::{
-    ARIE, SIXES, day_ago, expanded, list_body, open_log, open_page, scroll_to_in_log,
-    serve_two_logs, shell, sid, to_end,
+    ARIE, SIXES, assert_footer_fits, day_ago, demo_footer_at_800, expanded, list_body, open_log,
+    open_page, scroll_to_in_log, serve_two_logs, shell, sid, to_end,
 };
 
 // The kit's medium Select trigger around its title: borders, padding, gap and caret.
@@ -624,6 +624,24 @@ fn an_open_french_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn an_open_chinese_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     open_log_keeps_its_ids_and_fits(cx, "zh-CN");
+}
+
+// French words the footer longest and German next; both must keep every button in the panel.
+fn footer_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let f = demo_footer_at_800(cx, &env);
+    assert_footer_fits(cx, &f.s, 3);
+}
+
+#[gpui_kit::test]
+fn the_french_log_footer_fits_at_800(cx: &mut TestAppContext) {
+    footer_fits_at_800(cx, "fr");
+}
+
+#[gpui_kit::test]
+fn the_german_log_footer_fits_at_800(cx: &mut TestAppContext) {
+    footer_fits_at_800(cx, "de");
 }
 
 fn type_into_add(
