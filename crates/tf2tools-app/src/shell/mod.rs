@@ -437,11 +437,6 @@ impl Shell {
         self.shown(Page::LogsTf, self.logs_tf.as_ref())
     }
 
-    /// The Demo Viewer page while it shows.
-    pub fn demo_viewer_page(&self) -> Option<Entity<DemoViewerPage>> {
-        self.shown(Page::DemoViewer, self.demo_viewer.as_ref())
-    }
-
     /// The Addons page while it shows.
     pub fn addons_page(&self) -> Option<Entity<AddonsPage>> {
         self.addons.clone()

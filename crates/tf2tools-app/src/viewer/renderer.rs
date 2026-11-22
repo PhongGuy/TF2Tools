@@ -74,7 +74,7 @@ impl Renderer {
             .spawn(move || {
                 // A panic (wgpu reports validation errors that way) ends the worker as a failure.
                 if let Err(payload) = crate::crash::catching(|| run(&inbox, &worker_sender)) {
-                    let error = RendererError::Device(panic_text(payload.as_ref()));
+                    let error = RendererError::Device(crate::crash::panic_text(payload.as_ref()));
                     let _ = worker_sender.try_send(RenderEvent::Failed(error));
                 }
                 // The sender drops last, after `run` destroyed the device: closed means torn down.
@@ -108,15 +108,6 @@ impl SceneRenderer for Renderer {
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.events.clone()
     }
-}
-
-// A panic payload's message, when it carries one.
-fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
-    payload
-        .downcast_ref::<&str>()
-        .map(|text| (*text).to_owned())
-        .or_else(|| payload.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "the render worker panicked".into())
 }
 
 /// Joins every finished render worker, waiting up to `timeout` for the rest; true when none
@@ -626,7 +617,7 @@ impl Gpu {
         };
         if super::stats::enabled() {
             tracing::info!(
-                target: "tf2tools::viewer",
+                target: super::stats::TARGET,
                 seq = frame.seq,
                 render_us = stats.render.as_micros(),
                 readback_us = stats.readback.as_micros(),

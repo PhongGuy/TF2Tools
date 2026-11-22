@@ -29,7 +29,7 @@ fn vpk_resolves_to_the_vendored_copy() {
 
 /// binrw 0.14 is the release a future Rust rejects (E0365); vbsp needs binrw 0.15, which builds.
 #[test]
-fn every_locked_binrw_is_0_15_or_newer() {
+fn every_locked_binrw_is_0_15() {
     for name in ["binrw", "binrw_derive"] {
         let old: Vec<String> = lock_blocks(name)
             .into_iter()

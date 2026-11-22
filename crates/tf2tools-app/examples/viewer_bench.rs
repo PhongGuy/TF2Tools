@@ -17,13 +17,16 @@ const SIZES: [(u32, u32); 2] = [(1280, 720), (1920, 1080)];
 const IN_FLIGHT: u64 = 2;
 
 fn main() -> ExitCode {
-    match run() {
+    let code = match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(reason) => {
             eprintln!("viewer_bench: {reason}");
             ExitCode::FAILURE
         }
-    }
+    };
+    // Let each worker finish dropping its device first, or it races libc exit and segfaults.
+    tf2tools_app::viewer::join_render_workers(Duration::from_secs(10));
+    code
 }
 
 fn run() -> Result<(), String> {

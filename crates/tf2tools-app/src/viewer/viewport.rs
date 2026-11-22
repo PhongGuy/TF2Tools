@@ -270,7 +270,7 @@ impl Render for DemoViewport {
             move |_, _, _, _| {
                 if let Some((taken, seq)) = paint_taken.take() {
                     tracing::info!(
-                        target: "tf2tools::viewer",
+                        target: super::stats::TARGET,
                         seq,
                         ui_us = taken.elapsed().as_micros(),
                         "shown"

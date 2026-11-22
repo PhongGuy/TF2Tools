@@ -126,7 +126,7 @@ fn content(
                 .child(title)
                 .into_any_element(),
         })
-        .children((page == Page::DemoViewer).then(|| preview_badge(cx)))
+        .children((page == Page::DemoViewer).then(preview_badge))
         .children((page == Page::HudMaker).then(|| shortcuts_button(cx)))
         // v5's status slot: the rings in their own `gap-1.5` row, then the TF2 badge.
         .child(
@@ -141,7 +141,7 @@ fn content(
 }
 
 // The Demo Viewer's "Preview" pill beside its title, in the TF2 badge's shape.
-fn preview_badge(_cx: &App) -> impl IntoElement + use<> {
+fn preview_badge() -> impl IntoElement + use<> {
     let text = tr!("demo_viewer.preview");
     div()
         .id(ids::DEMO_VIEWER_PREVIEW_BADGE)
