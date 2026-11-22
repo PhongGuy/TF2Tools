@@ -7,11 +7,12 @@ use std::time::Duration;
 use gpui_kit::RenderImage;
 use tf2tools_core::MapMesh;
 
+pub mod load;
 pub mod math;
 pub mod renderer;
 pub mod viewport;
 
-pub use renderer::{Renderer, wgpu_renderers};
+pub use renderer::{Renderer, join_render_workers, wgpu_renderers};
 
 /// One frame to draw: its pixel size, the camera, and a sequence number the frame echoes back.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -109,6 +109,12 @@ pub fn run() {
             if let Some(timer) = timer {
                 timing::install(cx, timer);
             }
+            // A render worker still tearing down its device when the process exits can crash it.
+            cx.on_app_quit(|_| {
+                viewer::join_render_workers(std::time::Duration::from_secs(2));
+                async {}
+            })
+            .detach();
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {
                     cx.quit();

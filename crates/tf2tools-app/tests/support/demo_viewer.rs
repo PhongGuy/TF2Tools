@@ -1,11 +1,15 @@
 //! A scripted `SceneRenderer` and a viewport-only window for the demo viewer's headless tests.
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyWindowHandle, Context, Entity, RenderImage, TestAppContext, Window, div};
+use tf2tools_app::picker::ScriptedPicker;
+use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::viewport::{Clock, DemoViewport};
 use tf2tools_app::viewer::{
     DrawRequest, FrameStats, RenderEvent, RendererError, RendererFactory, SceneRenderer,
@@ -161,4 +165,49 @@ pub fn viewport_window(
     super::settle(cx, win);
     let viewport = cx.update(|cx| host.read(cx).0.clone());
     (win, viewport, handle)
+}
+
+/// A shell on the Demo Viewer whose picker answers `picks` and whose renderers are `answer` stubs.
+pub struct DemoViewerShell {
+    pub s: super::ShellWindow,
+    pub picker: Arc<ScriptedPicker>,
+    pub stubs: Arc<Mutex<Vec<StubHandle>>>,
+}
+
+pub fn demo_viewer_shell(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    answer: StubAnswer,
+) -> DemoViewerShell {
+    let picker = Arc::new(ScriptedPicker::new(picks));
+    let (factory, stubs) = stub_factory(answer);
+    let s = super::open_shell(
+        cx,
+        env,
+        state,
+        Arc::clone(&picker),
+        super::no_steam(),
+        None,
+        |services| {
+            services.renderers = factory;
+        },
+    );
+    super::click_nav(cx, s.win, Page::DemoViewer);
+    DemoViewerShell { s, picker, stubs }
+}
+
+/// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.
+pub fn install_map(env: &super::Env, name: &str) {
+    let dir = env.game.join("tf/maps");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(format!("{name}.bsp")), bsp(&BspOptions::default())).unwrap();
+}
+
+/// Writes `bytes` as `<name>` in `env`'s temp dir.
+pub fn demo_file(env: &super::Env, name: &str, bytes: &[u8]) -> PathBuf {
+    let path = env.tmp.path().join(name);
+    std::fs::write(&path, bytes).unwrap();
+    path
 }

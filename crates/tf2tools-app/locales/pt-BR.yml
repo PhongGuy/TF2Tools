@@ -165,6 +165,17 @@ demo_viewer:
   preview: "Prévia"
   open: "Abrir demo"
   empty: "Abra uma demo do TF2 para ver o mapa dela em 3D."
+  loading: "Carregando mapa..."
+  caption: "%{map}. Jogadores e reprodução virão depois."
+  hint: "Arraste para olhar, WASD para se mover, Shift para ir mais devagar."
+  error:
+    not_a_demo: "Este arquivo não é uma demo do TF2."
+    damaged: "Esta demo está danificada e não pode ser lida."
+    map_not_loadable: "O mapa %{map} ainda não pode ser carregado."
+    no_tf2: "O TF2 não foi encontrado, então os mapas dele não podem ser carregados."
+    map_missing: "O mapa %{map} não está instalado. Jogue nele uma vez no TF2 ou baixe-o na página Mapas."
+    map_unreadable: "Este mapa não pode ser exibido."
+    unsupported: "A visão 3D não é compatível com esta configuração gráfica."
 
 nav:
   huds: "HUDs"
