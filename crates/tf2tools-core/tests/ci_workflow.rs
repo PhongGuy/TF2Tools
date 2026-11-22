@@ -52,6 +52,19 @@ fn a_windows_job_lints_and_tests_the_workspace() {
     }
 }
 
+/// A job cancelled at its limit never saves its cache, so the next run starts cold too; the
+/// Windows limit leaves room for a cold build to finish.
+#[test]
+fn the_windows_job_has_room_to_finish_a_cold_build() {
+    let windows = job(&ci(), "windows");
+    let minutes: u32 = windows
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("timeout-minutes: "))
+        .and_then(|m| m.parse().ok())
+        .expect("the windows job sets timeout-minutes");
+    assert!(minutes >= 60, "windows timeout-minutes is {minutes}");
+}
+
 /// Lint and test unify dev-dependency features into the app, so only a plain check sees the
 /// release binary as release.yml builds it.
 #[test]

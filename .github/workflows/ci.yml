@@ -58,8 +58,8 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    # About 20 minutes with a warm cache; the margin covers a cold one.
-    timeout-minutes: 40
+    # A cold cache runs past 40 minutes, and a cancelled job never saves its cache.
+    timeout-minutes: 60
     defaults:
       run:
         # Git for Windows' bash, so the commands read the same as on Linux.
