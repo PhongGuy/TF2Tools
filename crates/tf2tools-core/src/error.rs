@@ -2655,3 +2655,21 @@ pub enum MapMeshError {
     #[error("the map is too large to show")]
     TooLarge,
 }
+
+/// Why a demo's header could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoHeaderError {
+    /// The file does not start with the HL2DEMO magic.
+    #[error("this is not a TF2 demo")]
+    NotADemo,
+    /// The file is shorter than a demo header.
+    #[error("the demo is cut short")]
+    Truncated,
+    /// The map name is not a plain file name, so no map is looked up for it.
+    #[error("the demo names a map that cannot be used: {name:?}")]
+    BadMapName {
+        /// The name the header holds.
+        name: String,
+    },
+}
