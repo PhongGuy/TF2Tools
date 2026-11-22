@@ -1,17 +1,18 @@
-//! A row's thumbnail and Show pictures button, and one open row at a time.
+//! A row's thumbnail, which opens its pictures, and one open row at a time.
 
 use crate::support;
 
+use gpui_kit::component::Theme;
 use gpui_kit::{TestAppContext, px, size};
 use support::graphics::{
-    found, lod_only_assets, no_network, open, picture_page, reveal, toggle_pictures, wait_for_list,
-    wait_for_pictures,
+    borders_at, found, lod_only_assets, no_network, open, picture_page, reveal, toggle_pictures,
+    wait_for_list, wait_for_pictures,
 };
 use tf2tools_app::ids;
 use tf2tools_app::remote_images::{RemoteImage, RemoteImages};
 
 #[gpui_kit::test]
-fn a_row_with_pictures_shows_a_thumbnail_and_a_pictures_button(cx: &mut TestAppContext) {
+fn a_row_with_pictures_shows_a_thumbnail_that_opens_them(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, _page) = picture_page(cx, &env, "medium", "{}");
     reveal(cx, &s, ids::graphics_thumb("lod"));
@@ -22,19 +23,11 @@ fn a_row_with_pictures_shows_a_thumbnail_and_a_pictures_button(cx: &mut TestAppC
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_thumb("lod")).as_deref(),
-        Some("Pictures of Model quality")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::graphics_pictures_toggle("lod")).as_deref(),
         Some("Show pictures")
     );
     for none in ["vsync", "motion_blur", "hud_achievement"] {
         assert!(
             !support::present(cx, s.win, ids::graphics_thumb(none)),
-            "{none}"
-        );
-        assert!(
-            !support::present(cx, s.win, ids::graphics_pictures_toggle(none)),
             "{none}"
         );
     }
@@ -84,7 +77,7 @@ fn one_row_s_pictures_are_open_at_a_time(cx: &mut TestAppContext) {
     assert_eq!(open_row(cx).as_deref(), Some("lod"));
     assert!(support::present(cx, s.win, ids::graphics_pictures("lod")));
     assert_eq!(
-        support::label_of(cx, s.win, ids::graphics_pictures_toggle("lod")).as_deref(),
+        support::label_of(cx, s.win, ids::graphics_thumb("lod")).as_deref(),
         Some("Hide pictures")
     );
     reveal(cx, &s, ids::graphics_thumb("decals"));
@@ -172,5 +165,38 @@ fn a_row_without_pictures_says_why(cx: &mut TestAppContext) {
         Some(
             "No picture: it looks the same in a still picture. The difference only shows while you move."
         )
+    );
+    assert!(
+        !support::present(cx, s.win, ids::graphics_thumb("motion_blur")),
+        "a row without pictures has nothing to open"
+    );
+}
+
+#[gpui_kit::test]
+fn the_open_thumbnail_is_outlined_in_the_foreground_colour(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", "{}");
+    let (foreground, border) = cx.update(|cx| {
+        let t = Theme::global(cx);
+        (t.foreground, t.border)
+    });
+    reveal(cx, &s, ids::graphics_thumb("lod"));
+    assert_eq!(
+        borders_at(cx, &s, ids::graphics_thumb("lod")),
+        [border],
+        "closed"
+    );
+    // The click leaves the pointer on the thumbnail, so this also reads the hovered outline.
+    toggle_pictures(cx, &s, "lod");
+    assert_eq!(
+        borders_at(cx, &s, ids::graphics_thumb("lod")),
+        [foreground],
+        "open"
+    );
+    toggle_pictures(cx, &s, "lod");
+    assert_eq!(
+        borders_at(cx, &s, ids::graphics_thumb("lod")),
+        [border],
+        "closed again"
     );
 }

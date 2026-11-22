@@ -1,5 +1,5 @@
-//! What a settings row draws of its pictures: the thumbnail of its current value, the
-//! Show/Hide pictures button and, while the row is open, its pictures panel: the preset's
+//! What a settings row draws of its pictures: the thumbnail of its current value, which
+//! opens and closes them, and, while the row is open, its pictures panel: the preset's
 //! picture and yours behind a wipe, the zoom toggle, and the strip that picks a value by
 //! its picture.
 
@@ -7,7 +7,7 @@ use std::path::Path;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::Slider;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
@@ -69,13 +69,12 @@ fn rounded(
     }
 }
 
-/// The current value's picture as a button that opens or closes the row's pictures. With no
-/// picture for the value the slot stays empty; a picture that failed to decode leaves an
-/// unfilled box, so the row keeps its shape either way.
+/// The current value's picture as the button that opens or closes the row's pictures,
+/// named "Show pictures" or "Hide pictures". With no picture for the value the slot stays
+/// empty; a picture that failed to decode leaves an unfilled box, so the row keeps its shape.
 pub(super) fn thumbnail(
     editor: &GraphicsChoicesEditor,
     module: &str,
-    label: &str,
     pictures: &RowPictures,
     cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
@@ -92,53 +91,32 @@ pub(super) fn thumbnail(
         px(7.),
         cx,
     );
-    let target = module.to_owned();
-    // A 1 px frame with an 8 px radius, in the accent while the row's pictures are open;
-    // the picture inside is rounded 7 px itself so its corners stay within the frame's arc.
-    let frame = if editor.open_row() == Some(module) {
-        cx.theme().primary
+    let open = editor.open_row() == Some(module);
+    let (frame, label) = if open {
+        (cx.theme().foreground, tr!("graphics.pictures.hide"))
     } else {
-        cx.theme().border
+        (cx.theme().border, tr!("graphics.pictures.show"))
     };
+    let target = module.to_owned();
+    // The 1 px frame sits on a child, since the kit's hover style replaces the Button's own
+    // border colour; the picture is rounded 7 px so its corners stay within the 8 px arc.
     Button::new(s.id(ids::graphics_thumb(module)))
         .ghost()
         .p_0()
         .flex_none()
         .h(px(THUMB_HEIGHT + 2.))
-        .border_1()
-        .border_color(frame)
         .rounded(px(8.))
-        .named(tr!("graphics.pictures.thumb", name = label))
+        .named(label)
         .on_click(
             cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
         )
-        .child(div().w(px(THUMB_WIDTH)).child(picture))
-        .into_any_element()
-}
-
-/// "Show pictures", or "Hide pictures" while the row is open.
-pub(super) fn toggle(
-    editor: &GraphicsChoicesEditor,
-    module: &str,
-    cx: &mut Context<GraphicsChoicesEditor>,
-) -> AnyElement {
-    let s = editor.scope;
-    let open = editor.open_row() == Some(module);
-    let label = if open {
-        tr!("graphics.pictures.hide")
-    } else {
-        tr!("graphics.pictures.show")
-    };
-    let target = module.to_owned();
-    Button::new(s.id(ids::graphics_pictures_toggle(module)))
-        .ghost()
-        .xsmall()
-        .h(px(24.))
-        .px_2()
-        .font_weight(FontWeight::MEDIUM)
-        .label(label)
-        .on_click(
-            cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
+        .child(
+            div()
+                .w(px(THUMB_WIDTH + 2.))
+                .border_1()
+                .border_color(frame)
+                .rounded(px(8.))
+                .child(picture),
         )
         .into_any_element()
 }

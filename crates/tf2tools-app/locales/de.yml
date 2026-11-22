@@ -3069,7 +3069,6 @@ graphics:
   pictures:
     show: "Bilder zeigen"
     hide: "Bilder ausblenden"
-    thumb: "Bilder von %{name}"
     yours: "Deins: %{value}"
     same: "%{value} (wie bei %{preset})"
     zoom: "Zoom"

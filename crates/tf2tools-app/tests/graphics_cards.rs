@@ -74,15 +74,10 @@ fn a_category_is_a_card_with_a_header_bar_and_rows_inside(cx: &mut TestAppContex
 fn learn_more_sits_under_the_description_and_opens_the_docs(cx: &mut TestAppContext) {
     let env = support::env();
     let s = wide_page(cx, &env);
-    reveal(cx, &s, ids::graphics_pictures_toggle("lod"));
+    reveal(cx, &s, ids::graphics_learn_more("lod"));
     let desc = at(cx, &s, ids::graphics_module_description("lod"));
     let more = at(cx, &s, ids::graphics_learn_more("lod"));
-    let toggle = at(cx, &s, ids::graphics_pictures_toggle("lod"));
     assert!(more.top() >= desc.bottom() - px(1.), "{desc:?} {more:?}");
-    assert!(
-        toggle.top() >= more.bottom() - px(1.),
-        "{more:?} {toggle:?}"
-    );
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_learn_more("lod")).as_deref(),
         Some("Learn more")
@@ -175,27 +170,21 @@ fn a_row_s_segments_sit_inside_one_track(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn learn_more_and_the_pictures_toggle_stay_small_and_tight(cx: &mut TestAppContext) {
+fn learn_more_stays_small_and_a_picture_row_tight(cx: &mut TestAppContext) {
     let env = support::env();
     let s = picture_page_at(cx, &env, 1280.);
-    reveal(cx, &s, ids::graphics_pictures_toggle("lod"));
+    reveal(cx, &s, ids::graphics_learn_more("lod"));
     let desc = at(cx, &s, ids::graphics_module_description("lod"));
     let more = at(cx, &s, ids::graphics_learn_more("lod"));
-    let toggle = at(cx, &s, ids::graphics_pictures_toggle("lod"));
     let row = at(cx, &s, ids::graphics_row("lod"));
     assert!(
         more.top() - desc.bottom() <= px(4.),
         "Learn more hugs the description: {desc:?} {more:?}"
     );
     assert!(more.size.height <= px(20.), "{more:?}");
-    assert!(
-        toggle.top() - more.bottom() <= px(4.),
-        "{more:?} {toggle:?}"
-    );
-    assert!(toggle.size.height <= px(26.), "{toggle:?}");
     // The row stays compact even though the description wraps in the app's narrower column.
     assert!(
-        row.size.height <= px(124.),
+        row.size.height <= px(100.),
         "a row with pictures stays compact: {row:?}"
     );
 }
@@ -220,17 +209,17 @@ fn at_800_px_the_thumbnail_stays_beside_the_text_and_only_the_control_drops(
         control.top() >= desc.bottom(),
         "the control drops under the text: {control:?} {desc:?}"
     );
-    let toggle = at(cx, &s, ids::graphics_pictures_toggle("lod"));
+    let more = at(cx, &s, ids::graphics_learn_more("lod"));
     assert!(
-        control.top() >= toggle.bottom(),
-        "the text column keeps its full height above the control: {toggle:?} {control:?}"
+        control.top() >= more.bottom(),
+        "the text column keeps its full height above the control: {more:?} {control:?}"
     );
     assert!(
         desc.right() <= row.right(),
         "the description wraps inside the row: {desc:?} {row:?}"
     );
     // Keeping the thumbnail beside the text keeps the narrow row short.
-    assert!(row.size.height <= px(164.), "{row:?}");
+    assert!(row.size.height <= px(140.), "{row:?}");
 }
 
 #[gpui_kit::test]

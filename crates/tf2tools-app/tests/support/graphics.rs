@@ -148,14 +148,44 @@ pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
     panic!("{id:?} never showed on the Graphics page");
 }
 
-/// Opens or closes `module`'s pictures with its Show/Hide pictures button.
+/// Opens or closes `module`'s pictures with a click on its thumbnail.
 pub fn toggle_pictures(cx: &mut TestAppContext, s: &super::ShellWindow, module: &str) {
-    reveal(cx, s, tf2tools_app::ids::graphics_pictures_toggle(module));
-    super::click_id(
-        cx,
-        s.win,
-        tf2tools_app::ids::graphics_pictures_toggle(module),
-    );
+    reveal(cx, s, tf2tools_app::ids::graphics_thumb(module));
+    super::click_id(cx, s.win, tf2tools_app::ids::graphics_thumb(module));
+}
+
+/// The distinct colours of the borders the last frame painted exactly around `id`'s box,
+/// leaving out borders drawn transparent or zero wide. A kit Button paints several identical
+/// quads over its box, so each colour is listed once.
+pub fn borders_at(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    id: impl Into<ElementId>,
+) -> Vec<gpui_kit::Hsla> {
+    let id = id.into();
+    let b = super::bounds_of(cx, s.win, id.clone()).unwrap_or_else(|| panic!("{id:?} not drawn"));
+    cx.update_window(s.win, |_, w, _| {
+        let scale = w.scale_factor();
+        let near = |a: f32, b: gpui_kit::Pixels| (a - f32::from(b) * scale).abs() <= 0.5;
+        w.painted_quads()
+            .iter()
+            .filter(|q| {
+                near(q.bounds.origin.x.0, b.origin.x)
+                    && near(q.bounds.origin.y.0, b.origin.y)
+                    && near(q.bounds.size.width.0, b.size.width)
+                    && near(q.bounds.size.height.0, b.size.height)
+                    && q.border_widths.top.0 > 0.
+            })
+            .map(|q| q.border_color)
+            .filter(|c| c.a > 0.)
+            .fold(Vec::new(), |mut seen, c| {
+                if !seen.contains(&c) {
+                    seen.push(c);
+                }
+                seen
+            })
+    })
+    .unwrap()
 }
 
 /// Scrolls the Graphics page back to its top, where the status card and changes strip are.

@@ -3069,7 +3069,6 @@ graphics:
   pictures:
     show: "Mostrar imágenes"
     hide: "Ocultar imágenes"
-    thumb: "Imágenes de %{name}"
     yours: "Tuyo: %{value}"
     same: "%{value} (igual que %{preset})"
     zoom: "Ampliar"

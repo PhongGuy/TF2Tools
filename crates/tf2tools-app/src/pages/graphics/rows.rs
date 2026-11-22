@@ -24,9 +24,9 @@ use crate::widgets::labelled;
 pub(super) const CHANGED: u32 = 0x1447e6;
 
 impl GraphicsChoicesEditor {
-    /// One settings row, with its thumbnail, Show pictures and open panel when the module has
-    /// pictures; None without a catalog or for an unknown module. Every row but the card's
-    /// `first` rules itself off from the one above.
+    /// One settings row, with its thumbnail and open panel when the module has pictures;
+    /// None without a catalog or for an unknown module. Every row but the card's `first`
+    /// rules itself off from the one above.
     pub fn settings_row(
         &self,
         module: &str,
@@ -86,13 +86,8 @@ impl GraphicsChoicesEditor {
         // The panel compares the crops while zoom is on, the same pictures the editor wants;
         // the thumbnail and strip stay on the full pictures.
         let index = self.pictures.as_deref();
-        let thumb = pictures.map(|p| picture_panel::thumbnail(self, name, &row.label, p, cx));
-        let toggle = pictures.map(|_| {
-            h_flex()
-                .ml(px(-8.))
-                .child(picture_panel::toggle(self, name, cx))
-        });
-        // A setting the manifest says has no pictures says why, in the Show pictures slot.
+        let thumb = pictures.map(|p| picture_panel::thumbnail(self, name, p, cx));
+        // A setting the manifest says has no pictures says why, under its description.
         let no_picture = index
             .filter(|_| pictures.is_none())
             .and_then(|index| index.no_picture(name))
@@ -122,7 +117,6 @@ impl GraphicsChoicesEditor {
             ))
             .children(description)
             .child(learn_more)
-            .children(toggle)
             .children(no_picture);
         let controls = h_flex().flex_none().gap_2().children(reset).child(control);
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)

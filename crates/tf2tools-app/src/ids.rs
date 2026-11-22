@@ -1146,11 +1146,6 @@ pub fn graphics_thumb_image(module: &str) -> ElementId {
     keyed("graphics-thumb-image", module)
 }
 
-/// A row's Show/Hide pictures Button: "graphics-pictures-toggle:<module>".
-pub fn graphics_pictures_toggle(module: &str) -> ElementId {
-    keyed("graphics-pictures-toggle", module)
-}
-
 /// The muted line saying why a row's setting has no pictures.
 pub fn graphics_no_picture(module: &str) -> ElementId {
     keyed("graphics-no-picture", module)
