@@ -38,9 +38,10 @@ tempfile = "3"
 # The test platform records file dialogs, so a test can see a pick reach one.
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }
 
-# The app workspace's binrw-free VPK reader; see vendor/vpk/README.md.
+# The app workspace's binrw-free VPK reader and lzma-free BSP reader; see vendor/*/README.md.
 [patch.crates-io]
 vpk = { path = "../../vendor/vpk" }
+vbsp = { path = "../../vendor/vbsp" }
 
 # Headless frame numbers need an optimised host and app.
 [profile.dev.package."*"]

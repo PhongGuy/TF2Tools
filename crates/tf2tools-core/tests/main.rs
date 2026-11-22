@@ -285,6 +285,7 @@ mod tf2_install;
 mod update_apply;
 mod update_check;
 mod update_download;
+mod vendor_vbsp;
 mod vendor_vpk;
 mod vpk;
 mod vtf;

@@ -2,12 +2,12 @@
 
 use std::path::{Path, PathBuf};
 
-fn repo() -> PathBuf {
+pub(crate) fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
 /// The `[[package]]` blocks of Cargo.lock whose name is exactly `name`.
-fn lock_blocks(name: &str) -> Vec<String> {
+pub(crate) fn lock_blocks(name: &str) -> Vec<String> {
     let lock = std::fs::read_to_string(repo().join("Cargo.lock")).unwrap();
     let line = format!("name = \"{name}\"");
     lock.split("[[package]]")
@@ -27,9 +27,18 @@ fn vpk_resolves_to_the_vendored_copy() {
     assert!(vendor.join("LICENSE").is_file());
 }
 
+/// binrw 0.14 is the release a future Rust rejects (E0365); vbsp needs binrw 0.15, which builds.
 #[test]
-fn binrw_is_gone_from_the_build() {
+fn every_locked_binrw_is_0_15_or_newer() {
     for name in ["binrw", "binrw_derive"] {
-        assert_eq!(lock_blocks(name), Vec::<String>::new(), "{name}");
+        let old: Vec<String> = lock_blocks(name)
+            .into_iter()
+            .filter(|block| {
+                !block
+                    .lines()
+                    .any(|l| l.trim().starts_with("version = \"0.15."))
+            })
+            .collect();
+        assert_eq!(old, Vec::<String>::new(), "{name}");
     }
 }
