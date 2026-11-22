@@ -1,6 +1,7 @@
-//! The open log's footer buttons, Show Chat, Show Killstreaks and Download log, and the
-//! dialogs the first two open.
+//! The open log's footer buttons, Show Chat, Show Killstreaks, Download log and its demo's
+//! two, and the dialogs the first two open.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
@@ -14,8 +15,10 @@ use super::{team_cell, team_colour};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
+use crate::pages::logs_tf::demo::DemoButton;
 use crate::pages::logs_tf::tables::ChatRow;
-use crate::pages::logs_tf::text::{duration_text, streaks_label};
+use crate::pages::logs_tf::text::{DEMOS_TF, demo_button_label, duration_text, streaks_label};
+use crate::services::Services;
 use crate::widgets::dialog_frame::content_max_height;
 use crate::widgets::tip::tip;
 
@@ -55,11 +58,20 @@ pub(in crate::pages::logs_tf) fn streak_rows(log: &LogDetail) -> Vec<StreakRow> 
 
 /// The buttons under the kill matrix: Show Chat and Show Killstreaks ask `page` to open
 /// their dialogs (Killstreaks disabled when the log has none); Download log saves log `id`.
-pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> Div {
+/// A found `demo` adds Download demo, disabled while it runs, and a link to its demos.tf page.
+pub(super) fn footer(
+    id: u64,
+    log: &LogDetail,
+    demo: Option<DemoButton>,
+    page: WeakEntity<LogsTfPage>,
+) -> Div {
     let chat_page = page.clone();
     let download_page = page.clone();
+    let demo_page = page.clone();
     let streaks = log.killstreaks().len();
+    // Buttons that outgrow the panel move to the next line whole; a label is never cut.
     h_flex()
+        .flex_wrap()
         .gap_2()
         .child(
             Button::new(ids::LOGSTF_CHAT_TOGGLE)
@@ -89,6 +101,31 @@ pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> 
                     let _ = download_page.update(cx, |page, cx| page.download_log(id, window, cx));
                 }),
         )
+        .children(demo.map(|demo| {
+            Button::new(ids::logstf_demo_download(id))
+                .outline()
+                .small()
+                .label(demo_button_label(demo.downloading))
+                .disabled(demo.downloading.is_some())
+                .on_click(move |_, window, cx| {
+                    let _ = demo_page.update(cx, |page, cx| page.download_demo(id, window, cx));
+                })
+        }))
+        .children(demo.map(|demo| {
+            Button::new(ids::logstf_demo_link(id))
+                .outline()
+                .small()
+                .icon(IconName::ExternalLink)
+                .label(DEMOS_TF)
+                .on_click(move |_, _, cx| {
+                    let url = cx
+                        .global::<Services>()
+                        .demos
+                        .endpoints()
+                        .demo_page(demo.demo_id);
+                    cx.open_url(&url);
+                })
+        }))
 }
 
 /// The chat dialog's content: each line's team badge, the name in its team's colour and the

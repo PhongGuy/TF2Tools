@@ -8,8 +8,9 @@ use std::sync::Arc;
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Entity, Global, SharedString, Task};
 use tf2tools_core::{
-    ActivityLog, BuiltinCrosshairs, DataDir, Database, DetectError, Endpoints, FontHost, Library,
-    LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient, StoreConfig, Tf2Install,
+    ActivityLog, BuiltinCrosshairs, DataDir, Database, DemosClient, DemosEndpoints, DetectError,
+    Endpoints, FontHost, Library, LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient,
+    StoreConfig, Tf2Install,
 };
 
 use crate::assets::{AssetRoot, AssetRootError};
@@ -43,6 +44,8 @@ pub struct Services {
     pub font_host: Option<Arc<dyn FontHost>>,
     /// Syncs tracked players' logs from logs.tf into the cache the logs.tf page reads.
     pub logs: LogsClient,
+    /// Finds and downloads an open log's demo on demos.tf.
+    pub demos: DemosClient,
 }
 
 impl Global for Services {}
@@ -91,6 +94,10 @@ impl Services {
         if offline {
             logs = logs.with_config(LogsClient::default_config().with_loopback_only(true));
         }
+        let mut demos = DemosClient::new(DemosEndpoints::default());
+        if offline {
+            demos = demos.with_config(DemosClient::default_config().with_loopback_only(true));
+        }
         Ok(Self {
             db,
             data,
@@ -104,6 +111,7 @@ impl Services {
             activity,
             font_host: None,
             logs,
+            demos,
         })
     }
 
@@ -118,6 +126,11 @@ impl Services {
     /// The same services with `logs` as the logs.tf client; tests aim it at a local or closed port.
     pub fn with_logs(self, logs: LogsClient) -> Self {
         Self { logs, ..self }
+    }
+
+    /// The same services with `demos` as the demos.tf client; tests aim it at a local or closed port.
+    pub fn with_demos(self, demos: DemosClient) -> Self {
+        Self { demos, ..self }
     }
 
     /// The same services with `host` as the font host; `open` leaves it `None`.

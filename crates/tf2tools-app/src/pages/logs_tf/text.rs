@@ -4,12 +4,13 @@ use std::time::Duration;
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, PlayerInputError, ResolveError,
-    SteamId, Team, TfClass,
+    DemosError, EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, PlayerInputError,
+    ResolveError, SteamId, Team, TfClass,
 };
 
 use crate::i18n::{Phrase, counted_plural, format, labelled, names, tr};
 use crate::logs_sync::SyncProgress;
+use crate::picker;
 
 /// logs.tf's front page, which the page's credit opens.
 pub const LOGS_TF_URL: &str = "https://logs.tf";
@@ -195,6 +196,71 @@ pub fn download_reason(error: &LogsFetchError) -> SharedString {
         | LogsFetchError::Http { .. }
         | LogsFetchError::Cache { .. }
         | _ => logs_tf_down(),
+    }
+}
+
+/// demos.tf's name, the open log's link label; a brand, so it reads the same in every language.
+pub const DEMOS_TF: &str = "demos.tf";
+
+/// The Download demo button: idle with `None`, downloading with `Some`, and the whole percent
+/// once the size is known.
+pub fn demo_button_label(downloading: Option<Option<u8>>) -> SharedString {
+    match downloading {
+        None => tr!("logs_tf.detail.demo_download"),
+        Some(None) => tr!("logs_tf.detail.demo_downloading"),
+        Some(Some(done)) => tr!(
+            "logs_tf.detail.demo_downloading_percent",
+            percent = format::percent(u64::from(done))
+        ),
+    }
+}
+
+/// How much of a demo has arrived, as a whole percent rounded down and capped at 100; None
+/// without a size. Computed in u128 so no byte count can overflow it.
+pub fn demo_percent(done: u64, total: Option<u64>) -> Option<u8> {
+    let total = total.filter(|&total| total > 0)?;
+    let share = (u128::from(done) * 100 / u128::from(total)).min(100);
+    u8::try_from(share).ok()
+}
+
+/// The file a demo is saved as: demos.tf's own name made safe, or `demo_<id>.dem` when that
+/// name holds nothing but dots and spaces (where `file_name_for` would fall back to its own
+/// default).
+pub fn demo_file_name(name: &str, demo_id: u64) -> String {
+    let stem = name.strip_suffix(".dem").unwrap_or(name);
+    if stem.trim_matches(['.', ' ']).is_empty() {
+        return format!("demo_{demo_id}.dem");
+    }
+    picker::file_name_for(stem, "dem")
+}
+
+/// The toast title when Download demo finishes.
+pub fn demo_downloaded() -> SharedString {
+    tr!("logs_tf.demo.done")
+}
+
+/// The toast title when Download demo fails; its description says why.
+pub fn demo_download_failed() -> SharedString {
+    tr!("logs_tf.demo.failed")
+}
+
+/// Why Download demo failed when demos.tf did not answer, or the download task stopped.
+pub fn demo_down() -> SharedString {
+    tr!("logs_tf.demo.down")
+}
+
+/// Why Download demo failed, in the player's words.
+pub fn demo_reason(error: &DemosError) -> SharedString {
+    match error {
+        DemosError::Gone => tr!("logs_tf.demo.gone"),
+        DemosError::Network { .. } => tr!("logs_tf.download.offline"),
+        DemosError::RateLimited { .. } => tr!("logs_tf.demo.busy"),
+        DemosError::TooLarge { .. } => tr!("logs_tf.demo.too_big"),
+        DemosError::Write { .. } => write_failed(),
+        // Every known variant is named for the lint; the wildcard shares the down text.
+        DemosError::Http { .. } | DemosError::Unreadable | DemosError::ForeignUrl { .. } | _ => {
+            demo_down()
+        }
     }
 }
 

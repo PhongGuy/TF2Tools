@@ -15,8 +15,8 @@ use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::weapon_names::LoadedWeaponNames;
 use tf2tools_core::{
-    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TrackedPlayer,
-    WeaponNames,
+    DemosClient, DemosEndpoints, LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId,
+    StoreConfig, TrackedPlayer, WeaponNames,
 };
 
 use crate::support;
@@ -72,8 +72,43 @@ pub fn shell_with_picker(
     players: &[(u64, &'static str)],
     picker: Arc<ScriptedPicker>,
 ) -> support::ShellWindow {
+    open_logs_shell(cx, env, base, None, players, picker)
+}
+
+/// A demos client on `base` with no request spacing and a 1 ms retry backoff.
+pub fn demos_client(base: &str) -> DemosClient {
+    DemosClient::new(DemosEndpoints::loopback(base)).with_config(
+        DemosClient::default_config()
+            .with_request_spacing(Duration::ZERO)
+            .with_retry_backoff(Duration::from_millis(1)),
+    )
+}
+
+/// Like `shell_with_picker`, with demos.tf served at `demos_base`.
+pub fn shell_with_demos(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    demos_base: &str,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> support::ShellWindow {
+    open_logs_shell(cx, env, base, Some(demos_base), players, picker)
+}
+
+// The one shell both helpers open: logs.tf at `base`, `players` tracked, and demos.tf at
+// `demos_base` when given, else the shell's dead demos client.
+fn open_logs_shell(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    demos_base: Option<&str>,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> support::ShellWindow {
     cx.executor().allow_parking();
     let base = base.to_owned();
+    let demos_base = demos_base.map(str::to_owned);
     let players = players.to_vec();
     super::open_shell(
         cx,
@@ -89,7 +124,11 @@ pub fn shell_with_picker(
                     .add_player(&TrackedPlayer::new(sid(*account), *name))
                     .unwrap();
             }
-            *services = services.clone().with_logs(logs);
+            let mut tweaked = services.clone().with_logs(logs);
+            if let Some(demos_base) = &demos_base {
+                tweaked = tweaked.with_demos(demos_client(demos_base));
+            }
+            *services = tweaked;
         },
     )
 }
@@ -412,4 +451,81 @@ pub fn load_icons(cx: &mut TestAppContext, env: &support::Env, icons: &Entity<Lo
     support::wait_real(cx, "the kill icons", |cx| {
         cx.update(|cx| icons.read(cx).icons().get("scattergun").is_some())
     });
+}
+
+// Log 3 is the 6v6 fixture: cp_gullywash_f9, uploaded 1792201829, 1714 s long. Log 2 is
+// koth_proside_v1, so the same list never matches it.
+pub const SIXES_MAP: &str = "cp_gullywash_f9";
+pub const SIXES_DATE: i64 = 1_792_201_829;
+pub const SIXES_LENGTH: u32 = 1714;
+pub const DEMO_ID: u64 = 777;
+pub const DEMO_NAME: &str = "match-20261017-2110-cp_gullywash_f9.dem";
+pub const DEMO_ROUTE: &str = "/files/ab/777.dem";
+
+/// A demos.tf list holding log 3's demo, its file on the demos.tf server at `base`.
+pub fn sixes_list(base: &str) -> Vec<u8> {
+    json!([{"id": DEMO_ID, "url": format!("{base}{DEMO_ROUTE}"), "name": DEMO_NAME,
+            "server": "serveme.tf #1", "duration": SIXES_LENGTH + 20, "map": SIXES_MAP,
+            "time": SIXES_DATE + 60, "playerCount": 12}])
+    .to_string()
+    .into_bytes()
+}
+
+/// The servers and shell behind an open log 3 whose demo demos.tf holds; drop it last.
+pub struct DemoFooter {
+    _logs: support::StoreServer,
+    _demos: support::StoreServer,
+    pub s: support::ShellWindow,
+}
+
+/// Arie's logs with demos.tf holding log 3's demo, in an 800x600 window, log 3 open with its
+/// lookup found and scrolled to its footer.
+pub fn demo_footer_at_800(cx: &mut TestAppContext, env: &support::Env) -> DemoFooter {
+    let logs = support::StoreServer::start();
+    serve_two_logs(&logs);
+    let demos = support::StoreServer::start();
+    demos.mount_bytes("/demos/", sixes_list(&demos.uri()));
+    let picker = Arc::new(ScriptedPicker::new(Vec::new()));
+    let s = shell_with_demos(
+        cx,
+        env,
+        &logs.uri(),
+        &demos.uri(),
+        &[(ARIE, "Arie")],
+        picker,
+    );
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
+    );
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    support::wait_real(cx, "the demo buttons", |cx| {
+        support::present(cx, s.win, ids::logstf_demo_download(3))
+    });
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_download(3));
+    DemoFooter {
+        _logs: logs,
+        _demos: demos,
+        s,
+    }
+}
+
+/// Asserts every button in log `log`'s footer lies inside its panel, left and right.
+pub fn assert_footer_fits(cx: &mut TestAppContext, s: &support::ShellWindow, log: u64) {
+    let panel = support::bounds_of(cx, s.win, ids::logstf_log_panel(log)).expect("the panel");
+    let buttons: [gpui_kit::ElementId; 5] = [
+        ids::LOGSTF_CHAT_TOGGLE.into(),
+        ids::LOGSTF_STREAKS_TOGGLE.into(),
+        ids::logstf_download(log),
+        ids::logstf_demo_download(log),
+        ids::logstf_demo_link(log),
+    ];
+    for id in buttons {
+        let at = support::bounds_of(cx, s.win, id.clone()).unwrap_or_else(|| panic!("{id:?}"));
+        assert!(
+            at.left() >= panel.left() && at.right() <= panel.right(),
+            "{id:?} {at:?} runs past the panel {panel:?}"
+        );
+    }
 }

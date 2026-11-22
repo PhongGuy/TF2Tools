@@ -3340,6 +3340,16 @@ pub fn logstf_download(id: u64) -> ElementId {
     keyed("logstf-download", &id.to_string())
 }
 
+/// The open log's Download demo button: "logstf-demo-download:<log id>".
+pub fn logstf_demo_download(log_id: u64) -> ElementId {
+    keyed("logstf-demo-download", &log_id.to_string())
+}
+
+/// The open log's link to its demo on demos.tf: "logstf-demo-link:<log id>".
+pub fn logstf_demo_link(log_id: u64) -> ElementId {
+    keyed("logstf-demo-link", &log_id.to_string())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())

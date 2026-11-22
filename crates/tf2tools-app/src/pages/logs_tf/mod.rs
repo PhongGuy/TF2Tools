@@ -2,6 +2,7 @@
 //! history range the player picks.
 
 mod class_weapons;
+mod demo;
 mod detail;
 mod grid;
 mod head;
@@ -10,9 +11,10 @@ pub mod sort;
 pub mod tables;
 pub mod text;
 
+pub use demo::DemoLookup;
 pub use list::STAT_COLUMNS;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
@@ -28,9 +30,9 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsCacheError, LogsFetchError,
-    LogsRange, MatrixKind, OpenedBody, SteamId, TfClass, TrackedPlayer, WeaponNames, parse_log,
-    parse_player_input,
+    ClassAverage, ClassWeapons, DemoQuery, LogDetail, LogRow, LogState, LogsCacheError,
+    LogsFetchError, LogsRange, MatrixKind, OpenedBody, SteamId, TfClass, TrackedPlayer,
+    WeaponNames, parse_log, parse_player_input,
 };
 
 use crate::i18n::{self, Phrase, tr};
@@ -108,6 +110,10 @@ pub struct LogsTfPage {
     // Logs whose fetch from logs.tf is out. A row reopened meanwhile waits for that fetch,
     // since a second one of a trimmed log would miss the restore and rewrite its rows.
     fetching: HashSet<u64>,
+    // Each opened log's demo lookup by log id; an entry means demos.tf was asked once already.
+    demos: HashMap<u64, DemoLookup>,
+    // Demo downloads running by log id, each with its whole percent once the size is known.
+    demo_downloads: HashMap<u64, Option<u8>>,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
     // The kill matrix tab and its sort, kept the same way.
@@ -239,6 +245,8 @@ impl LogsTfPage {
             stale_reads: 0,
             open: None,
             fetching: HashSet::new(),
+            demos: HashMap::new(),
+            demo_downloads: HashMap::new(),
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
             matrix_sort: None,
@@ -638,13 +646,21 @@ impl LogsTfPage {
         }
     }
 
-    // Moves open log `id` to `state`, unless its row closed or another opened meanwhile.
+    // Moves open log `id` to `state`, unless its row closed or another opened meanwhile. A log
+    // landing Ready starts its demo lookup, so both the read and the fetch path ask demos.tf.
     fn land(&mut self, id: u64, state: OpenState, cx: &mut Context<Self>) -> bool {
+        let ready = match &state {
+            OpenState::Ready(detail) => Some(DemoQuery::from_log(detail)),
+            OpenState::Loading | OpenState::Failed(_) => None,
+        };
         match &mut self.open {
             Some(open) if open.id == id => open.state = state,
             _ => return false,
         }
         self.remeasure_log(id);
+        if let Some(query) = ready {
+            self.look_up_demo(id, query, cx);
+        }
         cx.notify();
         true
     }

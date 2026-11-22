@@ -136,3 +136,13 @@ fn font_install_types_are_send_sync_debug() {
     assert_send_sync::<tf2tools_core::FontInstallError>();
     assert_send_sync::<tf2tools_core::FontSkipReason>();
 }
+
+#[test]
+fn demos_types_are_send_sync_debug() {
+    assert_send_sync::<tf2tools_core::DemosClient>();
+    assert_send_sync::<tf2tools_core::DemosEndpoints>();
+    assert_send_sync::<tf2tools_core::DemosError>();
+    assert_send_sync::<tf2tools_core::DemoQuery>();
+    assert_send_sync::<tf2tools_core::DemoSummary>();
+    assert_send_sync::<tf2tools_core::DemoDetail>();
+}

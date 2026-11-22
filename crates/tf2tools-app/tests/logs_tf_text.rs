@@ -4,12 +4,13 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    accuracy_text, charge_text, count_text, date_time_text, download_failed, download_reason,
-    duration_text, empty_text, event_parts, event_text, fetch_message, finding_text, floored,
-    floored_share_text, healing_text, kapd_text, known_text, medigun_name, no_logs_text,
-    one_decimal, per_min_text, progress_line, progress_text, range_label, reads_zero,
-    resolve_message, ring_label, round_length_text, seconds_text, share_text, streaks_label,
-    summary_text, sync_message, tenths_text, time_played_text, whole,
+    DEMOS_TF, accuracy_text, charge_text, count_text, date_time_text, demo_button_label, demo_down,
+    demo_download_failed, demo_downloaded, demo_file_name, demo_percent, demo_reason,
+    download_failed, download_reason, duration_text, empty_text, event_parts, event_text,
+    fetch_message, finding_text, floored, floored_share_text, healing_text, kapd_text, known_text,
+    medigun_name, no_logs_text, one_decimal, per_min_text, progress_line, progress_text,
+    range_label, reads_zero, resolve_message, ring_label, round_length_text, seconds_text,
+    share_text, streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -851,4 +852,84 @@ fn a_banner_date_reads_as_the_day_alone() {
         .timestamp();
     assert_eq!(date_text(unix), "2026-03-05");
     assert_eq!(date_time_text(unix), "2026-03-05 20:56");
+}
+
+#[test]
+fn the_demo_button_says_what_it_is_doing() {
+    assert_eq!(demo_button_label(None), "Download demo");
+    assert_eq!(demo_button_label(Some(None)), "Downloading demo");
+    assert_eq!(demo_button_label(Some(Some(42))), "Downloading demo 42%");
+    assert_eq!(DEMOS_TF, "demos.tf");
+}
+
+#[test]
+fn the_demo_percent_is_whole_and_needs_a_size() {
+    assert_eq!(demo_percent(0, Some(1000)), Some(0));
+    assert_eq!(demo_percent(429, Some(1000)), Some(42));
+    assert_eq!(demo_percent(999, Some(1000)), Some(99));
+    assert_eq!(demo_percent(1000, Some(1000)), Some(100));
+    assert_eq!(demo_percent(1500, Some(1000)), Some(100));
+    assert_eq!(demo_percent(u64::MAX, Some(u64::MAX)), Some(100));
+    assert_eq!(demo_percent(10, None), None);
+    assert_eq!(demo_percent(10, Some(0)), None);
+}
+
+#[test]
+fn a_demo_is_saved_under_its_own_name() {
+    assert_eq!(
+        demo_file_name("match-20261121-2109-cp_process_f12.dem", 7),
+        "match-20261121-2109-cp_process_f12.dem"
+    );
+    assert_eq!(demo_file_name("a/b:c.dem", 7), "a_b_c.dem");
+    assert_eq!(demo_file_name("", 7), "demo_7.dem");
+    assert_eq!(demo_file_name(".dem", 7), "demo_7.dem");
+    assert_eq!(demo_file_name("...dem", 7), "demo_7.dem");
+    assert_eq!(demo_file_name(" . .dem", 7), "demo_7.dem");
+}
+
+#[test]
+fn demo_failures_read_in_player_words() {
+    use tf2tools_core::DemosError;
+    assert_eq!(demo_downloaded(), "Demo downloaded");
+    assert_eq!(demo_download_failed(), "Couldn't download this demo.");
+    assert_eq!(
+        demo_down(),
+        "demos.tf isn't responding right now. Try again later."
+    );
+    assert_eq!(
+        demo_reason(&DemosError::Gone),
+        "demos.tf no longer has this demo."
+    );
+    let offline = DemosError::Network {
+        url: "u".into(),
+        message: "m".into(),
+    };
+    assert_eq!(demo_reason(&offline), "Check your internet connection.");
+    let busy = DemosError::RateLimited { url: "u".into() };
+    assert_eq!(
+        demo_reason(&busy),
+        "demos.tf is busy. Try again in a few minutes."
+    );
+    let big = DemosError::TooLarge {
+        url: "u".into(),
+        limit: 1,
+    };
+    assert_eq!(demo_reason(&big), "This demo is too big to download.");
+    let write = DemosError::Write {
+        message: "m".into(),
+    };
+    assert_eq!(demo_reason(&write), "Couldn't write the file.");
+    for down in [
+        DemosError::Http {
+            url: "u".into(),
+            status: 500,
+        },
+        DemosError::Unreadable,
+        DemosError::ForeignUrl { url: "u".into() },
+    ] {
+        assert_eq!(
+            demo_reason(&down),
+            "demos.tf isn't responding right now. Try again later."
+        );
+    }
 }

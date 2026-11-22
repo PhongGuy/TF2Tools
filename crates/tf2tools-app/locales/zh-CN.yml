@@ -424,6 +424,13 @@ logs_tf:
     gone: "logs.tf 上已没有此日志。"
     offline: "请检查网络连接。"
     too_big: "此日志太大，无法下载。"
+  demo:
+    done: "录像已下载"
+    failed: "无法下载此录像。"
+    gone: "demos.tf 上已没有此录像。"
+    too_big: "此录像太大，无法下载。"
+    down: "demos.tf 目前没有响应。请稍后重试。"
+    busy: "demos.tf 正忙。请过几分钟再试。"
   open:
     loading: "正在加载日志…"
     offline: "离线时无法加载此日志。"
@@ -525,6 +532,9 @@ logs_tf:
     type: "类型"
     description: "描述"
     won: "%{team} 获胜"
+    demo_download: "下载录像"
+    demo_downloading: "正在下载录像"
+    demo_downloading_percent: "正在下载录像 %{percent}"
   event:
     point_capture: "占领控制点"
     captured: " 占领了控制点 %{point}"

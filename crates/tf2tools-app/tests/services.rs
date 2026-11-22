@@ -274,3 +274,21 @@ fn opening_the_services_retires_override_addons_from_the_library() {
     assert!(!addons.join("mastercomfig-addon-override-1.vpk").exists());
     assert!(addons.join("mastercomfig-addon-flat-mouse.vpk").exists());
 }
+
+#[test]
+fn open_keeps_the_demos_client_on_loopback_when_offline() {
+    let env = support::env();
+    for offline in [true, false] {
+        let services = Services::open(
+            env.data.clone(),
+            support::repo_asset_root(),
+            Arc::new(ScriptedPicker::empty()),
+            support::no_steam(),
+            Arc::new(RecordingAudio::new()),
+            Endpoints::default(),
+            offline,
+        )
+        .unwrap();
+        assert_eq!(services.demos.is_loopback_only(), offline);
+    }
+}
