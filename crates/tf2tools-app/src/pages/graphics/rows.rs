@@ -224,18 +224,11 @@ impl GraphicsChoicesEditor {
             let choice = option.choice.clone();
             let entity = cx.entity().downgrade();
             let checked = row.shown == option.choice;
-            // Let TF2 decide shows a short word so six segments still fit beside the text; the
-            // tooltip, which is also its accessible name, keeps the full wording.
-            let shown = if value.is_empty() {
-                tr!("graphics.not_set_short")
-            } else {
-                option.label.clone()
-            };
-            // 4 px sides are the most that keep a changed row's controls beside its text at
-            // 1280 px once the Auto segment joins them.
+            // Tight sides keep a changed row's controls beside its text on a 1280 px page.
             let toggle = Toggle::new(self.scope.id(ids::graphics_segment(&row.module, value)))
                 .small()
-                .label(shown)
+                // The tooltip, which is also the accessible name, keeps the full words.
+                .label(option.segment_label.clone())
                 .tooltip(option.label.clone())
                 .checked(checked)
                 .disabled(self.disabled)

@@ -183,3 +183,35 @@ fn changed_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
         graphics::assert_rows_readable(cx, &s, ids::IdScope::PAGE, &graphics::WIDE, width);
     }
 }
+
+// A row whose own values include `auto` would show "Auto" twice, so no locale may draw two
+// segments with the same visible word.
+#[test]
+fn no_segmented_row_shows_two_segments_with_the_same_word() {
+    use tf2tools_app::pages::graphics::view::{ControlKind, row};
+    let catalog = support::full_module_catalog();
+    let choices = tf2tools_core::Choices::new(Preset::Medium);
+    for code in ["en", "de", "fr", "es", "pt-BR", "ru", "zh-CN"] {
+        let _guard = LocaleGuard::switch(code);
+        for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+            let r = row(&catalog, &choices, module);
+            if r.kind != ControlKind::Segmented {
+                continue;
+            }
+            let words: Vec<String> = r
+                .options
+                .iter()
+                .map(|o| o.segment_label.to_string())
+                .collect();
+            let mut unique = words.clone();
+            unique.sort();
+            unique.dedup();
+            assert_eq!(
+                unique.len(),
+                words.len(),
+                "{code}: {}'s segments repeat a word: {words:?}",
+                module.name()
+            );
+        }
+    }
+}

@@ -152,6 +152,14 @@ fn segments_and_selects_lead_with_let_tf2_decide_and_switches_do_not() {
                 .all(|(c, _)| *c != ModuleChoice::NotSet)
         );
     }
+    // The segment's visible word: short, unless the module has its own auto value.
+    let visible = |name: &str| -> String {
+        row(&catalog, &choices, catalog.module(name).unwrap()).options[0]
+            .segment_label
+            .to_string()
+    };
+    assert_eq!(visible("decals"), "Auto");
+    assert_eq!(visible("sillygibs"), "Let TF2 decide");
 }
 
 #[test]

@@ -38,7 +38,10 @@ pub fn control_kind(module: &ComfigModule) -> ControlKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChoiceView {
     pub choice: ModuleChoice,
+    /// The full words, for a Select entry, a tooltip and the accessible name.
     pub label: SharedString,
+    /// The words a segment shows.
+    pub segment_label: SharedString,
 }
 
 /// One setting's row.
@@ -80,11 +83,23 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
         ControlKind::Select | ControlKind::Segmented => select_choices(module),
         ControlKind::Switch => value_choices(module).collect(),
     };
+    // NotSet's segment shows a short word so a changed row stays on one line, but the full
+    // words where the module has its own auto value, so two segments never read "Auto".
+    let has_auto = module.values().iter().any(|v| v.value() == "auto");
     let options = offered
         .into_iter()
-        .map(|choice| ChoiceView {
-            label: choice_label(module, &choice),
-            choice,
+        .map(|choice| {
+            let label = choice_label(module, &choice);
+            let segment_label = if choice == ModuleChoice::NotSet && !has_auto {
+                tr!("graphics.not_set_short")
+            } else {
+                label.clone()
+            };
+            ChoiceView {
+                label,
+                segment_label,
+                choice,
+            }
         })
         .collect();
     RowView {
