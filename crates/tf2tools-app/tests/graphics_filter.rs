@@ -64,6 +64,26 @@ fn a_wide_page_starts_the_rail_beside_the_list_below_the_strip(cx: &mut TestAppC
 }
 
 #[gpui_kit::test]
+fn the_list_column_is_as_wide_as_the_mock_at_1280(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    let view = at(cx, &s, ids::page(Page::Graphics));
+    let status = at(cx, &s, ids::GRAPHICS_STATUS);
+    let section = at(cx, &s, ids::graphics_section("graphics"));
+    let inset = status.left() - view.left();
+    assert!(
+        (inset - px(24.)).abs() <= px(2.),
+        "the mock's 24 px side padding: {status:?} {view:?}"
+    );
+    assert!(
+        section.size.width >= px(760.),
+        "the list is as wide as the mock's: {section:?}"
+    );
+}
+
+#[gpui_kit::test]
 fn the_rail_stays_in_view_while_the_list_scrolls(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, _page) = full_page(cx, &env, "{}");
