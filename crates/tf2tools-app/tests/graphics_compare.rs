@@ -258,3 +258,112 @@ fn the_slider_s_thumb_rides_the_wipe_line_and_zoom_keeps_clear(cx: &mut TestAppC
         }
     }
 }
+
+#[gpui_kit::test]
+fn the_slider_runs_under_the_picture_and_zoom_sits_in_its_corner(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "low", r#"{"lod":"medium"}"#);
+    toggle_pictures(cx, &s, "lod");
+    for width in [1800., 1280., 800.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(900.)));
+        support::settle(cx, s.win);
+        reveal(cx, &s, ids::graphics_compare_slider("lod"));
+        let frame = at(cx, &s, ids::graphics_compare("lod"));
+        let slider = at(cx, &s, ids::graphics_compare_slider("lod"));
+        let zoom = at(cx, &s, ids::graphics_zoom("lod"));
+        assert!(
+            near(slider.top() - frame.bottom(), px(8.)) && near(slider.size.height, px(24.)),
+            "{width} px: the slider {slider:?} runs 8 px under the picture {frame:?}"
+        );
+        assert!(
+            near(slider.left(), frame.left()) && near(slider.right(), frame.right()),
+            "{width} px: the slider {slider:?} is as wide as the picture {frame:?}"
+        );
+        assert!(
+            near(frame.right() - zoom.right(), px(10.))
+                && near(frame.bottom() - zoom.bottom(), px(10.)),
+            "{width} px: Zoom {zoom:?} sits 10 px in from the corner of {frame:?}"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn without_a_wipe_zoom_keeps_its_corner_and_no_slider_shows(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", "{}");
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_zoom("lod"));
+    let frame = at(cx, &s, ids::graphics_compare("lod"));
+    let zoom = at(cx, &s, ids::graphics_zoom("lod"));
+    assert!(
+        near(frame.right() - zoom.right(), px(10.))
+            && near(frame.bottom() - zoom.bottom(), px(10.)),
+        "Zoom {zoom:?} sits 10 px in from the corner of {frame:?}"
+    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::graphics_compare_slider("lod")
+    ));
+}
+
+// The solid fill and the top-left radius of the quad painted exactly over `id`'s box, in
+// window pixels.
+fn pill_look(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    id: ElementId,
+) -> (gpui_kit::Hsla, f32, f32) {
+    let b = at(cx, s, id.clone());
+    cx.update_window(s.win, |_, w, _| {
+        let scale = w.scale_factor();
+        let close = |a: f32, b: Pixels| (a - f32::from(b) * scale).abs() <= 0.5;
+        w.painted_quads()
+            .iter()
+            .filter(|q| {
+                close(q.bounds.origin.x.0, b.origin.x)
+                    && close(q.bounds.origin.y.0, b.origin.y)
+                    && close(q.bounds.size.height.0, b.size.height)
+            })
+            .find_map(|q| {
+                q.background.as_solid().filter(|c| c.a > 0.).map(|c| {
+                    (
+                        c,
+                        q.corner_radii.top_left.0,
+                        f32::from(b.size.height) * scale,
+                    )
+                })
+            })
+            .unwrap_or_else(|| panic!("no fill painted for {id:?}"))
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn the_corner_pills_are_round_dark_and_10_px_in(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", r#"{"lod":"high"}"#);
+    cx.simulate_window_resize(s.win, size(px(1800.), px(1000.)));
+    support::settle(cx, s.win);
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_compare("lod"));
+    let frame = at(cx, &s, ids::graphics_compare("lod"));
+    let left = at(cx, &s, ids::graphics_compare_pill("lod", "preset"));
+    let right = at(cx, &s, ids::graphics_compare_pill("lod", "yours"));
+    assert!(
+        near(left.top() - frame.top(), px(10.)) && near(left.left() - frame.left(), px(10.)),
+        "{left:?}"
+    );
+    assert!(
+        near(right.top() - frame.top(), px(10.)) && near(frame.right() - right.right(), px(10.)),
+        "{right:?}"
+    );
+    for side in ["preset", "yours"] {
+        let (fill, radius, height) = pill_look(cx, &s, ids::graphics_compare_pill("lod", side));
+        assert_eq!(fill, gpui_kit::hsla(0., 0., 0., 0.8), "{side}");
+        assert!(
+            radius >= height / 2. - 0.5,
+            "{side}: fully rounded, {radius} for {height}"
+        );
+    }
+}
