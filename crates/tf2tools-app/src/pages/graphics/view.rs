@@ -22,7 +22,7 @@ pub enum ControlKind {
 }
 
 /// The most values a segmented control holds before a row falls back to a Select.
-pub const SEGMENTED_MOST: usize = 4;
+pub const SEGMENTED_MOST: usize = 5;
 
 /// A switch for a plain off/on module, segments for a few values, a Select for the rest.
 pub fn control_kind(module: &ComfigModule) -> ControlKind {

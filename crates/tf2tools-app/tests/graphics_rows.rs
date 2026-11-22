@@ -141,8 +141,12 @@ fn a_saved_let_tf2_decide_shows_no_segment_and_offers_reset(cx: &mut TestAppCont
         Some("Model quality")
     );
     assert!(
-        cx.update(|cx| page.read(cx).module_select("decals"))
+        cx.update(|cx| page.read(cx).module_select("fpscap"))
             .is_some()
+    );
+    assert!(
+        cx.update(|cx| page.read(cx).module_select("decals"))
+            .is_none()
     );
 }
 

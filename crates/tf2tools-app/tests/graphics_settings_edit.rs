@@ -4,8 +4,8 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, pick, reveal, row_value, saved, scroll_to_top,
-    shown, toasted, value, wait_for_list,
+    HEADER, choose, click_segment, found, idle, modules_cfg, open, reveal, row_value, saved,
+    scroll_to_top, segment_checked, shown, toasted, value, wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
@@ -55,36 +55,33 @@ fn a_pick_writes_modules_cfg_and_the_preset_s_value_clears_it(cx: &mut TestAppCo
         .entity_id();
     assert_eq!(after, row, "the row keeps its Select");
 
-    choose(cx, &page, "decals", Some(ModuleChoice::NotSet));
-    support::wait_real(cx, "Game default", |cx| {
-        saved(cx, &page, "decals") == Some(ModuleChoice::NotSet)
-    });
-    idle(cx, &page);
-    assert_eq!(
-        modules_cfg(&env).as_deref(),
-        Some(format!("{HEADER}alias decals\nfpscap=120\n").as_str())
-    );
-    assert_eq!(shown(cx, &page, "decals"), Some(ModuleChoice::NotSet));
-
     choose(cx, &page, "fpscap", Some(value("400")));
     support::wait_real(cx, "the preset's value", |cx| {
         saved(cx, &page, "fpscap").is_none()
     });
     idle(cx, &page);
-    assert_eq!(
-        modules_cfg(&env).as_deref(),
-        Some(format!("{HEADER}alias decals\n").as_str())
-    );
+    assert_eq!(modules_cfg(&env).as_deref(), Some(HEADER));
     assert!(!support::present(
         cx,
         s.win,
         ids::graphics_module_reset("fpscap")
     ));
 
-    choose(cx, &page, "decals", None);
+    choose(cx, &page, "fpscap", Some(ModuleChoice::NotSet));
+    support::wait_real(cx, "Game default", |cx| {
+        saved(cx, &page, "fpscap") == Some(ModuleChoice::NotSet)
+    });
     idle(cx, &page);
     assert_eq!(
-        saved(cx, &page, "decals"),
+        modules_cfg(&env).as_deref(),
+        Some(format!("{HEADER}alias fpscap\n").as_str())
+    );
+    assert_eq!(shown(cx, &page, "fpscap"), Some(ModuleChoice::NotSet));
+
+    choose(cx, &page, "fpscap", None);
+    idle(cx, &page);
+    assert_eq!(
+        saved(cx, &page, "fpscap"),
         Some(ModuleChoice::NotSet),
         "a cleared Select changes nothing"
     );
@@ -127,14 +124,17 @@ fn low_sound_waits_for_tf2_to_close_but_other_settings_do_not(cx: &mut TestAppCo
     let env = support::env();
     let (s, page) = managed_page(cx, &env, "{}");
     cx.update(|cx| Tf2Probe::install(cx, || true));
-    pick(cx, &s, &page, "sound", value("low"));
+    click_segment(cx, &s, "sound", "low");
     toasted(cx, &s, "Close TF2 first");
     idle(cx, &page);
     assert_eq!(saved(cx, &page, "sound"), None);
     assert_eq!(
-        shown(cx, &page, "sound"),
-        Some(value("high")),
-        "the Select goes back to the saved choice"
+        (
+            segment_checked(cx, &s, "sound", "high"),
+            segment_checked(cx, &s, "sound", "low")
+        ),
+        (Some(true), Some(false)),
+        "the row still shows the saved choice"
     );
     assert_eq!(modules_cfg(&env), None);
     assert!(
@@ -159,10 +159,15 @@ fn a_refused_pick_goes_back_even_when_the_reload_fails(cx: &mut TestAppContext) 
     let (s, page) = managed_page(cx, &env, "{}");
     cx.update(|cx| Tf2Probe::install(cx, || true));
     support::rename_table(&env, "mastercomfig_release", "gone_release");
-    pick(cx, &s, &page, "sound", value("low"));
-    assert_eq!(shown(cx, &page, "sound"), Some(value("low")));
+    click_segment(cx, &s, "sound", "low");
     toasted(cx, &s, "Close TF2 first");
     toasted(cx, &s, "Failed to load mastercomfig");
     idle(cx, &page);
-    assert_eq!(shown(cx, &page, "sound"), Some(value("high")));
+    assert_eq!(
+        (
+            segment_checked(cx, &s, "sound", "high"),
+            segment_checked(cx, &s, "sound", "low")
+        ),
+        (Some(true), Some(false))
+    );
 }

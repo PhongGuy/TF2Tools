@@ -4,8 +4,8 @@ use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, pick, saved, server_shell, shown, toasted,
-    value, wait_for_list,
+    HEADER, choose, click_segment, found, idle, modules_cfg, open, saved, segment_checked,
+    server_shell, toasted, value, wait_for_list,
 };
 use tf2tools_app::ids;
 
@@ -76,7 +76,7 @@ fn low_sound_downloads_its_override(cx: &mut TestAppContext) {
     support::seed_mastercomfig_overrides(&env, &server.uri());
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
-    choose(cx, &page, "sound", Some(value("low")));
+    click_segment(cx, &s, "sound", "low");
     support::wait_real(cx, "the override", |cx| {
         saved(cx, &page, "sound") == Some(value("low"))
     });
@@ -102,7 +102,7 @@ fn low_sound_asks_for_the_waiting_update_first(cx: &mut TestAppContext) {
     support::seed_mastercomfig_overrides(&env, &server.uri());
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
-    pick(cx, &s, &page, "sound", value("low"));
+    click_segment(cx, &s, "sound", "low");
     toasted(
         cx,
         &s,
@@ -111,9 +111,12 @@ fn low_sound_asks_for_the_waiting_update_first(cx: &mut TestAppContext) {
     idle(cx, &page);
     assert_eq!(saved(cx, &page, "sound"), None);
     assert_eq!(
-        shown(cx, &page, "sound"),
-        Some(value("high")),
-        "the Select goes back to the saved choice"
+        (
+            segment_checked(cx, &s, "sound", "high"),
+            segment_checked(cx, &s, "sound", "low")
+        ),
+        (Some(true), Some(false)),
+        "the row goes back to the saved choice"
     );
     assert_eq!(modules_cfg(&env), None);
     assert!(

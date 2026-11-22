@@ -118,7 +118,14 @@ impl GraphicsChoicesEditor {
             .children(description)
             .child(learn_more)
             .children(no_picture);
-        let controls = h_flex().flex_none().gap_2().children(reset).child(control);
+        // On a narrow page the controls take the row's width and wrap, so five segments in a
+        // long locale shrink to the row instead of running past it.
+        let controls = h_flex().gap_2().children(reset).child(control);
+        let controls = if narrow {
+            controls.w_full().flex_wrap()
+        } else {
+            controls.flex_none()
+        };
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
         // the control drops under them, since a segmented control beside a wrapped description
         // would not fit; otherwise it sits on the right.

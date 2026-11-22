@@ -136,8 +136,8 @@ fn every_graphics_id_is_drawn_in_some_page_state(cx: &mut TestAppContext) {
     );
 
     scroll_to_top(cx, &s);
-    reveal(cx, &s, ids::graphics_module_select("decals"));
-    support::click_id(cx, s.win, ids::graphics_module_select("decals"));
+    reveal(cx, &s, ids::graphics_module_select("fpscap"));
+    support::click_id(cx, s.win, ids::graphics_module_select("fpscap"));
     collect(cx, &s, &mut seen);
     support::press(cx, s.win, "escape");
 

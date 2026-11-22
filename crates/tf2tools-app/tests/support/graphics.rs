@@ -386,3 +386,27 @@ pub fn no_network() -> tf2tools_app::remote_images::ImageFetch {
         Box::pin(async { Err(tf2tools_app::remote_images::FetchFailure::Permanent) })
     })
 }
+
+/// Whether `module`'s `value` segment is checked; None when the row draws no such segment.
+pub fn segment_checked(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    module: &str,
+    value: &str,
+) -> Option<bool> {
+    super::checked_of(
+        cx,
+        s.win,
+        tf2tools_app::ids::graphics_segment(module, value),
+    )
+}
+
+/// Clicks `module`'s `value` segment as the player would.
+pub fn click_segment(cx: &mut TestAppContext, s: &super::ShellWindow, module: &str, value: &str) {
+    reveal(cx, s, tf2tools_app::ids::graphics_segment(module, value));
+    super::click_id(
+        cx,
+        s.win,
+        tf2tools_app::ids::graphics_segment(module, value),
+    );
+}
