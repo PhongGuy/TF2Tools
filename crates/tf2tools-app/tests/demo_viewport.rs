@@ -4,7 +4,7 @@
 use gpui_kit::test::TestEventExt as _;
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Entity, Modifiers, MouseButton, Pixels, Point,
-    TestAppContext, point, px, size,
+    TestAppContext, VisualTestContext, point, px, size,
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::DemoViewport;
@@ -156,6 +156,26 @@ fn losing_focus_lets_go_of_held_keys(cx: &mut TestAppContext) {
     cx.update_window(win, |_, w, cx| w.blur(cx)).unwrap();
     frames(cx, win, 60);
     assert_eq!(speed(cx, &viewport), 0.);
+}
+
+#[gpui_kit::test]
+fn leaving_the_window_lets_go_of_held_keys_and_drawing_stops(cx: &mut TestAppContext) {
+    let (win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    // Test windows open inactive, and deactivating one that never was active does nothing.
+    cx.update_window(win, |_, w, _| w.activate_window())
+        .unwrap();
+    focus(cx, win);
+    cx.update_window(win, |_, w, cx| w.key_down("w", false, cx))
+        .unwrap();
+    frames(cx, win, 10);
+    assert!(speed(cx, &viewport) > 100.);
+    // Alt-tab with W held: the key-up goes to the other app.
+    VisualTestContext::from_window(win, cx).deactivate_window();
+    frames(cx, win, 60);
+    assert_eq!(speed(cx, &viewport), 0.);
+    let drawn = stub.draws().len();
+    frames(cx, win, 5);
+    assert_eq!(stub.draws().len(), drawn, "an inactive window kept drawing");
 }
 
 #[gpui_kit::test]

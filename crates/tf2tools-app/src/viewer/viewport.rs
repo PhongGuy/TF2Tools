@@ -95,6 +95,21 @@ impl DemoViewport {
             });
         })
         .detach();
+        // Focus survives an alt-tab, but the key-ups go to the other app, so let go on leaving.
+        cx.observe_window_activation(window, |v, window, cx| {
+            if !window.is_window_active() {
+                v.keys = HeldKeys::default();
+                cx.notify();
+            }
+        })
+        .detach();
+        // The shown frame's atlas tile outlives the viewport unless it is dropped here.
+        cx.on_release(|v, cx| {
+            if let Some((image, _)) = v.shown.take() {
+                cx.drop_image(image, None);
+            }
+        })
+        .detach();
         Self {
             renderer,
             camera: FreeFly::new(origin, yaw, 0.0),
