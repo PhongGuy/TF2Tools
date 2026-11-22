@@ -172,7 +172,7 @@ demo_viewer:
     damaged: "Esta demo está dañada y no se puede leer."
     map_not_loadable: "El mapa %{map} aún no se puede cargar."
     no_tf2: "No se encontró TF2, así que no se pueden cargar sus mapas."
-    map_missing: "El mapa %{map} no está instalado. Juégalo una vez en TF2 o consíguelo en la página Mapas."
+    map_missing: "El mapa %{map} no está instalado. Juégalo una vez en TF2 o consigue un mapa personalizado en la página Mapas."
     map_unreadable: "Este mapa no se puede mostrar."
     unsupported: "La vista 3D no es compatible con esta configuración gráfica."
 

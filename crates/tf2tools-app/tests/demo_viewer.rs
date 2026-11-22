@@ -217,7 +217,7 @@ fn a_map_that_is_not_installed_names_it(cx: &mut TestAppContext) {
         found(&env),
         &demo,
         StubAnswer::Frames,
-        "The map cp_missing isn't installed. Play it once in TF2 or get it from the Maps page.",
+        "The map cp_missing isn't installed. Play it once in TF2, or get a custom map from the Maps page.",
     );
 }
 
