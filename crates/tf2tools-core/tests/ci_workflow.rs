@@ -100,3 +100,30 @@ fn the_gate_checks_the_third_party_notices_with_the_pinned_cargo_about() {
         );
     }
 }
+
+/// The app's GPU test needs a Vulkan driver, and GitHub's Ubuntu runners have none, so every job
+/// that runs `make check` installs lavapipe.
+#[test]
+fn every_job_that_runs_the_suite_installs_a_software_vulkan_driver() {
+    for (file, name) in [
+        ("ci.yml", "gate"),
+        ("release.yml", "gate"),
+        ("rolling.yml", "rolling"),
+    ] {
+        let text =
+            std::fs::read_to_string(repo().join(".github/workflows").join(file)).expect(file);
+        let job = job(&text, name);
+        assert!(
+            job.contains("make check"),
+            "{file} {name} no longer runs make check"
+        );
+        let apt = job
+            .lines()
+            .find(|l| l.contains("apt-get install"))
+            .unwrap_or_else(|| panic!("{file} {name} installs nothing"));
+        assert!(
+            apt.split_whitespace().any(|w| w == "mesa-vulkan-drivers"),
+            "{file} {name}: {apt}"
+        );
+    }
+}

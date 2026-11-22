@@ -11,6 +11,7 @@ mod activity;
 mod archive;
 mod crosshair_catalog;
 mod db;
+mod demo_view;
 mod demostf;
 mod disk;
 mod error;
@@ -43,21 +44,25 @@ pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEn
 pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
+pub use demo_view::{
+    DemoHeader, FlyInput, FreeFly, MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MapMesh, load_map_file,
+    load_map_file_capped, load_map_mesh, read_demo_header,
+};
 pub use demostf::{
     DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,
     pick_demo,
 };
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
-    BrowseError, CatalogError, CopyHudError, DataDirError, DemosError, DetectError, DownloadError,
-    FilesError, FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError,
-    GbAddonInstallError, GbMapInstallError, GbMapRemoveError, HistoryError, HudFilesError,
-    HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError, KeepHudError,
-    KvParseError, LibraryError, LogError, LogParseError, LogsCacheError, LogsFetchError,
-    LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError,
-    PresetError, PreviewError, ProfileError, QueryError, RecipeError, ReinstallError,
-    RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
+    BrowseError, CatalogError, CopyHudError, DataDirError, DemoHeaderError, DemosError,
+    DetectError, DownloadError, FilesError, FontCheckError, FontInstallError, GbAddonCheckError,
+    GbAddonFetchError, GbAddonInstallError, GbMapInstallError, GbMapRemoveError, HistoryError,
+    HudFilesError, HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError,
+    KeepHudError, KvParseError, LibraryError, LogError, LogParseError, LogsCacheError,
+    LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
+    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
+    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
     SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError, UpdateApplyError,
     UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
     WeaponIconsError, WeaponNamesError,
@@ -147,7 +152,9 @@ pub use store::{
     STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
     StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
-pub use store::{CommunityMap, MapEntry, MapSource, MapState, parse_serveme_maps};
+pub use store::{
+    CommunityMap, MapEntry, MapSource, MapState, find_installed_map, parse_serveme_maps,
+};
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,
     fit_to_maker, hud_texture_vtf, menu_textures, png_to_vtf, read_picture, read_png, rgba_to_vtf,

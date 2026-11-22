@@ -22,6 +22,7 @@ flate2.workspace = true
 sevenz-rust2.workspace = true
 bzip2.workspace = true
 vpk.workspace = true
+vbsp.workspace = true
 rars.workspace = true
 vtf.workspace = true
 image = { workspace = true, features = ["jpeg"] }

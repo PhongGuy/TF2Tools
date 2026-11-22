@@ -162,6 +162,22 @@ updater:
     installed: "TF2Tools v%{version} installé"
     installer_started: "Programme d'installation de TF2Tools v%{version} lancé"
 
+demo_viewer:
+  preview: "Aperçu"
+  open: "Ouvrir la démo"
+  empty: "Ouvrez une démo TF2 pour voir sa carte en 3D."
+  loading: "Chargement de la carte..."
+  caption: "%{map}. Les joueurs et la lecture viendront plus tard."
+  hint: "Faites glisser pour regarder, WASD pour bouger, Maj pour ralentir."
+  error:
+    not_a_demo: "Ce fichier n'est pas une démo TF2."
+    damaged: "Cette démo est endommagée et ne peut pas être lue."
+    map_not_loadable: "La carte %{map} ne peut pas encore être chargée."
+    no_tf2: "TF2 est introuvable, ses cartes ne peuvent donc pas être chargées."
+    map_missing: "La carte %{map} n'est pas installée. Jouez-y une fois dans TF2, ou obtenez une carte personnalisée sur la page Cartes."
+    map_unreadable: "Cette carte ne peut pas être affichée."
+    unsupported: "La vue 3D n'est pas prise en charge par cette configuration graphique."
+
 nav:
   huds: "HUD"
   sounds: "Sons"
@@ -177,6 +193,7 @@ nav:
   addon_store: "Magasin d'add-ons"
   maps: "Cartes"
   logs_tf: "logs.tf"
+  demo_viewer: "Visionneuse de démos"
   settings: "Paramètres"
   logs: "Journaux"
   activity_log: "Journal d'activité"

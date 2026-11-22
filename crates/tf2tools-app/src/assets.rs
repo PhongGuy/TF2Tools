@@ -120,7 +120,7 @@ mod extra {
         Undo2, Redo2, FilePlus, Grid3x3, SquareDashed, ZoomIn, ZoomOut, Slash, Circle, SquareSquare,
         Shapes, ImageUp, ImageDown, LayoutDashboard, PanelRight, AppWindow, ChevronUp, ChevronDown,
         RotateCcw, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, Dot, Map, Gamepad2,
-        CircleQuestionMark, Sparkles, Gauge, ChartLine, LayersPlus, CircleDashed,
+        CircleQuestionMark, Sparkles, Gauge, ChartLine, LayersPlus, CircleDashed, Clapperboard,
     ]);
 }
 use extra::ExtraIcons;

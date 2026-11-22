@@ -49,7 +49,9 @@ pub use gb_maps::GbMapGamemode;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub(crate) use maps::{BSP_MAGIC, is_map_name};
-pub use maps::{CommunityMap, MapEntry, MapSource, MapState, parse_serveme_maps};
+pub use maps::{
+    CommunityMap, MapEntry, MapSource, MapState, find_installed_map, parse_serveme_maps,
+};
 pub(crate) use maps::{MapIndex, downloaded_names, lowercase_all};
 pub use mastercomfig::MastercomfigRelease;
 

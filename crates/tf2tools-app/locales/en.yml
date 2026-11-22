@@ -137,6 +137,22 @@ updater:
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
 
+demo_viewer:
+  preview: "Preview"
+  open: "Open demo"
+  empty: "Open a TF2 demo to see its map in 3D."
+  loading: "Loading map..."
+  caption: "%{map}. Players and playback come later."
+  hint: "Drag to look, WASD to move, Shift to slow down."
+  error:
+    not_a_demo: "This file isn't a TF2 demo."
+    damaged: "This demo is damaged and can't be read."
+    map_not_loadable: "The map %{map} can't be loaded yet."
+    no_tf2: "TF2 wasn't found, so its maps can't be loaded."
+    map_missing: "The map %{map} isn't installed. Play it once in TF2, or get a custom map from the Maps page."
+    map_unreadable: "This map can't be shown."
+    unsupported: "3D view isn't supported on this graphics setup."
+
 nav:
   huds: "HUDs"
   sounds: "Sounds"
@@ -152,6 +168,7 @@ nav:
   addon_store: "Addon Store"
   maps: "Maps"
   logs_tf: "logs.tf"
+  demo_viewer: "Demo Viewer"
   settings: "Settings"
   logs: "Logs"
   activity_log: "Activity Log"

@@ -39,6 +39,7 @@ use tf2tools_core::{LogEntry, LogQuery};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+pub mod demo_viewer;
 pub mod fonts;
 pub mod graphics;
 pub mod hud_copies;
@@ -54,6 +55,9 @@ pub mod update_feed;
 
 #[path = "../../../tf2tools-core/tests/common/hud_stock.rs"]
 pub mod hud_stock;
+
+#[path = "../../../tf2tools-core/tests/common/demo_view.rs"]
+pub mod demo_view_fixtures;
 
 /// Kit, theme and reduced motion, as the app sets them up.
 pub fn init(cx: &mut TestAppContext) {

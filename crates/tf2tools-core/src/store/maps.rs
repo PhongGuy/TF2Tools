@@ -217,6 +217,79 @@ fn bsp_stems(dir: &Path) -> HashSet<String> {
         .collect()
 }
 
+/// Which of the game's map places a search dir belongs to.
+#[derive(PartialEq, Eq)]
+enum Origin {
+    Own,
+    Server,
+    /// A `tf/custom` folder, by name.
+    Custom(String),
+}
+
+struct SearchDir {
+    origin: Origin,
+    path: PathBuf,
+}
+
+/// Every dir the game loads maps from, in the order it prefers them: `tf/maps`,
+/// `tf/download/maps`, then the `maps` dir (any case) of each `tf/custom` folder, folders
+/// sorted by name. A case-sensitive disk may hold both `maps` and `Maps`; the game reads both.
+fn search_dirs(tf2: &Tf2Install) -> Vec<SearchDir> {
+    let mut dirs = vec![
+        SearchDir {
+            origin: Origin::Own,
+            path: maps_dir(tf2),
+        },
+        SearchDir {
+            origin: Origin::Server,
+            path: server_maps_dir(tf2),
+        },
+    ];
+    let mut folders: Vec<_> = std::fs::read_dir(tf2.custom_dir())
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_dir())
+        .collect();
+    folders.sort_by_key(|e| e.file_name());
+    for folder in folders {
+        let name = folder.file_name().to_string_lossy().into_owned();
+        let mut maps: Vec<_> = std::fs::read_dir(folder.path())
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().eq_ignore_ascii_case("maps"))
+            .map(|e| e.path())
+            .collect();
+        maps.sort();
+        dirs.extend(maps.into_iter().map(|path| SearchDir {
+            origin: Origin::Custom(name.clone()),
+            path,
+        }));
+    }
+    dirs
+}
+
+/// The path of map `map` (any case) where the game loads maps, in `MapIndex`'s order, or
+/// `None` when it is not a plain map name or no regular `<map>.bsp` is there. Never opens a VPK.
+pub fn find_installed_map(install: &Tf2Install, map: &str) -> Option<PathBuf> {
+    if !is_map_name(map) {
+        return None;
+    }
+    let wanted = format!("{}.bsp", map.to_lowercase());
+    search_dirs(install).into_iter().find_map(|dir| {
+        let mut hits: Vec<PathBuf> = std::fs::read_dir(&dir.path)
+            .ok()?
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().to_lowercase() == wanted)
+            .map(|e| e.path())
+            .filter(|p| p.is_file())
+            .collect();
+        hits.sort();
+        hits.into_iter().next()
+    })
+}
+
 /// The lowercased map stems in each place the game loads maps from, read once so a whole
 /// list can be checked without touching the disk per name.
 pub(crate) struct MapIndex {
@@ -230,28 +303,31 @@ impl MapIndex {
     /// Reads `tf/maps`, `tf/download/maps` and the `maps` dir (any case) of every folder
     /// directly in `tf/custom`. VPKs are never opened; unreadable dirs count as empty.
     pub(crate) fn scan(tf2: &Tf2Install) -> Self {
-        let mut custom: Vec<(String, HashSet<String>)> = std::fs::read_dir(tf2.custom_dir())
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_dir())
-            .filter_map(|folder| {
-                // A case-sensitive disk may hold both `maps` and `Maps`; the game reads both.
-                let stems: HashSet<String> = std::fs::read_dir(folder.path())
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Result::ok)
-                    .filter(|e| e.file_name().eq_ignore_ascii_case("maps"))
-                    .flat_map(|e| bsp_stems(&e.path()))
-                    .collect();
-                let name = folder.file_name().to_string_lossy().into_owned();
-                (!stems.is_empty()).then_some((name, stems))
-            })
-            .collect();
-        custom.sort_by(|a, b| a.0.cmp(&b.0));
+        let dirs = search_dirs(tf2);
+        let stems_of = |origin: Origin| -> HashSet<String> {
+            dirs.iter()
+                .filter(|d| d.origin == origin)
+                .flat_map(|d| bsp_stems(&d.path))
+                .collect()
+        };
+        let mut custom: Vec<(String, HashSet<String>)> = Vec::new();
+        for dir in dirs
+            .iter()
+            .filter(|d| matches!(d.origin, Origin::Custom(_)))
+        {
+            let Origin::Custom(folder) = &dir.origin else {
+                continue;
+            };
+            let stems = bsp_stems(&dir.path);
+            match custom.last_mut() {
+                Some((last, set)) if last == folder => set.extend(stems),
+                _ if stems.is_empty() => {}
+                _ => custom.push((folder.clone(), stems)),
+            }
+        }
         Self {
-            own: bsp_stems(&maps_dir(tf2)),
-            server: bsp_stems(&server_maps_dir(tf2)),
+            own: stems_of(Origin::Own),
+            server: stems_of(Origin::Server),
             custom,
         }
     }

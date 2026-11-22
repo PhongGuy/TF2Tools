@@ -42,6 +42,8 @@ tracing-subscriber.workspace = true
 tempfile.workspace = true
 rust-i18n.workspace = true
 sys-locale.workspace = true
+wgpu.workspace = true
+pollster.workspace = true
 
 [build-dependencies]
 embed-resource.workspace = true
@@ -74,6 +76,11 @@ path = "tests/i18n.rs"
 [[example]]
 name = "app_timing"
 test = true
+
+# A measurement tool run by hand against a real map, not a test.
+[[example]]
+name = "viewer_bench"
+test = false
 
 # cargo-packager 0.11.8 input for `make package`; paths are relative to this crate.
 [package.metadata.packager]

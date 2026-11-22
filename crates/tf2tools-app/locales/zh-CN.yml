@@ -159,6 +159,22 @@ updater:
     installed: "已安装 TF2Tools v%{version}"
     installer_started: "已启动 TF2Tools v%{version} 安装程序"
 
+demo_viewer:
+  preview: "预览"
+  open: "打开录像"
+  empty: "打开 TF2 录像，即可在 3D 中查看其地图。"
+  loading: "正在加载地图…"
+  caption: "%{map}。玩家与回放功能将在之后加入。"
+  hint: "拖动以环顾，WASD 移动，Shift 减速。"
+  error:
+    not_a_demo: "此文件不是 TF2 录像。"
+    damaged: "此录像已损坏，无法读取。"
+    map_not_loadable: "地图 %{map} 暂时无法加载。"
+    no_tf2: "未找到 TF2，因此无法加载其地图。"
+    map_missing: "地图 %{map} 未安装。请在 TF2 中玩一次，或在“地图”页面获取自定义地图。"
+    map_unreadable: "无法显示此地图。"
+    unsupported: "当前图形配置不支持 3D 视图。"
+
 nav:
   huds: "HUD"
   sounds: "音效"
@@ -174,6 +190,7 @@ nav:
   addon_store: "插件商店"
   maps: "地图"
   logs_tf: "logs.tf"
+  demo_viewer: "录像查看器"
   settings: "设置"
   logs: "日志"
   activity_log: "活动日志"

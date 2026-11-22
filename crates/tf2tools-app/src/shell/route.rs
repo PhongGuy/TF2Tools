@@ -21,13 +21,14 @@ pub enum Page {
     AddonStore,
     Maps,
     LogsTf,
+    DemoViewer,
     Settings,
     Logs,
 }
 
 impl Page {
-    /// Every page in sidebar order: tools, stores, makers, Maps and logs.tf, footer.
-    pub const ALL: [Page; 16] = [
+    /// Every page in sidebar order: tools, stores, makers, Maps, logs.tf and the Demo Viewer, footer.
+    pub const ALL: [Page; 17] = [
         Page::Huds,
         Page::Sounds,
         Page::Crosshairs,
@@ -42,6 +43,7 @@ impl Page {
         Page::HudMaker,
         Page::Maps,
         Page::LogsTf,
+        Page::DemoViewer,
         Page::Settings,
         Page::Logs,
     ];
@@ -63,6 +65,7 @@ impl Page {
             Page::AddonStore => "addon-store",
             Page::Maps => "maps",
             Page::LogsTf => "logs-tf",
+            Page::DemoViewer => "demo-viewer",
             Page::Settings => "settings",
             Page::Logs => "logs",
         }
@@ -85,6 +88,7 @@ impl Page {
             Page::AddonStore => tr!("nav.addon_store"),
             Page::Maps => tr!("nav.maps"),
             Page::LogsTf => tr!("nav.logs_tf"),
+            Page::DemoViewer => tr!("nav.demo_viewer"),
             Page::Settings => tr!("nav.settings"),
             Page::Logs => tr!("nav.logs"),
         }
@@ -108,6 +112,7 @@ impl Page {
             | other @ Page::AddonStore
             | other @ Page::Maps
             | other @ Page::LogsTf
+            | other @ Page::DemoViewer
             | other @ Page::Settings => other.label(),
         }
     }
@@ -132,6 +137,7 @@ impl Page {
                 | Page::Profiles
                 | Page::Maps
                 | Page::LogsTf
+                | Page::DemoViewer
         )
     }
 
