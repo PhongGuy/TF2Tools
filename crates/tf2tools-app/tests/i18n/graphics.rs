@@ -140,7 +140,7 @@ fn changed_russian_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
     support::seed_full_mastercomfig_catalog(&env, "9.100.1");
     support::seed_mastercomfig_choices(
         &env,
-        r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra"}"#,
+        r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra","lighting":null}"#,
     );
     let page = graphics::open(cx, &s);
     graphics::wait_for_list(cx, &s, &page);
@@ -148,7 +148,13 @@ fn changed_russian_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
     graphics::assert_changed_rows_fit(
         cx,
         &s,
-        &["shadows", "texture_quality", "color_filter", "water"],
+        &[
+            "shadows",
+            "texture_quality",
+            "color_filter",
+            "water",
+            "lighting",
+        ],
         800.,
     );
 }
@@ -174,12 +180,6 @@ fn changed_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
     let page = graphics::open(cx, &s);
     graphics::wait_for_list(cx, &s, &page);
     for width in [1252., 1280.] {
-        graphics::assert_rows_readable(
-            cx,
-            &s,
-            ids::IdScope::PAGE,
-            &["shadows", "texture_quality"],
-            width,
-        );
+        graphics::assert_rows_readable(cx, &s, ids::IdScope::PAGE, &graphics::WIDE, width);
     }
 }

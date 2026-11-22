@@ -1246,7 +1246,8 @@ pub fn graphics_segments(module: &str) -> ElementId {
     keyed("graphics-segments", module)
 }
 
-/// One segment of a row's segmented control: "graphics-segment:<module>=<value>".
+/// One segment of a row's segmented control: "graphics-segment:<module>=<value>", the value
+/// empty for Let TF2 decide.
 pub fn graphics_segment(module: &str, value: &str) -> ElementId {
     keyed("graphics-segment", &format!("{module}={value}"))
 }

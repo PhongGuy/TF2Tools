@@ -120,9 +120,10 @@ fn a_segment_picks_its_value_and_a_second_click_changes_nothing(cx: &mut TestApp
 }
 
 #[gpui_kit::test]
-fn a_saved_let_tf2_decide_shows_no_segment_and_offers_reset(cx: &mut TestAppContext) {
+fn a_saved_let_tf2_decide_checks_only_its_own_segment_and_offers_reset(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, page) = full_page(cx, &env, r#"{"lod":null}"#);
+    assert_eq!(checked(cx, &s, "lod", ""), Some(true));
     for v in ["low", "medium", "high", "ultra"] {
         assert_eq!(checked(cx, &s, "lod", v), Some(false), "{v}");
     }
@@ -280,8 +281,14 @@ fn a_saved_choice_the_new_preset_matches_still_offers_reset(cx: &mut TestAppCont
 }
 
 /// Changed five-value rows, for the fit checks.
-const CHANGED_FIVE: &str = r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra"}"#;
-const FIVE: [&str; 4] = ["shadows", "texture_quality", "color_filter", "water"];
+const CHANGED_FIVE: &str = r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra","lighting":null}"#;
+const FIVE: [&str; 5] = [
+    "shadows",
+    "texture_quality",
+    "color_filter",
+    "water",
+    "lighting",
+];
 
 #[gpui_kit::test]
 fn a_changed_row_puts_its_preset_note_and_reset_inline_before_the_control(cx: &mut TestAppContext) {
@@ -344,7 +351,7 @@ fn changed_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext)
             cx,
             &s,
             ids::IdScope::PAGE,
-            &["shadows", "texture_quality"],
+            &support::graphics::WIDE,
             width,
         );
     }

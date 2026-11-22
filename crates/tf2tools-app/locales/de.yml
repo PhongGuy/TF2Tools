@@ -3062,6 +3062,7 @@ graphics:
     offline: "Die Einstellungsliste braucht beim ersten Mal eine Internetverbindung. Stell eine Verbindung her und öffne diese Seite dann erneut."
     unsupported: "Diese mastercomfig-Version wird noch nicht unterstützt. Die Voreinstellungen oben funktionieren trotzdem."
   not_set: "TF2 entscheiden lassen"
+  not_set_short: "Auto"
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Zurücksetzen"

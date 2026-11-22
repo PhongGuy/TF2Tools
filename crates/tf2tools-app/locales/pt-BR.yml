@@ -3063,6 +3063,7 @@ graphics:
     offline: "A lista de configurações precisa de internet na primeira vez. Conecte-se e abra esta página de novo."
     unsupported: "Esta versão do mastercomfig ainda não é suportada. As predefinições acima continuam funcionando."
   not_set: "Deixar o TF2 decidir"
+  not_set_short: "Auto"
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Redefinir"

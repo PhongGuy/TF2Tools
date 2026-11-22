@@ -5,7 +5,7 @@ use gpui_kit::component::select::SelectEvent;
 use gpui_kit::{TestAppContext, px, size};
 use tf2tools_app::ids::{self, IdScope};
 use tf2tools_app::pages::graphics::model::ValueOption;
-use tf2tools_core::{Choices, Preset, ProfileDraft, SlotMode};
+use tf2tools_core::{Choices, ModuleChoice, Preset, ProfileDraft, SlotMode};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -120,6 +120,7 @@ fn editor_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
     let mut choices = Choices::new(Preset::Medium);
     choices.set(&catalog, "shadows", value("high"));
     choices.set(&catalog, "texture_quality", value("very_high"));
+    choices.set(&catalog, "color_filter", ModuleChoice::NotSet);
     let draft = ProfileDraft::new("Potato").with_graphics(SlotMode::Set(choices));
     let p = s.services.library.create_profile(&draft).unwrap();
     let page = page(cx, &s);
@@ -130,12 +131,6 @@ fn editor_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
     });
     support::click_id(cx, s.win, ids::profile_rail("graphics"));
     for width in [1280., 1100.] {
-        support::graphics::assert_rows_readable(
-            cx,
-            &s,
-            gfx,
-            &["shadows", "texture_quality"],
-            width,
-        );
+        support::graphics::assert_rows_readable(cx, &s, gfx, &support::graphics::WIDE, width);
     }
 }

@@ -58,7 +58,7 @@ pub struct RowView {
     pub preset_text: SharedString,
     /// The preset's own name, for labels that already show the value.
     pub preset_name: SharedString,
-    /// A Select's entries start with NotSet; switches and segments offer only values.
+    /// Segments and a Select's entries start with NotSet; a switch offers only its values.
     pub options: Vec<ChoiceView>,
 }
 
@@ -77,8 +77,8 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
         value = choice_label(module, &preset_value)
     );
     let offered = match kind {
-        ControlKind::Select => select_choices(module),
-        ControlKind::Switch | ControlKind::Segmented => value_choices(module).collect(),
+        ControlKind::Select | ControlKind::Segmented => select_choices(module),
+        ControlKind::Switch => value_choices(module).collect(),
     };
     let options = offered
         .into_iter()

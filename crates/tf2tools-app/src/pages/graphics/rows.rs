@@ -211,26 +211,36 @@ impl GraphicsChoicesEditor {
             .into_any_element()
     }
 
-    // One standalone Toggle per value in a single dark pill, so each is a tab stop that Enter
-    // and Space click. A click on the checked segment reports false and proposes nothing.
+    // One standalone Toggle per choice in a single dark pill, Let TF2 decide first, so each is
+    // a tab stop that Enter and Space click. A click on the checked one reports false: no edit.
     fn segments(&self, row: &RowView, cx: &mut Context<Self>) -> AnyElement {
-        let toggles = row.options.iter().filter_map(|option| {
-            // Segments offer only values; anything else has no segment to draw.
-            let ModuleChoice::Value(value) = &option.choice else {
-                return None;
+        let toggles = row.options.iter().map(|option| {
+            // Let TF2 decide takes the empty value, as its Select entry's id does.
+            let value = match &option.choice {
+                ModuleChoice::Value(value) => value.as_str(),
+                ModuleChoice::NotSet | _ => "",
             };
             let module = row.module.clone();
             let choice = option.choice.clone();
             let entity = cx.entity().downgrade();
             let checked = row.shown == option.choice;
+            // Let TF2 decide shows a short word so six segments still fit beside the text; the
+            // tooltip, which is also its accessible name, keeps the full wording.
+            let shown = if value.is_empty() {
+                tr!("graphics.not_set_short")
+            } else {
+                option.label.clone()
+            };
+            // 4 px sides are the most that keep a changed row's controls beside its text at
+            // 1280 px once the Auto segment joins them.
             let toggle = Toggle::new(self.scope.id(ids::graphics_segment(&row.module, value)))
                 .small()
-                .label(option.label.clone())
+                .label(shown)
                 .tooltip(option.label.clone())
                 .checked(checked)
                 .disabled(self.disabled)
                 .h(px(26.))
-                .px(px(10.))
+                .px(px(4.))
                 .text_size(px(13.))
                 .on_click(move |&next, _, cx| {
                     if !next {
@@ -241,7 +251,7 @@ impl GraphicsChoicesEditor {
                         editor.propose(|c, catalog| c.set(catalog, &module, choice), cx)
                     });
                 });
-            Some(pill::segment_look(toggle, checked, cx))
+            pill::segment_look(toggle, checked, cx)
         });
         pill::row_track(cx)
             .id(self.scope.id(ids::graphics_segments(&row.module)))

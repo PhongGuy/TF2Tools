@@ -171,3 +171,43 @@ fn a_refused_pick_goes_back_even_when_the_reload_fails(cx: &mut TestAppContext) 
         (Some(true), Some(false))
     );
 }
+
+#[gpui_kit::test]
+fn a_segmented_row_shows_and_offers_let_tf2_decide(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = managed_page(cx, &env, r#"{"decals":null}"#);
+    let values = ["off", "low", "medium", "high", "ultra"];
+    assert_eq!(segment_checked(cx, &s, "decals", ""), Some(true));
+    // The segment reads "Auto", but its tooltip and accessible name keep the full wording.
+    assert_eq!(
+        support::label_of(cx, s.win, ids::graphics_segment("decals", "")).as_deref(),
+        Some("Let TF2 decide")
+    );
+    for v in values {
+        assert_eq!(segment_checked(cx, &s, "decals", v), Some(false), "{v}");
+    }
+
+    click_segment(cx, &s, "decals", "high");
+    support::wait_real(cx, "the pick", |cx| {
+        saved(cx, &page, "decals") == Some(value("high"))
+    });
+    idle(cx, &page);
+    assert_eq!(
+        modules_cfg(&env).as_deref(),
+        Some(format!("{HEADER}decals=high\n").as_str())
+    );
+    assert_eq!(segment_checked(cx, &s, "decals", ""), Some(false));
+
+    click_segment(cx, &s, "decals", "");
+    support::wait_real(cx, "Let TF2 decide", |cx| {
+        saved(cx, &page, "decals") == Some(ModuleChoice::NotSet)
+    });
+    idle(cx, &page);
+    assert_eq!(
+        modules_cfg(&env).as_deref(),
+        Some(format!("{HEADER}alias decals\n").as_str())
+    );
+    assert_eq!(row_value(cx, &page, "decals"), Some(ModuleChoice::NotSet));
+    assert_eq!(segment_checked(cx, &s, "decals", ""), Some(true));
+    assert_eq!(segment_checked(cx, &s, "decals", "high"), Some(false));
+}

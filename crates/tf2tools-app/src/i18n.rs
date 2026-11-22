@@ -680,6 +680,7 @@ mod tests {
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.not_set_short",
         "graphics.preset.ultra.label",
         "graphics.row.preset_value",
         "graphics.value.dustbowl",
@@ -802,6 +803,7 @@ mod tests {
         "graphics.module.ragdolls.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.not_set_short",
         "graphics.preset.ultra.label",
         "graphics.row.preset_value",
         "graphics.value.dustbowl",
@@ -926,6 +928,7 @@ mod tests {
         "graphics.module.romevision.label",
         "graphics.module.sprays.label",
         "graphics.module.vsync.label",
+        "graphics.not_set_short",
         // "Zoom" is the language's own loanword for a picture's close-up.
         "graphics.pictures.zoom",
         "graphics.preset.ultra.label",
@@ -1076,6 +1079,7 @@ mod tests {
         "graphics.module.ragdolls.label",
         "graphics.module.romevision.label",
         "graphics.module.vsync.label",
+        "graphics.not_set_short",
         // "Zoom" is the language's own loanword for a picture's close-up.
         "graphics.pictures.zoom",
         "graphics.preset.ultra.label",

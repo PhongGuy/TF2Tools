@@ -3062,6 +3062,7 @@ graphics:
     offline: "La lista de ajustes necesita conexión a internet la primera vez. Conéctate y vuelve a abrir esta página."
     unsupported: "Esta versión de mastercomfig aún no es compatible. Los preajustes de arriba siguen funcionando."
   not_set: "Que TF2 decida"
+  not_set_short: "Auto"
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Restablecer"

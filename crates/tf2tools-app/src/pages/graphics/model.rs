@@ -306,7 +306,7 @@ pub fn value_choices(module: &ComfigModule) -> impl Iterator<Item = ModuleChoice
         .map(|v| ModuleChoice::Value(v.value().to_owned()))
 }
 
-/// A Select's choices: Let TF2 decide first, then each value in catalog order.
+/// A Select's or segmented control's choices: Let TF2 decide first, then each value in order.
 pub fn select_choices(module: &ComfigModule) -> Vec<ModuleChoice> {
     std::iter::once(ModuleChoice::NotSet)
         .chain(value_choices(module))

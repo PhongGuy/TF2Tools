@@ -448,9 +448,12 @@ pub fn assert_changed_rows_fit(
     }
 }
 
-/// The modules `assert_rows_readable` checks: two five-value rows whose preset note and
-/// Reset make the controls widest.
-pub const CHANGED_WIDE: &str = r#"{"shadows":"high","texture_quality":"very_high"}"#;
+/// The choices `assert_rows_readable` checks: two five-value rows whose preset note and
+/// Reset make the controls widest, and one left to TF2, whose extra segment is widest of all.
+pub const CHANGED_WIDE: &str =
+    r#"{"shadows":"high","texture_quality":"very_high","color_filter":null}"#;
+/// The modules `CHANGED_WIDE` changes.
+pub const WIDE: [&str; 3] = ["shadows", "texture_quality", "color_filter"];
 
 /// At `width`, asserts each changed `module` under `scope` keeps a text column at least 240 px
 /// wide with a visible label, that its note, Reset and track overlap neither the text nor the
@@ -510,16 +513,17 @@ pub fn assert_rows_readable(
             .flat_map(|c| c.modules())
             .find(|m| m.name() == name)
             .unwrap_or_else(|| panic!("{name} is not in the catalogue"));
-        for value in module.values() {
-            let seg = found(cx, "segment", ids::graphics_segment(name, value.value()));
+        // The Let TF2 decide segment (empty value) leads the module's own values.
+        let values = std::iter::once("").chain(module.values().iter().map(|v| v.value()));
+        for value in values {
+            let seg = found(cx, "segment", ids::graphics_segment(name, value));
             assert!(
                 seg.size.width > px(0.)
                     && seg.left() >= track.left()
                     && seg.right() <= track.right()
                     && seg.top() >= track.top()
                     && seg.bottom() <= track.bottom(),
-                "{name}'s {} segment {seg:?} leaves its track {track:?} at {width} px",
-                value.value()
+                "{name}'s {value:?} segment {seg:?} leaves its track {track:?} at {width} px"
             );
         }
     }

@@ -104,7 +104,7 @@ fn under_custom_most_modules_are_left_to_tf2() {
 }
 
 #[test]
-fn only_a_select_offers_let_tf2_decide() {
+fn segments_and_selects_lead_with_let_tf2_decide_and_switches_do_not() {
     let catalog = support::full_module_catalog();
     let choices = Choices::new(Preset::Medium);
     let options = |name: &str| -> Vec<(ModuleChoice, String)> {
@@ -139,17 +139,19 @@ fn only_a_select_offers_let_tf2_decide() {
         ]
         .map(value)
     );
-    assert!(
-        options("decals")
-            .iter()
-            .all(|(c, _)| *c != ModuleChoice::NotSet),
-        "five values draw segments, which offer only values"
-    );
-    assert!(
-        options("hud_avatars")
-            .iter()
-            .all(|(c, _)| *c != ModuleChoice::NotSet)
-    );
+    for module in ["decals", "hud_avatars"] {
+        let segments = options(module);
+        assert_eq!(
+            segments[0],
+            (ModuleChoice::NotSet, "Let TF2 decide".to_owned()),
+            "segments lead with Let TF2 decide, as a Select does"
+        );
+        assert!(
+            segments[1..]
+                .iter()
+                .all(|(c, _)| *c != ModuleChoice::NotSet)
+        );
+    }
 }
 
 #[test]
