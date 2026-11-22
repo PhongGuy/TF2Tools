@@ -301,11 +301,12 @@ fn a_changed_row_s_bar_marks_its_line_and_not_its_open_panel(cx: &mut TestAppCon
     );
 }
 
-/// From the compare picture's bottom to the strip's top: an 8 px gap, the 24 px slider row (reserved without a wipe), then the panel's 12 px gap.
+/// From the compare picture's bottom to the strip's top: an 8 px gap, the 24 px slider row
+/// (reserved without a wipe), then the panel's 12 px gap.
 const PICTURE_TO_STRIP: f32 = 44.;
 
-// The open lod panel's seams: the stage is no taller than its picture, the panel ends 16 px
-// under its caption, and the next row's rule follows at once.
+// The open lod panel's seams: the stage holds only its picture and the slider row, the panel
+// ends 16 px under its caption, and the next row's rule follows at once.
 fn assert_no_gap_under_lod(cx: &mut TestAppContext, s: &support::ShellWindow, when: &str) {
     reveal(cx, s, ids::graphics_strip_caption("lod"));
     let frame = at(cx, s, ids::graphics_compare("lod"));

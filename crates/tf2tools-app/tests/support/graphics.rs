@@ -447,3 +447,80 @@ pub fn assert_changed_rows_fit(
         }
     }
 }
+
+/// The modules `assert_rows_readable` checks: two five-value rows whose preset note and
+/// Reset make the controls widest.
+pub const CHANGED_WIDE: &str = r#"{"shadows":"high","texture_quality":"very_high"}"#;
+
+/// At `width`, asserts each changed `module` under `scope` keeps a text column at least 240 px
+/// wide with a visible label, that its note, Reset and track overlap neither the text nor the
+/// thumbnail, and that every segment lies inside its track.
+pub fn assert_rows_readable(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    scope: tf2tools_app::ids::IdScope,
+    modules: &[&str],
+    width: f32,
+) {
+    use gpui_kit::{Bounds, Pixels, px};
+    use tf2tools_app::ids;
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(width), px(900.)));
+    super::settle(cx, s.win);
+    // Strict overlap: touching edges are fine, any shared area is not.
+    let overlap = |a: Bounds<Pixels>, b: Bounds<Pixels>| {
+        a.left() < b.right() && b.left() < a.right() && a.top() < b.bottom() && b.top() < a.bottom()
+    };
+    let catalog = super::full_module_catalog();
+    for &name in modules {
+        let found = |cx: &mut TestAppContext, part: &str, id: ElementId| {
+            super::bounds_of(cx, s.win, scope.id(id))
+                .unwrap_or_else(|| panic!("no {part} for {name} at {width} px"))
+        };
+        // The label stretches across the text column, so its width is the column's.
+        let label = found(cx, "label", ids::graphics_module(name));
+        let more = found(cx, "Learn more", ids::graphics_learn_more(name));
+        assert!(
+            label.size.width >= px(240.),
+            "{name}'s text column {label:?} is under 240 px at {width} px"
+        );
+        let text =
+            Bounds::from_corners(label.origin, gpui_kit::point(label.right(), more.bottom()));
+        let thumb = super::bounds_of(cx, s.win, scope.id(ids::graphics_thumb(name)));
+        let track = found(cx, "track", ids::graphics_segments(name));
+        for (part, id) in [
+            ("note", ids::graphics_module_preset(name)),
+            ("Reset", ids::graphics_module_reset(name)),
+            ("track", ids::graphics_segments(name)),
+        ] {
+            let b = found(cx, part, id);
+            assert!(
+                !overlap(b, text),
+                "{name}'s {part} {b:?} covers its text {text:?} at {width} px"
+            );
+            if let Some(thumb) = thumb {
+                assert!(
+                    !overlap(b, thumb),
+                    "{name}'s {part} {b:?} covers its thumbnail {thumb:?} at {width} px"
+                );
+            }
+        }
+        let module = catalog
+            .categories()
+            .iter()
+            .flat_map(|c| c.modules())
+            .find(|m| m.name() == name)
+            .unwrap_or_else(|| panic!("{name} is not in the catalogue"));
+        for value in module.values() {
+            let seg = found(cx, "segment", ids::graphics_segment(name, value.value()));
+            assert!(
+                seg.size.width > px(0.)
+                    && seg.left() >= track.left()
+                    && seg.right() <= track.right()
+                    && seg.top() >= track.top()
+                    && seg.bottom() <= track.bottom(),
+                "{name}'s {} segment {seg:?} leaves its track {track:?} at {width} px",
+                value.value()
+            );
+        }
+    }
+}

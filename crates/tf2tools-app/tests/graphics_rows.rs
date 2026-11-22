@@ -334,3 +334,32 @@ fn changed_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
     support::graphics::assert_controls_fit(cx, &s, 800.);
     support::graphics::assert_changed_rows_fit(cx, &s, &FIVE, 800.);
 }
+
+#[gpui_kit::test]
+fn changed_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, support::graphics::CHANGED_WIDE);
+    for width in [1252., 1280.] {
+        support::graphics::assert_rows_readable(
+            cx,
+            &s,
+            ids::IdScope::PAGE,
+            &["shadows", "texture_quality"],
+            width,
+        );
+    }
+}
+
+// Only the link's own words open the docs, not the blank space beside it.
+#[gpui_kit::test]
+fn learn_more_hugs_its_label(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, r#"{"shadows":"high"}"#);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    let more = support::bounds_of(cx, s.win, ids::graphics_learn_more("shadows")).unwrap();
+    assert!(
+        (more.size.width - px(72.)).abs() <= px(8.),
+        "Learn more is {more:?}, not about 72 px wide"
+    );
+}

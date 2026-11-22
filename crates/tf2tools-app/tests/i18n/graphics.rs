@@ -152,3 +152,34 @@ fn changed_russian_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
         800.,
     );
 }
+
+// The mock's 1280 px and the widest page that still keeps the controls beside the text.
+#[gpui_kit::test]
+fn changed_german_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    changed_rows_stay_readable(cx, "de");
+}
+
+#[gpui_kit::test]
+fn changed_russian_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    changed_rows_stay_readable(cx, "ru");
+}
+
+fn changed_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
+    let _guard = LocaleGuard::switch(code);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, graphics::CHANGED_WIDE);
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    for width in [1252., 1280.] {
+        graphics::assert_rows_readable(
+            cx,
+            &s,
+            ids::IdScope::PAGE,
+            &["shadows", "texture_quality"],
+            width,
+        );
+    }
+}

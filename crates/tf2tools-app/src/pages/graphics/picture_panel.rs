@@ -29,6 +29,8 @@ use crate::widgets::{Named as _, labelled};
 /// The thumbnail's size, the pictures' 16:9.
 const THUMB_WIDTH: f32 = 96.;
 const THUMB_HEIGHT: f32 = 54.;
+/// The thumbnail's width with its 1 px frame, as a row lays it out.
+pub(super) const THUMB_FRAMED_WIDTH: f32 = THUMB_WIDTH + 2.;
 /// A strip value card's picture, also 16:9.
 const STRIP_WIDTH: f32 = 112.;
 /// The compare view's widest size; it shrinks with a narrow editor.
@@ -111,7 +113,7 @@ pub(super) fn thumbnail(
         )
         .child(
             div()
-                .w(px(THUMB_WIDTH + 2.))
+                .w(px(THUMB_FRAMED_WIDTH))
                 .border_1()
                 .border_color(frame)
                 .rounded(px(8.))

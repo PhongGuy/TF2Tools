@@ -13,6 +13,7 @@ use gpui_kit::{
 use tf2tools_core::ModuleChoice;
 
 use super::GraphicsChoicesEditor;
+use super::picture_panel::THUMB_FRAMED_WIDTH;
 use super::view::{ControlKind, RowView};
 use super::{picture_panel, pictures, pill};
 use crate::i18n::tr;
@@ -22,6 +23,8 @@ use crate::widgets::labelled;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 pub(super) const CHANGED: u32 = 0x1447e6;
+/// The narrowest a wide row's text column gets before its controls wrap under it.
+const TEXT_MIN_WIDTH: f32 = 240.;
 
 impl GraphicsChoicesEditor {
     /// One settings row, with its thumbnail and open panel when the module has pictures;
@@ -115,7 +118,8 @@ impl GraphicsChoicesEditor {
                 row.label.clone(),
             ))
             .children(description)
-            .child(learn_more)
+            // Wrapped, so the link hugs its words and blank space beside it opens nothing.
+            .child(h_flex().child(learn_more))
             .children(no_picture);
         // On a narrow page the controls take the row's width and wrap, so five segments in a
         // long locale shrink to the row instead of running past it.
@@ -131,9 +135,13 @@ impl GraphicsChoicesEditor {
         };
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
         // the control drops under them, since a segmented control beside a wrapped description
-        // would not fit; otherwise it sits on the right.
+        // would not fit; otherwise it sits on the right, and wraps to its own right-aligned line
+        // when the text column would fall under its minimum. The minimum is set on the lead
+        // outright, since text reports its unwrapped width as its smallest.
+        let lead_min = TEXT_MIN_WIDTH + thumb.as_ref().map_or(0., |_| THUMB_FRAMED_WIDTH + 12.);
         let lead = h_flex()
             .min_w_0()
+            .when(!narrow, |this| this.min_w(px(lead_min)))
             .items_start()
             .gap_3()
             .children(thumb)
@@ -146,10 +154,11 @@ impl GraphicsChoicesEditor {
                 .child(controls)
         } else {
             h_flex()
-                .justify_between()
-                .gap_4()
+                .flex_wrap()
+                .gap_x_4()
+                .gap_y_2()
                 .child(lead.flex_1())
-                .child(controls)
+                .child(controls.ml_auto())
         };
         // A changed row's line is tinted with a 3 px accent bar down its left edge, drawn as an
         // overlay so the row's single border colour stays free for the rule above it. The open
