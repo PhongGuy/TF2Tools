@@ -9,7 +9,8 @@ This is the developer guide; the player-facing page is [README.md](README.md).
 
 ```bash
 sudo apt-get install -y --no-install-recommends pkg-config libfontconfig-dev libfreetype-dev \
-  libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev
+  libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev \
+  mesa-vulkan-drivers
 ```
 
 ## Try it and install it

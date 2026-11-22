@@ -79,6 +79,10 @@ rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 anyhow = "1"
 async-channel = "2.5"
 rodio = { version = "0.23", default-features = false, features = ["playback", "wav", "mp3"] }
+# The demo viewer's own offscreen device; the version gpui-pre-wgpu already locks.
+wgpu = "=30.0.1"
+# Blocks the viewer worker on wgpu's adapter and device futures; already locked.
+pollster = "=0.4.0"
 
 # Dev builds optimised for measuring frame and startup timings.
 [profile.timing]

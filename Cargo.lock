@@ -8113,6 +8113,7 @@ dependencies = [
  "gpui-pre-wgpu",
  "image",
  "minisign",
+ "pollster 0.4.0",
  "rodio",
  "rusqlite",
  "rust-embed",
@@ -8126,6 +8127,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "wgpu",
  "wiremock",
  "zip",
 ]

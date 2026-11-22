@@ -57,6 +57,7 @@ pub mod theme;
 pub mod timing;
 pub mod tokio_bridge;
 pub mod updater;
+pub mod viewer;
 pub mod weapon_icons;
 pub mod weapon_names;
 pub mod widgets;

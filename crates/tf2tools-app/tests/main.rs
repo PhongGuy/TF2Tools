@@ -272,6 +272,8 @@ mod updater_messages;
 mod updater_startup;
 mod vendor_patch;
 mod version;
+mod viewer_gpu;
+mod viewer_math;
 mod weapon_assigner;
 mod weapon_icons;
 mod weapon_names;
