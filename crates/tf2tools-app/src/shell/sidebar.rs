@@ -31,15 +31,15 @@ const STORES: [Page; 4] = [
     Page::AddonStore,
 ];
 const MAKERS: [Page; 2] = [Page::CrosshairMaker, Page::HudMaker];
-// Maps and logs.tf get their own group under the makers: they are the least-used items.
-const MAPS: [Page; 2] = [Page::Maps, Page::LogsTf];
+// Maps, logs.tf and the Demo Viewer get their own group under the makers: they are the least-used items.
+const MAPS: [Page; 3] = [Page::Maps, Page::LogsTf, Page::DemoViewer];
 const FOOTER: [Page; 2] = [Page::Settings, Page::Logs];
 // v5's nav item height, and the shorter one a short window uses so every item fits.
 const NAV_HEIGHT: f32 = 32.;
-const NAV_TIGHT_HEIGHT: f32 = 25.;
+const NAV_TIGHT_HEIGHT: f32 = 24.;
 // The shortest window whose open rail fits every group whole at v5's spacing, with a few px
 // to spare; shorter windows tighten the spacing and the items so every item still shows.
-const ROOMY_HEIGHT: Pixels = px(756.);
+const ROOMY_HEIGHT: Pixels = px(792.);
 
 /// Element `sidebar`, `SIDEBAR_WIDTH` wide, or `SIDEBAR_COLLAPSED_WIDTH` when `collapsed`, in a
 /// window `window_height` tall.
@@ -196,6 +196,7 @@ pub fn icon(page: Page) -> IconName {
         Page::Logs => IconName::ScrollText,
         Page::Maps => IconName::Map,
         Page::LogsTf => IconName::ChartLine,
+        Page::DemoViewer => IconName::Clapperboard,
         Page::Graphics => IconName::Gauge,
     }
 }

@@ -29,6 +29,8 @@ pub enum PickKind {
     LogZip,
     /// Where to save a demos.tf demo.
     Demo,
+    /// A TF2 demo to open in the Demo Viewer.
+    OpenDemo,
 }
 
 /// Asks the user for one path; `None` means cancelled or unavailable.

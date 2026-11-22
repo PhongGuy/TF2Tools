@@ -34,6 +34,7 @@ use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::crosshair_store::CrosshairStorePage;
 use crate::pages::crosshairs::{AddToProfile, CopyToMaker, CrosshairsPage, EditPainted};
+use crate::pages::demo_viewer::DemoViewerPage;
 use crate::pages::graphics::GraphicsPage;
 use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
@@ -101,6 +102,7 @@ pub struct Shell {
     logs: Option<Entity<LogsPage>>,
     maps: Option<Entity<MapsPage>>,
     logs_tf: Option<Entity<LogsTfPage>>,
+    demo_viewer: Option<Entity<DemoViewerPage>>,
     addons: Option<Entity<AddonsPage>>,
     graphics: Option<Entity<GraphicsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
@@ -213,6 +215,7 @@ impl Shell {
             logs: None,
             maps: None,
             logs_tf: None,
+            demo_viewer: None,
             addons: None,
             graphics: None,
             profiles: None,
@@ -270,6 +273,7 @@ impl Shell {
         self.addons = None;
         self.graphics = None;
         self.profiles = None;
+        self.demo_viewer = None;
         self.set_kept_hidden(page, false, cx);
         show_idle(page.shows_player(), cx);
         cx.notify();
@@ -309,7 +313,8 @@ impl Shell {
             | Page::HudMaker
             | Page::Profiles
             | Page::Addons
-            | Page::Graphics => None,
+            | Page::Graphics
+            | Page::DemoViewer => None,
         };
     }
 
@@ -430,6 +435,11 @@ impl Shell {
     /// The logs.tf page while it shows.
     pub fn logs_tf_page(&self) -> Option<Entity<LogsTfPage>> {
         self.shown(Page::LogsTf, self.logs_tf.as_ref())
+    }
+
+    /// The Demo Viewer page while it shows.
+    pub fn demo_viewer_page(&self) -> Option<Entity<DemoViewerPage>> {
+        self.shown(Page::DemoViewer, self.demo_viewer.as_ref())
     }
 
     /// The Addons page while it shows.
@@ -634,6 +644,11 @@ impl Render for Shell {
             Page::LogsTf => self
                 .logs_tf
                 .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
+                .clone()
+                .into_any_element(),
+            Page::DemoViewer => self
+                .demo_viewer
+                .get_or_insert_with(|| cx.new(|cx| DemoViewerPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
             // The page asks to show another page by event; the subscription dies with the page.

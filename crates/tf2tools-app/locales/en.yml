@@ -137,6 +137,11 @@ updater:
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
 
+demo_viewer:
+  preview: "Preview"
+  open: "Open demo"
+  empty: "Open a TF2 demo to see its map in 3D."
+
 nav:
   huds: "HUDs"
   sounds: "Sounds"
@@ -152,6 +157,7 @@ nav:
   addon_store: "Addon Store"
   maps: "Maps"
   logs_tf: "logs.tf"
+  demo_viewer: "Demo Viewer"
   settings: "Settings"
   logs: "Logs"
   activity_log: "Activity Log"

@@ -159,6 +159,11 @@ updater:
     installed: "已安装 TF2Tools v%{version}"
     installer_started: "已启动 TF2Tools v%{version} 安装程序"
 
+demo_viewer:
+  preview: "预览"
+  open: "打开录像"
+  empty: "打开 TF2 录像，即可在 3D 中查看其地图。"
+
 nav:
   huds: "HUD"
   sounds: "音效"
@@ -174,6 +179,7 @@ nav:
   addon_store: "插件商店"
   maps: "地图"
   logs_tf: "logs.tf"
+  demo_viewer: "录像查看器"
   settings: "设置"
   logs: "日志"
   activity_log: "活动日志"

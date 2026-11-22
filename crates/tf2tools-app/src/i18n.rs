@@ -1556,6 +1556,7 @@ mod tests {
         "shell/font_check.rs",
         "widgets/carousel.rs",
         "pages/sounds.rs",
+        "pages/demo_viewer.rs",
         "audio/player.rs",
         "widgets/profile_menu.rs",
         "pages/crosshairs.rs",

@@ -3498,6 +3498,17 @@ pub fn addon_detail_map(index: usize) -> ElementId {
     keyed("addon-detail-map", &index.to_string())
 }
 
+/// The Demo Viewer's "Open demo" button.
+pub const DEMO_VIEWER_OPEN: &str = "demo-viewer-open";
+/// The Demo Viewer's status line: the empty prompt, the loading text or an error.
+pub const DEMO_VIEWER_STATUS: &str = "demo-viewer-status";
+/// The "Preview" badge beside the header title, present only on the Demo Viewer.
+pub const DEMO_VIEWER_PREVIEW_BADGE: &str = "demo-viewer-preview-badge";
+/// The caption row over the 3D view, naming the demo and its map.
+pub const DEMO_VIEWER_CAPTION: &str = "demo-viewer-caption";
+/// The hint line under the 3D view about its controls.
+pub const DEMO_VIEWER_HINT: &str = "demo-viewer-hint";
+
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";
 
