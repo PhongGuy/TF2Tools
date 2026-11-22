@@ -9,6 +9,7 @@ use tf2tools_core::MapMesh;
 
 pub mod math;
 pub mod renderer;
+pub mod viewport;
 
 pub use renderer::{Renderer, wgpu_renderers};
 

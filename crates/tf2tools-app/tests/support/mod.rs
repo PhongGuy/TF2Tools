@@ -39,6 +39,7 @@ use tf2tools_core::{LogEntry, LogQuery};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+pub mod demo_viewer;
 pub mod fonts;
 pub mod graphics;
 pub mod hud_copies;

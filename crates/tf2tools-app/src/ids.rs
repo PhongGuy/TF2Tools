@@ -3498,6 +3498,9 @@ pub fn addon_detail_map(index: usize) -> ElementId {
     keyed("addon-detail-map", &index.to_string())
 }
 
+/// The demo viewer's 3D view, which takes the keyboard when clicked.
+pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";
+
 /// The "Choose what to install" dialog for an add-on with several parts.
 pub const PAYLOAD_CHECKLIST: &str = "payload-checklist";
 /// The checklist's title, "Choose what to install".
