@@ -23,6 +23,7 @@ mod curated_images;
 mod data_dir;
 mod db_open;
 mod db_upgrade;
+mod demo_view_mesh;
 mod font_check;
 mod font_install;
 mod font_scan;

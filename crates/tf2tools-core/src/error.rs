@@ -2640,3 +2640,18 @@ pub enum SettingPicturesError {
         reason: String,
     },
 }
+
+/// Why a map could not be turned into a viewer mesh.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum MapMeshError {
+    /// The file could not be read, or is not a BSP the reader accepts.
+    #[error("the map cannot be read: {0}")]
+    Unreadable(String),
+    /// The map has no drawable face.
+    #[error("the map has nothing to draw")]
+    Empty,
+    /// The file or its triangle count is over the viewer's cap.
+    #[error("the map is too large to show")]
+    TooLarge,
+}

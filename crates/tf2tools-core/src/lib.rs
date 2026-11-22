@@ -11,6 +11,7 @@ mod activity;
 mod archive;
 mod crosshair_catalog;
 mod db;
+mod demo_view;
 mod demostf;
 mod disk;
 mod error;
@@ -43,6 +44,9 @@ pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEn
 pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
+pub use demo_view::{
+    MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MapMesh, load_map_file, load_map_file_capped, load_map_mesh,
+};
 pub use demostf::{
     DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,
     pick_demo,
@@ -54,10 +58,10 @@ pub use error::{
     GbAddonInstallError, GbMapInstallError, GbMapRemoveError, HistoryError, HudFilesError,
     HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError, KeepHudError,
     KvParseError, LibraryError, LogError, LogParseError, LogsCacheError, LogsFetchError,
-    LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError,
-    PresetError, PreviewError, ProfileError, QueryError, RecipeError, ReinstallError,
-    RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
+    LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
+    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
+    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
     SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError, UpdateApplyError,
     UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
     WeaponIconsError, WeaponNamesError,

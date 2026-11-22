@@ -1,6 +1,7 @@
 //! Helpers shared by the integration tests. Each test binary uses a subset.
 #![allow(dead_code)]
 
+pub mod demo_view;
 pub mod fake_host;
 pub mod hud_anims;
 pub mod hud_borrow;
