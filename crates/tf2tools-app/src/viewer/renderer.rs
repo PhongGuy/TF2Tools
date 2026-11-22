@@ -624,6 +624,16 @@ impl Gpu {
             readback,
             image: started.elapsed(),
         };
+        if super::stats::enabled() {
+            tracing::info!(
+                target: "tf2tools::viewer",
+                seq = frame.seq,
+                render_us = stats.render.as_micros(),
+                readback_us = stats.readback.as_micros(),
+                image_us = stats.image.as_micros(),
+                "frame"
+            );
+        }
         events
             .try_send(RenderEvent::Frame {
                 image,

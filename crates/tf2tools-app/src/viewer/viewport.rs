@@ -66,6 +66,8 @@ pub struct DemoViewport {
     focus: FocusHandle,
     failure: Option<RendererError>,
     clock: Clock,
+    /// When the shown frame was taken off the channel and its seq, until its paint logs `ui_us`.
+    taken: Rc<Cell<Option<(Instant, u64)>>>,
 }
 
 impl DemoViewport {
@@ -124,6 +126,7 @@ impl DemoViewport {
             focus: cx.focus_handle(),
             failure: None,
             clock,
+            taken: Rc::new(Cell::new(None)),
         }
     }
 
@@ -148,6 +151,9 @@ impl DemoViewport {
             RenderEvent::Frame { image, seq, .. } => {
                 if self.shown_seq().is_some_and(|shown| seq <= shown) {
                     return cx.drop_image(image, None);
+                }
+                if super::stats::enabled() {
+                    self.taken.set(Some((Instant::now(), seq)));
                 }
                 if let Some((old, _)) = self.shown.replace((image, seq)) {
                     cx.drop_image(old, None);
@@ -250,6 +256,7 @@ impl Render for DemoViewport {
         // The canvas measures the element in device pixels every prepaint, so a resize or a
         // scale change asks for one more frame, which draws at the new size.
         let measured = Rc::clone(&self.device_size);
+        let paint_taken = Rc::clone(&self.taken);
         let watch = canvas(
             move |bounds, window, _| {
                 let scale = window.scale_factor();
@@ -260,7 +267,16 @@ impl Render for DemoViewport {
                     window.request_animation_frame();
                 }
             },
-            |_, _, _, _| {},
+            move |_, _, _, _| {
+                if let Some((taken, seq)) = paint_taken.take() {
+                    tracing::info!(
+                        target: "tf2tools::viewer",
+                        seq,
+                        ui_us = taken.elapsed().as_micros(),
+                        "shown"
+                    );
+                }
+            },
         )
         .absolute()
         .size_full();

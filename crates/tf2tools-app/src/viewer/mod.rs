@@ -10,6 +10,7 @@ use tf2tools_core::MapMesh;
 pub mod load;
 pub mod math;
 pub mod renderer;
+pub mod stats;
 pub mod viewport;
 
 pub use renderer::{Renderer, join_render_workers, wgpu_renderers};

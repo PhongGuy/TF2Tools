@@ -16,11 +16,26 @@ pub fn log_filter(rust_log: Option<&str>) -> EnvFilter {
         .unwrap_or_else(|| EnvFilter::new("warn"))
 }
 
-/// Installs a fmt layer to stderr filtered by `log_filter(RUST_LOG)` beside the crash report's
+/// `log_filter(rust_log)`, plus the viewer's frame lines at info when `viewer_stats` is on.
+pub fn log_filter_with(rust_log: Option<&str>, viewer_stats: bool) -> EnvFilter {
+    let filter = log_filter(rust_log);
+    if !viewer_stats {
+        return filter;
+    }
+    match format!("{}=info", crate::viewer::stats::TARGET).parse() {
+        Ok(directive) => filter.add_directive(directive),
+        Err(_) => filter,
+    }
+}
+
+/// Installs a fmt layer to stderr filtered by `log_filter_with(RUST_LOG, ..)` beside the crash report's
 /// recent-lines layer; a second call is a no-op.
 pub fn init() {
     // Per-layer filters, so `RUST_LOG=error` on stderr still leaves warnings for a crash report.
-    let filter = log_filter(std::env::var("RUST_LOG").ok().as_deref());
+    let filter = log_filter_with(
+        std::env::var("RUST_LOG").ok().as_deref(),
+        crate::viewer::stats::enabled(),
+    );
     let stderr = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
         .with_filter(filter);
