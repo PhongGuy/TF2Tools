@@ -3061,6 +3061,7 @@ graphics:
     offline: "首次加载设置列表需要联网。请连接网络后重新打开此页面。"
     unsupported: "尚不支持此 mastercomfig 版本。上方的预设仍可使用。"
   not_set: "由 TF2 决定"
+  not_set_short: "自动"
   row:
     preset_value: "%{preset}：%{value}"
     reset: "重置"
@@ -3068,7 +3069,6 @@ graphics:
   pictures:
     show: "显示图片"
     hide: "隐藏图片"
-    thumb: "%{name} 的图片"
     yours: "你的：%{value}"
     same: "%{value}（与 %{preset} 相同）"
     zoom: "放大"

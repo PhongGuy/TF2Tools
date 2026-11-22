@@ -8,11 +8,12 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, div, px, relative, rgb,
+    Styled as _, TestSupportExt as _, div, px, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
 use super::GraphicsChoicesEditor;
+use super::picture_panel::THUMB_FRAMED_WIDTH;
 use super::view::{ControlKind, RowView};
 use super::{picture_panel, pictures, pill};
 use crate::i18n::tr;
@@ -22,11 +23,13 @@ use crate::widgets::labelled;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 pub(super) const CHANGED: u32 = 0x1447e6;
+/// The narrowest a wide row's text column gets before its controls wrap under it.
+const TEXT_MIN_WIDTH: f32 = 240.;
 
 impl GraphicsChoicesEditor {
-    /// One settings row, with its thumbnail, Show pictures and open panel when the module has
-    /// pictures; None without a catalog or for an unknown module. Every row but the card's
-    /// `first` rules itself off from the one above.
+    /// One settings row, with its thumbnail and open panel when the module has pictures;
+    /// None without a catalog or for an unknown module. Every row but the card's `first`
+    /// rules itself off from the one above.
     pub fn settings_row(
         &self,
         module: &str,
@@ -45,32 +48,31 @@ impl GraphicsChoicesEditor {
                 text,
             )
         });
-        // Set solid, so the Learn more link alone gives the line its height.
+        // The preset's value leads the controls on one fixed 16 px line, so a pick widens the
+        // controls without adding a line to the text.
         let preset = row.changed.then(|| {
             labelled(
-                div().text_xs().line_height(relative(1.)).text_color(muted),
+                div()
+                    .text_xs()
+                    .line_height(px(16.))
+                    .whitespace_nowrap()
+                    .text_color(muted),
                 scope.id(ids::graphics_module_preset(name)),
                 row.preset_text.clone(),
             )
         });
         // The docs link reads as part of the description: its size and muted colour, underlined.
-        // The preset's value shares its line, so a pick never adds a line to the text.
-        let learn_more = h_flex()
-            .gap_3()
-            .child(
-                Button::new(scope.id(ids::graphics_learn_more(name)))
-                    .link()
-                    .xsmall()
-                    .text_color(muted)
-                    .label(tr!("graphics.row.learn_more"))
-                    .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
-            )
-            .children(preset);
+        let learn_more = Button::new(scope.id(ids::graphics_learn_more(name)))
+            .link()
+            .xsmall()
+            .text_color(muted)
+            .label(tr!("graphics.row.learn_more"))
+            .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL));
         let reset =
             row.changed.then(|| {
                 let module = name.to_owned();
                 Button::new(scope.id(ids::graphics_module_reset(name)))
-                    .outline()
+                    .ghost()
                     .small()
                     .label(tr!("graphics.row.reset"))
                     .disabled(self.disabled)
@@ -86,13 +88,8 @@ impl GraphicsChoicesEditor {
         // The panel compares the crops while zoom is on, the same pictures the editor wants;
         // the thumbnail and strip stay on the full pictures.
         let index = self.pictures.as_deref();
-        let thumb = pictures.map(|p| picture_panel::thumbnail(self, name, &row.label, p, cx));
-        let toggle = pictures.map(|_| {
-            h_flex()
-                .ml(px(-8.))
-                .child(picture_panel::toggle(self, name, cx))
-        });
-        // A setting the manifest says has no pictures says why, in the Show pictures slot.
+        let thumb = pictures.map(|p| picture_panel::thumbnail(self, name, p, cx));
+        // A setting the manifest says has no pictures says why, under its description.
         let no_picture = index
             .filter(|_| pictures.is_none())
             .and_then(|index| index.no_picture(name))
@@ -121,15 +118,30 @@ impl GraphicsChoicesEditor {
                 row.label.clone(),
             ))
             .children(description)
-            .child(learn_more)
-            .children(toggle)
+            // Wrapped, so the link hugs its words and blank space beside it opens nothing.
+            .child(h_flex().child(learn_more))
             .children(no_picture);
-        let controls = h_flex().flex_none().gap_2().children(reset).child(control);
+        // On a narrow page the controls take the row's width and wrap, so five segments in a
+        // long locale shrink to the row instead of running past it.
+        let controls = h_flex()
+            .gap_2()
+            .children(preset)
+            .children(reset)
+            .child(control);
+        let controls = if narrow {
+            controls.w_full().flex_wrap()
+        } else {
+            controls.flex_none()
+        };
         // The thumbnail always sits beside the text. On a narrow page (the one without the rail)
         // the control drops under them, since a segmented control beside a wrapped description
-        // would not fit; otherwise it sits on the right.
+        // would not fit; otherwise it sits on the right, and wraps to its own right-aligned line
+        // when the text column would fall under its minimum. The minimum is set on the lead
+        // outright, since text reports its unwrapped width as its smallest.
+        let lead_min = TEXT_MIN_WIDTH + thumb.as_ref().map_or(0., |_| THUMB_FRAMED_WIDTH + 12.);
         let lead = h_flex()
             .min_w_0()
+            .when(!narrow, |this| this.min_w(px(lead_min)))
             .items_start()
             .gap_3()
             .children(thumb)
@@ -142,10 +154,11 @@ impl GraphicsChoicesEditor {
                 .child(controls)
         } else {
             h_flex()
-                .justify_between()
-                .gap_4()
+                .flex_wrap()
+                .gap_x_4()
+                .gap_y_2()
                 .child(lead.flex_1())
-                .child(controls)
+                .child(controls.ml_auto())
         };
         // A changed row's line is tinted with a 3 px accent bar down its left edge, drawn as an
         // overlay so the row's single border colour stays free for the rule above it. The open
@@ -198,26 +211,29 @@ impl GraphicsChoicesEditor {
             .into_any_element()
     }
 
-    // One standalone Toggle per value in a single dark pill, so each is a tab stop that Enter
-    // and Space click. A click on the checked segment reports false and proposes nothing.
+    // One standalone Toggle per choice in a single dark pill, Let TF2 decide first, so each is
+    // a tab stop that Enter and Space click. A click on the checked one reports false: no edit.
     fn segments(&self, row: &RowView, cx: &mut Context<Self>) -> AnyElement {
-        let toggles = row.options.iter().filter_map(|option| {
-            // Segments offer only values; anything else has no segment to draw.
-            let ModuleChoice::Value(value) = &option.choice else {
-                return None;
+        let toggles = row.options.iter().map(|option| {
+            // Let TF2 decide takes the empty value, as its Select entry's id does.
+            let value = match &option.choice {
+                ModuleChoice::Value(value) => value.as_str(),
+                ModuleChoice::NotSet | _ => "",
             };
             let module = row.module.clone();
             let choice = option.choice.clone();
             let entity = cx.entity().downgrade();
             let checked = row.shown == option.choice;
+            // Tight sides keep a changed row's controls beside its text on a 1280 px page.
             let toggle = Toggle::new(self.scope.id(ids::graphics_segment(&row.module, value)))
                 .small()
-                .label(option.label.clone())
+                // The tooltip, which is also the accessible name, keeps the full words.
+                .label(option.segment_label.clone())
                 .tooltip(option.label.clone())
                 .checked(checked)
                 .disabled(self.disabled)
                 .h(px(26.))
-                .px(px(10.))
+                .px(px(4.))
                 .text_size(px(13.))
                 .on_click(move |&next, _, cx| {
                     if !next {
@@ -228,7 +244,7 @@ impl GraphicsChoicesEditor {
                         editor.propose(|c, catalog| c.set(catalog, &module, choice), cx)
                     });
                 });
-            Some(pill::segment_look(toggle, checked, cx))
+            pill::segment_look(toggle, checked, cx)
         });
         pill::row_track(cx)
             .id(self.scope.id(ids::graphics_segments(&row.module)))

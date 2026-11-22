@@ -133,8 +133,8 @@ fn picking_a_value_keeps_the_pictures_panel_steady(cx: &mut TestAppContext) {
             "{width} px: {under_caption:?} under the caption"
         );
         assert!(
-            (over_strip - px(12.)).abs() <= px(0.5),
-            "{width} px: {over_strip:?} between the picture and the strip"
+            (over_strip - px(44.)).abs() <= px(0.5),
+            "{width} px: {over_strip:?} between the picture and the strip, past the slider row"
         );
     }
 }

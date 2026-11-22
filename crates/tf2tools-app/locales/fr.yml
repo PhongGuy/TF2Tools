@@ -3064,6 +3064,7 @@ graphics:
     offline: "La liste des paramètres nécessite une connexion Internet la première fois. Connectez-vous, puis rouvrez cette page."
     unsupported: "Cette version de mastercomfig n'est pas encore prise en charge. Les préréglages ci-dessus fonctionnent toujours."
   not_set: "Laisser TF2 décider"
+  not_set_short: "Auto"
   row:
     preset_value: "%{preset}\u00A0: %{value}"
     reset: "Réinitialiser"
@@ -3071,7 +3072,6 @@ graphics:
   pictures:
     show: "Afficher les images"
     hide: "Masquer les images"
-    thumb: "Images de %{name}"
     yours: "Le vôtre\u00A0: %{value}"
     same: "%{value} (identique au préréglage %{preset})"
     zoom: "Zoom"

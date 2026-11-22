@@ -130,3 +130,88 @@ fn as_is_text_fits_at_800_px(cx: &mut TestAppContext, code: &str) {
     graphics::wait_for_list(cx, &s, &page);
     graphics::assert_as_is_text_fits(cx, &s, 800., 90.);
 }
+
+#[gpui_kit::test]
+fn changed_russian_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(
+        &env,
+        r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra","lighting":null}"#,
+    );
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    graphics::assert_controls_fit(cx, &s, 800.);
+    graphics::assert_changed_rows_fit(
+        cx,
+        &s,
+        &[
+            "shadows",
+            "texture_quality",
+            "color_filter",
+            "water",
+            "lighting",
+        ],
+        800.,
+    );
+}
+
+// The mock's 1280 px and the widest page that still keeps the controls beside the text.
+#[gpui_kit::test]
+fn changed_german_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    changed_rows_stay_readable(cx, "de");
+}
+
+#[gpui_kit::test]
+fn changed_russian_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    changed_rows_stay_readable(cx, "ru");
+}
+
+fn changed_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
+    let _guard = LocaleGuard::switch(code);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, graphics::CHANGED_WIDE);
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    for width in [1252., 1280.] {
+        graphics::assert_rows_readable(cx, &s, ids::IdScope::PAGE, &graphics::WIDE, width);
+    }
+}
+
+// A row whose own values include `auto` would show "Auto" twice, so no locale may draw two
+// segments with the same visible word.
+#[test]
+fn no_segmented_row_shows_two_segments_with_the_same_word() {
+    use tf2tools_app::pages::graphics::view::{ControlKind, row};
+    let catalog = support::full_module_catalog();
+    let choices = tf2tools_core::Choices::new(Preset::Medium);
+    for code in ["en", "de", "fr", "es", "pt-BR", "ru", "zh-CN"] {
+        let _guard = LocaleGuard::switch(code);
+        for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+            let r = row(&catalog, &choices, module);
+            if r.kind != ControlKind::Segmented {
+                continue;
+            }
+            let words: Vec<String> = r
+                .options
+                .iter()
+                .map(|o| o.segment_label.to_string())
+                .collect();
+            let mut unique = words.clone();
+            unique.sort();
+            unique.dedup();
+            assert_eq!(
+                unique.len(),
+                words.len(),
+                "{code}: {}'s segments repeat a word: {words:?}",
+                module.name()
+            );
+        }
+    }
+}

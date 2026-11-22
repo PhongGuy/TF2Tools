@@ -14,8 +14,9 @@ pub(crate) fn track(cx: &App) -> Div {
 }
 
 /// The tighter track a settings row's choices sit in: 3 px inset with 2 px between segments.
+/// It wraps its segments onto a second line when the row is narrower than the track.
 pub(crate) fn row_track(cx: &App) -> Div {
-    track(cx).p(px(3.)).gap(px(2.))
+    track(cx).p(px(3.)).gap(px(2.)).flex_wrap()
 }
 
 /// Styles one segment: background fill, foreground text and a small shadow when checked;

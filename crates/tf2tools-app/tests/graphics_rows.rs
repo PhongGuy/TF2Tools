@@ -2,7 +2,7 @@
 
 use crate::support;
 
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::{Entity, TestAppContext, px, size};
 use support::graphics::{
     HEADER, found, idle, modules_cfg, open, reveal, row_value, saved, shown, value, wait_for_list,
 };
@@ -120,9 +120,10 @@ fn a_segment_picks_its_value_and_a_second_click_changes_nothing(cx: &mut TestApp
 }
 
 #[gpui_kit::test]
-fn a_saved_let_tf2_decide_shows_no_segment_and_offers_reset(cx: &mut TestAppContext) {
+fn a_saved_let_tf2_decide_checks_only_its_own_segment_and_offers_reset(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, page) = full_page(cx, &env, r#"{"lod":null}"#);
+    assert_eq!(checked(cx, &s, "lod", ""), Some(true));
     for v in ["low", "medium", "high", "ultra"] {
         assert_eq!(checked(cx, &s, "lod", v), Some(false), "{v}");
     }
@@ -141,8 +142,12 @@ fn a_saved_let_tf2_decide_shows_no_segment_and_offers_reset(cx: &mut TestAppCont
         Some("Model quality")
     );
     assert!(
-        cx.update(|cx| page.read(cx).module_select("decals"))
+        cx.update(|cx| page.read(cx).module_select("fpscap"))
             .is_some()
+    );
+    assert!(
+        cx.update(|cx| page.read(cx).module_select("decals"))
+            .is_none()
     );
 }
 
@@ -272,5 +277,96 @@ fn a_saved_choice_the_new_preset_matches_still_offers_reset(cx: &mut TestAppCont
     assert_eq!(
         support::label_of(cx, s.win, ids::graphics_change_undo("lod")).as_deref(),
         Some("Reset")
+    );
+}
+
+/// Changed five-value rows, for the fit checks.
+const CHANGED_FIVE: &str = r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra","lighting":null}"#;
+const FIVE: [&str; 5] = [
+    "shadows",
+    "texture_quality",
+    "color_filter",
+    "water",
+    "lighting",
+];
+
+#[gpui_kit::test]
+fn a_changed_row_puts_its_preset_note_and_reset_inline_before_the_control(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, r#"{"shadows":"high"}"#);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    reveal(cx, &s, ids::graphics_segments("shadows"));
+    let b = |cx: &mut TestAppContext, id| support::bounds_of(cx, s.win, id).unwrap();
+    let more = b(cx, ids::graphics_learn_more("shadows"));
+    let note = b(cx, ids::graphics_module_preset("shadows"));
+    let reset = b(cx, ids::graphics_module_reset("shadows"));
+    let control = b(cx, ids::graphics_segments("shadows"));
+    assert!(more.right() <= note.left(), "{more:?} {note:?}");
+    assert!(
+        note.right() <= reset.left()
+            && reset.left() - note.right() <= px(12.)
+            && reset.right() <= control.left(),
+        "note, Reset, then the control, side by side: {note:?} {reset:?} {control:?}"
+    );
+    for (name, el) in [("note", note), ("Reset", reset)] {
+        assert!(
+            (el.center().y - control.center().y).abs() <= px(2.),
+            "the {name} {el:?} sits level with the control {control:?}"
+        );
+    }
+    assert!(
+        note.size.height <= px(18.),
+        "the note keeps to one line: {note:?}"
+    );
+    assert!(reset.size.height <= px(28.), "{reset:?}");
+}
+
+#[gpui_kit::test]
+fn a_row_s_reset_is_a_ghost_button(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, r#"{"lod":"high"}"#);
+    reveal(cx, &s, ids::graphics_module_reset("lod"));
+    assert_eq!(
+        support::graphics::borders_at(cx, &s, ids::graphics_module_reset("lod")),
+        [],
+        "no outline round Reset"
+    );
+}
+
+#[gpui_kit::test]
+fn changed_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, CHANGED_FIVE);
+    support::graphics::assert_controls_fit(cx, &s, 800.);
+    support::graphics::assert_changed_rows_fit(cx, &s, &FIVE, 800.);
+}
+
+#[gpui_kit::test]
+fn changed_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, support::graphics::CHANGED_WIDE);
+    for width in [1252., 1280.] {
+        support::graphics::assert_rows_readable(
+            cx,
+            &s,
+            ids::IdScope::PAGE,
+            &support::graphics::WIDE,
+            width,
+        );
+    }
+}
+
+// Only the link's own words open the docs, not the blank space beside it.
+#[gpui_kit::test]
+fn learn_more_hugs_its_label(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, r#"{"shadows":"high"}"#);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(900.)));
+    support::settle(cx, s.win);
+    let more = support::bounds_of(cx, s.win, ids::graphics_learn_more("shadows")).unwrap();
+    assert!(
+        (more.size.width - px(72.)).abs() <= px(8.),
+        "Learn more is {more:?}, not about 72 px wide"
     );
 }

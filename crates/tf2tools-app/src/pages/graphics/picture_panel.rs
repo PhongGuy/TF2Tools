@@ -1,13 +1,13 @@
-//! What a settings row draws of its pictures: the thumbnail of its current value, the
-//! Show/Hide pictures button and, while the row is open, its pictures panel: the preset's
-//! picture and yours behind a wipe, the zoom toggle, and the strip that picks a value by
-//! its picture.
+//! What a settings row draws of its pictures: the thumbnail of its current value, which
+//! opens and closes them, and, while the row is open, its pictures panel: the preset's
+//! picture and yours behind a wipe, with the wipe slider under it and the zoom toggle in its
+//! corner, and the strip that picks a value by its picture.
 
 use std::path::Path;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::Slider;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
@@ -29,14 +29,15 @@ use crate::widgets::{Named as _, labelled};
 /// The thumbnail's size, the pictures' 16:9.
 const THUMB_WIDTH: f32 = 96.;
 const THUMB_HEIGHT: f32 = 54.;
+/// The thumbnail's width with its 1 px frame, as a row lays it out.
+pub(super) const THUMB_FRAMED_WIDTH: f32 = THUMB_WIDTH + 2.;
 /// A strip value card's picture, also 16:9.
 const STRIP_WIDTH: f32 = 112.;
 /// The compare view's widest size; it shrinks with a narrow editor.
 const COMPARE_MAX_WIDTH: f32 = 720.;
 /// The compare view's corner radius.
 const COMPARE_RADIUS: f32 = 8.;
-/// The darkened band along a wipe's bottom edge, and the kit slider's height inside it.
-const SLIDER_BAND: f32 = 36.;
+/// The row under the compare picture that holds the wipe slider.
 const SLIDER_HEIGHT: f32 = 24.;
 /// The wipe line, centred on the clip's left edge.
 const WIPE_LINE_WIDTH: f32 = 2.;
@@ -69,13 +70,12 @@ fn rounded(
     }
 }
 
-/// The current value's picture as a button that opens or closes the row's pictures. With no
-/// picture for the value the slot stays empty; a picture that failed to decode leaves an
-/// unfilled box, so the row keeps its shape either way.
+/// The current value's picture as the button that opens or closes the row's pictures,
+/// named "Show pictures" or "Hide pictures". With no picture for the value the slot stays
+/// empty; a picture that failed to decode leaves an unfilled box, so the row keeps its shape.
 pub(super) fn thumbnail(
     editor: &GraphicsChoicesEditor,
     module: &str,
-    label: &str,
     pictures: &RowPictures,
     cx: &mut Context<GraphicsChoicesEditor>,
 ) -> AnyElement {
@@ -92,59 +92,38 @@ pub(super) fn thumbnail(
         px(7.),
         cx,
     );
-    let target = module.to_owned();
-    // A 1 px frame with an 8 px radius, in the accent while the row's pictures are open;
-    // the picture inside is rounded 7 px itself so its corners stay within the frame's arc.
-    let frame = if editor.open_row() == Some(module) {
-        cx.theme().primary
+    let open = editor.open_row() == Some(module);
+    let (frame, label) = if open {
+        (cx.theme().foreground, tr!("graphics.pictures.hide"))
     } else {
-        cx.theme().border
+        (cx.theme().border, tr!("graphics.pictures.show"))
     };
+    let target = module.to_owned();
+    // The 1 px frame sits on a child, since the kit's hover style replaces the Button's own
+    // border colour; the picture is rounded 7 px so its corners stay within the 8 px arc.
     Button::new(s.id(ids::graphics_thumb(module)))
         .ghost()
         .p_0()
         .flex_none()
         .h(px(THUMB_HEIGHT + 2.))
-        .border_1()
-        .border_color(frame)
         .rounded(px(8.))
-        .named(tr!("graphics.pictures.thumb", name = label))
+        .named(label)
         .on_click(
             cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
         )
-        .child(div().w(px(THUMB_WIDTH)).child(picture))
-        .into_any_element()
-}
-
-/// "Show pictures", or "Hide pictures" while the row is open.
-pub(super) fn toggle(
-    editor: &GraphicsChoicesEditor,
-    module: &str,
-    cx: &mut Context<GraphicsChoicesEditor>,
-) -> AnyElement {
-    let s = editor.scope;
-    let open = editor.open_row() == Some(module);
-    let label = if open {
-        tr!("graphics.pictures.hide")
-    } else {
-        tr!("graphics.pictures.show")
-    };
-    let target = module.to_owned();
-    Button::new(s.id(ids::graphics_pictures_toggle(module)))
-        .ghost()
-        .xsmall()
-        .h(px(24.))
-        .px_2()
-        .font_weight(FontWeight::MEDIUM)
-        .label(label)
-        .on_click(
-            cx.listener(move |editor, _, window, cx| editor.toggle_pictures(&target, window, cx)),
+        .child(
+            div()
+                .w(px(THUMB_FRAMED_WIDTH))
+                .border_1()
+                .border_color(frame)
+                .rounded(px(8.))
+                .child(picture),
         )
         .into_any_element()
 }
 
 /// The open row's pictures panel, the card's full width on the page's darker fill: the
-/// compare view with the wipe slider and the zoom toggle along its bottom edge, then the
+/// compare view with the zoom toggle in its corner and the wipe slider under it, then the
 /// strip of value pictures and its caption.
 pub(super) fn panel(
     editor: &GraphicsChoicesEditor,
@@ -297,7 +276,8 @@ fn strip(
 
 // The compare view. The preset's picture fills the box; on a wipe, an overlay from the wipe
 // line to the right edge shows the matching right part of yours, which keeps the box's full
-// width so both pictures line up. The slider sits on the picture, so a pick never resizes it.
+// width so both pictures line up. The slider runs in a row under the picture, reserved even
+// without a wipe, so a pick that starts or ends one moves nothing below.
 fn compare(
     editor: &GraphicsChoicesEditor,
     module: &str,
@@ -326,12 +306,11 @@ fn compare(
         .rounded(px(COMPARE_RADIUS))
         .overflow_hidden();
     let full = |child: AnyElement| div().absolute().inset_0().size_full().child(child);
-    // Zoom in the bottom-right corner, lifted over the slider's band on a wipe.
-    let corner = |bottom: f32, zoom: Option<Button>| {
+    let corner = |zoom: Option<Button>| {
         div()
             .absolute()
             .right(px(10.))
-            .bottom(px(bottom))
+            .bottom(px(10.))
             .children(zoom)
     };
     let (view, slider) = match compare {
@@ -343,7 +322,7 @@ fn compare(
             frame
                 .child(full(side("preset", picture, cx)))
                 .child(pill(s, module, "same", text, false))
-                .child(corner(10., zoom)),
+                .child(corner(zoom)),
             None,
         ),
         Compare::Single {
@@ -356,7 +335,7 @@ fn compare(
                 frame
                     .child(full(side(name, picture, cx)))
                     .child(pill(s, module, name, text, *yours))
-                    .child(corner(10., zoom)),
+                    .child(corner(zoom)),
                 None,
             )
         }
@@ -403,50 +382,43 @@ fn compare(
                             .child(side("yours", yours, cx)),
                     )
             });
-            // The track spans the frame's full width, so the thumb's centre is the line's x.
+            // The track spans the picture's full width, so the thumb's centre is the line's x.
             let slider = div()
                 .id(s.id(ids::graphics_compare_slider(module)))
                 .aria_label(tr!("graphics.pictures.wipe"))
                 .test_support()
-                .absolute()
-                .left_0()
-                .right_0()
-                .bottom(px((SLIDER_BAND - SLIDER_HEIGHT) / 2.))
+                .w_full()
+                .h(px(SLIDER_HEIGHT))
                 .flex()
+                .items_center()
                 .child(
                     Slider::new(editor.wipe_state())
                         .accessibility_label(tr!("graphics.pictures.wipe")),
-                );
-            let band = div()
-                .absolute()
-                .left_0()
-                .right_0()
-                .bottom_0()
-                .h(px(SLIDER_BAND))
-                .bg(hsla(0., 0., 0., 0.45));
+                )
+                .into_any_element();
             (
                 frame
                     .child(full(side("preset", preset, cx)))
                     .children(clip)
                     .children(line)
-                    .child(band)
                     .child(pill(s, module, "preset", preset_pill, false))
                     .child(pill(s, module, "yours", yours_pill, true))
-                    .child(corner(SLIDER_BAND + 6., zoom)),
+                    .child(corner(zoom)),
                 Some(slider),
             )
         }
     };
-    // In a row the stage's width settles on the main axis before its 16:9 height follows,
-    // so a stage capped below the panel's width takes no height for the width it lost. The
-    // slider sits outside the frame's clip, so a thumb at either end is drawn whole.
-    let stage = div()
+    // In a row the stage's width settles on the main axis before its column lays out, so
+    // the 16:9 picture box takes its height from the capped width. The slider sits outside
+    // the frame's clip, so a thumb at either end is drawn whole.
+    let row = slider.unwrap_or_else(|| div().w_full().h(px(SLIDER_HEIGHT)).into_any_element());
+    let stage = v_flex()
         .relative()
         .flex_1()
         .max_w(px(COMPARE_MAX_WIDTH))
-        .aspect_ratio(16. / 9.)
-        .child(view)
-        .children(slider);
+        .gap_2()
+        .child(div().relative().w_full().aspect_ratio(16. / 9.).child(view))
+        .child(row);
     Some(h_flex().w_full().mt_3().child(stage).into_any_element())
 }
 
@@ -463,13 +435,20 @@ fn pill(
         .aria_label(text.clone())
         .test_support()
         .absolute()
-        .top_2()
-        .map(|pill| if right { pill.right_2() } else { pill.left_2() })
+        .top(px(10.))
+        .map(|pill| {
+            if right {
+                pill.right(px(10.))
+            } else {
+                pill.left(px(10.))
+            }
+        })
         .px_2()
         .py_0p5()
-        .rounded_md()
-        .bg(hsla(0., 0., 0., 0.6))
+        .rounded_full()
+        .bg(hsla(0., 0., 0., 0.8))
         .text_xs()
+        .font_weight(FontWeight::MEDIUM)
         .text_color(hsla(0., 0., 1., 1.))
         .child(text.clone())
 }
