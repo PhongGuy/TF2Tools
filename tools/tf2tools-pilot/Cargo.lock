@@ -8040,6 +8040,7 @@ dependencies = [
  "gpui-component",
  "gpui-kit",
  "image",
+ "pollster 0.4.0",
  "rodio",
  "rust-embed",
  "rust-i18n",
@@ -8051,6 +8052,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "wgpu",
 ]
 
 [[package]]
