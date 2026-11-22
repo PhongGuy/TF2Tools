@@ -132,6 +132,9 @@ pub struct GraphicsPage {
 /// Below this page width the category rail becomes a chip row above the settings.
 const NARROW: f32 = 900.;
 
+/// The mock's side padding, narrower than other pages' so the settings list matches its width.
+const SIDE_PADDING: f32 = 24.;
+
 impl GraphicsPage {
     /// Needs the `Services` and `Tf2Global` globals. Loads the status and release off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -903,7 +906,8 @@ impl Render for GraphicsPage {
             .size_full()
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
-            .p(CONTENT_PADDING)
+            .py(CONTENT_PADDING)
+            .px(px(SIDE_PADDING))
             .gap_6()
             .children(children);
         scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()

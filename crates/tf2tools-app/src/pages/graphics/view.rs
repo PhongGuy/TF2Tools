@@ -22,7 +22,7 @@ pub enum ControlKind {
 }
 
 /// The most values a segmented control holds before a row falls back to a Select.
-pub const SEGMENTED_MOST: usize = 4;
+pub const SEGMENTED_MOST: usize = 5;
 
 /// A switch for a plain off/on module, segments for a few values, a Select for the rest.
 pub fn control_kind(module: &ComfigModule) -> ControlKind {
@@ -38,7 +38,10 @@ pub fn control_kind(module: &ComfigModule) -> ControlKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChoiceView {
     pub choice: ModuleChoice,
+    /// The full words, for a Select entry, a tooltip and the accessible name.
     pub label: SharedString,
+    /// The words a segment shows.
+    pub segment_label: SharedString,
 }
 
 /// One setting's row.
@@ -58,7 +61,7 @@ pub struct RowView {
     pub preset_text: SharedString,
     /// The preset's own name, for labels that already show the value.
     pub preset_name: SharedString,
-    /// A Select's entries start with NotSet; switches and segments offer only values.
+    /// Segments and a Select's entries start with NotSet; a switch offers only its values.
     pub options: Vec<ChoiceView>,
 }
 
@@ -77,14 +80,26 @@ pub fn row(catalog: &ModuleCatalog, choices: &Choices, module: &ComfigModule) ->
         value = choice_label(module, &preset_value)
     );
     let offered = match kind {
-        ControlKind::Select => select_choices(module),
-        ControlKind::Switch | ControlKind::Segmented => value_choices(module).collect(),
+        ControlKind::Select | ControlKind::Segmented => select_choices(module),
+        ControlKind::Switch => value_choices(module).collect(),
     };
+    // NotSet's segment shows a short word so a changed row stays on one line, but the full
+    // words where the module has its own auto value, so two segments never read "Auto".
+    let has_auto = module.values().iter().any(|v| v.value() == "auto");
     let options = offered
         .into_iter()
-        .map(|choice| ChoiceView {
-            label: choice_label(module, &choice),
-            choice,
+        .map(|choice| {
+            let label = choice_label(module, &choice);
+            let segment_label = if choice == ModuleChoice::NotSet && !has_auto {
+                tr!("graphics.not_set_short")
+            } else {
+                label.clone()
+            };
+            ChoiceView {
+                label,
+                segment_label,
+                choice,
+            }
         })
         .collect();
     RowView {

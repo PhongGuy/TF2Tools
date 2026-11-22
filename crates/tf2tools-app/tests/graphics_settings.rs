@@ -36,7 +36,10 @@ fn a_saved_catalog_lists_every_module_with_the_preset_s_value(cx: &mut TestAppCo
     );
     assert_eq!(row_value(cx, &page, "lod"), Some(value("medium")));
     assert_eq!(shown(cx, &page, "fpscap"), Some(value("400")));
-    assert_eq!(shown(cx, &page, "decals"), Some(value("low")));
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::graphics_segment("decals", "low")),
+        Some(true)
+    );
     assert!(!support::present(
         cx,
         s.win,
@@ -88,7 +91,10 @@ fn the_catalog_is_fetched_once_and_saved_for_next_time(cx: &mut TestAppContext) 
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let page = open(cx, &s);
     wait_for_list(cx, &s, &page);
-    assert_eq!(shown(cx, &page, "sound"), Some(value("high")));
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::graphics_segment("sound", "high")),
+        Some(true)
+    );
     assert!(
         env.data
             .mastercomfig_dir()

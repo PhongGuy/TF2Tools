@@ -5,7 +5,7 @@ use gpui_kit::component::select::SelectEvent;
 use gpui_kit::{TestAppContext, px, size};
 use tf2tools_app::ids::{self, IdScope};
 use tf2tools_app::pages::graphics::model::ValueOption;
-use tf2tools_core::{Choices, Preset, ProfileDraft, SlotMode};
+use tf2tools_core::{Choices, ModuleChoice, Preset, ProfileDraft, SlotMode};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -91,4 +91,46 @@ fn the_first_german_change_keeps_the_editor_rows_still_at_1300_px(cx: &mut TestA
         "the strip keeps its height: {empty:?} {strip:?}"
     );
     assert_eq!(row_before.top(), row(cx).top(), "the first row moved");
+}
+
+// The editor's rows are narrower than the page's at the same window width, so a changed row's
+// controls must leave its text room there too.
+#[gpui_kit::test]
+fn changed_english_editor_rows_keep_their_text_readable(cx: &mut TestAppContext) {
+    editor_rows_stay_readable(cx, "en");
+}
+
+#[gpui_kit::test]
+fn changed_german_editor_rows_keep_their_text_readable(cx: &mut TestAppContext) {
+    editor_rows_stay_readable(cx, "de");
+}
+
+#[gpui_kit::test]
+fn changed_russian_editor_rows_keep_their_text_readable(cx: &mut TestAppContext) {
+    editor_rows_stay_readable(cx, "ru");
+}
+
+fn editor_rows_stay_readable(cx: &mut TestAppContext, code: &str) {
+    let _guard = LocaleGuard::switch(code);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let catalog = support::full_module_catalog();
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&catalog, "shadows", value("high"));
+    choices.set(&catalog, "texture_quality", value("very_high"));
+    choices.set(&catalog, "color_filter", ModuleChoice::NotSet);
+    let draft = ProfileDraft::new("Potato").with_graphics(SlotMode::Set(choices));
+    let p = s.services.library.create_profile(&draft).unwrap();
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let gfx = IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_segments("shadows")))
+    });
+    support::click_id(cx, s.win, ids::profile_rail("graphics"));
+    for width in [1280., 1100.] {
+        support::graphics::assert_rows_readable(cx, &s, gfx, &support::graphics::WIDE, width);
+    }
 }

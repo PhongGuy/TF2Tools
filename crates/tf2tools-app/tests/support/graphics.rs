@@ -148,14 +148,44 @@ pub fn reveal(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
     panic!("{id:?} never showed on the Graphics page");
 }
 
-/// Opens or closes `module`'s pictures with its Show/Hide pictures button.
+/// Opens or closes `module`'s pictures with a click on its thumbnail.
 pub fn toggle_pictures(cx: &mut TestAppContext, s: &super::ShellWindow, module: &str) {
-    reveal(cx, s, tf2tools_app::ids::graphics_pictures_toggle(module));
-    super::click_id(
-        cx,
-        s.win,
-        tf2tools_app::ids::graphics_pictures_toggle(module),
-    );
+    reveal(cx, s, tf2tools_app::ids::graphics_thumb(module));
+    super::click_id(cx, s.win, tf2tools_app::ids::graphics_thumb(module));
+}
+
+/// The distinct colours of the borders the last frame painted exactly around `id`'s box,
+/// leaving out borders drawn transparent or zero wide. A kit Button paints several identical
+/// quads over its box, so each colour is listed once.
+pub fn borders_at(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    id: impl Into<ElementId>,
+) -> Vec<gpui_kit::Hsla> {
+    let id = id.into();
+    let b = super::bounds_of(cx, s.win, id.clone()).unwrap_or_else(|| panic!("{id:?} not drawn"));
+    cx.update_window(s.win, |_, w, _| {
+        let scale = w.scale_factor();
+        let near = |a: f32, b: gpui_kit::Pixels| (a - f32::from(b) * scale).abs() <= 0.5;
+        w.painted_quads()
+            .iter()
+            .filter(|q| {
+                near(q.bounds.origin.x.0, b.origin.x)
+                    && near(q.bounds.origin.y.0, b.origin.y)
+                    && near(q.bounds.size.width.0, b.size.width)
+                    && near(q.bounds.size.height.0, b.size.height)
+                    && q.border_widths.top.0 > 0.
+            })
+            .map(|q| q.border_color)
+            .filter(|c| c.a > 0.)
+            .fold(Vec::new(), |mut seen, c| {
+                if !seen.contains(&c) {
+                    seen.push(c);
+                }
+                seen
+            })
+    })
+    .unwrap()
 }
 
 /// Scrolls the Graphics page back to its top, where the status card and changes strip are.
@@ -355,4 +385,146 @@ pub fn no_network() -> tf2tools_app::remote_images::ImageFetch {
     std::sync::Arc::new(|_url: String| {
         Box::pin(async { Err(tf2tools_app::remote_images::FetchFailure::Permanent) })
     })
+}
+
+/// Whether `module`'s `value` segment is checked; None when the row draws no such segment.
+pub fn segment_checked(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    module: &str,
+    value: &str,
+) -> Option<bool> {
+    super::checked_of(
+        cx,
+        s.win,
+        tf2tools_app::ids::graphics_segment(module, value),
+    )
+}
+
+/// Clicks `module`'s `value` segment as the player would.
+pub fn click_segment(cx: &mut TestAppContext, s: &super::ShellWindow, module: &str, value: &str) {
+    reveal(cx, s, tf2tools_app::ids::graphics_segment(module, value));
+    super::click_id(
+        cx,
+        s.win,
+        tf2tools_app::ids::graphics_segment(module, value),
+    );
+}
+
+/// Asserts each changed `module`'s preset note, Reset and segments lie inside its row and the
+/// `width` px window, under the row's text, on a page already `width` px wide.
+pub fn assert_changed_rows_fit(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    modules: &[&str],
+    width: f32,
+) {
+    use tf2tools_app::ids;
+    for &name in modules {
+        let found = |cx: &mut TestAppContext, part: &str, id: ElementId| {
+            super::bounds_of(cx, s.win, id).unwrap_or_else(|| panic!("no {part} for {name}"))
+        };
+        let row = found(cx, "row", ids::graphics_row(name));
+        let more = found(cx, "Learn more", ids::graphics_learn_more(name));
+        for (part, id) in [
+            ("note", ids::graphics_module_preset(name)),
+            ("Reset", ids::graphics_module_reset(name)),
+            ("control", ids::graphics_segments(name)),
+        ] {
+            let b = found(cx, part, id);
+            assert!(
+                b.left() >= row.left() && b.right() <= row.right(),
+                "{name}'s {part} {b:?} spills out of its row {row:?}"
+            );
+            assert!(
+                b.right() <= gpui_kit::px(width) && b.size.width > gpui_kit::px(0.),
+                "{name}'s {part} {b:?} is cut off at {width} px"
+            );
+            assert!(
+                b.top() >= more.bottom(),
+                "{name}'s {part} {b:?} sits under the row's text {more:?}"
+            );
+        }
+    }
+}
+
+/// The choices `assert_rows_readable` checks: two five-value rows whose preset note and
+/// Reset make the controls widest, and one left to TF2, whose extra segment is widest of all.
+pub const CHANGED_WIDE: &str =
+    r#"{"shadows":"high","texture_quality":"very_high","color_filter":null}"#;
+/// The modules `CHANGED_WIDE` changes.
+pub const WIDE: [&str; 3] = ["shadows", "texture_quality", "color_filter"];
+
+/// At `width`, asserts each changed `module` under `scope` keeps a text column at least 240 px
+/// wide with a visible label, that its note, Reset and track overlap neither the text nor the
+/// thumbnail, and that every segment lies inside its track.
+pub fn assert_rows_readable(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    scope: tf2tools_app::ids::IdScope,
+    modules: &[&str],
+    width: f32,
+) {
+    use gpui_kit::{Bounds, Pixels, px};
+    use tf2tools_app::ids;
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(width), px(900.)));
+    super::settle(cx, s.win);
+    // Strict overlap: touching edges are fine, any shared area is not.
+    let overlap = |a: Bounds<Pixels>, b: Bounds<Pixels>| {
+        a.left() < b.right() && b.left() < a.right() && a.top() < b.bottom() && b.top() < a.bottom()
+    };
+    let catalog = super::full_module_catalog();
+    for &name in modules {
+        let found = |cx: &mut TestAppContext, part: &str, id: ElementId| {
+            super::bounds_of(cx, s.win, scope.id(id))
+                .unwrap_or_else(|| panic!("no {part} for {name} at {width} px"))
+        };
+        // The label stretches across the text column, so its width is the column's.
+        let label = found(cx, "label", ids::graphics_module(name));
+        let more = found(cx, "Learn more", ids::graphics_learn_more(name));
+        assert!(
+            label.size.width >= px(240.),
+            "{name}'s text column {label:?} is under 240 px at {width} px"
+        );
+        let text =
+            Bounds::from_corners(label.origin, gpui_kit::point(label.right(), more.bottom()));
+        let thumb = super::bounds_of(cx, s.win, scope.id(ids::graphics_thumb(name)));
+        let track = found(cx, "track", ids::graphics_segments(name));
+        for (part, id) in [
+            ("note", ids::graphics_module_preset(name)),
+            ("Reset", ids::graphics_module_reset(name)),
+            ("track", ids::graphics_segments(name)),
+        ] {
+            let b = found(cx, part, id);
+            assert!(
+                !overlap(b, text),
+                "{name}'s {part} {b:?} covers its text {text:?} at {width} px"
+            );
+            if let Some(thumb) = thumb {
+                assert!(
+                    !overlap(b, thumb),
+                    "{name}'s {part} {b:?} covers its thumbnail {thumb:?} at {width} px"
+                );
+            }
+        }
+        let module = catalog
+            .categories()
+            .iter()
+            .flat_map(|c| c.modules())
+            .find(|m| m.name() == name)
+            .unwrap_or_else(|| panic!("{name} is not in the catalogue"));
+        // The Let TF2 decide segment (empty value) leads the module's own values.
+        let values = std::iter::once("").chain(module.values().iter().map(|v| v.value()));
+        for value in values {
+            let seg = found(cx, "segment", ids::graphics_segment(name, value));
+            assert!(
+                seg.size.width > px(0.)
+                    && seg.left() >= track.left()
+                    && seg.right() <= track.right()
+                    && seg.top() >= track.top()
+                    && seg.bottom() <= track.bottom(),
+                "{name}'s {value:?} segment {seg:?} leaves its track {track:?} at {width} px"
+            );
+        }
+    }
 }

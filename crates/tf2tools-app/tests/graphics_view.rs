@@ -34,7 +34,7 @@ fn each_module_gets_the_control_that_fits_its_values() {
             count(ControlKind::Segmented),
             count(ControlKind::Select)
         ),
-        (13, 28, 15)
+        (13, 38, 5)
     );
     let kind = |name: &str| control_kind(catalog.module(name).unwrap());
     assert_eq!(kind("vsync"), ControlKind::Switch);
@@ -46,7 +46,13 @@ fn each_module_gets_the_control_that_fits_its_values() {
     );
     assert_eq!(kind("phong"), ControlKind::Segmented);
     assert_eq!(kind("lod"), ControlKind::Segmented, "four values still fit");
-    assert_eq!(kind("shadows"), ControlKind::Select, "five values do not");
+    assert_eq!(kind("shadows"), ControlKind::Segmented, "five values fit");
+    assert_eq!(kind("texture_quality"), ControlKind::Segmented);
+    assert_eq!(
+        kind("texture_filter"),
+        ControlKind::Select,
+        "six values do not"
+    );
     assert_eq!(kind("fpscap"), ControlKind::Select);
 }
 
@@ -98,7 +104,7 @@ fn under_custom_most_modules_are_left_to_tf2() {
 }
 
 #[test]
-fn only_a_select_offers_let_tf2_decide() {
+fn segments_and_selects_lead_with_let_tf2_decide_and_switches_do_not() {
     let catalog = support::full_module_catalog();
     let choices = Choices::new(Preset::Medium);
     let options = |name: &str| -> Vec<(ModuleChoice, String)> {
@@ -115,18 +121,45 @@ fn only_a_select_offers_let_tf2_decide() {
             (value("on"), "On".to_owned())
         ]
     );
-    let decals = options("decals");
+    let filter = options("texture_filter");
     assert_eq!(
-        decals[0],
+        filter[0],
         (ModuleChoice::NotSet, "Let TF2 decide".to_owned())
     );
-    let rest: Vec<ModuleChoice> = decals[1..].iter().map(|(c, _)| c.clone()).collect();
-    assert_eq!(rest, ["off", "low", "medium", "high", "ultra"].map(value));
-    assert!(
-        options("hud_avatars")
-            .iter()
-            .all(|(c, _)| *c != ModuleChoice::NotSet)
+    let rest: Vec<ModuleChoice> = filter[1..].iter().map(|(c, _)| c.clone()).collect();
+    assert_eq!(
+        rest,
+        [
+            "blocky",
+            "trilinear",
+            "aniso2x",
+            "aniso4x",
+            "aniso8x",
+            "aniso16x"
+        ]
+        .map(value)
     );
+    for module in ["decals", "hud_avatars"] {
+        let segments = options(module);
+        assert_eq!(
+            segments[0],
+            (ModuleChoice::NotSet, "Let TF2 decide".to_owned()),
+            "segments lead with Let TF2 decide, as a Select does"
+        );
+        assert!(
+            segments[1..]
+                .iter()
+                .all(|(c, _)| *c != ModuleChoice::NotSet)
+        );
+    }
+    // The segment's visible word: short, unless the module has its own auto value.
+    let visible = |name: &str| -> String {
+        row(&catalog, &choices, catalog.module(name).unwrap()).options[0]
+            .segment_label
+            .to_string()
+    };
+    assert_eq!(visible("decals"), "Auto");
+    assert_eq!(visible("sillygibs"), "Let TF2 decide");
 }
 
 #[test]

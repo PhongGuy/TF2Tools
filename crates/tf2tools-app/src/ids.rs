@@ -1146,11 +1146,6 @@ pub fn graphics_thumb_image(module: &str) -> ElementId {
     keyed("graphics-thumb-image", module)
 }
 
-/// A row's Show/Hide pictures Button: "graphics-pictures-toggle:<module>".
-pub fn graphics_pictures_toggle(module: &str) -> ElementId {
-    keyed("graphics-pictures-toggle", module)
-}
-
 /// The muted line saying why a row's setting has no pictures.
 pub fn graphics_no_picture(module: &str) -> ElementId {
     keyed("graphics-no-picture", module)
@@ -1251,7 +1246,8 @@ pub fn graphics_segments(module: &str) -> ElementId {
     keyed("graphics-segments", module)
 }
 
-/// One segment of a row's segmented control: "graphics-segment:<module>=<value>".
+/// One segment of a row's segmented control: "graphics-segment:<module>=<value>", the value
+/// empty for Let TF2 decide.
 pub fn graphics_segment(module: &str, value: &str) -> ElementId {
     keyed("graphics-segment", &format!("{module}={value}"))
 }

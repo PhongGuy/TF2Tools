@@ -3056,6 +3056,7 @@ graphics:
     offline: "The settings list needs an internet connection the first time. Connect, then open this page again."
     unsupported: "This mastercomfig version isn't supported yet. The presets above still work."
   not_set: "Let TF2 decide"
+  not_set_short: "Auto"
   row:
     preset_value: "%{preset}: %{value}"
     reset: "Reset"
@@ -3063,7 +3064,6 @@ graphics:
   pictures:
     show: "Show pictures"
     hide: "Hide pictures"
-    thumb: "Pictures of %{name}"
     yours: "Yours: %{value}"
     same: "%{value} (same as %{preset})"
     zoom: "Zoom"
