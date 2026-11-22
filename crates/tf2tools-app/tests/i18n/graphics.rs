@@ -130,3 +130,25 @@ fn as_is_text_fits_at_800_px(cx: &mut TestAppContext, code: &str) {
     graphics::wait_for_list(cx, &s, &page);
     graphics::assert_as_is_text_fits(cx, &s, 800., 90.);
 }
+
+#[gpui_kit::test]
+fn changed_russian_five_value_rows_fit_at_800_px(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, graphics::found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(
+        &env,
+        r#"{"shadows":"high","texture_quality":"very_high","color_filter":"grayscale","water":"ultra"}"#,
+    );
+    let page = graphics::open(cx, &s);
+    graphics::wait_for_list(cx, &s, &page);
+    graphics::assert_controls_fit(cx, &s, 800.);
+    graphics::assert_changed_rows_fit(
+        cx,
+        &s,
+        &["shadows", "texture_quality", "color_filter", "water"],
+        800.,
+    );
+}

@@ -410,3 +410,40 @@ pub fn click_segment(cx: &mut TestAppContext, s: &super::ShellWindow, module: &s
         tf2tools_app::ids::graphics_segment(module, value),
     );
 }
+
+/// Asserts each changed `module`'s preset note, Reset and segments lie inside its row and the
+/// `width` px window, under the row's text, on a page already `width` px wide.
+pub fn assert_changed_rows_fit(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    modules: &[&str],
+    width: f32,
+) {
+    use tf2tools_app::ids;
+    for &name in modules {
+        let found = |cx: &mut TestAppContext, part: &str, id: ElementId| {
+            super::bounds_of(cx, s.win, id).unwrap_or_else(|| panic!("no {part} for {name}"))
+        };
+        let row = found(cx, "row", ids::graphics_row(name));
+        let more = found(cx, "Learn more", ids::graphics_learn_more(name));
+        for (part, id) in [
+            ("note", ids::graphics_module_preset(name)),
+            ("Reset", ids::graphics_module_reset(name)),
+            ("control", ids::graphics_segments(name)),
+        ] {
+            let b = found(cx, part, id);
+            assert!(
+                b.left() >= row.left() && b.right() <= row.right(),
+                "{name}'s {part} {b:?} spills out of its row {row:?}"
+            );
+            assert!(
+                b.right() <= gpui_kit::px(width) && b.size.width > gpui_kit::px(0.),
+                "{name}'s {part} {b:?} is cut off at {width} px"
+            );
+            assert!(
+                b.top() >= more.bottom(),
+                "{name}'s {part} {b:?} sits under the row's text {more:?}"
+            );
+        }
+    }
+}

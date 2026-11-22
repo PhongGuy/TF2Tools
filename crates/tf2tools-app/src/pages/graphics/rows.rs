@@ -8,7 +8,7 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, div, px, relative, rgb,
+    Styled as _, TestSupportExt as _, div, px, rgb,
 };
 use tf2tools_core::ModuleChoice;
 
@@ -45,32 +45,31 @@ impl GraphicsChoicesEditor {
                 text,
             )
         });
-        // Set solid, so the Learn more link alone gives the line its height.
+        // The preset's value leads the controls on one fixed 16 px line, so a pick widens the
+        // controls without adding a line to the text.
         let preset = row.changed.then(|| {
             labelled(
-                div().text_xs().line_height(relative(1.)).text_color(muted),
+                div()
+                    .text_xs()
+                    .line_height(px(16.))
+                    .whitespace_nowrap()
+                    .text_color(muted),
                 scope.id(ids::graphics_module_preset(name)),
                 row.preset_text.clone(),
             )
         });
         // The docs link reads as part of the description: its size and muted colour, underlined.
-        // The preset's value shares its line, so a pick never adds a line to the text.
-        let learn_more = h_flex()
-            .gap_3()
-            .child(
-                Button::new(scope.id(ids::graphics_learn_more(name)))
-                    .link()
-                    .xsmall()
-                    .text_color(muted)
-                    .label(tr!("graphics.row.learn_more"))
-                    .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL)),
-            )
-            .children(preset);
+        let learn_more = Button::new(scope.id(ids::graphics_learn_more(name)))
+            .link()
+            .xsmall()
+            .text_color(muted)
+            .label(tr!("graphics.row.learn_more"))
+            .on_click(|_, _, cx| cx.open_url(MASTERCOMFIG_DOCS_URL));
         let reset =
             row.changed.then(|| {
                 let module = name.to_owned();
                 Button::new(scope.id(ids::graphics_module_reset(name)))
-                    .outline()
+                    .ghost()
                     .small()
                     .label(tr!("graphics.row.reset"))
                     .disabled(self.disabled)
@@ -120,7 +119,11 @@ impl GraphicsChoicesEditor {
             .children(no_picture);
         // On a narrow page the controls take the row's width and wrap, so five segments in a
         // long locale shrink to the row instead of running past it.
-        let controls = h_flex().gap_2().children(reset).child(control);
+        let controls = h_flex()
+            .gap_2()
+            .children(preset)
+            .children(reset)
+            .child(control);
         let controls = if narrow {
             controls.w_full().flex_wrap()
         } else {
