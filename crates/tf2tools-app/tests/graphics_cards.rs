@@ -311,3 +311,58 @@ fn a_changed_row_s_bar_marks_its_line_and_not_its_open_panel(cx: &mut TestAppCon
         "the bar and tint stop at the row line: {bar:?} {panel:?}"
     );
 }
+
+/// From the compare picture's bottom to the strip's top.
+const PICTURE_TO_STRIP: f32 = 12.;
+
+// The open lod panel's seams: the stage is no taller than its picture, the panel ends 16 px
+// under its caption, and the next row's rule follows at once.
+fn assert_no_gap_under_lod(cx: &mut TestAppContext, s: &support::ShellWindow, when: &str) {
+    reveal(cx, s, ids::graphics_strip_caption("lod"));
+    let frame = at(cx, s, ids::graphics_compare("lod"));
+    let strip = at(cx, s, ids::graphics_strip("lod"));
+    let caption = at(cx, s, ids::graphics_strip_caption("lod"));
+    let panel = at(cx, s, ids::graphics_pictures("lod"));
+    let next = at(cx, s, ids::graphics_row("lighting"));
+    let over_strip = strip.top() - frame.bottom();
+    assert!(
+        (over_strip - px(PICTURE_TO_STRIP)).abs() <= px(0.5),
+        "{when}: {over_strip:?} between the picture {frame:?} and the strip {strip:?}"
+    );
+    let under_caption = panel.bottom() - caption.bottom();
+    assert!(
+        under_caption <= px(17.5),
+        "{when}: the panel runs {under_caption:?} past its caption"
+    );
+    // The panel's 1 px bottom rule overlaps the next row's top rule.
+    let seam = next.top() - panel.bottom();
+    assert!(
+        seam >= px(-1.5) && seam <= px(0.5),
+        "{when}: {seam:?} between the panel {panel:?} and the next row {next:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn an_open_panel_leaves_no_gap_before_the_next_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = picture_page(cx, &env, "medium", "{}");
+    toggle_pictures(cx, &s, "lod");
+    for width in [1800., 1280., 800.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(900.)));
+        support::settle(cx, s.win);
+        assert_no_gap_under_lod(cx, &s, &format!("{width} px"));
+    }
+}
+
+#[gpui_kit::test]
+fn a_zoomed_wipe_leaves_no_gap_before_the_next_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = picture_page(cx, &env, "low", r#"{"lod":"medium"}"#);
+    cx.simulate_window_resize(s.win, size(px(1800.), px(1000.)));
+    support::settle(cx, s.win);
+    toggle_pictures(cx, &s, "lod");
+    reveal(cx, &s, ids::graphics_zoom("lod"));
+    support::click_id(cx, s.win, ids::graphics_zoom("lod"));
+    assert!(cx.update(|cx| page.read(cx).zoom()));
+    assert_no_gap_under_lod(cx, &s, "1800 px, zoomed");
+}
