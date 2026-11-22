@@ -101,6 +101,26 @@ fn rows_pad_to_256_bytes_and_unpad_back() {
     assert_eq!(rows, want);
 }
 
+// Three rows of five pixels in a 256-byte stride, every byte distinct; a short buffer keeps
+// only the rows it holds, the last one possibly cut.
+#[test]
+fn unpad_rows_keeps_each_rows_pixels_across_a_padded_stride() {
+    let stride = math::padded_row_bytes(5) as usize;
+    assert_eq!(stride, 256);
+    let mut padded = vec![0xEE; stride * 3];
+    for row in 0..3 {
+        for i in 0..20 {
+            padded[row * stride + i] = (row * 20 + i) as u8;
+        }
+    }
+    let want: Vec<u8> = (0..60).collect();
+    assert_eq!(math::unpad_rows(&padded, 5, 3), want);
+
+    let short = &padded[..stride + 12];
+    let want_short: Vec<u8> = (0..20).chain(20..32).collect();
+    assert_eq!(math::unpad_rows(short, 5, 3), want_short);
+}
+
 #[test]
 fn the_camera_starts_at_the_spawn_at_eye_height() {
     let mesh = load_map_mesh(&bsp(&BspOptions::default())).unwrap();

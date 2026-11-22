@@ -72,12 +72,12 @@ pub fn padded_row_bytes(width: u32) -> u32 {
 pub fn unpad_rows(padded: &[u8], width: u32, height: u32) -> Vec<u8> {
     let stride = padded_row_bytes(width) as usize;
     let row = width as usize * 4;
-    padded
-        .chunks(stride)
-        .take(height as usize)
-        .flat_map(|chunk| chunk.get(..row).unwrap_or(chunk))
-        .copied()
-        .collect()
+    // One slice copy per row; a per-byte iterator chain cost milliseconds at 1080p.
+    let mut out = Vec::with_capacity(row * height as usize);
+    for chunk in padded.chunks(stride).take(height as usize) {
+        out.extend_from_slice(chunk.get(..row).unwrap_or(chunk));
+    }
+    out
 }
 
 /// Where the camera starts: the first spawn at eye height facing its yaw, else the middle of
