@@ -73,18 +73,20 @@ impl Renderer {
             .name("viewer-render".into())
             .spawn(move || {
                 // A panic (wgpu reports validation errors that way) ends the worker as a failure.
-                if crate::crash::catching(|| run(&inbox, &worker_sender)).is_err() {
-                    let error = RendererError::Device("the render worker panicked".into());
+                if let Err(payload) = crate::crash::catching(|| run(&inbox, &worker_sender)) {
+                    let error = RendererError::Device(panic_text(payload.as_ref()));
                     let _ = worker_sender.try_send(RenderEvent::Failed(error));
                 }
                 // The sender drops last, after `run` destroyed the device: closed means torn down.
                 drop(worker_sender);
             });
         match spawned {
-            Ok(handle) => WORKERS
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push(handle),
+            Ok(handle) => {
+                // Finished workers have nothing left to join, so page visits don't pile them up.
+                let mut workers = WORKERS.lock().unwrap_or_else(PoisonError::into_inner);
+                workers.retain(|worker| !worker.is_finished());
+                workers.push(handle);
+            }
             Err(e) => {
                 let error = RendererError::Device(e.to_string());
                 let _ = sender.try_send(RenderEvent::Failed(error));
@@ -106,6 +108,15 @@ impl SceneRenderer for Renderer {
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.events.clone()
     }
+}
+
+// A panic payload's message, when it carries one.
+fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "the render worker panicked".into())
 }
 
 /// Joins every finished render worker, waiting up to `timeout` for the rest; true when none
@@ -266,9 +277,13 @@ struct Gpu {
 impl Gpu {
     fn new() -> Result<Self, RendererError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-                .map_err(|_| RendererError::NoAdapter)?;
+        // High performance ranks discrete GPUs first and CPU renderers such as lavapipe last.
+        let options = wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            ..Default::default()
+        };
+        let adapter = pollster::block_on(instance.request_adapter(&options))
+            .map_err(|_| RendererError::NoAdapter)?;
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
                 .map_err(|e| RendererError::Device(e.to_string()))?;
