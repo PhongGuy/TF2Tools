@@ -2,6 +2,8 @@
 
 use crate::support;
 
+use gpui_kit::prelude::*;
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{ElementId, Entity, TestAppContext, px, size};
 use support::graphics::{
     found, idle, open, picture_page, reveal, saved, scroll_to_top, search, toggle_pictures,
@@ -285,4 +287,76 @@ fn changed_only_hiding_the_open_row_closes_its_pictures(cx: &mut TestAppContext)
         None
     );
     assert!(!support::present(cx, s.win, ids::graphics_compare("water")));
+}
+
+// Whether the category rail hangs beside the settings list rather than above it as chips.
+fn rail_beside_list(cx: &mut TestAppContext, s: &support::ShellWindow) -> bool {
+    let rail = at(cx, s, ids::graphics_rail("graphics"));
+    let section = at(cx, s, ids::graphics_section("graphics"));
+    rail.right() <= section.left()
+}
+
+#[gpui_kit::test]
+fn the_rail_stays_beside_a_list_at_its_minimum_width(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    cx.simulate_window_resize(s.win, size(px(1252.), px(900.)));
+    support::settle(cx, s.win);
+    assert!(rail_beside_list(cx, &s), "1252 px keeps the side rail");
+    let section = at(cx, &s, ids::graphics_section("graphics"));
+    assert!(section.size.width >= px(740.), "{section:?}");
+}
+
+#[gpui_kit::test]
+fn the_rail_becomes_chips_one_pixel_below_the_list_minimum(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    cx.simulate_window_resize(s.win, size(px(1251.), px(900.)));
+    support::settle(cx, s.win);
+    let rail = at(cx, &s, ids::graphics_rail("graphics"));
+    let section = at(cx, &s, ids::graphics_section("graphics"));
+    assert!(rail.bottom() <= section.top(), "{rail:?} {section:?}");
+}
+
+#[gpui_kit::test]
+fn a_collapsed_sidebar_keeps_the_rail_beside_the_list(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    support::click_id(cx, s.win, ids::SIDEBAR_TOGGLE);
+    cx.simulate_window_resize(s.win, size(px(1100.), px(900.)));
+    support::settle(cx, s.win);
+    assert!(
+        rail_beside_list(cx, &s),
+        "the collapsed sidebar leaves room"
+    );
+    let section = at(cx, &s, ids::graphics_section("graphics"));
+    assert!(section.size.width >= px(740.), "{section:?}");
+}
+
+#[gpui_kit::test]
+fn the_layout_settles_after_one_extra_frame(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) = full_page(cx, &env, "{}");
+    support::click_id(cx, s.win, ids::SIDEBAR_TOGGLE);
+    cx.simulate_window_resize(s.win, size(px(1000.), px(900.)));
+    support::settle(cx, s.win);
+    // Growing past the switch point: the frame after the resize measures the new column, and
+    // the one after that draws the rail beside the list, with no further frames.
+    cx.simulate_window_resize(s.win, size(px(1100.), px(900.)));
+    cx.run_until_parked();
+    let beside = cx
+        .update_window(s.win, |_, w, cx| {
+            w.render_frame(cx);
+            w.simulate_next_frame(cx);
+            w.render_frame(cx);
+            let rail = w
+                .try_find(ids::graphics_rail("graphics"))
+                .map(|e| e.bounds());
+            let section = w
+                .try_find(ids::graphics_section("graphics"))
+                .map(|e| e.bounds());
+            rail.zip(section).map(|(r, s)| r.right() <= s.left())
+        })
+        .unwrap();
+    assert_eq!(beside, Some(true));
 }
