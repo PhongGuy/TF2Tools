@@ -71,8 +71,10 @@ each draw. The app's `diagnostics.rs` forwards that target into its viewer stats
 
 Copy the new upstream version from `~/.cargo/registry/src/*/gpui-pre-linux-<ver>`,
 delete `.cargo-ok`, `Cargo.toml.orig` and `Cargo.lock`, reapply the changes above and
-update the version in `crates/tf2tools-app/tests/vendor_patch.rs`. Reapply the pointer
+update the version in `crates/tf2tools-app/tests/vendor_patch.rs` and the app's
+`gpui-pre-linux` pin in `crates/tf2tools-app/Cargo.toml`. Reapply the pointer
 lock (the new module, its `pub mod`/`pub use` lines in `src/linux.rs` and
 `src/gpui_linux.rs`, and both `client.rs` files) and the frame logging too. Drop this
 directory and the patch entry once upstream starts the renderer opaque and offers a
-pointer lock.
+pointer lock; the app's `LinuxLock` (`src/viewer/pointer.rs`) and its
+`gpui-pre-linux` dependency then move to the upstream API.
