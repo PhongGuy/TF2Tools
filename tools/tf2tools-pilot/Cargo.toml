@@ -38,8 +38,10 @@ tempfile = "3"
 # The test platform records file dialogs, so a test can see a pick reach one.
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }
 
-# The app workspace's binrw-free VPK reader and lzma-free BSP reader; see vendor/*/README.md.
+# Patch the same vendored crates as the root workspace, so the app builds here as it does there; see vendor/*/README.md.
 [patch.crates-io]
+gpui-pre-linux = { path = "../../vendor/gpui-pre-linux" }
+gpui-pre-scheduler = { path = "../../vendor/gpui-pre-scheduler" }
 vpk = { path = "../../vendor/vpk" }
 vbsp = { path = "../../vendor/vbsp" }
 
