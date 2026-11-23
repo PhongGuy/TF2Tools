@@ -60,6 +60,7 @@ tokio = { version = "1.53", features = ["sync", "fs", "time", "io-util", "rt"] }
 md-5 = "0.11"
 sha2 = "0.11"
 tracing = "0.1"
+log = "0.4"
 # Unix process-group kill for the bounded font commands; the version already locked.
 libc = "0.2.190"
 ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"] }

@@ -39,6 +39,8 @@ chrono.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+# Carries the vendored platform crate's frame stats into `tracing`.
+log.workspace = true
 tempfile.workspace = true
 rust-i18n.workspace = true
 sys-locale.workspace = true
