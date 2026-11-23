@@ -29,7 +29,8 @@ fn open_missing(
 #[gpui_kit::test]
 fn a_missing_map_shows_its_download_while_it_runs(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
-    let w = open_missing(cx, &env, &server, Duration::from_secs(3));
+    // Far longer than any wait, so a loaded machine cannot finish the download before the check.
+    let w = open_missing(cx, &env, &server, Duration::from_secs(60));
     let want = format!("Downloading {MAP} from serveme.tf...");
     support::wait_real(cx, &want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
