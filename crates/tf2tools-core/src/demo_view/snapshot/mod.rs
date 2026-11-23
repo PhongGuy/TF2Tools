@@ -3,6 +3,8 @@
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
+mod pick;
+
 /// The most of a demo read when looking for players; the early-match tick sits well inside it.
 pub const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
 
