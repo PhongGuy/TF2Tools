@@ -1,31 +1,34 @@
 //! The Demo Viewer page: opens a local TF2 demo and shows its map in 3D.
 
+use std::cell::Cell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use gpui_kit::component::button::Button;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div,
+    AppContext as _, Context, CursorStyle, Entity, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, Render, SharedString, Size, StatefulInteractiveElement as _,
+    Styled as _, Subscription, TestSupportExt as _, Window, canvas, div, px,
 };
 
 use crate::i18n::tr;
 use crate::ids;
 use crate::picker::PickKind;
 use crate::services::{Services, tf2_state};
-use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
+use crate::widgets::Named as _;
 
 mod bar;
 
 pub use bar::BarPlace;
 
-/// What the page shows below its caption row.
+/// What the page shows under its control bar.
 enum View {
     Empty,
     Loading,
@@ -40,11 +43,14 @@ enum View {
     },
 }
 
-/// The Demo Viewer page: an Open button, and the chosen demo's map once it loads.
+/// The Demo Viewer page: the chosen demo's map over the whole page, under a floating control bar.
 pub struct DemoViewerPage {
     view: View,
     /// Bumped by every resolved pick, so a slower earlier load cannot land over a later one.
     generation: u64,
+    /// The page's and the bar's sizes from the last frame, which place the bar.
+    area: Rc<Cell<Size<Pixels>>>,
+    bar_size: Rc<Cell<Size<Pixels>>>,
 }
 
 impl DemoViewerPage {
@@ -52,6 +58,8 @@ impl DemoViewerPage {
         Self {
             view: View::Empty,
             generation: 0,
+            area: Rc::default(),
+            bar_size: Rc::default(),
         }
     }
 
@@ -145,83 +153,133 @@ impl DemoViewerPage {
 impl Render for DemoViewerPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
-        let open = Button::new(ids::DEMO_VIEWER_OPEN)
-            .outline()
-            .small()
-            .label(tr!("demo_viewer.open"))
-            .on_click(cx.listener(|page, _, window, cx| page.open_demo(window, cx)));
-        let page = v_flex()
-            .id(ids::page(Page::DemoViewer))
-            .test_support()
-            .size_full()
-            .p(CONTENT_PADDING)
-            .gap_4();
-        let status = match &self.view {
-            // Loaded: the caption row names the map beside the controls hint, with a note when
-            // the players could not be read, then the viewport fills the rest.
+        let text = |id: &'static str, words: SharedString, muted: Option<Hsla>| {
+            div()
+                .id(id)
+                .aria_label(words.clone())
+                .test_support()
+                .flex_none()
+                .whitespace_nowrap()
+                .text_sm()
+                .when_some(muted, |el, colour| el.text_color(colour))
+                .child(words)
+        };
+        // The viewport fills the whole page; without one, the status sits in its centre.
+        let status = |words: SharedString| {
+            let centre = div().size_full().flex().items_center().justify_center();
+            let line = text(ids::DEMO_VIEWER_STATUS, words, Some(muted));
+            (centre.child(line).into_any_element(), None)
+        };
+        let (body, caption) = match &self.view {
             View::Loaded {
                 caption,
                 players_note,
                 viewport,
                 ..
-            } => {
-                let caption = caption.clone();
-                let hint = tr!("demo_viewer.hint");
-                let line = h_flex()
-                    .gap_3()
-                    .child(
-                        div()
-                            .id(ids::DEMO_VIEWER_CAPTION)
-                            .aria_label(caption.clone())
-                            .test_support()
-                            .text_sm()
-                            .child(caption),
-                    )
-                    .child(
-                        div()
-                            .id(ids::DEMO_VIEWER_HINT)
-                            .aria_label(hint.clone())
-                            .test_support()
-                            .text_sm()
-                            .text_color(muted)
-                            .child(hint),
-                    );
-                // The note goes under the caption line, so it never pushes Open off the row.
-                let text = v_flex().gap_1().child(line).when(*players_note, |text| {
-                    let note = tr!("demo_viewer.players_note");
-                    text.child(
-                        div()
-                            .id(ids::DEMO_VIEWER_PLAYERS_NOTE)
-                            .aria_label(note.clone())
-                            .test_support()
-                            .text_sm()
-                            .text_color(muted)
-                            .child(note),
-                    )
-                });
-                let row = h_flex()
-                    .gap_3()
-                    .child(text)
-                    .child(div().flex_1())
-                    .child(open);
-                return page
-                    .child(row)
-                    .child(div().flex_1().min_h_0().child(viewport.clone()));
-            }
-            View::Empty => tr!("demo_viewer.empty"),
-            View::Loading => tr!("demo_viewer.loading"),
-            View::Failed(message) => message.clone(),
-        };
-        page.child(h_flex().justify_end().child(open)).child(
-            div().flex_1().flex().items_center().justify_center().child(
-                div()
-                    .id(ids::DEMO_VIEWER_STATUS)
-                    .aria_label(status.clone())
-                    .test_support()
-                    .text_sm()
-                    .text_color(muted)
-                    .child(status),
+            } => (
+                viewport.clone().into_any_element(),
+                Some((caption.clone(), *players_note)),
             ),
+            View::Empty => status(tr!("demo_viewer.empty")),
+            View::Loading => status(tr!("demo_viewer.loading")),
+            View::Failed(message) => status(message.clone()),
+        };
+        let open = Button::new(ids::DEMO_VIEWER_OPEN)
+            .outline()
+            .small()
+            .label(tr!("demo_viewer.open"))
+            .on_click(cx.listener(|page, _, window, cx| page.open_demo(window, cx)));
+        let grip = div()
+            .id(ids::DEMO_VIEWER_BAR_GRIP)
+            .aria_label(tr!("demo_viewer.bar_grip"))
+            .test_support()
+            .flex_none()
+            .cursor(CursorStyle::OpenHand)
+            .text_color(muted)
+            .child(Icon::new(IconName::GripVertical).small());
+        let collapse = Button::new(ids::DEMO_VIEWER_BAR_COLLAPSE)
+            .ghost()
+            .small()
+            .icon(IconName::ChevronDown)
+            .named(tr!("demo_viewer.bar_collapse"));
+
+        // Both watchers keep last frame's sizes and ask for one more frame when either moves,
+        // so the bar settles at its place a frame after it first draws.
+        let area = Rc::clone(&self.area);
+        let area_watch = canvas(
+            move |bounds, window, _| {
+                if area.get() != bounds.size {
+                    area.set(bounds.size);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
         )
+        .absolute()
+        .size_full();
+        let bar_size = Rc::clone(&self.bar_size);
+        let bar_watch = canvas(
+            move |inner, window, _| {
+                // The watcher fills the inside of the 1 px border; the bar is that much bigger.
+                let size = inner.dilate(px(1.)).size;
+                if bar_size.get() != size {
+                    bar_size.set(size);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
+        let at = BarPlace::DEFAULT.clamp(self.area.get(), self.bar_size.get());
+        let theme = cx.theme();
+        let bar = h_flex()
+            .id(ids::DEMO_VIEWER_BAR)
+            .test_support()
+            .occlude()
+            .absolute()
+            .left(at.x)
+            .top(at.y)
+            .flex_none()
+            .items_center()
+            .gap_3()
+            .pl_2()
+            .pr_1()
+            .py_1()
+            .rounded_md()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .shadow_md()
+            .child(bar_watch)
+            .child(grip)
+            // The note stands under the caption, so the row stays narrow enough for the page.
+            .when_some(caption.clone(), |bar, (caption, note)| {
+                let words = v_flex()
+                    .flex_none()
+                    .child(text(ids::DEMO_VIEWER_CAPTION, caption, None))
+                    .when(note, |words| {
+                        let note = tr!("demo_viewer.players_note");
+                        words.child(text(ids::DEMO_VIEWER_PLAYERS_NOTE, note, Some(muted)))
+                    });
+                bar.child(words)
+            })
+            .child(open)
+            .when(caption.is_some(), |bar| {
+                bar.child(text(
+                    ids::DEMO_VIEWER_HINT,
+                    tr!("demo_viewer.hint"),
+                    Some(muted),
+                ))
+            })
+            .child(collapse);
+        div()
+            .id(ids::page(Page::DemoViewer))
+            .test_support()
+            .relative()
+            .size_full()
+            .child(area_watch)
+            .child(body)
+            .child(bar)
     }
 }

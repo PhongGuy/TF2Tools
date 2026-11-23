@@ -121,6 +121,7 @@ mod extra {
         Shapes, ImageUp, ImageDown, LayoutDashboard, PanelRight, AppWindow, ChevronUp, ChevronDown,
         RotateCcw, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, Dot, Map, Gamepad2,
         CircleQuestionMark, Sparkles, Gauge, ChartLine, LayersPlus, CircleDashed, Clapperboard,
+        GripVertical,
     ]);
 }
 use extra::ExtraIcons;

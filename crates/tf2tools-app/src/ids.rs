@@ -3505,12 +3505,18 @@ pub const DEMO_VIEWER_OPEN: &str = "demo-viewer-open";
 pub const DEMO_VIEWER_STATUS: &str = "demo-viewer-status";
 /// The "Preview" badge beside the header title, present only on the Demo Viewer.
 pub const DEMO_VIEWER_PREVIEW_BADGE: &str = "demo-viewer-preview-badge";
-/// The caption row over the 3D view, naming the demo and its map.
+/// The caption in the control bar, naming the demo's map.
 pub const DEMO_VIEWER_CAPTION: &str = "demo-viewer-caption";
-/// The hint line under the 3D view about its controls.
+/// The muted hint in the control bar about the 3D view's controls.
 pub const DEMO_VIEWER_HINT: &str = "demo-viewer-hint";
-/// The muted note under the caption when a demo's players could not be read.
+/// The muted note in the control bar when a demo's players could not be read.
 pub const DEMO_VIEWER_PLAYERS_NOTE: &str = "demo-viewer-players-note";
+/// The Demo Viewer's floating control bar over the page's foot.
+pub const DEMO_VIEWER_BAR: &str = "demo-viewer-bar";
+/// The bar's grip handle, which drags the bar.
+pub const DEMO_VIEWER_BAR_GRIP: &str = "demo-viewer-bar-grip";
+/// The bar's button that minimises it to its grip, or shows it again.
+pub const DEMO_VIEWER_BAR_COLLAPSE: &str = "demo-viewer-bar-collapse";
 
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";

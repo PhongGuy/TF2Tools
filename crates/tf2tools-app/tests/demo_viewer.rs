@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use gpui_kit::TestAppContext;
 use gpui_kit::assets::IconName;
+use gpui_kit::{Bounds, Pixels, TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::picker::{PickKind, ScriptedPicker};
 use tf2tools_app::services::Tf2State;
@@ -129,7 +129,7 @@ fn an_installed_map_opens_in_the_viewport_under_its_caption(cx: &mut TestAppCont
     });
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
-        Some("cp_synthetic. Playback comes later.")
+        Some("cp_synthetic")
     );
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_HINT).as_deref(),
@@ -293,7 +293,7 @@ fn a_second_open_replaces_the_load_in_flight(cx: &mut TestAppContext) {
     );
     support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
     support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
-    let want = "cp_second. Playback comes later.";
+    let want = "cp_second";
     support::wait_real(cx, "the second map", |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref() == Some(want)
     });
@@ -374,7 +374,7 @@ fn players_show_with_their_count_and_time_in_the_caption(cx: &mut TestAppContext
     let w = open_with_players(cx, &env, demo_header("cp_synthetic", 60.0), reader);
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
-        Some("cp_synthetic, 3 players at 1:02. Playback comes later.")
+        Some("cp_synthetic, 3 players at 1:02")
     );
     assert!(!support::present(
         cx,
@@ -396,7 +396,7 @@ fn an_unfinalised_demo_counts_0_015_seconds_a_tick(cx: &mut TestAppContext) {
     let w = open_with_players(cx, &env, header, reader);
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
-        Some("cp_synthetic, 3 players at 1:01. Playback comes later.")
+        Some("cp_synthetic, 3 players at 1:01")
     );
 }
 
@@ -408,7 +408,7 @@ fn unreadable_players_leave_the_map_with_a_note(cx: &mut TestAppContext) {
     let w = open_with_players(cx, &env, demo_header("cp_synthetic", 60.0), reader);
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
-        Some("cp_synthetic. Playback comes later.")
+        Some("cp_synthetic")
     );
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS_NOTE).as_deref(),
@@ -437,4 +437,92 @@ fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
     });
     assert_eq!(asked.load(Ordering::SeqCst), 0);
+}
+
+// Whether `inner` lies wholly inside `outer`, give or take half a pixel of rounding.
+fn inside(inner: Bounds<Pixels>, outer: Bounds<Pixels>) -> bool {
+    let slack = px(0.5);
+    inner.left() >= outer.left() - slack
+        && inner.top() >= outer.top() - slack
+        && inner.right() <= outer.right() + slack
+        && inner.bottom() <= outer.bottom() + slack
+}
+
+// Asserts the bar sits at the page's bottom centre: centred across it within a pixel, and its
+// foot in the page's lower part without leaving it.
+fn assert_bar_at_bottom_centre(page: Bounds<Pixels>, bar: Bounds<Pixels>) {
+    assert!(
+        bar.size.width > px(0.) && bar.size.height > px(0.),
+        "{bar:?}"
+    );
+    let page_mid = page.left() + page.size.width / 2.;
+    let bar_mid = bar.left() + bar.size.width / 2.;
+    assert!((bar_mid - page_mid).abs() <= px(1.), "{bar:?} in {page:?}");
+    assert!(inside(bar, page), "{bar:?} leaves {page:?}");
+    assert!(
+        bar.bottom() > page.top() + page.size.height * 0.75,
+        "{bar:?} is not low in {page:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_loaded_map_fills_the_page_under_a_bottom_bar(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemoViewer)).unwrap();
+    let viewport = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT).unwrap();
+    assert_eq!(viewport, page);
+    let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
+    assert_bar_at_bottom_centre(page, bar);
+    for id in [
+        ids::DEMO_VIEWER_BAR_GRIP,
+        ids::DEMO_VIEWER_CAPTION,
+        ids::DEMO_VIEWER_PLAYERS_NOTE,
+        ids::DEMO_VIEWER_OPEN,
+        ids::DEMO_VIEWER_HINT,
+        ids::DEMO_VIEWER_BAR_COLLAPSE,
+    ] {
+        let part = support::bounds_of(cx, w.s.win, id).unwrap();
+        assert!(
+            inside(part, bar),
+            "{id} at {part:?} is outside the bar {bar:?}"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn the_empty_page_keeps_the_bar_and_centres_its_status(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::DemoViewer)).unwrap();
+    let bar = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_BAR).unwrap();
+    assert_bar_at_bottom_centre(page, bar);
+    for id in [
+        ids::DEMO_VIEWER_BAR_GRIP,
+        ids::DEMO_VIEWER_OPEN,
+        ids::DEMO_VIEWER_BAR_COLLAPSE,
+    ] {
+        let part = support::bounds_of(cx, s.win, id).unwrap();
+        assert!(
+            inside(part, bar),
+            "{id} at {part:?} is outside the bar {bar:?}"
+        );
+    }
+    assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_CAPTION));
+    assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_HINT));
+    let status = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_STATUS).unwrap();
+    let centre = |b: Bounds<Pixels>| (b.left() + b.size.width / 2., b.top() + b.size.height / 2.);
+    let (sx, sy) = centre(status);
+    let (px_, py) = centre(page);
+    assert!(
+        (sx - px_).abs() <= px(1.) && (sy - py).abs() <= px(1.),
+        "status {status:?} is not centred in {page:?}"
+    );
 }
