@@ -8,6 +8,7 @@ const HEADER_LEN: usize = 1072;
 const MAP_OFFSET: usize = 536;
 const MAP_FIELD: usize = 260;
 const DURATION_OFFSET: usize = 1056;
+const TICKS_OFFSET: usize = 1060;
 
 /// What the viewer needs from a demo's header.
 #[derive(Debug, Clone, PartialEq)]
@@ -15,6 +16,7 @@ const DURATION_OFFSET: usize = 1056;
 pub struct DemoHeader {
     map: String,
     duration_seconds: f32,
+    ticks: u32,
 }
 
 impl DemoHeader {
@@ -26,6 +28,11 @@ impl DemoHeader {
     /// The recording's length in seconds, as the header states it.
     pub fn duration_seconds(&self) -> f32 {
         self.duration_seconds
+    }
+
+    /// The recording's length in ticks, as the header states it; a negative count reads as 0.
+    pub fn ticks(&self) -> u32 {
+        self.ticks
     }
 }
 
@@ -49,10 +56,13 @@ pub fn read_demo_header(dem: &[u8]) -> Result<DemoHeader, DemoHeaderError> {
     if !is_map_name(&map) {
         return Err(DemoHeaderError::BadMapName { name: map });
     }
-    let mut bytes = [0u8; 4];
-    bytes.copy_from_slice(&dem[DURATION_OFFSET..DURATION_OFFSET + 4]);
+    let mut duration = [0u8; 4];
+    duration.copy_from_slice(&dem[DURATION_OFFSET..DURATION_OFFSET + 4]);
+    let mut ticks = [0u8; 4];
+    ticks.copy_from_slice(&dem[TICKS_OFFSET..TICKS_OFFSET + 4]);
     Ok(DemoHeader {
         map,
-        duration_seconds: f32::from_le_bytes(bytes),
+        duration_seconds: f32::from_le_bytes(duration),
+        ticks: u32::try_from(i32::from_le_bytes(ticks)).unwrap_or(0),
     })
 }
