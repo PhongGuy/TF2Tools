@@ -1,4 +1,4 @@
-//! `viewer_bench <map.bsp> <frames>`: times the viewer's renderer on one map at two sizes.
+//! `viewer_bench <map.bsp> <frames>`: times the viewer's renderer on one map at four sizes.
 //!
 //! Prints the adapter, then one line per size and stage with p50, p99 and max.
 
@@ -12,7 +12,7 @@ use tf2tools_app::viewer::stats::{Percentiles, percentiles};
 use tf2tools_app::viewer::{DrawRequest, RenderEvent, Renderer, SceneRenderer};
 use tf2tools_core::{MapMesh, load_map_file};
 
-const SIZES: [(u32, u32); 2] = [(1280, 720), (1920, 1080)];
+const SIZES: [(u32, u32); 4] = [(1280, 720), (1920, 1080), (2560, 1440), (3840, 2160)];
 /// Draws kept in flight, so rendering one frame overlaps reading back the previous.
 const IN_FLIGHT: u64 = 2;
 
