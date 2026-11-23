@@ -13,6 +13,7 @@ fn pictures_dir() -> PathBuf {
 }
 
 /// Pictured modules from outside the graphics category, as (category, module), in manifest order.
+/// They come last, so a setup that shows the HUD never leaks into a graphics shot.
 const EXTRA_PICTURED: &[(&str, &str)] = &[("hud", "hud_player_model")];
 
 /// mastercomfig's graphics modules in its order, then each extra pictured module, with their values.

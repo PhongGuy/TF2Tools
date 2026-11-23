@@ -151,10 +151,14 @@ fn the_player_model_row_wipes_between_its_two_bundled_pictures_with_zoom() {
     )
     .unwrap();
     assert_eq!(row.thumb, Some(dir.join("hud_player_model/off.webp")));
-    assert!(
-        matches!(row.compare, Compare::Wipe { .. }),
-        "{:?}",
-        row.compare
+    assert_eq!(
+        row.compare,
+        Compare::Wipe {
+            preset: dir.join("hud_player_model/on.webp"),
+            yours: dir.join("hud_player_model/off.webp"),
+            preset_pill: "Medium: On".into(),
+            yours_pill: "Yours: Off".into(),
+        }
     );
     let strip: Vec<(&str, bool, bool)> = row
         .strip
