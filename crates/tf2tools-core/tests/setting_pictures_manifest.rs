@@ -36,7 +36,9 @@ fn pictured() -> Vec<(String, Vec<String>)> {
         category("graphics").modules().iter().map(named).collect();
     for (key, name) in EXTRA_PICTURED {
         let module = category(key).modules().iter().find(|m| m.name() == *name);
-        modules.push(named(module.unwrap_or_else(|| panic!("no {name} in {key}"))));
+        modules.push(named(
+            module.unwrap_or_else(|| panic!("no {name} in {key}")),
+        ));
     }
     modules
 }
