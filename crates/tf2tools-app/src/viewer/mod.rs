@@ -1,11 +1,12 @@
 //! The demo viewer's 3D view: camera math and a renderer worker that draws a map offscreen and
 //! hands each frame back as a GPUI image.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::RenderImage;
-use tf2tools_core::{MapMesh, Team};
+use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, Team};
 
 pub mod load;
 pub mod math;
@@ -81,3 +82,13 @@ pub trait SceneRenderer {
 
 /// Makes a renderer for a page; tests swap the wgpu one for a stub.
 pub type RendererFactory = Arc<dyn Fn() -> Box<dyn SceneRenderer> + Send + Sync>;
+
+/// Reads a demo's players; tests swap the core reader for a fixed answer.
+pub type SnapshotReader =
+    Arc<dyn Fn(&Path) -> Result<DemoSnapshot, DemoSnapshotError> + Send + Sync>;
+
+/// The reader `Services` holds in the real app: `tf2tools_core::read_demo_snapshot`.
+pub fn core_snapshots() -> SnapshotReader {
+    // A closure, because a fn item does not coerce to the higher-ranked `dyn Fn(&Path)` here.
+    Arc::new(|dem: &Path| tf2tools_core::read_demo_snapshot(dem))
+}

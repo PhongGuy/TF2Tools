@@ -1,7 +1,7 @@
 //! A scripted `SceneRenderer` and a viewport-only window for the demo viewer's headless tests.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -13,8 +13,9 @@ use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::viewport::{Clock, DemoViewport};
 use tf2tools_app::viewer::{
     DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
+    SnapshotReader,
 };
-use tf2tools_core::{DemoSnapshot, MapMesh, load_map_mesh};
+use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, load_map_mesh};
 
 use super::demo_view_fixtures::{BspOptions, bsp};
 
@@ -199,6 +200,18 @@ pub fn demo_viewer_shell(
     picks: Vec<PathBuf>,
     answer: StubAnswer,
 ) -> DemoViewerShell {
+    demo_viewer_shell_with(cx, env, state, picks, answer, None)
+}
+
+/// `demo_viewer_shell`, with `snapshots` as the reader when given (the core reader otherwise).
+pub fn demo_viewer_shell_with(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    answer: StubAnswer,
+    snapshots: Option<SnapshotReader>,
+) -> DemoViewerShell {
     let picker = Arc::new(ScriptedPicker::new(picks));
     let (factory, stubs) = stub_factory(answer);
     let s = super::open_shell(
@@ -210,10 +223,26 @@ pub fn demo_viewer_shell(
         None,
         |services| {
             services.renderers = factory;
+            if let Some(snapshots) = snapshots {
+                services.demo_snapshots = snapshots;
+            }
         },
     );
     super::click_nav(cx, s.win, Page::DemoViewer);
     DemoViewerShell { s, picker, stubs }
+}
+
+/// A reader answering `answer()` every time, and how many times it was asked.
+pub fn counting_snapshots(
+    answer: impl Fn() -> Result<DemoSnapshot, DemoSnapshotError> + Send + Sync + 'static,
+) -> (SnapshotReader, Arc<AtomicUsize>) {
+    let asked = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&asked);
+    let reader: SnapshotReader = Arc::new(move |_| {
+        count.fetch_add(1, Ordering::SeqCst);
+        answer()
+    });
+    (reader, asked)
 }
 
 /// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.
