@@ -21,6 +21,10 @@ use crate::shell::route::Page;
 use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
 
+mod bar;
+
+pub use bar::BarPlace;
+
 /// What the page shows below its caption row.
 enum View {
     Empty,
