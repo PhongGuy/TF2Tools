@@ -3065,6 +3065,7 @@ graphics:
     show: "Показать изображения"
     hide: "Скрыть изображения"
     yours: "Ваше: %{value}"
+    this_profile: "Этот профиль: %{value}"
     same: "%{value} (как в пресете «%{preset}»)"
     zoom: "Приблизить"
     full: "Всё изображение"

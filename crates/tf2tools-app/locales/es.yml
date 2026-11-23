@@ -3090,6 +3090,7 @@ graphics:
     show: "Mostrar imágenes"
     hide: "Ocultar imágenes"
     yours: "Tuyo: %{value}"
+    this_profile: "Este perfil: %{value}"
     same: "%{value} (igual que %{preset})"
     zoom: "Ampliar"
     full: "Imagen completa"

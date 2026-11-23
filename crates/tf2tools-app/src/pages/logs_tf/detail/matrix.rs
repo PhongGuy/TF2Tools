@@ -14,7 +14,7 @@ use super::{ICON, NUMBER, team_cell};
 use crate::i18n::{names, tr};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::head::sortable;
+use crate::pages::logs_tf::head::arrow_under;
 use crate::pages::logs_tf::sort::{MatrixColumn, MatrixSort, sort_matrix_rows};
 use crate::pages::logs_tf::tables::matrix_rows;
 use crate::services::Services;
@@ -124,7 +124,7 @@ fn table(
                 .child(class_icon(class, assets.class_icon(class).as_deref(), ICON)),
             None => button.label(total),
         };
-        sortable(
+        arrow_under(
             button,
             ids::logstf_matrix_arrow(class),
             sorted.map(|s| s.descending),

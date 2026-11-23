@@ -3089,6 +3089,7 @@ graphics:
     show: "显示图片"
     hide: "隐藏图片"
     yours: "你的：%{value}"
+    this_profile: "此配置文件：%{value}"
     same: "%{value}（与 %{preset} 相同）"
     zoom: "放大"
     full: "完整图片"

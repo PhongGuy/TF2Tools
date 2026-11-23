@@ -45,7 +45,10 @@ fn the_classes_stack_as_compact_rows_in_one_box(cx: &mut TestAppContext) {
     }
     for row in &rows {
         assert!(row.size.height <= px(40.), "row {row:?} is not compact");
-        assert!(row.left() >= table.left() && row.right() <= table.right());
+        assert!(
+            row.left() >= table.left() && row.right() <= table.right(),
+            "{row:?} outside {table:?}"
+        );
     }
 }
 
@@ -447,29 +450,119 @@ fn low_to_high_puts_empty_medic_cells_first_among_played_rows(cx: &mut TestAppCo
 }
 
 #[gpui_kit::test]
-fn the_class_title_reads_from_the_left_and_the_numbers_from_the_right(cx: &mut TestAppContext) {
+fn each_title_and_its_arrow_sit_centred_in_its_column_but_class_reads_from_the_left(
+    cx: &mut TestAppContext,
+) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let _page = open_page(cx, &s);
-    let title = |cx: &mut TestAppContext, label| {
-        support::bounds_of(cx, s.win, ids::logstf_class_title(label)).expect(label)
+    let bounds = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+        support::bounds_of(cx, s.win, id).unwrap()
     };
-    // The first row's icon starts past the row's 12 px padding and 1 px border.
-    let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
-    let class = title(cx, "Class");
-    let icon_left = f32::from(row.left()) + 13.;
-    assert!(
-        (f32::from(class.left()) - icon_left).abs() <= 2.,
-        "{class:?} not over the icon at {icon_left}"
-    );
-    for label in COLUMNS {
-        let text = title(cx, label);
-        let head = support::bounds_of(cx, s.win, ids::logstf_class_head(label)).unwrap();
+    // The table's top edge is the lowest of its rows' tops, whatever order they sort into.
+    let rows_top = |cx: &mut TestAppContext| {
+        TfClass::ALL
+            .into_iter()
+            .map(|class| f32::from(bounds(cx, ids::logstf_class(class)).top()))
+            .fold(f32::MAX, f32::min)
+    };
+    let mut titles = vec!["Class"];
+    titles.extend(COLUMNS);
+    titles.extend(["Heals/min", "Ubers/10 min"]);
+    for label in titles {
+        let before = bounds(cx, ids::logstf_class_title(label));
+        let (head, top) = (bounds(cx, ids::logstf_class_head(label)), rows_top(cx));
+        support::click_id(cx, s.win, ids::logstf_class_head(label));
+        let title = bounds(cx, ids::logstf_class_title(label));
+        let arrow = bounds(cx, ids::logstf_class_arrow(label));
+        let sorted = bounds(cx, ids::logstf_class_head(label));
+        // Sorting moves nothing: not the title, the header's height or the rows under it.
+        assert_eq!(title, before, "{label} jumped when sorted");
+        assert_eq!(sorted, head, "{label}'s button changed when sorted");
+        assert_eq!(rows_top(cx), top, "{label}: the header changed height");
+        // The arrow sits beside the title, and the two fit inside the button.
+        let (left, right) = (f32::from(title.left()), f32::from(arrow.right()));
         assert!(
-            (f32::from(text.right()) - f32::from(head.right())).abs() <= 1.,
-            "{label}: {text:?} not flush right in {head:?}"
+            arrow.left() >= title.right(),
+            "{label}: {arrow:?} not after {title:?}"
         );
+        assert!(
+            left >= f32::from(head.left()) - 0.5 && right <= f32::from(head.right()) + 0.5,
+            "{label}: {title:?} and {arrow:?} spill out of {head:?}"
+        );
+        if label == "Class" {
+            // The class title starts over the row's icon, past its 8 px padding and border.
+            let row = bounds(cx, ids::logstf_class(TfClass::Scout));
+            let icon_left = f32::from(row.left()) + 9.;
+            assert!(
+                (left - icon_left).abs() <= 1.,
+                "{title:?} not over the icon at {icon_left}"
+            );
+        } else {
+            let centre = f32::from(head.center().x);
+            assert!(
+                ((left + right) / 2. - centre).abs() <= 1.,
+                "{label}: {title:?} and {arrow:?} not centred in {head:?}"
+            );
+        }
     }
+}
+
+#[gpui_kit::test]
+fn the_class_column_holds_the_longest_class_name_in_english_and_russian(cx: &mut TestAppContext) {
+    use gpui_kit::component::ActiveTheme as _;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    let names = [
+        "Scout",
+        "Soldier",
+        "Pyro",
+        "Demoman",
+        "Heavy",
+        "Engineer",
+        "Medic",
+        "Sniper",
+        "Spy",
+        "Разведчик",
+        "Солдат",
+        "Поджигатель",
+        "Подрывник",
+        "Пулемётчик",
+        "Инженер",
+        "Медик",
+        "Снайпер",
+        "Шпион",
+    ];
+    // Each name is semibold text-sm, after a 20 px icon and an 8 px gap.
+    let widest = cx
+        .update_window(s.win, |_, w, cx| {
+            let mut font = gpui_kit::font(cx.theme().font_family.clone());
+            font.weight = gpui_kit::FontWeight::SEMIBOLD;
+            let size = gpui_kit::rems(0.875).to_pixels(w.rem_size());
+            names
+                .iter()
+                .map(|name| {
+                    let run = gpui_kit::TextRun {
+                        len: name.len(),
+                        font: font.clone(),
+                        ..Default::default()
+                    };
+                    let line = w
+                        .text_system()
+                        .shape_line((*name).into(), size, &[run], None);
+                    f32::from(line.width)
+                })
+                .fold(0., f32::max)
+        })
+        .unwrap();
+    let column = support::bounds_of(cx, s.win, ids::logstf_class_head("Class")).unwrap();
+    assert!(
+        20. + 8. + widest <= f32::from(column.size.width),
+        "{widest} px of name does not fit {column:?}"
+    );
 }

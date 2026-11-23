@@ -357,6 +357,30 @@ fn changed_rows_keep_their_text_readable_on_a_wide_page(cx: &mut TestAppContext)
     }
 }
 
+// A thumbnail widens the lead's minimum, so the controls must still wrap clear of the text and
+// the picture beside it, up to a page wide enough to hold all three on one line.
+#[gpui_kit::test]
+fn changed_rows_with_thumbnails_keep_their_text_readable(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _page) =
+        support::graphics::picture_page(cx, &env, "medium", support::graphics::CHANGED_WIDE);
+    for name in support::graphics::WIDE {
+        assert!(
+            support::present(cx, s.win, ids::graphics_thumb(name)),
+            "{name} draws a thumbnail"
+        );
+    }
+    for width in [1252., 1280., 1600.] {
+        support::graphics::assert_rows_readable(
+            cx,
+            &s,
+            ids::IdScope::PAGE,
+            &support::graphics::WIDE,
+            width,
+        );
+    }
+}
+
 // Only the link's own words open the docs, not the blank space beside it.
 #[gpui_kit::test]
 fn learn_more_hugs_its_label(cx: &mut TestAppContext) {
