@@ -4,10 +4,11 @@ use std::time::Duration;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
+use tf2tools_app::shell::route::Page;
 
 use crate::support;
 use crate::support::demo_view_fixtures::{BspOptions, bsp, demo_header};
-use crate::support::demo_viewer::{StubAnswer, demo_file, demo_viewer_shell_served};
+use crate::support::demo_viewer::{StubAnswer, demo_file, demo_viewer_shell_served, install_map};
 
 const MAP: &str = "cp_fetched";
 
@@ -132,4 +133,96 @@ fn a_downloaded_map_opens_and_is_kept_as_downloaded(cx: &mut TestAppContext) {
         )
         .unwrap();
     assert_eq!(rows, 1);
+}
+
+// The download's temporary files in tf/maps: core makes one before it asks the server.
+fn partial_files(env: &support::Env) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(env.game.join("tf/maps")) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|name| name.starts_with(".tf2tools-") && name.ends_with(".part"))
+        .collect()
+}
+
+fn downloaded_rows(env: &support::Env) -> i64 {
+    support::sql(env)
+        .query_row(
+            "SELECT count(*) FROM downloaded_maps WHERE name = ?1",
+            [MAP],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
+
+// Opens a demo whose map is served far too slowly to arrive, and waits until its download is
+// visibly under way with its temporary file in place.
+fn open_stalled(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+    picks: Vec<std::path::PathBuf>,
+) -> support::demo_viewer::DemoViewerShell {
+    let route = format!("/fastdl/maps/{MAP}.bsp");
+    server.mount_bytes_after(&route, bsp(&BspOptions::default()), Duration::from_secs(60));
+    let w = demo_viewer_shell_served(cx, env, server, picks, StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    let want = format!("Downloading {MAP} from serveme.tf...");
+    support::wait_real(cx, "the download and its partial file", |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
+            && !partial_files(env).is_empty()
+    });
+    w
+}
+
+#[gpui_kit::test]
+fn another_demo_opened_mid_download_drops_the_download(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let installed = "cp_installed";
+    install_map(&env, installed);
+    let first = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
+    let second = demo_file(&env, "other.dem", &demo_header(installed, 60.0));
+    let w = open_stalled(cx, &env, &server, vec![first, second]);
+
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the second demo's viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some(installed)
+    );
+    // The aborted transfer deletes its temporary file once tokio drops it.
+    support::wait_real(cx, "the partial file to go", |_| {
+        partial_files(&env).is_empty()
+    });
+    let until = std::time::Instant::now() + Duration::from_millis(300);
+    while std::time::Instant::now() < until {
+        cx.run_until_parked();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT));
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_PROGRESS));
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some(installed)
+    );
+    assert!(!env.game.join(format!("tf/maps/{MAP}.bsp")).exists());
+    assert_eq!(partial_files(&env), Vec::<String>::new());
+    assert_eq!(downloaded_rows(&env), 0);
+}
+
+#[gpui_kit::test]
+fn leaving_the_page_mid_download_drops_the_download(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
+    let w = open_stalled(cx, &env, &server, vec![demo]);
+
+    support::click_nav(cx, w.s.win, Page::Huds);
+    support::wait_real(cx, "the partial file to go", |_| {
+        partial_files(&env).is_empty()
+    });
+    assert!(!env.game.join(format!("tf/maps/{MAP}.bsp")).exists());
+    assert_eq!(downloaded_rows(&env), 0);
 }
