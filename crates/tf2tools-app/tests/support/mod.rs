@@ -583,9 +583,12 @@ fn open_shell(
         picker,
         detector,
         Arc::<RecordingAudio>::clone(&audio),
+        // No shell test may reach serveme.tf either; map tests point the store at a fake.
         Endpoints::default()
             .with_mastercomfig_data("http://127.0.0.1:9")
-            .with_gamebanana("http://127.0.0.1:9/apiv11"),
+            .with_gamebanana("http://127.0.0.1:9/apiv11")
+            .with_serveme("http://127.0.0.1:9/serveme")
+            .with_map_downloads("http://127.0.0.1:9/fastdl/maps"),
         false,
     )
     .unwrap()

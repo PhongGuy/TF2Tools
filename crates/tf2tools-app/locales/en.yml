@@ -142,6 +142,7 @@ demo_viewer:
   open: "Open demo"
   empty: "Open a TF2 demo to see its map in 3D."
   loading: "Loading map..."
+  downloading: "Downloading %{map} from serveme.tf..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} players at %{time}"
   players_note: "Players couldn't be read from this demo."

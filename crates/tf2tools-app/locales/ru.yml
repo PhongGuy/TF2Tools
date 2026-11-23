@@ -140,6 +140,7 @@ demo_viewer:
   open: "Открыть демо"
   empty: "Откройте демо TF2, чтобы увидеть его карту в 3D."
   loading: "Загрузка карты..."
+  downloading: "Загрузка %{map} с serveme.tf..."
   caption: "%{map}"
   caption_players: "%{map}, игроков: %{count}, момент %{time}"
   players_note: "Не удалось прочитать игроков из этого демо."

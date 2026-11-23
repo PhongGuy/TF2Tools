@@ -164,6 +164,7 @@ demo_viewer:
   open: "打开录像"
   empty: "打开 TF2 录像，即可在 3D 中查看其地图。"
   loading: "正在加载地图…"
+  downloading: "正在从 serveme.tf 下载 %{map}…"
   caption: "%{map}"
   caption_players: "%{map}，%{time} 时的 %{count} 名玩家"
   players_note: "无法从此录像中读取玩家。"

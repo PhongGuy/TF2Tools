@@ -166,6 +166,7 @@ demo_viewer:
   open: "Abrir demo"
   empty: "Abra uma demo do TF2 para ver o mapa dela em 3D."
   loading: "Carregando mapa..."
+  downloading: "Baixando %{map} do serveme.tf..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} jogadores em %{time}"
   players_note: "Não foi possível ler os jogadores desta demo."
