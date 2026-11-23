@@ -257,6 +257,8 @@ struct X11PointerLock {
     centre: (f32, f32),
     /// The same centre in device pixels, as `WarpPointer` takes it.
     centre_device: (i16, i16),
+    /// The window's top-left corner on the root window, in device pixels.
+    origin_device: (i16, i16),
 }
 
 #[derive(Clone)]
@@ -1464,14 +1466,19 @@ impl X11Client {
                 let modifiers = modifiers_from_xinput_info(event.mods);
                 state.modifiers = modifiers;
                 let mut moved = event.valuator_mask[0] & 3 != 0;
-                let x_window = window.x_window;
+                let scale_factor = state.scale_factor;
                 match state.pointer_lock.as_mut() {
-                    // Every motion feeds the tracker, so the warp's echo is consumed even without
-                    // x/y valuators; only real deltas move the virtual pointer.
-                    Some(lock) if lock.window == x_window => {
-                        let (dx, dy) = lock
-                            .tracker
-                            .motion((position.x.as_f32(), position.y.as_f32()));
+                    // Root coordinates place motion over any window in the lock window's frame, and
+                    // every motion feeds the tracker so the warp's echo is consumed even without x/y
+                    // valuators; only real deltas move the virtual pointer.
+                    Some(lock) => {
+                        let at = (
+                            (event.root_x as f32 / u16::MAX as f32 - lock.origin_device.0 as f32)
+                                / scale_factor,
+                            (event.root_y as f32 / u16::MAX as f32 - lock.origin_device.1 as f32)
+                                / scale_factor,
+                        );
+                        let (dx, dy) = lock.tracker.motion(at);
                         moved = dx != 0.0 || dy != 0.0;
                         let (x, y) = if moved {
                             lock.position.apply(dx, dy)
@@ -1479,19 +1486,28 @@ impl X11Client {
                             lock.position.position()
                         };
                         position = point(px(x), px(y));
-                        if lock.tracker.should_warp(lock.centre) {
-                            let (window, (cx, cy)) = (lock.window, lock.centre_device);
-                            state
-                                .xcb_connection
-                                .warp_pointer(x11rb::NONE, window, 0, 0, 0, 0, cx, cy)
-                                .map_err(handle_connection_error)
-                                .context("X11: failed to warp the locked pointer to the centre")
-                                .log_err();
-                            state.xcb_connection.flush().log_err();
+                        let warp = lock.tracker.should_warp(lock.centre);
+                        let (lock_window, event_window) = (lock.window, window.x_window);
+                        if warp {
+                            state.warp_to_lock_centre();
+                        }
+                        // Motion over another window is reported to the lock window instead.
+                        if lock_window != event_window {
+                            let lock_window =
+                                state.windows.get(&lock_window).map(|w| w.window.clone());
+                            drop(state);
+                            if moved && let Some(lock_window) = lock_window {
+                                lock_window.handle_input(PlatformInput::MouseMove(
+                                    gpui::MouseMoveEvent {
+                                        position,
+                                        pressed_button,
+                                        modifiers,
+                                    },
+                                ));
+                            }
+                            return Some(());
                         }
                     }
-                    // Positions over another window are not in the lock's coordinates.
-                    Some(_) => moved = false,
                     None => state.mouse_location = Some(position),
                 }
                 drop(state);
@@ -1529,8 +1545,11 @@ impl X11Client {
                 state.restore_cursor_after_hide();
             }
             Event::XinputLeave(event) if event.mode == xinput::NotifyMode::NORMAL => {
-                end_pointer_lock(&self.0);
                 let mut state = self.0.borrow_mut();
+                // A flick can cross the edge between warps; the locked pointer is still logically inside.
+                if state.pointer_lock.is_some() {
+                    return Some(());
+                }
 
                 // Set last scroll values to `None` so that a large delta isn't created if scrolling is done outside the window (the valuator is global)
                 reset_all_pointer_device_scroll_positions(&mut state.pointer_device_states);
@@ -2313,6 +2332,15 @@ impl X11ClientState {
         .log_err() else {
             return PointerLockState::Unsupported;
         };
+        let root = self.xcb_connection.setup().roots[self.x_root_index].root;
+        let Some(origin) = get_reply(
+            || "X11: failed to place the window for a pointer lock",
+            self.xcb_connection
+                .translate_coordinates(window, root, 0, 0),
+        )
+        .log_err() else {
+            return PointerLockState::Unsupported;
+        };
         // Owner events keep XI2 motion and buttons flowing through the window's usual handlers.
         let mask = [u32::from(
             xinput::XIEventMask::MOTION
@@ -2343,16 +2371,38 @@ impl X11ClientState {
             centre_device.1 as f32 / self.scale_factor,
         );
         let at = (start.x.as_f32(), start.y.as_f32());
+        let mut tracker = WarpTracker::new(at);
+        // Centring at once gives the first flick half the window of room; the tracker records the
+        // warp as in flight so its echo is filtered like any later one.
+        let warp = tracker.should_warp(centre);
         self.pointer_lock = Some(X11PointerLock {
             window,
             device,
             start,
             position: VirtualPointer::new(at),
-            tracker: WarpTracker::new(at),
+            tracker,
             centre,
             centre_device,
+            origin_device: (origin.dst_x, origin.dst_y),
         });
+        if warp {
+            self.warp_to_lock_centre();
+        }
         PointerLockState::Locked
+    }
+
+    /// Sends the locked pointer back to its window's centre, without waiting for a reply.
+    fn warp_to_lock_centre(&self) {
+        let Some(lock) = &self.pointer_lock else {
+            return;
+        };
+        let (cx, cy) = lock.centre_device;
+        self.xcb_connection
+            .warp_pointer(x11rb::NONE, lock.window, 0, 0, 0, 0, cx, cy)
+            .map_err(handle_connection_error)
+            .context("X11: failed to warp the locked pointer to the centre")
+            .log_err();
+        self.xcb_connection.flush().log_err();
     }
 
     /// The master pointer that drives `window`. The client pointer is unset until this client makes
