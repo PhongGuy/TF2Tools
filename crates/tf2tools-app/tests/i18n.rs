@@ -16,6 +16,9 @@ mod apply;
 #[path = "i18n/de.rs"]
 mod de;
 
+#[path = "i18n/demo_viewer.rs"]
+mod demo_viewer;
+
 #[path = "i18n/es.rs"]
 mod es;
 

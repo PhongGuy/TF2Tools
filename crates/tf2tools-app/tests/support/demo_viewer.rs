@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyWindowHandle, Context, Entity, RenderImage, TestAppContext, Window, div};
+use gpui_kit::{
+    AnyWindowHandle, Bounds, Context, Entity, Pixels, RenderImage, TestAppContext, Window, div, px,
+};
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
@@ -257,4 +259,13 @@ pub fn demo_file(env: &super::Env, name: &str, bytes: &[u8]) -> PathBuf {
     let path = env.tmp.path().join(name);
     std::fs::write(&path, bytes).unwrap();
     path
+}
+
+/// Whether `inner` lies wholly inside `outer`, give or take half a pixel of rounding.
+pub fn inside(inner: Bounds<Pixels>, outer: Bounds<Pixels>) -> bool {
+    let slack = px(0.5);
+    inner.left() >= outer.left() - slack
+        && inner.top() >= outer.top() - slack
+        && inner.right() <= outer.right() + slack
+        && inner.bottom() <= outer.bottom() + slack
 }

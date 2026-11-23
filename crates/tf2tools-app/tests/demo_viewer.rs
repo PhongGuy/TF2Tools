@@ -21,7 +21,7 @@ use tf2tools_core::{DemoSnapshot, DemoSnapshotError, SnapshotPlayer, Team, Tf2In
 use crate::support;
 use crate::support::demo_view_fixtures::demo_header;
 use crate::support::demo_viewer::{
-    StubAnswer, counting_snapshots, demo_file, demo_viewer_shell, demo_viewer_shell_with,
+    StubAnswer, counting_snapshots, demo_file, demo_viewer_shell, demo_viewer_shell_with, inside,
     install_map,
 };
 
@@ -444,15 +444,6 @@ fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
     assert_eq!(asked.load(Ordering::SeqCst), 0);
 }
 
-// Whether `inner` lies wholly inside `outer`, give or take half a pixel of rounding.
-fn inside(inner: Bounds<Pixels>, outer: Bounds<Pixels>) -> bool {
-    let slack = px(0.5);
-    inner.left() >= outer.left() - slack
-        && inner.top() >= outer.top() - slack
-        && inner.right() <= outer.right() + slack
-        && inner.bottom() <= outer.bottom() + slack
-}
-
 // Asserts the bar sits at the page's bottom centre: centred across it within a pixel, and its
 // foot in the page's lower part without leaving it.
 fn assert_bar_at_bottom_centre(page: Bounds<Pixels>, bar: Bounds<Pixels>) {
@@ -671,6 +662,51 @@ fn minimising_hides_the_controls_and_expanding_brings_them_back(cx: &mut TestApp
     );
 }
 
+#[gpui_kit::test]
+fn minimising_a_loaded_bar_hides_its_caption_and_hint_until_expanded(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    let words = [
+        ids::DEMO_VIEWER_CAPTION,
+        ids::DEMO_VIEWER_PLAYERS_NOTE,
+        ids::DEMO_VIEWER_HINT,
+    ];
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
+    for id in words {
+        assert!(!support::present(cx, w.s.win, id), "{id} shows minimised");
+    }
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
+    for id in words {
+        assert!(support::present(cx, w.s.win, id), "{id} is gone expanded");
+    }
+}
+
+#[gpui_kit::test]
+fn a_press_on_the_grip_that_never_moves_saves_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
+    let press = MouseDownEvent {
+        button: MouseButton::Left,
+        position: grip,
+        modifiers: Modifiers::default(),
+        click_count: 1,
+        first_mouse: false,
+    };
+    send(cx, s.win, press);
+    release(cx, s.win, grip);
+    assert_eq!(saved_bar(&s), None, "a still press saved the place");
+    assert_eq!(bounds(cx, s.win, ids::DEMO_VIEWER_BAR), before);
+}
+
 fn yaw(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
     cx.update(|cx| {
         let page = s
@@ -714,6 +750,13 @@ fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppConte
     support::click_nav(cx, s.win, Page::DemoViewer);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     drag(cx, s.win, grip, (2000., 2000.));
+    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    assert!(
+        (bar.right() - page.right()).abs() <= px(1.)
+            && (bar.bottom() - page.bottom()).abs() <= px(1.),
+        "the drag left {bar:?} short of {page:?}'s corner"
+    );
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     support::settle(cx, s.win);
     let page = bounds(cx, s.win, ids::page(Page::DemoViewer));

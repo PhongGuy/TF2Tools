@@ -31,7 +31,8 @@ mod bar;
 
 pub use bar::BarPlace;
 
-/// The least room the bar leaves at each side of a page it would otherwise fill.
+/// The bar's frame is the page width less this at each side; a bar dragged to an edge can
+/// still touch it.
 const BAR_MARGIN: Pixels = px(8.);
 
 /// What the page shows under its control bar.
