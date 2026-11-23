@@ -486,9 +486,9 @@ logs_tf:
     kills_min: "Kills/min"
     assists_min: "Assists/min"
     deaths_min: "Tode/min"
-    dmg_min: "Schaden/min"
-    heals_min: "Heilung/min"
-    ubers_10min: "Überl./10 min"
+    dmg_min: "Dmg/min"
+    heals_min: "Heil./min"
+    ubers_10min: "Überl./10min"
   sort:
     descending: "absteigend"
     ascending: "aufsteigend"

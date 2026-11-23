@@ -484,10 +484,10 @@ logs_tf:
   stat:
     played: "Jogado"
     logs: "Logs"
-    kills_min: "Abates/min"
+    kills_min: "Abat./min"
     assists_min: "Assist./min"
     deaths_min: "Mortes/min"
-    dmg_min: "Dano/min"
+    dmg_min: "Dano/m"
     heals_min: "Cura/min"
     ubers_10min: "Übers/10\u00A0min"
   sort:

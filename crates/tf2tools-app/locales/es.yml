@@ -483,11 +483,11 @@ logs_tf:
   stat:
     played: "Jugado"
     logs: "Logs"
-    kills_min: "Víctimas/min"
+    kills_min: "Víct./min"
     assists_min: "Asist./min"
-    deaths_min: "Muertes/min"
-    dmg_min: "Daño/min"
-    heals_min: "Curación/min"
+    deaths_min: "Muert./min"
+    dmg_min: "Daño/m"
+    heals_min: "Cura/min"
     ubers_10min: "Übers/10 min"
   sort:
     descending: "de mayor a menor"
