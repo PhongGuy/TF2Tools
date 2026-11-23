@@ -2878,6 +2878,8 @@ messages:
     load_panel_place: "No se pudo cargar la posición del panel lateral"
     load_default_hud: "No se pudo cargar el HUD predeterminado"
     save_panel_place: "No se pudo guardar la posición del panel lateral"
+    load_bar_place: "No se pudo cargar la posición de los controles del visor de demos"
+    save_bar_place: "No se pudo guardar la posición de los controles del visor de demos"
     change_hud_options: "No se pudieron cambiar las opciones del HUD"
     save_hud: "No se pudo guardar el HUD"
     list_presets: "No se pudieron leer tus preajustes"

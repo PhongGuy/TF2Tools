@@ -4,8 +4,13 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::{Bounds, Pixels, TestAppContext, px};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{
+    AnyWindowHandle, AppContext as _, Bounds, ElementId, InputEvent, Modifiers, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, TestAppContext, point, px, size,
+};
 use tf2tools_app::ids;
+use tf2tools_app::pages::demo_viewer::BarPlace;
 use tf2tools_app::picker::{PickKind, ScriptedPicker};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::nav_icon;
@@ -525,4 +530,212 @@ fn the_empty_page_keeps_the_bar_and_centres_its_status(cx: &mut TestAppContext) 
         (sx - px_).abs() <= px(1.) && (sy - py).abs() <= px(1.),
         "status {status:?} is not centred in {page:?}"
     );
+}
+
+// The bar place the database holds, read back through its setting text.
+fn saved_bar(s: &support::ShellWindow) -> Option<BarPlace> {
+    let settings = s.services.db.settings().unwrap();
+    settings.demo_viewer_bar().and_then(BarPlace::from_setting)
+}
+
+fn send(cx: &mut TestAppContext, win: AnyWindowHandle, event: impl InputEvent) {
+    cx.update_window(win, |_, w, cx| {
+        let _ = w.dispatch_event(event.to_platform_input(), cx);
+        w.render_frame(cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+}
+
+// Presses at `from` and moves by `by` in four steps with the left button held; `release`
+// lets go there.
+fn drag(cx: &mut TestAppContext, win: AnyWindowHandle, from: Point<Pixels>, by: (f32, f32)) {
+    hold_drag(cx, win, from, by);
+    release(cx, win, from + point(px(by.0), px(by.1)));
+}
+
+fn hold_drag(cx: &mut TestAppContext, win: AnyWindowHandle, from: Point<Pixels>, by: (f32, f32)) {
+    let modifiers = Modifiers::default();
+    send(
+        cx,
+        win,
+        MouseMoveEvent {
+            position: from,
+            pressed_button: None,
+            modifiers,
+        },
+    );
+    send(
+        cx,
+        win,
+        MouseDownEvent {
+            button: MouseButton::Left,
+            position: from,
+            modifiers,
+            click_count: 1,
+            first_mouse: false,
+        },
+    );
+    for step in 1..=4 {
+        let t = step as f32 / 4.;
+        let position = from + point(px(by.0 * t), px(by.1 * t));
+        send(
+            cx,
+            win,
+            MouseMoveEvent {
+                position,
+                pressed_button: Some(MouseButton::Left),
+                modifiers,
+            },
+        );
+    }
+}
+
+fn release(cx: &mut TestAppContext, win: AnyWindowHandle, at: Point<Pixels>) {
+    let up = MouseUpEvent {
+        button: MouseButton::Left,
+        position: at,
+        modifiers: Modifiers::default(),
+        click_count: 1,
+    };
+    send(cx, win, up);
+}
+
+fn bounds(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    id: impl Into<ElementId>,
+) -> Bounds<Pixels> {
+    let id = id.into();
+    support::bounds_of(cx, win, id.clone()).unwrap_or_else(|| panic!("no {id}"))
+}
+
+// The bar's centre as fractions of the page, as its setting stores it.
+fn fractions(page: Bounds<Pixels>, bar: Bounds<Pixels>) -> (f32, f32) {
+    let c = bar.center();
+    (
+        (c.x - page.left()) / page.size.width,
+        (c.y - page.top()) / page.size.height,
+    )
+}
+
+#[gpui_kit::test]
+fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
+    hold_drag(cx, s.win, grip, (-200., -300.));
+    assert_eq!(
+        saved_bar(&s),
+        None,
+        "a move saved the place before the release"
+    );
+    release(cx, s.win, grip + point(px(-200.), px(-300.)));
+    let after = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    let moved = after.origin - before.origin;
+    assert!(
+        (moved.x - px(-200.)).abs() <= px(1.) && (moved.y - px(-300.)).abs() <= px(1.),
+        "{before:?} -> {after:?}"
+    );
+    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let (x, y) = fractions(page, after);
+    let saved = saved_bar(&s).expect("a saved place");
+    assert!(
+        (saved.x - x).abs() < 0.002 && (saved.y - y).abs() < 0.002,
+        "{saved:?} vs {x} {y}"
+    );
+    assert!(!saved.collapsed);
+}
+
+#[gpui_kit::test]
+fn minimising_hides_the_controls_and_expanding_brings_them_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_id(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
+    assert_eq!(saved_bar(&s).map(|p| p.collapsed), Some(true));
+    assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
+    assert!(support::present(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE).as_deref(),
+        Some("Show controls")
+    );
+    support::click_id(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
+    assert_eq!(saved_bar(&s).map(|p| p.collapsed), Some(false));
+    assert!(support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE).as_deref(),
+        Some("Minimise controls")
+    );
+}
+
+fn yaw(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
+    cx.update(|cx| {
+        let page = s
+            .shell
+            .read(cx)
+            .demo_viewer_page()
+            .expect("the Demo Viewer");
+        let viewport = page.read(cx).viewport().expect("a viewport");
+        viewport.read(cx).camera().yaw()
+    })
+}
+
+#[gpui_kit::test]
+fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    let start = yaw(cx, &w.s);
+    let caption = bounds(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).center();
+    drag(cx, w.s.win, caption, (100., -200.));
+    assert_eq!(
+        yaw(cx, &w.s),
+        start,
+        "a drag from the bar turned the camera"
+    );
+    // The same drag on the open map does turn it, so the check above can fail.
+    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    drag(cx, w.s.win, page.center(), (100., 0.));
+    assert_ne!(yaw(cx, &w.s), start);
+}
+
+#[gpui_kit::test]
+fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
+    drag(cx, s.win, grip, (2000., 2000.));
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    assert!(inside(bar, page), "{bar:?} leaves {page:?}");
+}
+
+#[gpui_kit::test]
+fn a_saved_place_is_where_the_bar_opens(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    s.services
+        .db
+        .set_demo_viewer_bar("0.250 0.300 collapsed")
+        .unwrap();
+    support::click_nav(cx, s.win, Page::DemoViewer);
+    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
+    let (x, y) = fractions(page, bar);
+    assert!(
+        (x - 0.25).abs() < 0.002 && (y - 0.3).abs() < 0.002,
+        "{x} {y}"
+    );
+    assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
 }

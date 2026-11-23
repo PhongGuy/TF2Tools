@@ -34,6 +34,13 @@ fn a_collapsed_place_round_trips_through_its_setting() {
 }
 
 #[test]
+fn the_page_edges_are_valid_places() {
+    let place = BarPlace::from_setting("0 1 open").unwrap();
+    assert_eq!((place.x, place.y, place.collapsed), (0.0, 1.0, false));
+    assert_eq!(BarPlace::from_setting(&place.to_setting()), Some(place));
+}
+
+#[test]
 fn a_malformed_setting_is_rejected() {
     for text in [
         "",
@@ -43,6 +50,7 @@ fn a_malformed_setting_is_rejected() {
         "inf 0.5 open",
         "0.5 0.5 shut",
         "1.5 0.5 open",
+        "-0.1 0.5 open",
         "x 0.5 open",
     ] {
         assert_eq!(BarPlace::from_setting(text), None, "{text:?}");
@@ -89,4 +97,25 @@ fn the_default_place_is_bottom_centre_inside_the_page() {
     assert_eq!(origin.x, px(300.));
     assert!(origin.y > px(800. * 0.8), "{origin:?}");
     assert!(origin.y + bar.height <= px(800.), "{origin:?}");
+}
+
+#[test]
+fn a_drag_moves_the_centre_by_the_pointer_as_fractions_of_the_area() {
+    let moved = BarPlace::DEFAULT.dragged(at(500., 700.), at(-100., -300.), area(1000., 800.));
+    assert_eq!((moved.x, moved.y), (0.4, 0.5));
+    assert!(!moved.collapsed);
+}
+
+#[test]
+fn a_drag_past_the_edge_stops_at_the_edge() {
+    let moved = BarPlace::DEFAULT.dragged(at(500., 700.), at(-900., 900.), area(1000., 800.));
+    assert_eq!((moved.x, moved.y), (0.0, 1.0));
+}
+
+#[test]
+fn a_drag_over_a_zero_area_leaves_the_place() {
+    for page in [area(0., 0.), area(0., 800.), area(1000., 0.)] {
+        let moved = BarPlace::DEFAULT.dragged(at(10., 10.), at(5., 5.), page);
+        assert_eq!(moved, BarPlace::DEFAULT, "{page:?}");
+    }
 }

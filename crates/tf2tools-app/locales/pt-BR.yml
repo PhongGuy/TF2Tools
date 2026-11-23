@@ -2879,6 +2879,8 @@ messages:
     load_panel_place: "Não foi possível carregar a posição do painel lateral"
     load_default_hud: "Não foi possível carregar o HUD padrão"
     save_panel_place: "Não foi possível salvar a posição do painel lateral"
+    load_bar_place: "Não foi possível carregar a posição dos controles do visualizador de demos"
+    save_bar_place: "Não foi possível salvar a posição dos controles do visualizador de demos"
     change_hud_options: "Não foi possível alterar as opções do HUD"
     save_hud: "Não foi possível salvar o HUD"
     list_presets: "Não foi possível ler suas predefinições"

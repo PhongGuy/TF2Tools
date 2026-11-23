@@ -57,4 +57,21 @@ impl BarPlace {
             axis(self.y, area.height, bar.height),
         )
     }
+
+    /// This place with its centre moved from `from` by `by` pixels, as fractions of `area`
+    /// kept inside 0..=1; unchanged over an area with no width or height.
+    pub fn dragged(self, from: Point<Pixels>, by: Point<Pixels>, area: Size<Pixels>) -> BarPlace {
+        let fraction = |at: Pixels, length: Pixels| f32::from(at) / f32::from(length);
+        let centre = from + by;
+        let x = fraction(centre.x, area.width);
+        let y = fraction(centre.y, area.height);
+        if !(area.width > px(0.) && area.height > px(0.) && x.is_finite() && y.is_finite()) {
+            return self;
+        }
+        BarPlace {
+            x: x.clamp(0., 1.),
+            y: y.clamp(0., 1.),
+            ..self
+        }
+    }
 }

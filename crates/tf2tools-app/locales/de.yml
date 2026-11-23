@@ -2878,6 +2878,8 @@ messages:
     load_panel_place: "Die Position des Seitenpanels konnte nicht geladen werden"
     load_default_hud: "Das Standard-HUD konnte nicht geladen werden"
     save_panel_place: "Die Position des Seitenpanels konnte nicht gespeichert werden"
+    load_bar_place: "Die Position der Demo-Viewer-Steuerung konnte nicht geladen werden"
+    save_bar_place: "Die Position der Demo-Viewer-Steuerung konnte nicht gespeichert werden"
     change_hud_options: "Ändern der HUD-Optionen fehlgeschlagen"
     save_hud: "Speichern des HUDs fehlgeschlagen"
     list_presets: "Deine Voreinstellungen konnten nicht gelesen werden"

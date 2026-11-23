@@ -2877,6 +2877,8 @@ messages:
     load_panel_place: "无法加载侧面板的位置"
     load_default_hud: "无法加载默认 HUD"
     save_panel_place: "无法保存侧面板的位置"
+    load_bar_place: "无法加载录像查看器控制栏的位置"
+    save_bar_place: "无法保存录像查看器控制栏的位置"
     change_hud_options: "更改 HUD 选项失败"
     save_hud: "保存 HUD 失败"
     list_presets: "无法读取预设"
