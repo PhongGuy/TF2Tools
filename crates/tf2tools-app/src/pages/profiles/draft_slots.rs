@@ -762,7 +762,7 @@ impl ProfileDraftEditor {
     // category's heading and rows; without a catalogue the card holds a line saying where to
     // get one.
     fn graphics_body(&self, cx: &mut Context<Self>) -> AnyElement {
-        let narrow = self.narrow;
+        let narrow = self.rows_narrow;
         let sections = (self.graphics_sections.as_ref()).map(|(_, s)| Rc::clone(s));
         let theme = cx.theme();
         let (muted, border, background) = (theme.muted_foreground, theme.border, theme.background);

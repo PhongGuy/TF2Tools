@@ -23,8 +23,7 @@ use gpui_kit::component::v_flex;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, InteractiveElement as _,
     IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window,
-    canvas, px,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, px,
 };
 use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
@@ -40,6 +39,7 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::shell::{CONTENT_PADDING, SIDEBAR_WIDTH};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::width_watch::width_watch;
 use editor::ValueSelect;
 use jobs::{ModulesFailure, save_failed};
 use model::{
@@ -51,6 +51,7 @@ use settings::{RAIL_GUTTER, RAIL_WIDTH};
 use view::{Filter, SectionView};
 
 pub use editor::{ChoicesEdit, GraphicsChoicesEditor};
+pub(crate) use rows::WIDE_ROWS_MIN_WIDTH;
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
@@ -134,8 +135,8 @@ pub struct GraphicsPage {
 }
 
 /// The narrowest the settings list gets beside the rail; below it the rail becomes a chip row
-/// above the list.
-const LIST_MIN_WIDTH: f32 = 740.;
+/// above the list. It is the width wide rows need, the same in the Profiles editor.
+const LIST_MIN_WIDTH: f32 = WIDE_ROWS_MIN_WIDTH;
 
 /// The mock's side padding, narrower than other pages' so the settings list matches its width.
 const SIDE_PADDING: f32 = 24.;
@@ -908,7 +909,7 @@ impl Render for GraphicsPage {
         self.toolbar_item = toolbar;
         // The column holds both rail and list, so its width never changes with the layout. It
         // goes last so the rail's child indices stay put.
-        let watch = column_watch(&self.column_width);
+        let watch = width_watch(&self.column_width);
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -924,25 +925,6 @@ impl Render for GraphicsPage {
     }
 }
 
-/// Records the scroll column's width, padding included, in `cell`; a change asks for another
-/// frame. It has no height, so it never adds to the column's scroll extent.
-fn column_watch(cell: &Rc<Cell<Option<Pixels>>>) -> impl IntoElement {
-    let measured = Rc::clone(cell);
-    canvas(
-        move |bounds, window, _| {
-            if measured.get() != Some(bounds.size.width) {
-                measured.set(Some(bounds.size.width));
-                window.request_animation_frame();
-            }
-        },
-        |_, _, _, _| {},
-    )
-    .absolute()
-    .left_0()
-    .w_full()
-    .h_0()
-}
-
 /// Whether the rail sits above the list as chips, from the scroll column's measured width. Before
 /// the first measurement it estimates the column from the window with the full sidebar, so the
 /// first frame matches only then; with a collapsed sidebar it corrects itself one frame later.
@@ -954,9 +936,6 @@ fn list_is_narrow(column: Option<Pixels>, viewport: Pixels) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui_kit::component::h_flex;
-    use gpui_kit::test::TestWindowExt as _;
-    use gpui_kit::{TestAppContext, WindowOptions, div};
 
     #[test]
     fn the_window_estimate_switches_where_the_full_sidebar_column_does() {
@@ -965,54 +944,5 @@ mod tests {
         assert!(list_is_narrow(None, px(1251.)));
         assert!(!list_is_narrow(Some(px(996.)), px(1252.)));
         assert!(list_is_narrow(Some(px(995.)), px(1252.)));
-    }
-
-    // A padded column with the watch as its last child; counts its renders.
-    struct Column {
-        width: Rc<Cell<Option<Pixels>>>,
-        renders: Rc<Cell<usize>>,
-    }
-
-    impl Render for Column {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            self.renders.set(self.renders.get() + 1);
-            h_flex().size_full().child(
-                v_flex()
-                    .w(px(500.))
-                    .py(CONTENT_PADDING)
-                    .px(px(SIDE_PADDING))
-                    .child(div().h(px(40.)))
-                    .child(column_watch(&self.width)),
-            )
-        }
-    }
-
-    #[gpui_kit::test]
-    fn the_column_watch_records_the_padded_width_then_asks_for_a_frame(cx: &mut TestAppContext) {
-        cx.update(crate::init);
-        let width = Rc::new(Cell::new(None));
-        let renders = Rc::new(Cell::new(0));
-        let (w, r) = (Rc::clone(&width), Rc::clone(&renders));
-        let win = cx
-            .update(|cx| {
-                gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
-                    cx.new(|_| Column {
-                        width: w,
-                        renders: r,
-                    })
-                })
-            })
-            .unwrap()
-            .0;
-        cx.run_until_parked();
-        cx.update_window(win, |_, w, cx| w.render_frame(cx))
-            .unwrap();
-        assert_eq!(width.get(), Some(px(500.)));
-        // The first measurement must bring one more render, since a draw's own notify is dropped.
-        let before = renders.get();
-        cx.update_window(win, |_, w, cx| w.simulate_next_frame(cx))
-            .unwrap();
-        cx.run_until_parked();
-        assert!(renders.get() > before, "no frame was asked for");
     }
 }

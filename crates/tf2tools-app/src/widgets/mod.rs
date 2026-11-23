@@ -15,6 +15,7 @@ pub mod sync_banner;
 pub mod sync_ring;
 pub mod tip;
 pub mod weapon_assigner;
+pub mod width_watch;
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::Button;
