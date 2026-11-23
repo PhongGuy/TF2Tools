@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use tf2tools_core::{ModuleCatalog, REASON_KEYS, SettingPictures};
+use tf2tools_core::{ComfigModule, ModuleCatalog, REASON_KEYS, SettingPictures};
 
 const MODULES: &[u8] = include_bytes!("fixtures/mastercomfig/modules-9.100.1.json");
 const PRESETS: &[u8] = include_bytes!("fixtures/mastercomfig/preset_modules.json");
@@ -12,28 +12,36 @@ fn pictures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/setting-pictures")
 }
 
-/// mastercomfig's graphics modules and their values, in its order.
-fn graphics() -> Vec<(String, Vec<String>)> {
+/// Pictured modules from outside the graphics category, as (category, module), in manifest order.
+const EXTRA_PICTURED: &[(&str, &str)] = &[("hud", "hud_player_model")];
+
+/// mastercomfig's graphics modules in its order, then each extra pictured module, with their values.
+fn pictured() -> Vec<(String, Vec<String>)> {
     let catalog = ModuleCatalog::parse("9.100.1", MODULES, PRESETS).unwrap();
-    let category = catalog
-        .categories()
-        .iter()
-        .find(|c| c.key() == "graphics")
-        .unwrap();
-    category
-        .modules()
-        .iter()
-        .map(|m| {
-            (
-                m.name().to_owned(),
-                m.values().iter().map(|v| v.value().to_owned()).collect(),
-            )
-        })
-        .collect()
+    let category = |key: &str| {
+        catalog
+            .categories()
+            .iter()
+            .find(|c| c.key() == key)
+            .unwrap_or_else(|| panic!("no {key} category"))
+    };
+    let named = |m: &ComfigModule| {
+        (
+            m.name().to_owned(),
+            m.values().iter().map(|v| v.value().to_owned()).collect(),
+        )
+    };
+    let mut modules: Vec<(String, Vec<String>)> =
+        category("graphics").modules().iter().map(named).collect();
+    for (key, name) in EXTRA_PICTURED {
+        let module = category(key).modules().iter().find(|m| m.name() == *name);
+        modules.push(named(module.unwrap_or_else(|| panic!("no {name} in {key}"))));
+    }
+    modules
 }
 
 #[test]
-fn the_manifest_lists_every_graphics_module_and_value_in_order() {
+fn the_manifest_lists_every_graphics_module_then_the_extras_in_order() {
     let pics = SettingPictures::open(&pictures_dir()).unwrap();
     let ours: Vec<(String, Vec<String>)> = pics
         .manifest()
@@ -46,7 +54,7 @@ fn the_manifest_lists_every_graphics_module_and_value_in_order() {
             )
         })
         .collect();
-    assert_eq!(ours, graphics());
+    assert_eq!(ours, pictured());
     assert_eq!(pics.manifest().mastercomfig, "9.100.1");
     assert_eq!(pics.manifest().size, [960, 540]);
 }
@@ -54,7 +62,7 @@ fn the_manifest_lists_every_graphics_module_and_value_in_order() {
 #[test]
 fn the_base_sets_every_visual_module_to_one_of_its_values() {
     let pics = SettingPictures::open(&pictures_dir()).unwrap();
-    let modules: BTreeMap<String, Vec<String>> = graphics().into_iter().collect();
+    let modules: BTreeMap<String, Vec<String>> = pictured().into_iter().collect();
     for setting in &pics.manifest().settings {
         if setting.no_picture.is_some() {
             assert!(
