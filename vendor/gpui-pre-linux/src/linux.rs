@@ -3,6 +3,7 @@ mod display_connection;
 mod headless;
 mod keyboard;
 mod platform;
+pub mod pointer_lock;
 #[cfg(any(feature = "wayland", feature = "x11"))]
 mod power;
 mod system_notifications;

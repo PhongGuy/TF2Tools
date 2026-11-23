@@ -23,6 +23,9 @@ use crate::widgets::labelled;
 
 /// The left bar and tint that mark a row the player changed from the preset.
 pub(super) const CHANGED: u32 = 0x1447e6;
+/// The narrowest list or card that keeps rows wide, controls beside the text; any narrower and
+/// the controls drop under it.
+pub(crate) const WIDE_ROWS_MIN_WIDTH: f32 = 740.;
 /// The narrowest a wide row's text column gets before its controls wrap under it.
 const TEXT_MIN_WIDTH: f32 = 240.;
 

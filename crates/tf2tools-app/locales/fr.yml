@@ -491,7 +491,7 @@ logs_tf:
     kills_min: "Vict./min"
     assists_min: "Coop./min"
     deaths_min: "Morts/min"
-    dmg_min: "Dégâts/min"
+    dmg_min: "Dég/min"
     heals_min: "Soins/min"
     ubers_10min: "Übers/10 min"
   sort:
@@ -3102,6 +3102,7 @@ graphics:
     zoom: "Zoom"
     full: "Image entière"
     wipe: "Glisser entre l'image du préréglage et la vôtre"
+    wipe_profile: "Glisser entre l'image du préréglage et celle de ce profil"
     caption: "Cliquez sur une image pour utiliser ce réglage."
     no_picture:
       performance_only: "Pas d'image\u00A0: ce réglage change les performances, pas l'apparence du jeu."

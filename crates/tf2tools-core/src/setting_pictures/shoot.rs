@@ -48,10 +48,15 @@ pub fn step_cfg(n: u32, commands: &[String]) -> String {
     cfg
 }
 
-/// Whether the console log holds step `n`'s marker as a whole line, so `_12` never matches `_1`.
+/// Whether the console log holds step `n`'s marker as a whole word at the start of a line, so
+/// `_12` never matches `_1`; the console sometimes writes its next message on the marker's line.
 pub fn marker_seen(log: &str, n: u32) -> bool {
     let marker = format!("TFS_DONE_{n}");
-    log.lines().any(|line| line.trim() == marker)
+    log.lines().any(|line| {
+        line.trim_start()
+            .strip_prefix(&marker)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
+    })
 }
 
 /// Whether the console log shows the server dropping the player, such as for too many commands.

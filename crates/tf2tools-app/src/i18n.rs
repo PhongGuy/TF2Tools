@@ -991,6 +991,7 @@ mod tests {
         "logs_tf.detail.team_short",
         "logs_tf.event.drop",
         "logs_tf.stat.assists_min",
+        "logs_tf.stat.dmg_min",
         "logs_tf.stat.kills_min",
         "logs_tf.stat.logs",
         "logs_tf.weapons.kills",

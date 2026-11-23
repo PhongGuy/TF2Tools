@@ -12,6 +12,7 @@ mod settings;
 mod status;
 pub mod view;
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -33,12 +34,12 @@ use crate::pages::common::no_tf2_warning;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::remote_images::ImageKey;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
-use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
+use crate::shell::{CONTENT_PADDING, SIDEBAR_WIDTH};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::width_watch::width_watch;
 use editor::ValueSelect;
 use jobs::{ModulesFailure, save_failed};
 use model::{
@@ -46,9 +47,11 @@ use model::{
     foreign_modules_cfg, own_modules_cfg_kept, preset_label, status_card,
 };
 use pictures::PictureIndex;
+use settings::{RAIL_GUTTER, RAIL_WIDTH};
 use view::{Filter, SectionView};
 
 pub use editor::{ChoicesEdit, GraphicsChoicesEditor};
+pub(crate) use rows::WIDE_ROWS_MIN_WIDTH;
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
@@ -112,6 +115,8 @@ pub struct GraphicsPage {
     /// The search toolbar's child index in the scroll column, from the last render.
     toolbar_item: Option<usize>,
     scroll: ScrollHandle,
+    /// The scroll column's width as last painted, padding included; None before the first frame.
+    column_width: Rc<Cell<Option<Pixels>>>,
     /// The bundled setting pictures, once read off the UI thread.
     pictures: Option<Arc<PictureIndex>>,
     /// The editor's image wants, copied after each frame asks for them.
@@ -129,8 +134,9 @@ pub struct GraphicsPage {
     _subscriptions: Vec<Subscription>,
 }
 
-/// Below this page width the category rail becomes a chip row above the settings.
-const NARROW: f32 = 900.;
+/// The narrowest the settings list gets beside the rail; below it the rail becomes a chip row
+/// above the list. It is the width wide rows need, the same in the Profiles editor.
+const LIST_MIN_WIDTH: f32 = WIDE_ROWS_MIN_WIDTH;
 
 /// The mock's side padding, narrower than other pages' so the settings list matches its width.
 const SIDE_PADDING: f32 = 24.;
@@ -191,6 +197,7 @@ impl GraphicsPage {
             section_items: BTreeMap::new(),
             toolbar_item: None,
             scroll: ScrollHandle::new(),
+            column_width: Rc::new(Cell::new(None)),
             pictures: None,
             wanted: Vec::new(),
             open_row: None,
@@ -837,7 +844,7 @@ impl Render for GraphicsPage {
             missing.then(|| no_tf2_warning(ids::GRAPHICS_NO_TF2, tr!("graphics.no_tf2"), cx));
         // Each section must be a direct child of the scroll column, so the rail can scroll
         // to it by index; the children are gathered first to learn those indices.
-        let narrow = window.viewport_size().width - SHELL_CHROME_WIDTH < px(NARROW);
+        let narrow = list_is_narrow(self.column_width.get(), window.viewport_size().width);
         let filter = self.filter(cx);
         let generation = self.editor.update(cx, |e, _| {
             e.follow_language();
@@ -900,6 +907,9 @@ impl Render for GraphicsPage {
         }
         self.section_items = items;
         self.toolbar_item = toolbar;
+        // The column holds both rail and list, so its width never changes with the layout. It
+        // goes last so the rail's child indices stay put.
+        let watch = width_watch(&self.column_width);
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -909,7 +919,30 @@ impl Render for GraphicsPage {
             .py(CONTENT_PADDING)
             .px(px(SIDE_PADDING))
             .gap_6()
-            .children(children);
+            .children(children)
+            .child(watch);
         scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
+    }
+}
+
+/// Whether the rail sits above the list as chips, from the scroll column's measured width. Before
+/// the first measurement it estimates the column from the window with the full sidebar, so the
+/// first frame matches only then; with a collapsed sidebar it corrects itself one frame later.
+fn list_is_narrow(column: Option<Pixels>, viewport: Pixels) -> bool {
+    let column = column.unwrap_or(viewport - SIDEBAR_WIDTH);
+    column - px(2. * SIDE_PADDING) - px(RAIL_WIDTH + RAIL_GUTTER) < px(LIST_MIN_WIDTH)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_window_estimate_switches_where_the_full_sidebar_column_does() {
+        // At 1252 px with the full sidebar the integration tests measure a 996 px column.
+        assert!(!list_is_narrow(None, px(1252.)));
+        assert!(list_is_narrow(None, px(1251.)));
+        assert!(!list_is_narrow(Some(px(996.)), px(1252.)));
+        assert!(list_is_narrow(Some(px(995.)), px(1252.)));
     }
 }

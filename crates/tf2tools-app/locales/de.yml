@@ -489,9 +489,9 @@ logs_tf:
     kills_min: "Kills/min"
     assists_min: "Assists/min"
     deaths_min: "Tode/min"
-    dmg_min: "Schaden/min"
-    heals_min: "Heilung/min"
-    ubers_10min: "Überl./10 min"
+    dmg_min: "Dmg/min"
+    heals_min: "Heil./min"
+    ubers_10min: "Überl./10min"
   sort:
     descending: "absteigend"
     ascending: "aufsteigend"
@@ -3100,6 +3100,7 @@ graphics:
     zoom: "Zoom"
     full: "Ganzes Bild"
     wipe: "Zwischen dem Bild der Voreinstellung und deinem schieben"
+    wipe_profile: "Zwischen dem Bild der Voreinstellung und dem dieses Profils schieben"
     caption: "Klicke auf ein Bild, um diese Einstellung zu verwenden."
     no_picture:
       performance_only: "Kein Bild: Diese Einstellung ändert die Leistung, nicht das Aussehen des Spiels."

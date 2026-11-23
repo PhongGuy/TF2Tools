@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use tf2tools_app::pages::graphics::pictures::{
     ChoicesOwner, Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, no_picture_note,
-    row_pictures,
+    row_pictures, wipe_label,
 };
 use tf2tools_app::pages::graphics::view::row;
 use tf2tools_app::remote_images::local_image_url;
@@ -137,6 +137,37 @@ fn the_preset_s_own_value_shows_one_picture_and_the_strip_tags_it() {
     );
     assert_eq!(lod.strip[0].picture, dir.join("lod/low.webp"));
     assert!(lod.has_zoom);
+}
+
+#[test]
+fn the_player_model_row_wipes_between_its_two_bundled_pictures_with_zoom() {
+    // A HUD setting, outside mastercomfig's graphics category, with real pictures of both values.
+    let dir = bundled();
+    let row = pictures_of(
+        Preset::Medium,
+        &[("hud_player_model", value("off"))],
+        "hud_player_model",
+        false,
+    )
+    .unwrap();
+    assert_eq!(row.thumb, Some(dir.join("hud_player_model/off.webp")));
+    assert_eq!(
+        row.compare,
+        Compare::Wipe {
+            preset: dir.join("hud_player_model/on.webp"),
+            yours: dir.join("hud_player_model/off.webp"),
+            preset_pill: "Medium: On".into(),
+            yours_pill: "Yours: Off".into(),
+        }
+    );
+    let strip: Vec<(&str, bool, bool)> = row
+        .strip
+        .iter()
+        .map(|p| (p.value.as_str(), p.preset, p.chosen))
+        .collect();
+    assert_eq!(strip, [("off", false, true), ("on", true, false)]);
+    assert_eq!(row.strip[1].picture, dir.join("hud_player_model/on.webp"));
+    assert!(row.has_zoom);
 }
 
 #[test]
@@ -344,4 +375,19 @@ fn every_no_picture_reason_has_a_note() {
         )
     );
     assert_eq!(no_picture_note("made-up"), None);
+}
+
+// The wipe slider's label names the other side the way the pill does: the player's own on
+// the Graphics page, the profile's in the Profiles editor.
+#[test]
+fn the_wipe_label_names_whose_side_it_slides_to() {
+    let _lock = tf2tools_app::i18n::test_lock();
+    assert_eq!(
+        wipe_label(ChoicesOwner::Player).as_ref(),
+        "Slide between the preset's picture and yours"
+    );
+    assert_eq!(
+        wipe_label(ChoicesOwner::Profile).as_ref(),
+        "Slide between the preset's picture and this profile's"
+    );
 }

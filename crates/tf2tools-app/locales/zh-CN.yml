@@ -3099,6 +3099,7 @@ graphics:
     zoom: "放大"
     full: "完整图片"
     wipe: "滑动以对比预设的图片和你的图片"
+    wipe_profile: "滑动以对比预设的图片和此配置文件的图片"
     caption: "点击图片即可使用该设置。"
     no_picture:
       performance_only: "无图片：此设置影响性能，而不是游戏外观。"

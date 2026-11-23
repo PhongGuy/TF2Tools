@@ -487,10 +487,10 @@ logs_tf:
   stat:
     played: "Jogado"
     logs: "Logs"
-    kills_min: "Abates/min"
+    kills_min: "Abat./min"
     assists_min: "Assist./min"
     deaths_min: "Mortes/min"
-    dmg_min: "Dano/min"
+    dmg_min: "Dano/m"
     heals_min: "Cura/min"
     ubers_10min: "Übers/10\u00A0min"
   sort:
@@ -3101,6 +3101,7 @@ graphics:
     zoom: "Ampliar"
     full: "Imagem inteira"
     wipe: "Deslize entre a imagem da predefinição e a sua"
+    wipe_profile: "Deslize entre a imagem da predefinição e a deste perfil"
     caption: "Clique em uma imagem para usar essa configuração."
     no_picture:
       performance_only: "Sem imagem: esta configuração muda o desempenho, não a aparência do jogo."

@@ -10,6 +10,7 @@ use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, Team};
 
 pub mod load;
 pub mod math;
+pub mod pointer;
 pub mod renderer;
 pub mod stats;
 pub mod viewport;
