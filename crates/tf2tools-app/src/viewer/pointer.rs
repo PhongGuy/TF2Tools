@@ -149,6 +149,14 @@ impl PointerLock for LinuxLock {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl Drop for LinuxLock {
+    // A viewport dropped mid-drag must not leave the pointer locked.
+    fn drop(&mut self) {
+        self.unlock();
+    }
+}
+
 /// The lock `Services` holds in the real app: the cursor lock on Windows and Linux, the fallback elsewhere.
 pub fn platform_pointer_locks() -> PointerLockFactory {
     #[cfg(windows)]
