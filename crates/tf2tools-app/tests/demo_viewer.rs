@@ -739,3 +739,28 @@ fn a_saved_place_is_where_the_bar_opens(cx: &mut TestAppContext) {
     );
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
 }
+
+#[gpui_kit::test]
+fn a_loaded_bar_fits_the_narrowest_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    // The app's minimum window size.
+    cx.simulate_window_resize(w.s.win, size(px(800.), px(600.)));
+    support::settle(cx, w.s.win);
+    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    for id in [
+        ids::DEMO_VIEWER_BAR,
+        ids::DEMO_VIEWER_HINT,
+        ids::DEMO_VIEWER_OPEN,
+        ids::DEMO_VIEWER_BAR_COLLAPSE,
+    ] {
+        let part = bounds(cx, w.s.win, id);
+        assert!(inside(part, page), "{id} at {part:?} leaves {page:?}");
+    }
+}

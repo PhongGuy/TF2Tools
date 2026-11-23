@@ -31,6 +31,9 @@ mod bar;
 
 pub use bar::BarPlace;
 
+/// The least room the bar leaves at each side of a page it would otherwise fill.
+const BAR_MARGIN: Pixels = px(8.);
+
 /// What the page shows under its control bar.
 enum View {
     Empty,
@@ -67,8 +70,9 @@ pub struct DemoViewerPage {
     view: View,
     /// Bumped by every resolved pick, so a slower earlier load cannot land over a later one.
     generation: u64,
-    /// The page's and the bar's sizes from the last frame, which place the bar.
+    /// The page's size from the last frame, which places and caps the bar.
     area: Rc<Cell<Size<Pixels>>>,
+    /// The bar's own size from the last frame, which the clamp keeps inside the page.
     bar_size: Rc<Cell<Size<Pixels>>>,
     /// The player's place for the bar, as stored; drawing clamps it but never writes back.
     bar: BarPlace,
@@ -286,13 +290,15 @@ impl DemoViewerPage {
 impl Render for DemoViewerPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
-        let text = |id: &'static str, words: SharedString, muted: Option<Hsla>| {
+        // A line of the bar's text column wraps; the status stays on one line.
+        let line = |id: &'static str, words: SharedString, muted: Option<Hsla>, wraps: bool| {
             div()
                 .id(id)
                 .aria_label(words.clone())
                 .test_support()
                 .flex_none()
-                .whitespace_nowrap()
+                .when(wraps, |el| el.min_w_0())
+                .when(!wraps, |el| el.whitespace_nowrap())
                 .text_sm()
                 .when_some(muted, |el, colour| el.text_color(colour))
                 .child(words)
@@ -300,8 +306,8 @@ impl Render for DemoViewerPage {
         // The viewport fills the whole page; without one, the status sits in its centre.
         let status = |words: SharedString| {
             let centre = div().size_full().flex().items_center().justify_center();
-            let line = text(ids::DEMO_VIEWER_STATUS, words, Some(muted));
-            (centre.child(line).into_any_element(), None)
+            let status = line(ids::DEMO_VIEWER_STATUS, words, Some(muted), false);
+            (centre.child(status).into_any_element(), None)
         };
         let (body, caption) = match &self.view {
             View::Loaded {
@@ -395,15 +401,15 @@ impl Render for DemoViewerPage {
         .absolute()
         .size_full();
         let at = self.bar.clamp(self.area.get(), self.bar_size.get());
+        // The bar's room is a fixed-width frame, so where it sits never changes how it wraps.
+        let room = (self.area.get().width - BAR_MARGIN * 2.).max(px(0.));
         let theme = cx.theme();
         let bar = h_flex()
             .id(ids::DEMO_VIEWER_BAR)
             .test_support()
             .occlude()
-            .absolute()
-            .left(at.x)
-            .top(at.y)
-            .flex_none()
+            .max_w_full()
+            .min_w_0()
             .items_center()
             .gap_3()
             .pl_2()
@@ -416,28 +422,42 @@ impl Render for DemoViewerPage {
             .shadow_md()
             .child(bar_watch)
             .child(grip)
-            // Minimised, only the grip and the expand button stay.
+            // Minimised, only the grip and the expand button stay. The caption, note and hint
+            // share one column, the only part that shrinks and wraps on a narrow page.
             .when(!collapsed, |bar| {
                 bar.when_some(caption.clone(), |bar, (caption, note)| {
                     let words = v_flex()
-                        .flex_none()
-                        .child(text(ids::DEMO_VIEWER_CAPTION, caption, None))
+                        .min_w_0()
+                        .flex_shrink(1.)
+                        .child(line(ids::DEMO_VIEWER_CAPTION, caption, None, true))
                         .when(note, |words| {
                             let note = tr!("demo_viewer.players_note");
-                            words.child(text(ids::DEMO_VIEWER_PLAYERS_NOTE, note, Some(muted)))
-                        });
+                            words.child(line(
+                                ids::DEMO_VIEWER_PLAYERS_NOTE,
+                                note,
+                                Some(muted),
+                                true,
+                            ))
+                        })
+                        .child(line(
+                            ids::DEMO_VIEWER_HINT,
+                            tr!("demo_viewer.hint"),
+                            Some(muted),
+                            true,
+                        ));
                     bar.child(words)
                 })
-                .child(open)
-                .when(caption.is_some(), |bar| {
-                    bar.child(text(
-                        ids::DEMO_VIEWER_HINT,
-                        tr!("demo_viewer.hint"),
-                        Some(muted),
-                    ))
-                })
+                .child(div().flex_none().child(open))
             })
-            .child(collapse);
+            .child(div().flex_none().child(collapse));
+        let frame = div()
+            .absolute()
+            .left(at.x)
+            .top(at.y)
+            .w(room)
+            .flex()
+            .items_start()
+            .child(bar);
         div()
             .id(ids::page(Page::DemoViewer))
             .test_support()
@@ -445,6 +465,6 @@ impl Render for DemoViewerPage {
             .size_full()
             .child(area_watch)
             .child(body)
-            .child(bar)
+            .child(frame)
     }
 }
