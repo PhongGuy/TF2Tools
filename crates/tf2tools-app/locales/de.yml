@@ -3095,6 +3095,7 @@ graphics:
     zoom: "Zoom"
     full: "Ganzes Bild"
     wipe: "Zwischen dem Bild der Voreinstellung und deinem schieben"
+    wipe_profile: "Zwischen dem Bild der Voreinstellung und dem dieses Profils schieben"
     caption: "Klicke auf ein Bild, um diese Einstellung zu verwenden."
     no_picture:
       performance_only: "Kein Bild: Diese Einstellung ändert die Leistung, nicht das Aussehen des Spiels."

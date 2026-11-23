@@ -3095,6 +3095,7 @@ graphics:
     zoom: "Ampliar"
     full: "Imagen completa"
     wipe: "Desliza entre la imagen del preajuste y la tuya"
+    wipe_profile: "Desliza entre la imagen del preajuste y la de este perfil"
     caption: "Haz clic en una imagen para usar ese ajuste."
     no_picture:
       performance_only: "Sin imagen: este ajuste cambia el rendimiento, no el aspecto del juego."
