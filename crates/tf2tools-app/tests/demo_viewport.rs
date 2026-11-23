@@ -393,6 +393,17 @@ fn a_second_button_mid_drag_does_not_lock_again(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_move_with_no_button_held_unlocks(cx: &mut TestAppContext) {
+    let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    cx.update_window(win, |_, w, cx| w.pointer_move(at, None, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(lock.calls(), vec![LockCall::Lock, LockCall::Unlock]);
+}
+
+#[gpui_kit::test]
 fn escape_unlocks(cx: &mut TestAppContext) {
     let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
     let at = centre(cx, win);
