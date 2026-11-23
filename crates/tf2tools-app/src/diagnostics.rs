@@ -44,4 +44,36 @@ pub fn init() {
         .with(stderr)
         .with(recent::global().layer())
         .try_init();
+    if crate::viewer::stats::enabled() {
+        install_platform_stats_bridge();
+    }
+}
+
+/// The `log` target of the vendored platform crate's frame lines.
+pub const PLATFORM_STATS_TARGET: &str = "tf2tools_viewer_stats";
+
+/// A `log` sink that re-emits the platform crate's frame lines as `tracing` events on the viewer's
+/// stats target; every other `log` record is dropped, as it was before this bridge.
+pub struct PlatformStatsBridge;
+
+impl log::Log for PlatformStatsBridge {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.target() == PLATFORM_STATS_TARGET
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            tracing::info!(target: crate::viewer::stats::TARGET, "{}", record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+// `log` stays off unless the stats are, so the platform crate's lines cost nothing by default.
+fn install_platform_stats_bridge() {
+    static BRIDGE: PlatformStatsBridge = PlatformStatsBridge;
+    if log::set_logger(&BRIDGE).is_ok() {
+        log::set_max_level(log::LevelFilter::Info);
+    }
 }

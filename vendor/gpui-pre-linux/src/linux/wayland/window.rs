@@ -47,6 +47,21 @@ use gpui::{
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig, wgpu};
 
+/// Whether `TF2TOOLS_VIEWER_STATS` is `1`, read once for the process.
+fn frame_stats_enabled() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("TF2TOOLS_VIEWER_STATS").as_deref() == Ok("1"))
+}
+
+// One `wayland-frame:` line per frame-loop step, so a stalled repaint shows where the loop stopped.
+macro_rules! frame_stat {
+    ($($arg:tt)*) => {
+        if frame_stats_enabled() {
+            log::info!(target: "tf2tools_viewer_stats", "wayland-frame: {}", format_args!($($arg)*));
+        }
+    };
+}
+
 #[derive(Default)]
 pub(crate) struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
@@ -965,6 +980,11 @@ impl WaylandWindowStatePtr {
     }
 
     pub fn frame(&self, signal_at: Option<Instant>, signal_source: FrameRequestSource) {
+        frame_stat!(
+            "window={:#x} tick from={:?} source={signal_source:?}",
+            self.stats_id(),
+            self.frame_loop.get()
+        );
         self.frame_loop.set(FrameLoop::Ticking);
         let mut state = self.state.borrow_mut();
         state.resize_throttle = false;
@@ -989,6 +1009,11 @@ impl WaylandWindowStatePtr {
         drop(callbacks);
 
         self.complete_frame();
+        frame_stat!(
+            "window={:#x} tick done state={:?}",
+            self.stats_id(),
+            self.frame_loop.get()
+        );
     }
 
     fn complete_frame(&self) {
@@ -1036,6 +1061,11 @@ impl WaylandWindowStatePtr {
     }
 
     pub fn frame_callback_fired(&self, signal_at: Option<Instant>) {
+        frame_stat!(
+            "window={:#x} callback state={:?}",
+            self.stats_id(),
+            self.frame_loop.get()
+        );
         // Another wl_surface commit may have carried this callback while a retry
         // timer owned the render-loop wakeup.
         self.state.borrow_mut().pending_frame_callback = None;
@@ -1066,7 +1096,23 @@ impl WaylandWindowStatePtr {
         self.frame_loop.get() != FrameLoop::Unconfigured
     }
 
+    /// A stable per-window number for the frame stats lines, read without borrowing the state.
+    fn stats_id(&self) -> usize {
+        Rc::as_ptr(&self.state) as usize
+    }
+
     pub fn schedule_frame(&self) {
+        frame_stat!(
+            "window={:#x} schedule state={:?} {}",
+            self.stats_id(),
+            self.frame_loop.get(),
+            match self.frame_loop.get() {
+                FrameLoop::Parked => "ping",
+                FrameLoop::Ticking => "reschedule",
+                FrameLoop::AwaitingCallback => "skipped: awaiting callback",
+                _ => "skipped",
+            }
+        );
         match self.frame_loop.get() {
             FrameLoop::Parked => {
                 self.frame_loop.set(FrameLoop::Scheduled);
@@ -2078,9 +2124,15 @@ impl PlatformWindow for WaylandWindow {
         if renderer.draw(scene) {
             state.presentation = PresentationState::Presented;
             self.0.frame_loop.set(FrameLoop::AwaitingCallback);
+            frame_stat!("window={:#x} drawn presented=true", self.0.stats_id());
         } else {
             state.presentation = state.presentation.failed();
             self.0.frame_loop.set(FrameLoop::PresentationFailed);
+            frame_stat!(
+                "window={:#x} drawn presented=false next={:?}",
+                self.0.stats_id(),
+                state.presentation
+            );
         }
 
         if renderer.needs_redraw() {

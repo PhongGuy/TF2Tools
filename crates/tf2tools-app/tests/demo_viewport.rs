@@ -14,6 +14,7 @@ use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass};
 use crate::support;
 use tf2tools_app::viewer::pointer::LockMode;
 
+use crate::support::demo_viewer::viewport_window_unsettled;
 use crate::support::demo_viewer::{LockCall, viewport_window_locked, viewport_window_with};
 use crate::support::demo_viewer::{StubAnswer, fake_lock, one_pixel, viewport_window};
 
@@ -62,6 +63,26 @@ fn the_scene_loads_and_one_draw_goes_out_at_device_pixels(cx: &mut TestAppContex
     assert_eq!(draws.len(), 1, "{draws:?}");
     assert_eq!((draws[0].width, draws[0].height), device_size(cx, win));
     assert_eq!(draws[0].seq, 1);
+}
+
+// Drives only the frame loop a real window has, with no forced re-render and no input, so a
+// first frame that waits on a wake-up which never comes stays unshown here too (#1405).
+#[gpui_kit::test]
+fn the_first_frame_shows_with_no_input_and_no_forced_render(cx: &mut TestAppContext) {
+    let (win, viewport, stub) =
+        viewport_window_unsettled(cx, StubAnswer::Frames, None, fake_lock(LockMode::Grabbed).0);
+    cx.run_until_parked();
+    for _ in 0..4 {
+        cx.update_window(win, |_, w, cx| {
+            w.simulate_next_frame(cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    }
+    let draws = stub.draws();
+    assert_eq!(draws.len(), 1, "{draws:?}");
+    assert_eq!(draws[0].seq, 1);
+    assert_eq!(cx.update(|cx| viewport.read(cx).shown_seq()), Some(1));
 }
 
 #[gpui_kit::test]
