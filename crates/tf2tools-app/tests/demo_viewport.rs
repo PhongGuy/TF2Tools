@@ -9,8 +9,10 @@ use gpui_kit::{
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::DemoViewport;
 use tf2tools_app::viewer::{RenderEvent, RendererError};
+use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass};
 
 use crate::support;
+use crate::support::demo_viewer::viewport_window_with;
 use crate::support::demo_viewer::{StubAnswer, one_pixel, viewport_window};
 
 fn centre(cx: &mut TestAppContext, win: AnyWindowHandle) -> Point<Pixels> {
@@ -228,4 +230,50 @@ fn a_worker_that_stops_after_no_adapter_still_reads_as_no_adapter(cx: &mut TestA
         cx.update(|cx| viewport.read(cx).failure().cloned()),
         Some(RendererError::NoAdapter)
     );
+}
+
+#[gpui_kit::test]
+fn a_viewport_without_players_clears_the_boxes_once(cx: &mut TestAppContext) {
+    let (_win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    let sent = stub.players();
+    assert_eq!(sent.len(), 1);
+    assert!(sent[0].is_empty());
+    assert_eq!(cx.update(|cx| viewport.read(cx).camera().pitch()), 0.);
+}
+
+#[gpui_kit::test]
+fn a_viewport_with_players_sends_their_boxes_and_starts_at_the_red_eye(cx: &mut TestAppContext) {
+    let snapshot = DemoSnapshot::new(
+        1668,
+        vec![
+            SnapshotPlayer::new(
+                Team::Blue,
+                TfClass::Scout,
+                [0., 0., 64.],
+                90.,
+                0.,
+                65.,
+                false,
+            ),
+            SnapshotPlayer::new(
+                Team::Red,
+                TfClass::Medic,
+                [100., 200., 64.],
+                270.,
+                12.,
+                75.,
+                false,
+            ),
+        ],
+    );
+    let (_win, viewport, stub) = viewport_window_with(cx, StubAnswer::Frames, Some(snapshot));
+    let sent = stub.players();
+    assert_eq!(sent.len(), 1);
+    let teams: Vec<Team> = sent[0].iter().map(|b| b.team).collect();
+    assert_eq!(teams, [Team::Blue, Team::Red]);
+    let (origin, yaw, pitch) = cx.update(|cx| {
+        let camera = viewport.read(cx).camera();
+        (camera.origin(), camera.yaw(), camera.pitch())
+    });
+    assert_eq!((origin, yaw, pitch), ([100., 200., 139.], 270., 12.));
 }

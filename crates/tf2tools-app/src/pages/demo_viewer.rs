@@ -94,7 +94,14 @@ impl DemoViewerPage {
             Ok((map, mesh)) => {
                 let renderer = (cx.global::<Services>().renderers)();
                 let viewport = cx.new(|cx| {
-                    DemoViewport::new(Arc::new(mesh), renderer, Arc::new(Instant::now), window, cx)
+                    DemoViewport::new(
+                        Arc::new(mesh),
+                        None,
+                        renderer,
+                        Arc::new(Instant::now),
+                        window,
+                        cx,
+                    )
                 });
                 // A renderer that stops leaves nothing to look at, so its viewport goes too.
                 let watch = cx.observe(&viewport, |page, viewport, cx| {

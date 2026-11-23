@@ -12,9 +12,9 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::viewport::{Clock, DemoViewport};
 use tf2tools_app::viewer::{
-    DrawRequest, FrameStats, RenderEvent, RendererError, RendererFactory, SceneRenderer,
+    DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
 };
-use tf2tools_core::{MapMesh, load_map_mesh};
+use tf2tools_core::{DemoSnapshot, MapMesh, load_map_mesh};
 
 use super::demo_view_fixtures::{BspOptions, bsp};
 
@@ -34,6 +34,7 @@ pub enum StubAnswer {
 pub struct StubHandle {
     pub draws: Arc<Mutex<Vec<DrawRequest>>>,
     pub scenes: Arc<Mutex<usize>>,
+    pub players: Arc<Mutex<Vec<Arc<[PlayerBox]>>>>,
     pub alive: Arc<AtomicBool>,
     pub events: async_channel::Sender<RenderEvent>,
 }
@@ -44,6 +45,9 @@ impl StubHandle {
     }
     pub fn scenes(&self) -> usize {
         *self.scenes.lock().unwrap()
+    }
+    pub fn players(&self) -> Vec<Arc<[PlayerBox]>> {
+        self.players.lock().unwrap().clone()
     }
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::SeqCst)
@@ -80,6 +84,9 @@ impl SceneRenderer for StubRenderer {
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.receiver.clone()
     }
+    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
+        self.handle.players.lock().unwrap().push(boxes);
+    }
 }
 
 pub fn one_pixel() -> Arc<RenderImage> {
@@ -104,6 +111,7 @@ pub fn stub(answer: StubAnswer) -> (Box<dyn SceneRenderer>, StubHandle) {
     let handle = StubHandle {
         draws: Arc::default(),
         scenes: Arc::default(),
+        players: Arc::default(),
         alive: Arc::new(AtomicBool::new(true)),
         events,
     };
@@ -150,14 +158,24 @@ pub fn viewport_window(
     cx: &mut TestAppContext,
     answer: StubAnswer,
 ) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
+    viewport_window_with(cx, answer, None)
+}
+
+/// `viewport_window`, with `snapshot`'s players handed to the viewport.
+pub fn viewport_window_with(
+    cx: &mut TestAppContext,
+    answer: StubAnswer,
+    snapshot: Option<DemoSnapshot>,
+) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
     super::init(cx);
     let mesh = Arc::new(load_map_mesh(&bsp(&BspOptions::default())).unwrap());
     let (renderer, handle) = stub(answer);
     let (win, host) = cx
         .update(|cx| {
             gpui_kit::open_window(super::window_options(), cx, |window, cx| {
-                let viewport =
-                    cx.new(|cx| DemoViewport::new(mesh, renderer, frame_clock(), window, cx));
+                let viewport = cx.new(|cx| {
+                    DemoViewport::new(mesh, snapshot.as_ref(), renderer, frame_clock(), window, cx)
+                });
                 cx.new(|_| ViewportHost(viewport))
             })
         })

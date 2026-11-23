@@ -12,7 +12,9 @@ use tf2tools_core::MapMesh;
 use wgpu::util::DeviceExt as _;
 
 use super::math::{padded_row_bytes, unpad_rows};
-use super::{DrawRequest, FrameStats, RenderEvent, RendererError, RendererFactory, SceneRenderer};
+use super::{
+    DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
+};
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -55,6 +57,13 @@ static WORKERS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
 enum Command {
     LoadScene(Arc<MapMesh>),
     Draw(DrawRequest),
+    SetPlayers(
+        #[expect(
+            dead_code,
+            reason = "the worker accepts the boxes before it can draw them"
+        )]
+        Arc<[PlayerBox]>,
+    ),
 }
 
 /// The real renderer. Dropping it ends the worker without waiting for it.
@@ -107,6 +116,10 @@ impl SceneRenderer for Renderer {
 
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.events.clone()
+    }
+
+    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
+        let _ = self.commands.send(Command::SetPlayers(boxes));
     }
 }
 
@@ -210,6 +223,7 @@ fn step(
         match command {
             Command::LoadScene(mesh) => gpu.load_scene(&mesh),
             Command::Draw(request) => draw = Some(request),
+            Command::SetPlayers(_) => {}
         }
         next = match inbox.try_recv() {
             Ok(command) => Some(command),

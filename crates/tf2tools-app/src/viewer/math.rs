@@ -1,7 +1,11 @@
 //! Camera math for the viewer in Source's frame (Z up, yaw counter-clockwise from +X, positive
-//! pitch looks down), and the row unpadding the GPU readback needs.
+//! pitch looks down), player box geometry, and the row unpadding the GPU readback needs.
 
-use tf2tools_core::MapMesh;
+use std::sync::Arc;
+
+use tf2tools_core::{DemoSnapshot, MapMesh, Team};
+
+use super::PlayerBox;
 
 /// Degrees of turn per pixel of mouse drag.
 pub const LOOK_DEG_PER_PX: f32 = 0.22;
@@ -13,6 +17,26 @@ pub const NEAR: f32 = 4.0;
 pub const FAR: f32 = 32768.0;
 /// Half the vertical field of view as a tangent: 90 degrees horizontal at 4:3.
 pub const TAN_HALF_VFOV: f32 = 0.75;
+
+/// A player box's side in map units.
+pub const BOX_WIDTH: f32 = 48.0;
+/// A standing player box's height.
+pub const BOX_HEIGHT: f32 = 82.0;
+/// A crouched player box's height.
+pub const BOX_DUCKED_HEIGHT: f32 = 62.0;
+/// RED's box colour, sRGB `#B8383B`.
+pub const RED: [f32; 3] = [184.0 / 255.0, 56.0 / 255.0, 59.0 / 255.0];
+/// BLU's box colour, sRGB `#5885A2`.
+pub const BLU: [f32; 3] = [88.0 / 255.0, 133.0 / 255.0, 162.0 / 255.0];
+/// The steepest pitch the camera starts at, as `FreeFly` allows.
+const MAX_PITCH: f32 = 89.0;
+
+/// A box corner: map-space position and sRGB colour.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoxVertex {
+    pub position: [f32; 3],
+    pub color: [f32; 3],
+}
 
 /// wgpu's row alignment for texture-to-buffer copies.
 const ROW_ALIGNMENT: u32 = 256;
@@ -80,15 +104,89 @@ pub fn unpad_rows(padded: &[u8], width: u32, height: u32) -> Vec<u8> {
     out
 }
 
-/// Where the camera starts: the first spawn at eye height facing its yaw, else the middle of
-/// the map's bounds looking along +X (the origin for an empty mesh).
-pub fn start_camera(mesh: &MapMesh) -> ([f32; 3], f32) {
+/// Eye, yaw and pitch: the first RED player's eye (else the first player's), pitch clamped to
+/// +-89; without players, the first spawn at eye height facing its yaw, else the middle of the
+/// map's bounds looking along +X (the origin for an empty mesh), with pitch 0.
+pub fn start_camera(mesh: &MapMesh, snapshot: Option<&DemoSnapshot>) -> ([f32; 3], f32, f32) {
+    let players = snapshot.map_or(&[][..], DemoSnapshot::players);
+    let chosen = players
+        .iter()
+        .find(|p| p.team() == Team::Red)
+        .or_else(|| players.first());
+    if let Some(p) = chosen {
+        let [x, y, z] = p.feet();
+        let pitch = p.pitch().clamp(-MAX_PITCH, MAX_PITCH);
+        return ([x, y, z + p.eye_height()], p.yaw(), pitch);
+    }
     if let Some((origin, yaw)) = mesh.start() {
-        return ([origin[0], origin[1], origin[2] + EYE_HEIGHT], yaw);
+        return ([origin[0], origin[1], origin[2] + EYE_HEIGHT], yaw, 0.0);
     }
     if mesh.triangle_count() == 0 {
-        return ([0.0; 3], 0.0);
+        return ([0.0; 3], 0.0, 0.0);
     }
     let (min, max) = mesh.bounds();
-    ([0, 1, 2].map(|i| (min[i] + max[i]) / 2.0), 0.0)
+    ([0, 1, 2].map(|i| (min[i] + max[i]) / 2.0), 0.0, 0.0)
+}
+
+/// The snapshot's players as boxes, in its order; none for `None`.
+pub fn player_boxes(snapshot: Option<&DemoSnapshot>) -> Arc<[PlayerBox]> {
+    snapshot
+        .map_or(&[][..], DemoSnapshot::players)
+        .iter()
+        .map(|p| PlayerBox {
+            feet: p.feet(),
+            yaw_deg: p.yaw(),
+            ducked: p.ducked(),
+            team: p.team(),
+        })
+        .collect()
+}
+
+// Corner indices into `player_box_vertices`' corners: bit 0 is front (+X), bit 1 left (+Y),
+// bit 2 top. Each face lists its corners counter-clockwise seen from outside.
+const FACES: [[usize; 4]; 6] = [
+    [1, 3, 7, 5], // front, +X
+    [0, 4, 6, 2], // back, -X
+    [2, 6, 7, 3], // left, +Y
+    [0, 1, 5, 4], // right, -Y
+    [4, 5, 7, 6], // top
+    [0, 2, 3, 1], // bottom
+];
+
+/// 12 triangles wound counter-clockwise seen from outside; the face toward the yaw is 25 % lighter.
+pub fn player_box_vertices(player: &PlayerBox) -> [BoxVertex; 36] {
+    let half = BOX_WIDTH / 2.0;
+    let height = if player.ducked {
+        BOX_DUCKED_HEIGHT
+    } else {
+        BOX_HEIGHT
+    };
+    let (sin, cos) = player.yaw_deg.to_radians().sin_cos();
+    // Corners in the box's own frame (+X forward, +Y left), turned by the yaw and set on the feet.
+    let corners: [[f32; 3]; 8] = std::array::from_fn(|i| {
+        let x = if i & 1 == 0 { -half } else { half };
+        let y = if i & 2 == 0 { -half } else { half };
+        let z = if i & 4 == 0 { 0.0 } else { height };
+        let [fx, fy, fz] = player.feet;
+        [fx + x * cos - y * sin, fy + x * sin + y * cos, fz + z]
+    });
+    let base = match player.team {
+        Team::Red => RED,
+        Team::Blue | _ => BLU,
+    };
+    let front = base.map(|c| c + (1.0 - c) * 0.25);
+    let mut out = [BoxVertex {
+        position: [0.0; 3],
+        color: base,
+    }; 36];
+    for (face, quad) in FACES.iter().enumerate() {
+        let color = if face == 0 { front } else { base };
+        for (slot, corner) in [0, 1, 2, 0, 2, 3].into_iter().enumerate() {
+            out[face * 6 + slot] = BoxVertex {
+                position: corners[quad[corner]],
+                color,
+            };
+        }
+    }
+    out
 }
