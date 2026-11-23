@@ -270,7 +270,12 @@ impl DemoViewerPage {
                 // A 404 means serveme.tf lacks the map, so retrying is pointless; any other
                 // failure may pass, so it keeps its reason and a Retry.
                 let (failure, absent) = match joined {
-                    Ok(Ok(())) => return page.load(path, generation, true, window, cx),
+                    // A map that landed meanwhile, say from the Maps page, is simply shown.
+                    Ok(Ok(()))
+                    | Ok(Err(
+                        MapDownloadError::AlreadyDownloaded { .. }
+                        | MapDownloadError::InGame { .. },
+                    )) => return page.load(path, generation, true, window, cx),
                     Ok(Err(e)) => (
                         describe_map_download(&e),
                         matches!(e, MapDownloadError::Http { status: 404, .. }),

@@ -226,3 +226,38 @@ fn leaving_the_page_mid_download_drops_the_download(cx: &mut TestAppContext) {
     assert!(!env.game.join(format!("tf/maps/{MAP}.bsp")).exists());
     assert_eq!(downloaded_rows(&env), 0);
 }
+
+#[gpui_kit::test]
+fn a_map_the_maps_page_finishes_first_is_simply_shown(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let route = format!("/fastdl/maps/{MAP}.bsp");
+    server.mount_bytes_after(&route, bsp(&BspOptions::default()), Duration::from_secs(2));
+    let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
+    let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
+
+    // Another download of the same map holds the store's lock, as the Maps page's would, so
+    // the viewer's own download waits behind it and then finds the map already in place.
+    let (rt, store) = cx.update(|cx| {
+        tf2tools_app::tokio_bridge::init(cx);
+        let services = cx.global::<tf2tools_app::services::Services>();
+        (
+            tf2tools_app::tokio_bridge::handle(cx),
+            services.store.clone(),
+        )
+    });
+    let install = tf2tools_core::Tf2Install::from_path(&env.game).unwrap();
+    let other = rt.spawn(async move { store.download_map(&install, MAP, &|_, _| {}).await });
+    support::wait_real(cx, "the other download's partial file", |_| {
+        !partial_files(&env).is_empty()
+    });
+
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some(MAP)
+    );
+    assert!(rt.block_on(other).unwrap().is_ok());
+}
