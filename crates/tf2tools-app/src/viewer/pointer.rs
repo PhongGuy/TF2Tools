@@ -82,7 +82,10 @@ impl PointerLock for WindowsLock {
             return LockMode::Grabbed;
         };
         let anchor = anchor_for(start, press, centre, window.scale_factor());
-        tf2tools_core::cursor::set_position(anchor.0, anchor.1);
+        // A cursor that cannot reach the anchor would measure every move from the wrong place.
+        if !tf2tools_core::cursor::set_position(anchor.0, anchor.1) {
+            return LockMode::Grabbed;
+        }
         tf2tools_core::cursor::hide();
         self.held = Some((start, anchor));
         LockMode::Locked
