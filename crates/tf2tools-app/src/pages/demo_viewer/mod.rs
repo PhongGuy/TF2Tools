@@ -275,6 +275,8 @@ impl DemoViewerPage {
                         describe_map_download(&e),
                         matches!(e, MapDownloadError::Http { status: 404, .. }),
                     ),
+                    // Only a panic in the download joins as an error; a dropped task has
+                    // no one left to join it.
                     Err(e) => (map_stopped(e.to_string()), false),
                 };
                 failure.log("map download");
