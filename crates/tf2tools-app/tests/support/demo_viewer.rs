@@ -1,5 +1,6 @@
 //! A scripted `SceneRenderer` and a viewport-only window for the demo viewer's headless tests.
 
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -7,11 +8,13 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyWindowHandle, Context, Entity, RenderImage, TestAppContext, Window, div, relative,
+    AnyWindowHandle, Context, Entity, Pixels, Point, RenderImage, TestAppContext, Window, div,
+    relative,
 };
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::viewer::pointer::{FallbackLock, LockMode, PointerLock, PointerLockFactory};
 use tf2tools_app::viewer::viewport::{Clock, DemoViewport};
 use tf2tools_app::viewer::{
     DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
@@ -138,6 +141,68 @@ pub fn stub_factory(answer: StubAnswer) -> (RendererFactory, Arc<Mutex<Vec<StubH
     (factory, made)
 }
 
+/// One call a viewport made on its pointer lock.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LockCall {
+    Lock,
+    Unlock,
+}
+
+/// A test's view of one fake lock: the calls it got and the motions it will hand out.
+#[derive(Clone)]
+pub struct FakeLockHandle {
+    pub calls: Arc<Mutex<Vec<LockCall>>>,
+    /// Motions `motion()` hands out, front first; empty means `None`.
+    pub motions: Arc<Mutex<VecDeque<Point<Pixels>>>>,
+}
+
+impl FakeLockHandle {
+    pub fn calls(&self) -> Vec<LockCall> {
+        self.calls.lock().unwrap().clone()
+    }
+    pub fn push_motion(&self, by: Point<Pixels>) {
+        self.motions.lock().unwrap().push_back(by)
+    }
+}
+
+// Records only an unlock that releases a held lock, so a doubled unlock shows up as missing
+// idempotence in the viewport rather than being hidden here.
+struct FakeLock {
+    handle: FakeLockHandle,
+    mode: LockMode,
+    locked: bool,
+}
+
+impl PointerLock for FakeLock {
+    fn lock(&mut self, _: Point<Pixels>, _: Point<Pixels>, _: &Window) -> LockMode {
+        self.locked = true;
+        self.handle.calls.lock().unwrap().push(LockCall::Lock);
+        self.mode
+    }
+    fn motion(&mut self, _: &Window) -> Option<Point<Pixels>> {
+        self.handle.motions.lock().unwrap().pop_front()
+    }
+    fn unlock(&mut self) {
+        if std::mem::take(&mut self.locked) {
+            self.handle.calls.lock().unwrap().push(LockCall::Unlock);
+        }
+    }
+}
+
+/// A fake lock that takes hold as `mode`, and its handle.
+pub fn fake_lock(mode: LockMode) -> (Box<dyn PointerLock>, FakeLockHandle) {
+    let handle = FakeLockHandle {
+        calls: Arc::default(),
+        motions: Arc::default(),
+    };
+    let lock = FakeLock {
+        handle: handle.clone(),
+        mode,
+        locked: false,
+    };
+    (Box::new(lock), handle)
+}
+
 /// A clock that moves 16 ms on every read, so each render is one 60 fps frame.
 pub fn frame_clock() -> Clock {
     let now = Arc::new(Mutex::new(Instant::now()));
@@ -168,14 +233,30 @@ pub fn viewport_window(
     cx: &mut TestAppContext,
     answer: StubAnswer,
 ) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
-    viewport_window_with(cx, answer, None)
+    viewport_window_with(cx, answer, None, fake_lock(LockMode::Grabbed).0)
 }
 
-/// `viewport_window`, with `snapshot`'s players handed to the viewport.
+/// `viewport_window` on a fake lock that takes hold as `mode`, with the lock's handle.
+pub fn viewport_window_locked(
+    cx: &mut TestAppContext,
+    mode: LockMode,
+) -> (
+    AnyWindowHandle,
+    Entity<DemoViewport>,
+    StubHandle,
+    FakeLockHandle,
+) {
+    let (lock, handle) = fake_lock(mode);
+    let (win, viewport, stub) = viewport_window_with(cx, StubAnswer::Frames, None, lock);
+    (win, viewport, stub, handle)
+}
+
+/// `viewport_window`, with `snapshot`'s players handed to the viewport and `lock` as its pointer lock.
 pub fn viewport_window_with(
     cx: &mut TestAppContext,
     answer: StubAnswer,
     snapshot: Option<DemoSnapshot>,
+    lock: Box<dyn PointerLock>,
 ) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
     super::init(cx);
     let mesh = Arc::new(load_map_mesh(&bsp(&BspOptions::default())).unwrap());
@@ -184,7 +265,15 @@ pub fn viewport_window_with(
         .update(|cx| {
             gpui_kit::open_window(super::window_options(), cx, |window, cx| {
                 let viewport = cx.new(|cx| {
-                    DemoViewport::new(mesh, snapshot.as_ref(), renderer, frame_clock(), window, cx)
+                    DemoViewport::new(
+                        mesh,
+                        snapshot.as_ref(),
+                        renderer,
+                        lock,
+                        frame_clock(),
+                        window,
+                        cx,
+                    )
                 });
                 cx.new(|_| ViewportHost(viewport))
             })
@@ -232,6 +321,9 @@ pub fn demo_viewer_shell_with(
         None,
         |services| {
             services.renderers = factory;
+            // Shell tests never reach a real OS lock.
+            let fallback: PointerLockFactory = Arc::new(|| Box::new(FallbackLock));
+            services.pointer_lock = fallback;
             if let Some(snapshots) = snapshots {
                 services.demo_snapshots = snapshots;
             }

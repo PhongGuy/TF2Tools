@@ -7,12 +7,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    Context, DispatchPhase, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent,
-    KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _,
-    Pixels, Point, Render, RenderImage, Styled as _, TestSupportExt as _, Window, canvas, div, img,
+    Bounds, Context, DispatchPhase, FocusHandle, InteractiveElement as _, IntoElement,
+    KeyDownEvent, KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    ParentElement as _, Pixels, Point, Render, RenderImage, Styled as _, TestSupportExt as _,
+    Window, canvas, div, img,
 };
 use tf2tools_core::{DemoSnapshot, FlyInput, FreeFly, MapMesh};
 
+use super::pointer::PointerLock;
 use super::{DrawRequest, RenderEvent, RendererError, SceneRenderer, math};
 use crate::ids;
 
@@ -51,12 +53,15 @@ fn axis(plus: bool, minus: bool) -> f32 {
 /// A free-fly view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
 pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
+    lock: Box<dyn PointerLock>,
     camera: FreeFly,
     keys: HeldKeys,
     shown: Option<(Arc<RenderImage>, u64)>,
     last_seq: u64,
     /// The element's size in device pixels, as the last prepaint measured it.
     device_size: Rc<Cell<(u32, u32)>>,
+    /// The element's window bounds in logical pixels, as the last prepaint measured them.
+    bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
     drawn_size: Option<(u32, u32)>,
     /// When the last moving frame was stepped; `None` while the camera rests.
     last_tick: Option<Instant>,
@@ -77,6 +82,7 @@ impl DemoViewport {
         mesh: Arc<MapMesh>,
         snapshot: Option<&DemoSnapshot>,
         renderer: Box<dyn SceneRenderer>,
+        lock: Box<dyn PointerLock>,
         clock: Clock,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -104,12 +110,15 @@ impl DemoViewport {
         cx.observe_window_activation(window, |v, window, cx| {
             if !window.is_window_active() {
                 v.keys = HeldKeys::default();
+                v.end_drag(cx);
                 cx.notify();
             }
         })
         .detach();
-        // The shown frame's atlas tile outlives the viewport unless it is dropped here.
+        // The shown frame's atlas tile outlives the viewport unless it is dropped here, and a
+        // window closed mid-drag must not leave the pointer locked.
         cx.on_release(|v, cx| {
+            v.lock.unlock();
             if let Some((image, _)) = v.shown.take() {
                 cx.drop_image(image, None);
             }
@@ -117,11 +126,13 @@ impl DemoViewport {
         .detach();
         Self {
             renderer,
+            lock,
             camera: FreeFly::new(origin, yaw, pitch),
             keys: HeldKeys::default(),
             shown: None,
             last_seq: 0,
             device_size: Rc::new(Cell::new((0, 0))),
+            bounds: Rc::new(Cell::new(None)),
             drawn_size: None,
             last_tick: None,
             tick_pending: false,
@@ -195,6 +206,9 @@ impl DemoViewport {
 
     fn press(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.focus.focus(window, cx);
+        // Before the first prepaint there is no measured centre, so the press point stands in.
+        let centre = self.bounds.get().map_or(ev.position, |b| b.center());
+        self.lock.lock(ev.position, centre, window);
         self.drag = Some(ev.position);
         cx.notify();
     }
@@ -202,12 +216,14 @@ impl DemoViewport {
     /// Ends a drag, whichever way it ended; does nothing when none is under way.
     fn end_drag(&mut self, cx: &mut Context<Self>) {
         if self.drag.take().is_some() {
+            self.lock.unlock();
             cx.notify();
         }
     }
 
-    /// Turns the camera by the drag since the last move; a move with no button held ends it.
-    fn drag_to(&mut self, ev: &MouseMoveEvent, cx: &mut Context<Self>) {
+    /// Turns the camera by the drag since the last move, as the lock measures it when it can;
+    /// a move with no button held ends it.
+    fn drag_to(&mut self, ev: &MouseMoveEvent, window: &Window, cx: &mut Context<Self>) {
         let Some(last) = self.drag else {
             return;
         };
@@ -215,7 +231,13 @@ impl DemoViewport {
             return self.end_drag(cx);
         }
         self.drag = Some(ev.position);
-        let by = ev.position - last;
+        let by = self
+            .lock
+            .motion(window)
+            .unwrap_or_else(|| ev.position - last);
+        if by == Point::default() {
+            return;
+        }
         let (d_yaw, d_pitch) = math::drag_look(by.x.as_f32(), by.y.as_f32());
         self.camera.look(d_yaw, d_pitch);
         self.draw();
@@ -266,10 +288,12 @@ impl Render for DemoViewport {
         // The canvas measures the element in device pixels every prepaint, so a resize or a
         // scale change asks for one more frame, which draws at the new size.
         let measured = Rc::clone(&self.device_size);
+        let logical = Rc::clone(&self.bounds);
         let paint_taken = Rc::clone(&self.taken);
         let dragging = self.drag.is_some().then(|| cx.entity().downgrade());
         let watch = canvas(
             move |bounds, window, _| {
+                logical.set(Some(bounds));
                 let scale = window.scale_factor();
                 let device = |v: Pixels| (v.as_f32() * scale).round().max(1.0) as u32;
                 let size = (device(bounds.size.width), device(bounds.size.height));
@@ -283,9 +307,9 @@ impl Render for DemoViewport {
                 // past the viewport's edge still reach it.
                 if let Some(view) = dragging {
                     let moved = view.clone();
-                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
+                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
                         if phase == DispatchPhase::Capture {
-                            let _ = moved.update(cx, |v, cx| v.drag_to(ev, cx));
+                            let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
                         }
                     });
                     window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {

@@ -18,6 +18,7 @@ use crate::audio::AudioOut;
 use crate::i18n::tr;
 use crate::local_messages;
 use crate::picker::PathPicker;
+use crate::viewer::pointer::{PointerLockFactory, platform_pointer_locks};
 use crate::viewer::{RendererFactory, SnapshotReader, core_snapshots, wgpu_renderers};
 
 /// Finds a TF2 install; injected so tests and the pilot never touch the real Steam library.
@@ -49,6 +50,8 @@ pub struct Services {
     pub demos: DemosClient,
     /// Makes the Demo Viewer's map renderers; tests swap in a stub.
     pub renderers: RendererFactory,
+    /// Makes the Demo Viewer's pointer locks; tests swap in a fake.
+    pub pointer_lock: PointerLockFactory,
     /// Reads a demo's players for the Demo Viewer; tests swap in a fixed answer.
     pub demo_snapshots: SnapshotReader,
 }
@@ -118,6 +121,7 @@ impl Services {
             logs,
             demos,
             renderers: wgpu_renderers(),
+            pointer_lock: platform_pointer_locks(),
             demo_snapshots: core_snapshots(),
         })
     }
@@ -143,6 +147,14 @@ impl Services {
     /// The same services with `renderers` making the Demo Viewer's renderers.
     pub fn with_renderers(self, renderers: RendererFactory) -> Self {
         Self { renderers, ..self }
+    }
+
+    /// The same services with `pointer_lock` making the Demo Viewer's pointer locks.
+    pub fn with_pointer_lock(self, pointer_lock: PointerLockFactory) -> Self {
+        Self {
+            pointer_lock,
+            ..self
+        }
     }
 
     /// The same services with `demo_snapshots` reading the Demo Viewer's players.

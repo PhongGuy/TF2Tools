@@ -12,8 +12,10 @@ use tf2tools_app::viewer::{RenderEvent, RendererError};
 use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass};
 
 use crate::support;
-use crate::support::demo_viewer::viewport_window_with;
-use crate::support::demo_viewer::{StubAnswer, one_pixel, viewport_window};
+use tf2tools_app::viewer::pointer::LockMode;
+
+use crate::support::demo_viewer::{LockCall, viewport_window_locked, viewport_window_with};
+use crate::support::demo_viewer::{StubAnswer, fake_lock, one_pixel, viewport_window};
 
 fn centre(cx: &mut TestAppContext, win: AnyWindowHandle) -> Point<Pixels> {
     support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
@@ -266,7 +268,12 @@ fn a_viewport_with_players_sends_their_boxes_and_starts_at_the_red_eye(cx: &mut 
             ),
         ],
     );
-    let (_win, viewport, stub) = viewport_window_with(cx, StubAnswer::Frames, Some(snapshot));
+    let (_win, viewport, stub) = viewport_window_with(
+        cx,
+        StubAnswer::Frames,
+        Some(snapshot),
+        fake_lock(LockMode::Grabbed).0,
+    );
     let sent = stub.players();
     assert_eq!(sent.len(), 1);
     let teams: Vec<Team> = sent[0].iter().map(|b| b.team).collect();
@@ -355,4 +362,113 @@ fn escape_ends_a_drag(cx: &mut TestAppContext) {
     .unwrap();
     support::settle(cx, win);
     assert_eq!(yaw_pitch(cx, &viewport), before);
+}
+
+fn press(cx: &mut TestAppContext, win: AnyWindowHandle, at: Point<Pixels>) {
+    cx.update_window(win, |_, w, cx| w.pointer_down(at, MouseButton::Right, cx))
+        .unwrap();
+    support::settle(cx, win);
+}
+
+#[gpui_kit::test]
+fn a_press_locks_once_and_a_release_unlocks(cx: &mut TestAppContext) {
+    let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    assert_eq!(lock.calls(), vec![LockCall::Lock]);
+    cx.update_window(win, |_, w, cx| w.pointer_up(at, MouseButton::Right, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(lock.calls(), vec![LockCall::Lock, LockCall::Unlock]);
+}
+
+#[gpui_kit::test]
+fn escape_unlocks(cx: &mut TestAppContext) {
+    let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    cx.update_window(win, |_, w, cx| w.key_down("escape", false, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(lock.calls(), vec![LockCall::Lock, LockCall::Unlock]);
+}
+
+#[gpui_kit::test]
+fn leaving_the_window_unlocks(cx: &mut TestAppContext) {
+    let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    cx.update_window(win, |_, w, _| w.activate_window())
+        .unwrap();
+    support::settle(cx, win);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    VisualTestContext::from_window(win, cx).deactivate_window();
+    support::settle(cx, win);
+    assert_eq!(lock.calls(), vec![LockCall::Lock, LockCall::Unlock]);
+}
+
+#[gpui_kit::test]
+fn closing_the_window_mid_drag_unlocks(cx: &mut TestAppContext) {
+    // The test must hold no handle to the viewport, or it outlives the window and never releases.
+    let (win, viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    drop(viewport);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    cx.update_window(win, |_, w, _| w.remove_window()).unwrap();
+    cx.run_until_parked();
+    assert_eq!(lock.calls(), vec![LockCall::Lock, LockCall::Unlock]);
+}
+
+#[gpui_kit::test]
+fn a_locked_drag_turns_by_the_lock_motion(cx: &mut TestAppContext) {
+    let (win, viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    let (yaw, pitch) = yaw_pitch(cx, &viewport);
+    // The event position stays at the press point, as a warped Windows cursor does.
+    lock.push_motion(point(px(100.), px(50.)));
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(at, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw2, pitch2) = yaw_pitch(cx, &viewport);
+    assert!((yaw2 - (yaw - 22.)).abs() < 1e-3, "{yaw} -> {yaw2}");
+    assert!((pitch2 - (pitch + 11.)).abs() < 1e-3, "{pitch} -> {pitch2}");
+}
+
+#[gpui_kit::test]
+fn a_zero_lock_motion_leaves_the_camera_and_draws_nothing(cx: &mut TestAppContext) {
+    let (win, viewport, stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    let before = (yaw_pitch(cx, &viewport), stub.draws().len());
+    lock.push_motion(point(px(0.), px(0.)));
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(at, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    assert_eq!((yaw_pitch(cx, &viewport), stub.draws().len()), before);
+}
+
+#[gpui_kit::test]
+fn a_grabbed_drag_outside_the_viewport_still_turns(cx: &mut TestAppContext) {
+    let (win, viewport, _stub, _lock) = viewport_window_locked(cx, LockMode::Grabbed);
+    let bounds = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT).expect("the viewport");
+    let out = point(bounds.right() + px(50.), bounds.center().y);
+    press(cx, win, bounds.center());
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(out, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw, _) = yaw_pitch(cx, &viewport);
+    let further = point(out.x + px(100.), out.y);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(further, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw2, _) = yaw_pitch(cx, &viewport);
+    assert!((yaw2 - (yaw - 22.)).abs() < 1e-3, "{yaw} -> {yaw2}");
 }
