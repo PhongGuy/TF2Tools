@@ -194,6 +194,30 @@ fn copy_heads_the_graphics_settings_card(cx: &mut TestAppContext) {
     );
 }
 
+// The editor's open picture panel keeps the Graphics page's seams, at each page width.
+#[gpui_kit::test]
+fn an_open_picture_panel_leaves_no_gap_before_the_next_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let p = gfx_profile(&s, &env);
+    // Tall enough that the lod panel and the row under it draw without scrolling the body.
+    cx.simulate_window_resize(s.win, size(px(1800.), px(4000.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let gfx = ids::IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the lod thumbnail", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_thumb("lod")))
+    });
+    support::click_id(cx, s.win, gfx.id(ids::graphics_thumb("lod")));
+    for width in [1800., 1280., 800.] {
+        cx.simulate_window_resize(s.win, size(px(width), px(4000.)));
+        support::settle(cx, s.win);
+        support::graphics::assert_no_gap_under_lod(cx, s.win, gfx, &format!("{width} px"));
+    }
+}
+
 #[gpui_kit::test]
 fn an_addon_row_puts_its_switch_at_the_right(cx: &mut TestAppContext) {
     let env = support::env();

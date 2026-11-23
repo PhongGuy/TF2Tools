@@ -301,35 +301,10 @@ fn a_changed_row_s_bar_marks_its_line_and_not_its_open_panel(cx: &mut TestAppCon
     );
 }
 
-/// From the compare picture's bottom to the strip's top: an 8 px gap, the 24 px slider row
-/// (reserved without a wipe), then the panel's 12 px gap.
-const PICTURE_TO_STRIP: f32 = 44.;
-
-// The open lod panel's seams: the stage holds only its picture and the slider row, the panel
-// ends 16 px under its caption, and the next row's rule follows at once.
+// The open lod panel's seams, after scrolling its caption into view.
 fn assert_no_gap_under_lod(cx: &mut TestAppContext, s: &support::ShellWindow, when: &str) {
     reveal(cx, s, ids::graphics_strip_caption("lod"));
-    let frame = at(cx, s, ids::graphics_compare("lod"));
-    let strip = at(cx, s, ids::graphics_strip("lod"));
-    let caption = at(cx, s, ids::graphics_strip_caption("lod"));
-    let panel = at(cx, s, ids::graphics_pictures("lod"));
-    let next = at(cx, s, ids::graphics_row("lighting"));
-    let over_strip = strip.top() - frame.bottom();
-    assert!(
-        (over_strip - px(PICTURE_TO_STRIP)).abs() <= px(0.5),
-        "{when}: {over_strip:?} between the picture {frame:?} and the strip {strip:?}"
-    );
-    let under_caption = panel.bottom() - caption.bottom();
-    assert!(
-        under_caption <= px(17.5),
-        "{when}: the panel runs {under_caption:?} past its caption"
-    );
-    // The panel's 1 px bottom rule overlaps the next row's top rule.
-    let seam = next.top() - panel.bottom();
-    assert!(
-        seam >= px(-1.5) && seam <= px(0.5),
-        "{when}: {seam:?} between the panel {panel:?} and the next row {next:?}"
-    );
+    support::graphics::assert_no_gap_under_lod(cx, s.win, ids::IdScope::PAGE, when);
 }
 
 #[gpui_kit::test]
