@@ -115,13 +115,51 @@ impl Drop for WindowsLock {
     }
 }
 
-/// The lock `Services` holds in the real app: the cursor lock on Windows, the fallback elsewhere.
+/// The Linux lock: the vendored platform crate pins and hides the pointer and keeps delivering
+/// ordinary MouseMoves at a virtual position, so the drag reads event positions as before.
+#[cfg(target_os = "linux")]
+#[derive(Default)]
+struct LinuxLock {
+    /// Whether this lock asked the client to lock, so unlock only releases a lock it took.
+    held: bool,
+}
+
+#[cfg(target_os = "linux")]
+impl PointerLock for LinuxLock {
+    fn lock(&mut self, _: Point<Pixels>, _: Point<Pixels>, _: &Window) -> LockMode {
+        use gpui_linux::pointer_lock::{PointerLockState, lock_pointer};
+        // A pending request counts as held: the compositor confirms it a roundtrip later.
+        match lock_pointer() {
+            PointerLockState::Locked | PointerLockState::Pending => {
+                self.held = true;
+                LockMode::Locked
+            }
+            PointerLockState::Unsupported => LockMode::Grabbed,
+        }
+    }
+
+    fn motion(&mut self, _: &Window) -> Option<Point<Pixels>> {
+        None
+    }
+
+    fn unlock(&mut self) {
+        if std::mem::take(&mut self.held) {
+            gpui_linux::pointer_lock::unlock_pointer();
+        }
+    }
+}
+
+/// The lock `Services` holds in the real app: the cursor lock on Windows and Linux, the fallback elsewhere.
 pub fn platform_pointer_locks() -> PointerLockFactory {
     #[cfg(windows)]
     {
         Arc::new(|| Box::new(WindowsLock::default()))
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        Arc::new(|| Box::new(LinuxLock::default()))
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         Arc::new(|| Box::new(FallbackLock))
     }

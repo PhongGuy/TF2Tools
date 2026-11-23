@@ -77,3 +77,42 @@ fn without_a_running_client_locking_is_unsupported() {
     );
     unlock_pointer();
 }
+
+struct Blank;
+
+impl gpui_kit::Render for Blank {
+    fn render(
+        &mut self,
+        _: &mut gpui_kit::Window,
+        _: &mut gpui_kit::Context<Self>,
+    ) -> impl gpui_kit::IntoElement {
+        gpui_kit::div()
+    }
+}
+
+#[gpui_kit::test]
+fn the_linux_lock_falls_back_to_a_grab_without_a_client(cx: &mut gpui_kit::TestAppContext) {
+    use gpui_kit::{AppContext as _, point, px};
+    use tf2tools_app::viewer::pointer::{LockMode, platform_pointer_locks};
+    let win = cx
+        .update(|cx| {
+            gpui_kit::open_window(crate::support::window_options(), cx, |_, cx| {
+                cx.new(|_| Blank)
+            })
+        })
+        .unwrap()
+        .0;
+    let mode = cx
+        .update_window(win, |_, w, _| {
+            let mut lock = platform_pointer_locks()();
+            let mode = lock.lock(point(px(10.), px(10.)), point(px(20.), px(20.)), w);
+            lock.unlock();
+            mode
+        })
+        .unwrap();
+    assert_eq!(
+        mode,
+        LockMode::Grabbed,
+        "no Linux client in a headless test"
+    );
+}
