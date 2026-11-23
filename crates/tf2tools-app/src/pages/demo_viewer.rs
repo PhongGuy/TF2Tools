@@ -109,11 +109,13 @@ impl DemoViewerPage {
                 };
                 let players_note = players.is_none();
                 let renderer = (cx.global::<Services>().renderers)();
+                let lock = (cx.global::<Services>().pointer_lock)();
                 let viewport = cx.new(|cx| {
                     DemoViewport::new(
                         Arc::new(loaded.mesh),
                         loaded.snapshot.as_ref(),
                         renderer,
+                        lock,
                         Arc::new(Instant::now),
                         window,
                         cx,

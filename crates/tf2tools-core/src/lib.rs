@@ -10,6 +10,7 @@
 mod activity;
 mod archive;
 mod crosshair_catalog;
+pub mod cursor;
 mod db;
 mod demo_view;
 mod demostf;
