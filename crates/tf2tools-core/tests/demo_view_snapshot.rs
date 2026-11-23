@@ -3,7 +3,7 @@
 use crate::common::demo_view::demo_header;
 use tf2tools_core::{
     DemoSnapshot, DemoSnapshotError, MAX_SNAPSHOT_BYTES, SnapshotPlayer, Team, TfClass,
-    read_demo_header,
+    read_demo_header, read_demo_snapshot,
 };
 
 #[test]
@@ -81,4 +81,49 @@ fn the_snapshot_errors_read_plainly() {
 #[test]
 fn at_most_64_mib_of_a_demo_is_read_for_players() {
     assert_eq!(MAX_SNAPSHOT_BYTES, 64 * 1024 * 1024);
+}
+
+fn snapshot_of(bytes: &[u8]) -> Result<DemoSnapshot, DemoSnapshotError> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("match.dem");
+    std::fs::write(&path, bytes).unwrap();
+    read_demo_snapshot(&path)
+}
+
+#[test]
+fn a_missing_file_is_unreadable() {
+    let dir = tempfile::tempdir().unwrap();
+    let got = read_demo_snapshot(&dir.path().join("gone.dem"));
+    assert!(
+        matches!(got, Err(DemoSnapshotError::Unreadable(_))),
+        "{got:?}"
+    );
+}
+
+#[test]
+fn a_file_that_is_not_a_demo_is_unreadable() {
+    let got = snapshot_of(b"hello");
+    assert!(
+        matches!(got, Err(DemoSnapshotError::Unreadable(_))),
+        "{got:?}"
+    );
+}
+
+#[test]
+fn a_header_without_packets_has_no_players() {
+    // Measured: the parser accepts the synthetic header and yields no packet.
+    let got = snapshot_of(&demo_header("cp_synthetic", 60.0));
+    assert!(matches!(got, Err(DemoSnapshotError::NoPlayers)), "{got:?}");
+}
+
+#[test]
+fn garbage_after_a_good_header_never_panics_out() {
+    let mut dem = demo_header("cp_synthetic", 60.0);
+    dem.extend_from_slice(&[0xFF; 4096]);
+    let got = snapshot_of(&dem);
+    // Measured: the parser errors on the first packet type ("Unmatched discriminant '255'").
+    assert!(
+        matches!(got, Err(DemoSnapshotError::Unreadable(_))),
+        "{got:?}"
+    );
 }

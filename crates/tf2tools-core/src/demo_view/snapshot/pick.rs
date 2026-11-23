@@ -35,7 +35,6 @@ pub(crate) struct TickRow {
 }
 
 /// Every player row of one tick, with the game's round state at that tick.
-#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct TickFrame {
     pub tick: u32,
@@ -79,7 +78,6 @@ struct Candidate {
 ///
 /// Two windows are scored: one after the first real tick, as a fallback, and one after the
 /// pre-round to running edge, which wins whenever it holds a drawable tick.
-#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Default)]
 pub(crate) struct SnapshotPicker {
     first_tick: Option<u32>,
@@ -89,7 +87,6 @@ pub(crate) struct SnapshotPicker {
     at_edge: Option<Candidate>,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 impl SnapshotPicker {
     pub fn new() -> Self {
         Self::default()
@@ -167,7 +164,6 @@ fn offer(slot: &mut Option<Candidate>, tick: u32, rows: Vec<TickRow>) {
 }
 
 /// The snapshot of the picked rows, trusting the sent eye height only when it is plausible.
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn into_snapshot(tick: u32, rows: Vec<TickRow>) -> DemoSnapshot {
     let players = rows
         .into_iter()

@@ -47,7 +47,7 @@ pub use db::Database;
 pub use demo_view::{
     DemoHeader, DemoSnapshot, FlyInput, FreeFly, MAX_MAP_BYTES, MAX_MAP_TRIANGLES,
     MAX_SNAPSHOT_BYTES, MapMesh, SnapshotPlayer, load_map_file, load_map_file_capped,
-    load_map_mesh, read_demo_header,
+    load_map_mesh, read_demo_header, read_demo_snapshot,
 };
 pub use demostf::{
     DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,

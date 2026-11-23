@@ -3,7 +3,10 @@
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
+mod parse;
 mod pick;
+
+pub use parse::read_demo_snapshot;
 
 /// The most of a demo read when looking for players; the early-match tick sits well inside it.
 pub const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
@@ -105,7 +108,6 @@ impl SnapshotPlayer {
 }
 
 /// The eye height above the feet: the class's standing view offset, or 45 for any ducked class.
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn class_eye_height(class: TfClass, ducked: bool) -> f32 {
     if ducked {
         return 45.;

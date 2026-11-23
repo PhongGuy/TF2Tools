@@ -11,4 +11,4 @@ pub use header::{DemoHeader, read_demo_header};
 pub use mesh::{
     MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MapMesh, load_map_file, load_map_file_capped, load_map_mesh,
 };
-pub use snapshot::{DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer};
+pub use snapshot::{DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer, read_demo_snapshot};
