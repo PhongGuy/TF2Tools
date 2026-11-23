@@ -456,8 +456,8 @@ pub const CHANGED_WIDE: &str =
 pub const WIDE: [&str; 3] = ["shadows", "texture_quality", "color_filter"];
 
 /// At `width`, asserts each changed `module` under `scope` keeps a text column at least 240 px
-/// wide with a visible label, that its note, Reset and track overlap neither the text nor the
-/// thumbnail, and that every segment lies inside its track.
+/// wide with a visible label, that its note, Reset and track lie inside the row and overlap
+/// neither the text nor the thumbnail, and that every segment lies inside its track.
 pub fn assert_rows_readable(
     cx: &mut TestAppContext,
     s: &super::ShellWindow,
@@ -490,12 +490,21 @@ pub fn assert_rows_readable(
             Bounds::from_corners(label.origin, gpui_kit::point(label.right(), more.bottom()));
         let thumb = super::bounds_of(cx, s.win, scope.id(ids::graphics_thumb(name)));
         let track = found(cx, "track", ids::graphics_segments(name));
+        let row = found(cx, "row", ids::graphics_row(name));
         for (part, id) in [
             ("note", ids::graphics_module_preset(name)),
             ("Reset", ids::graphics_module_reset(name)),
             ("track", ids::graphics_segments(name)),
         ] {
             let b = found(cx, part, id);
+            // Controls kept beside text that cannot shrink further would run past the row.
+            assert!(
+                b.left() >= row.left()
+                    && b.right() <= row.right()
+                    && b.top() >= row.top()
+                    && b.bottom() <= row.bottom(),
+                "{name}'s {part} {b:?} spills out of its row {row:?} at {width} px"
+            );
             assert!(
                 !overlap(b, text),
                 "{name}'s {part} {b:?} covers its text {text:?} at {width} px"
@@ -527,4 +536,67 @@ pub fn assert_rows_readable(
             );
         }
     }
+}
+
+/// From the compare picture's bottom to the strip's top: an 8 px gap, the 24 px slider row
+/// (reserved without a wipe), then the panel's 12 px gap.
+const PICTURE_TO_STRIP: f32 = 44.;
+
+/// Asserts the open lod panel's seams under `scope`: the stage holds only its picture and the
+/// slider row, the panel ends 16 px under its caption, and the next row's rule follows at once.
+pub fn assert_no_gap_under_lod(
+    cx: &mut TestAppContext,
+    win: gpui_kit::AnyWindowHandle,
+    scope: tf2tools_app::ids::IdScope,
+    when: &str,
+) {
+    use gpui_kit::px;
+    use tf2tools_app::ids;
+    let at = |cx: &mut TestAppContext, id: ElementId| {
+        super::bounds_of(cx, win, scope.id(id.clone()))
+            .unwrap_or_else(|| panic!("{when}: {id:?} not drawn"))
+    };
+    let frame = at(cx, ids::graphics_compare("lod"));
+    let strip = at(cx, ids::graphics_strip("lod"));
+    let caption = at(cx, ids::graphics_strip_caption("lod"));
+    let panel = at(cx, ids::graphics_pictures("lod"));
+    let next = at(cx, ids::graphics_row("lighting"));
+    let over_strip = strip.top() - frame.bottom();
+    assert!(
+        (over_strip - px(PICTURE_TO_STRIP)).abs() <= px(0.5),
+        "{when}: {over_strip:?} between the picture {frame:?} and the strip {strip:?}"
+    );
+    let under_caption = panel.bottom() - caption.bottom();
+    assert!(
+        under_caption <= px(17.5),
+        "{when}: the panel runs {under_caption:?} past its caption"
+    );
+    // The panel's 1 px bottom rule overlaps the next row's top rule.
+    let seam = next.top() - panel.bottom();
+    assert!(
+        seam >= px(-1.5) && seam <= px(0.5),
+        "{when}: {seam:?} between the panel {panel:?} and the next row {next:?}"
+    );
+}
+
+/// Saves the trimmed catalogue as release `tag`'s with a sixth sound value, `very_low`, so the
+/// guarded sound row draws as a Select instead of a segmented control.
+pub fn seed_six_value_sound_catalog(env: &super::Env, tag: &str) {
+    let mut modules: serde_json::Value = serde_json::from_slice(super::MC_MODULES).unwrap();
+    let sound = modules["sound"]["modules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|m| m["name"] == "sound")
+        .expect("the fixture has a sound module");
+    let values = sound["values"].as_array_mut().unwrap();
+    values.insert(
+        0,
+        serde_json::json!({"value": "very_low", "description": "Very low sound quality"}),
+    );
+    assert_eq!(values.len(), 6, "six values make the row a Select");
+    let dir = env.data.mastercomfig_dir().join(tag);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("modules.json"), modules.to_string()).unwrap();
+    std::fs::write(dir.join("preset_modules.json"), super::MC_PRESET_MODULES).unwrap();
 }

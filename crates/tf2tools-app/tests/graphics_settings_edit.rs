@@ -4,7 +4,7 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, choose, click_segment, found, idle, modules_cfg, open, reveal, row_value, saved,
+    HEADER, choose, click_segment, found, idle, modules_cfg, open, pick, reveal, row_value, saved,
     scroll_to_top, segment_checked, shown, toasted, value, wait_for_list,
 };
 use tf2tools_app::ids;
@@ -169,6 +169,44 @@ fn a_refused_pick_goes_back_even_when_the_reload_fails(cx: &mut TestAppContext) 
             segment_checked(cx, &s, "sound", "low")
         ),
         (Some(true), Some(false))
+    );
+}
+
+// With six values the guarded sound row is a Select, which shows a pick before the page saves
+// it; a refused pick must move it back once the page settles.
+#[gpui_kit::test]
+fn a_refused_select_pick_moves_the_select_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::graphics::seed_six_value_sound_catalog(&env, "9.100.1");
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    assert_eq!(
+        shown(cx, &page, "sound"),
+        Some(value("high")),
+        "a Select row"
+    );
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    pick(cx, &s, &page, "sound", value("low"));
+    assert_eq!(
+        shown(cx, &page, "sound"),
+        Some(value("low")),
+        "the click shows"
+    );
+    toasted(cx, &s, "Close TF2 first");
+    idle(cx, &page);
+    assert_eq!(saved(cx, &page, "sound"), None);
+    assert_eq!(
+        shown(cx, &page, "sound"),
+        Some(value("high")),
+        "the Select goes back to the saved choice"
+    );
+    assert_eq!(modules_cfg(&env), None);
+    assert!(
+        !env.game
+            .join("tf/custom/mastercomfig-addon-override-1.vpk")
+            .exists()
     );
 }
 
