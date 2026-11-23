@@ -382,6 +382,17 @@ fn a_press_locks_once_and_a_release_unlocks(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_second_button_mid_drag_does_not_lock_again(cx: &mut TestAppContext) {
+    let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    let at = centre(cx, win);
+    press(cx, win, at);
+    cx.update_window(win, |_, w, cx| w.pointer_down(at, MouseButton::Left, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(lock.calls(), vec![LockCall::Lock]);
+}
+
+#[gpui_kit::test]
 fn escape_unlocks(cx: &mut TestAppContext) {
     let (win, _viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
     let at = centre(cx, win);

@@ -206,6 +206,10 @@ impl DemoViewport {
 
     fn press(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.focus.focus(window, cx);
+        // A second button joining a drag keeps the lock the first one took.
+        if self.drag.is_some() {
+            return;
+        }
         // Before the first prepaint there is no measured centre, so the press point stands in.
         let centre = self.bounds.get().map_or(ev.position, |b| b.center());
         self.lock.lock(ev.position, centre, window);

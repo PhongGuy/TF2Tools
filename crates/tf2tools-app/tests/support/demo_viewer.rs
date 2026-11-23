@@ -165,8 +165,8 @@ impl FakeLockHandle {
     }
 }
 
-// Records only an unlock that releases a held lock, so a doubled unlock shows up as missing
-// idempotence in the viewport rather than being hidden here.
+// Unlocks only a held lock, as the contract's idempotent `unlock` asks, so a drop after a
+// finished drag records nothing.
 struct FakeLock {
     handle: FakeLockHandle,
     mode: LockMode,
