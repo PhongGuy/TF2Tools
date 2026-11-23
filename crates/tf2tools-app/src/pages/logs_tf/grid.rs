@@ -4,7 +4,7 @@
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
-use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Entity, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
@@ -25,22 +25,22 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
 const ICON_SIZE: f32 = 20.;
-const ROW_PAD: Pixels = px(12.);
-const GAP: Pixels = px(10.);
-// The class column grows to fill the box but keeps room for "Demoman" beside its icon; each
-// number column fits its title, in English or Russian, and widest value on one line, so the
-// table fits a 1200 px window.
-const CLASS_MIN: Pixels = px(120.);
+const ROW_PAD: Pixels = px(8.);
+const GAP: Pixels = px(4.);
+// The class column grows to fill the box but keeps room for the longest class name in English
+// or Russian beside its icon; each number column fits its English title beside the sort
+// arrow's slot, and its widest value, on one line, so the table fits a 1200 px window.
+const CLASS_MIN: Pixels = px(122.);
 const COLUMNS: [(ClassStat, Pixels); 9] = [
     (ClassStat::Played, px(72.)),
     (ClassStat::Logs, px(44.)),
     (ClassStat::KillsPerMin, px(80.)),
-    (ClassStat::AssistsPerMin, px(80.)),
-    (ClassStat::DeathsPerMin, px(76.)),
-    (ClassStat::DmgPerMin, px(60.)),
+    (ClassStat::AssistsPerMin, px(94.)),
+    (ClassStat::DeathsPerMin, px(86.)),
+    (ClassStat::DmgPerMin, px(66.)),
     (ClassStat::Kad, px(44.)),
-    (ClassStat::HealsPerMin, px(68.)),
-    (ClassStat::UbersPer10Min, px(84.)),
+    (ClassStat::HealsPerMin, px(80.)),
+    (ClassStat::UbersPer10Min, px(102.)),
 ];
 
 // The stop labels sit one cell apart, each centred on its thumb stop. The slider's track is
@@ -152,53 +152,30 @@ fn class_table(
     let min_width = CLASS_MIN + numbers + GAP * COLUMNS.len() as f32 + ROW_PAD * 2. + px(2.);
     let theme = cx.theme();
     let (border, radius) = (theme.border, theme.radius_lg);
-    // Every title is a button that sorts by its column, or flips it when it leads.
-    // They keep no padding so each title stays flush with its column's values or icons.
-    let title = |stat: ClassStat, end: bool| {
+    // Every title is a button filling its column that sorts by it, or flips it when it leads.
+    let title = |stat: ClassStat| {
         let (id, label) = (stat.title(), stat.label());
         let page = page.clone();
         let sorted = sort.filter(|s| s.column == stat);
-        // The kit centres a button's label, so the title is a child in a row that fills it,
-        // pushed to its column's side.
-        let text = h_flex()
-            .flex_1()
-            .min_w_0()
-            .when(end, |row| row.justify_end())
-            .child(
-                div()
-                    .id(ids::logstf_class_title(id))
-                    .test_support()
-                    .child(label.clone()),
-            );
-        let button = Button::new(ids::logstf_class_head(id))
-            .ghost()
-            .xsmall()
-            .accessibility_label(label)
-            .child(text)
-            .selected(sorted.is_some())
-            .w_full()
-            .px_0()
-            .on_click(move |_, _, cx| {
-                let _ = page.update(cx, |page, cx| page.sort_classes_by(stat, cx));
-            });
         sortable(
-            button,
+            ids::logstf_class_head(id),
+            ids::logstf_class_title(id),
+            label,
             ids::logstf_class_arrow(id),
             sorted.map(|s| s.descending),
+            stat == ClassStat::Class,
         )
+        .on_click(move |_, _, cx| {
+            let _ = page.update(cx, |page, cx| page.sort_classes_by(stat, cx));
+        })
     };
     let head = line()
         .items_start()
         .text_xs()
         .text_color(theme.muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(
-            title(ClassStat::Class, false)
-                .flex_1()
-                .min_w(CLASS_MIN)
-                .items_start(),
-        )
-        .children(COLUMNS.map(|(stat, width)| title(stat, true).w(width).items_end()));
+        .child(title(ClassStat::Class).flex_1().min_w(CLASS_MIN))
+        .children(COLUMNS.map(|(stat, width)| title(stat).w(width)));
     let mut rows = v_flex()
         .w_full()
         .min_w(min_width)

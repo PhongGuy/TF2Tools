@@ -3069,6 +3069,11 @@ pub fn logstf_sort_arrow(title: &str) -> ElementId {
     keyed("logstf-sort-arrow", title)
 }
 
+/// The text inside a players header's button, beside its arrow: "logstf-sort-title:K/D".
+pub fn logstf_sort_title(title: &str) -> ElementId {
+    keyed("logstf-sort-title", title)
+}
+
 /// One player's line in the open log's players table: "logstf-player:<id64>".
 pub fn logstf_player_row(id: SteamId) -> ElementId {
     keyed("logstf-player", &id.id64().to_string())

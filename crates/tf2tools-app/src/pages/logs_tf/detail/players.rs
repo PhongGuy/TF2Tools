@@ -1,7 +1,6 @@
 //! The open log's players table, sortable by any header as on logs.tf.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Styled as _,
@@ -21,12 +20,15 @@ use crate::widgets::class_icon::class_icon;
 
 // The table's fixed columns. The name is sized at its minimum so a long one never widens the
 // table, and grows into any room the window leaves, truncating what still does not fit.
-const TEAM: Pixels = px(40.);
+const TEAM: Pixels = px(44.);
 const NAME_MIN: Pixels = px(100.);
 // A class icon, a size up from the other tables' because the art leaves empty borders; and
 // room for four of them, as many as a player shows before the rest clip: 4 x 24 plus 3 x 2 gaps.
 const CLASS_ICON: Pixels = px(24.);
 const CLASSES: Pixels = px(102.);
+
+// A number column whose four-letter title needs room beside it for the sort arrow.
+const WIDE: Pixels = px(44.);
 
 // One number column: which sort it is and how a player's cell reads.
 type Column = (PlayerColumn, fn(&PlayerLine) -> String);
@@ -43,22 +45,21 @@ pub(super) fn players_table(
     let columns = player_columns(log.columns());
     // A kept sort by a column this log hides lists in the default order, but stays saved.
     let shown = sort.shown_in(log.columns());
-    // The sorted header carries an arrow under its title, since the columns are too narrow
-    // to fit one beside it.
     let header = |column: PlayerColumn| {
         let page = page.clone();
         let sorted = shown.filter(|s| s.column == column);
-        let button = Button::new(ids::logstf_sort(column.title()))
-            .ghost()
-            .xsmall()
-            .label(column.label())
-            .selected(sorted.is_some())
-            .w_full()
-            .on_click(move |_, _, cx| {
-                let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
-            });
-        let arrow = ids::logstf_sort_arrow(column.title());
-        sortable(button, arrow, sorted.map(|s| s.descending))
+        let title = column.title();
+        sortable(
+            ids::logstf_sort(title),
+            ids::logstf_sort_title(title),
+            column.label(),
+            ids::logstf_sort_arrow(title),
+            sorted.map(|s| s.descending),
+            false,
+        )
+        .on_click(move |_, _, cx| {
+            let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
+        })
     };
     let mut table = v_flex().w_full().child(
         h_flex()
@@ -73,7 +74,7 @@ pub(super) fn players_table(
             .child(header(PlayerColumn::Team).w(TEAM))
             .child(header(PlayerColumn::Name).w(NAME_MIN).flex_grow(1.))
             .child(header(PlayerColumn::Class).w(CLASSES).ml_2())
-            .children(columns.iter().map(|(c, _)| header(*c).w(NUMBER))),
+            .children(columns.iter().map(|(c, _)| header(*c).w(width(*c)))),
     );
     let assets = &cx.global::<Services>().assets;
     let players = log.players();
@@ -126,14 +127,26 @@ pub(super) fn players_table(
                     .overflow_hidden()
                     .children(icons),
             )
-            .children(columns.iter().map(|(_, cell)| {
+            .children(columns.iter().map(|(column, cell)| {
                 let text = cell(player);
                 let zero = reads_zero(&text);
-                super::number(text).when(zero, |el| el.text_color(cx.theme().muted_foreground))
+                super::number(text)
+                    .w(width(*column))
+                    .when(zero, |el| el.text_color(cx.theme().muted_foreground))
             })),
         );
     }
     table
+}
+
+// A number column's width: the common one, or wider for a title that needs it.
+fn width(column: PlayerColumn) -> Pixels {
+    use PlayerColumn as P;
+    let wide = matches!(
+        column,
+        P::DamagePerMin | P::KaPerD | P::DamageTakenPerMin | P::Caps
+    );
+    if wide { WIDE } else { NUMBER }
 }
 
 // logs.tf's number columns in its order, without the ones the log did not record.

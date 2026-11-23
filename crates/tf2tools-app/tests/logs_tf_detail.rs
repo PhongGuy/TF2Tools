@@ -1408,3 +1408,51 @@ fn a_matrix_class_header_sorts_its_column_flips_and_holds_across_tabs(cx: &mut T
         ids::logstf_matrix_arrow(Some(TfClass::Scout))
     ));
 }
+
+#[gpui_kit::test]
+fn each_players_title_and_its_arrow_sit_centred_in_the_full_column_button(cx: &mut TestAppContext) {
+    // The highlander fixture records every column logs.tf can show, all in view at 1280.
+    let (_env, _server, s, _page) = opened_at(cx, 2, 1280., 800., ids::LOGSTF_PLAYERS_HEAD);
+    let bounds = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+        let found = support::bounds_of(cx, s.win, id.clone());
+        found.unwrap_or_else(|| panic!("{id:?} not drawn"))
+    };
+    let titles = PlayerColumn::ALL
+        .iter()
+        .map(|c| c.title())
+        .collect::<Vec<_>>();
+    for title in titles {
+        let before = bounds(cx, ids::logstf_sort_title(title));
+        let head = bounds(cx, ids::logstf_sort(title));
+        let line = bounds(cx, ids::LOGSTF_PLAYERS_HEAD.into());
+        support::click_id(cx, s.win, ids::logstf_sort(title));
+        let text = bounds(cx, ids::logstf_sort_title(title));
+        let arrow = bounds(cx, ids::logstf_sort_arrow(title));
+        assert_eq!(text, before, "{title} jumped when sorted");
+        assert_eq!(
+            bounds(cx, ids::logstf_sort(title)),
+            head,
+            "{title}'s button changed"
+        );
+        assert_eq!(
+            bounds(cx, ids::LOGSTF_PLAYERS_HEAD.into()).size.height,
+            line.size.height,
+            "{title}: the header changed height"
+        );
+        // The button spans its column, at least a number column's 40 px.
+        assert!(head.size.width >= gpui_kit::px(40.), "{title}: {head:?}");
+        let (left, right) = (f32::from(text.left()), f32::from(arrow.right()));
+        assert!(
+            arrow.left() >= text.right(),
+            "{title}: {arrow:?} not after {text:?}"
+        );
+        assert!(
+            left >= f32::from(head.left()) - 0.5 && right <= f32::from(head.right()) + 0.5,
+            "{title}: {text:?} and {arrow:?} spill out of {head:?}"
+        );
+        assert!(
+            ((left + right) / 2. - f32::from(head.center().x)).abs() <= 1.,
+            "{title}: {text:?} and {arrow:?} not centred in {head:?}"
+        );
+    }
+}
