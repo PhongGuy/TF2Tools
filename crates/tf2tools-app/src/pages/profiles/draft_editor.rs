@@ -35,17 +35,17 @@ use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
 use crate::pages::graphics::pictures::ChoicesOwner;
 use crate::pages::graphics::view::SectionView;
-use crate::pages::graphics::{ChoicesEdit, GraphicsChoicesEditor, pill};
+use crate::pages::graphics::{ChoicesEdit, GraphicsChoicesEditor, WIDE_ROWS_MIN_WIDTH, pill};
 use crate::previews::CrosshairPreviews;
 use crate::remote_images::RemoteImages;
 use crate::services::{OpError, run_blocking};
-use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
-use crate::widgets::card_grid::SHELL_CHROME_WIDTH;
+use crate::shell::{CONTENT_PADDING, SIDEBAR_WIDTH};
 use crate::widgets::crosshair_picker::{CrosshairPicker, ImportCrosshair};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::width_watch;
 
 /// The body's widest column, centred in a wider window.
 const BODY_MAX_WIDTH: f32 = 1180.;
@@ -143,8 +143,12 @@ pub struct ProfileDraftEditor {
     pub(super) graphics: Entity<GraphicsChoicesEditor>,
     /// The Graphics page's saved choices for Copy; None until the read lands.
     pub(super) page_choices: Option<Result<Option<Choices>, OpError>>,
-    /// The content area was narrower than the wide layout last frame.
+    /// The rail stood in a row above the cards last frame.
     pub(super) narrow: bool,
+    /// The Graphics rows put their controls under their text last frame.
+    pub(super) rows_narrow: bool,
+    /// The body's width, padding included, as last painted; None before the first paint.
+    body_width: Rc<Cell<Option<Pixels>>>,
     /// The Graphics sections the last frame drew, with the rows generation they were cut from.
     pub(super) graphics_sections: Option<(u64, Rc<[SectionView]>)>,
     /// How many times the Graphics sections were cut.
@@ -231,6 +235,8 @@ impl ProfileDraftEditor {
             graphics,
             page_choices: None,
             narrow: false,
+            rows_narrow: false,
+            body_width: Rc::new(Cell::new(None)),
             graphics_sections: None,
             sections_cut: 0,
             library: None,
@@ -762,18 +768,11 @@ fn slot_text(slot: SlotKind, mode: Mode) -> SharedString {
 
 impl Render for ProfileDraftEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = window.viewport_size().width - SHELL_CHROME_WIDTH;
-        let narrow = content < RAIL_ROW_BELOW;
+        let layout = editor_layout(self.body_width.get(), window.viewport_size().width);
+        let narrow = layout.rail_above;
         self.narrow = narrow;
-        // A card's lane (the content width, which already leaves out the body's padding) less
-        // the side rail when it stands beside, then the card's own padding.
-        let lane_width = content.min(px(BODY_MAX_WIDTH));
-        let beside = if narrow {
-            px(0.)
-        } else {
-            RAIL_WIDTH + RAIL_GUTTER
-        };
-        self.card_width = lane_width - beside - CARD_INSET * 2.;
+        self.rows_narrow = layout.rows_narrow;
+        self.card_width = layout.card_width;
         // Each card is a direct child of the scroll column so the rail can scroll to it by
         // index; the narrow rail row comes first, the wide rail hangs off the first card.
         self.cards_from = if narrow { 2 } else { 1 };
@@ -830,7 +829,9 @@ impl Render for ProfileDraftEditor {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(children);
+            .children(children)
+            // Last, so the cards' child indices stay put for the rail's jumps.
+            .child(width_watch::width_watch(&self.body_width));
         v_flex()
             .id(ids::PROFILE_EDITOR)
             .test_support()
@@ -1030,5 +1031,78 @@ impl Render for EditorCrumb {
                     ),
             )
             .into_any_element()
+    }
+}
+
+/// Where the rail goes and how wide the slot cards and their rows are, for one frame. A card's
+/// width is the content lane less the rail when it stands beside, then the card's own padding.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct EditorLayout {
+    rail_above: bool,
+    rows_narrow: bool,
+    card_width: Pixels,
+}
+
+/// Lays the editor out from the body's measured width, padding included. Before the first
+/// measurement it assumes the full sidebar, and a collapsed one corrects itself a frame later.
+fn editor_layout(body: Option<Pixels>, viewport: Pixels) -> EditorLayout {
+    let content = body.unwrap_or(viewport - SIDEBAR_WIDTH) - CONTENT_PADDING * 2.;
+    let rail_above = content < RAIL_ROW_BELOW;
+    let beside = if rail_above {
+        px(0.)
+    } else {
+        RAIL_WIDTH + RAIL_GUTTER
+    };
+    let card_width = content.min(px(BODY_MAX_WIDTH)) - beside - CARD_INSET * 2.;
+    EditorLayout {
+        rail_above,
+        rows_narrow: card_width < px(WIDE_ROWS_MIN_WIDTH),
+        card_width,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::SIDEBAR_COLLAPSED_WIDTH;
+
+    // The layout for a window `width` wide with the full sidebar, as measured after a frame.
+    fn at(width: f32) -> EditorLayout {
+        editor_layout(Some(px(width) - SIDEBAR_WIDTH), px(width))
+    }
+
+    #[test]
+    fn the_rows_follow_the_card_width_each_side_of_the_rail_switch() {
+        // (window, rail above, card width, rows narrow); the rows go wide again when the rail
+        // moves above and hands its width to the card.
+        for (width, above, card, narrow) in [
+            (1334., false, 740., false),
+            (1333., false, 739., true),
+            (1252., false, 658., true),
+            (1251., true, 865., false),
+            (1126., true, 740., false),
+            (1125., true, 739., true),
+        ] {
+            let layout = at(width);
+            assert_eq!(layout.rail_above, above, "rail at {width}");
+            assert_eq!(layout.card_width, px(card), "card at {width}");
+            assert_eq!(layout.rows_narrow, narrow, "rows at {width}");
+        }
+    }
+
+    #[test]
+    fn a_collapsed_sidebar_keeps_the_rail_beside_and_the_rows_wide() {
+        let viewport = px(1200.);
+        let layout = editor_layout(Some(viewport - SIDEBAR_COLLAPSED_WIDTH), viewport);
+        assert!(!layout.rail_above);
+        assert_eq!(layout.card_width, px(814.));
+        assert!(!layout.rows_narrow);
+    }
+
+    #[test]
+    fn the_first_frame_estimates_the_body_from_the_full_sidebar() {
+        for width in [1334., 1333., 1251., 1125., 800.] {
+            assert_eq!(editor_layout(None, px(width)), at(width), "at {width}");
+        }
     }
 }
