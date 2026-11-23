@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyWindowHandle, Context, Entity, RenderImage, TestAppContext, Window, div};
+use gpui_kit::{
+    AnyWindowHandle, Context, Entity, RenderImage, TestAppContext, Window, div, relative,
+};
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
@@ -148,13 +150,20 @@ pub fn frame_clock() -> Clock {
 
 pub struct ViewportHost(pub Entity<DemoViewport>);
 
+// The viewport fills the window's top-left quarter, so a drag can leave it and still be in the
+// window, and a window resize still resizes it.
 impl Render for ViewportHost {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().child(self.0.clone())
+        div().size_full().child(
+            div()
+                .w(relative(0.5))
+                .h(relative(0.5))
+                .child(self.0.clone()),
+        )
     }
 }
 
-/// A 1200x900 window holding only a viewport over the synthetic map, drawn by an `answer` stub.
+/// A 1200x900 window holding only a viewport (in its top-left quarter) over the synthetic map, drawn by an `answer` stub.
 pub fn viewport_window(
     cx: &mut TestAppContext,
     answer: StubAnswer,

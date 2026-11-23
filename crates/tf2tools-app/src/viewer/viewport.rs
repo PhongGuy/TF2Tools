@@ -7,9 +7,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    Context, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent, KeyUpEvent,
-    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point,
-    Render, RenderImage, Styled as _, TestSupportExt as _, Window, canvas, div, img,
+    Context, DispatchPhase, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent,
+    KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _,
+    Pixels, Point, Render, RenderImage, Styled as _, TestSupportExt as _, Window, canvas, div, img,
 };
 use tf2tools_core::{DemoSnapshot, FlyInput, FreeFly, MapMesh};
 
@@ -196,6 +196,14 @@ impl DemoViewport {
     fn press(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.focus.focus(window, cx);
         self.drag = Some(ev.position);
+        cx.notify();
+    }
+
+    /// Ends a drag, whichever way it ended; does nothing when none is under way.
+    fn end_drag(&mut self, cx: &mut Context<Self>) {
+        if self.drag.take().is_some() {
+            cx.notify();
+        }
     }
 
     /// Turns the camera by the drag since the last move; a move with no button held ends it.
@@ -204,8 +212,7 @@ impl DemoViewport {
             return;
         };
         if ev.pressed_button.is_none() {
-            self.drag = None;
-            return;
+            return self.end_drag(cx);
         }
         self.drag = Some(ev.position);
         let by = ev.position - last;
@@ -260,6 +267,7 @@ impl Render for DemoViewport {
         // scale change asks for one more frame, which draws at the new size.
         let measured = Rc::clone(&self.device_size);
         let paint_taken = Rc::clone(&self.taken);
+        let dragging = self.drag.is_some().then(|| cx.entity().downgrade());
         let watch = canvas(
             move |bounds, window, _| {
                 let scale = window.scale_factor();
@@ -270,7 +278,22 @@ impl Render for DemoViewport {
                     window.request_animation_frame();
                 }
             },
-            move |_, _, _, _| {
+            move |_, _, window, _| {
+                // A drag follows the pointer anywhere in the window, so moves and the release
+                // past the viewport's edge still reach it.
+                if let Some(view) = dragging {
+                    let moved = view.clone();
+                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Capture {
+                            let _ = moved.update(cx, |v, cx| v.drag_to(ev, cx));
+                        }
+                    });
+                    window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Capture {
+                            let _ = view.update(cx, |v, cx| v.end_drag(cx));
+                        }
+                    });
+                }
                 if let Some((taken, seq)) = paint_taken.take() {
                     tracing::info!(
                         target: super::stats::TARGET,
@@ -298,19 +321,16 @@ impl Render for DemoViewport {
             .child(watch)
             .children(frame)
             .on_key_down(cx.listener(|v, ev: &KeyDownEvent, _, cx| {
+                if ev.keystroke.key == "escape" {
+                    v.end_drag(cx);
+                }
                 v.set_key(&ev.keystroke.key, true, cx);
             }))
             .on_key_up(cx.listener(|v, ev: &KeyUpEvent, _, cx| {
                 v.set_key(&ev.keystroke.key, false, cx);
-            }))
-            .on_mouse_move(cx.listener(|v, ev: &MouseMoveEvent, _, cx| v.drag_to(ev, cx)));
+            }));
         for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-            view = view
-                .on_mouse_down(button, cx.listener(Self::press))
-                .on_mouse_up(
-                    button,
-                    cx.listener(|v, _: &MouseUpEvent, _, _| v.drag = None),
-                );
+            view = view.on_mouse_down(button, cx.listener(Self::press));
         }
         view
     }

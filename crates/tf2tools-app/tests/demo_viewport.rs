@@ -277,3 +277,82 @@ fn a_viewport_with_players_sends_their_boxes_and_starts_at_the_red_eye(cx: &mut 
     });
     assert_eq!((origin, yaw, pitch), ([100., 200., 139.], 270., 12.));
 }
+
+fn yaw_pitch(cx: &mut TestAppContext, viewport: &Entity<DemoViewport>) -> (f32, f32) {
+    cx.update(|cx| {
+        let camera = viewport.read(cx).camera();
+        (camera.yaw(), camera.pitch())
+    })
+}
+
+#[gpui_kit::test]
+fn a_drag_that_leaves_the_viewport_keeps_turning(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = viewport_window(cx, StubAnswer::Frames);
+    let bounds = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT).expect("the viewport");
+    let from = bounds.center();
+    // Past the right edge and below the bottom edge, still inside the window.
+    let out = point(bounds.right() + px(100.), bounds.bottom() + px(50.));
+    let further = point(out.x + px(100.), out.y);
+    cx.update_window(win, |_, w, cx| w.pointer_down(from, MouseButton::Right, cx))
+        .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(out, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw, _) = yaw_pitch(cx, &viewport);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(further, Some(MouseButton::Right), cx);
+        w.pointer_up(further, MouseButton::Right, cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw2, _) = yaw_pitch(cx, &viewport);
+    assert!((yaw2 - (yaw - 22.)).abs() < 1e-3, "{yaw} -> {yaw2}");
+}
+
+#[gpui_kit::test]
+fn a_release_outside_the_viewport_ends_the_drag(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = viewport_window(cx, StubAnswer::Frames);
+    let bounds = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT).expect("the viewport");
+    let out = point(bounds.right() + px(100.), bounds.bottom() + px(50.));
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_down(bounds.center(), MouseButton::Left, cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| w.pointer_up(out, MouseButton::Left, cx))
+        .unwrap();
+    support::settle(cx, win);
+    let before = yaw_pitch(cx, &viewport);
+    // A later button-held move over the viewport must not turn: the drag ended at the release outside.
+    // (On the current code the outside release is missed, so this move turns the camera.)
+    let to = point(bounds.center().x + px(100.), bounds.center().y);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(to, Some(MouseButton::Left), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    assert_eq!(yaw_pitch(cx, &viewport), before);
+}
+
+#[gpui_kit::test]
+fn escape_ends_a_drag(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = viewport_window(cx, StubAnswer::Frames);
+    let from = centre(cx, win);
+    cx.update_window(win, |_, w, cx| w.pointer_down(from, MouseButton::Right, cx))
+        .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| w.key_down("escape", false, cx))
+        .unwrap();
+    support::settle(cx, win);
+    let before = yaw_pitch(cx, &viewport);
+    let to = point(from.x + px(100.), from.y);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(to, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    assert_eq!(yaw_pitch(cx, &viewport), before);
+}
