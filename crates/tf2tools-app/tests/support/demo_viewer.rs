@@ -259,6 +259,19 @@ pub fn viewport_window_with(
     snapshot: Option<DemoSnapshot>,
     lock: Box<dyn PointerLock>,
 ) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
+    let opened = viewport_window_unsettled(cx, answer, snapshot, lock);
+    super::settle(cx, opened.0);
+    opened
+}
+
+/// `viewport_window_with` straight after the window opens: nothing has run or rendered since,
+/// so a test can drive the frame loop itself without the forced re-render `settle` does.
+pub fn viewport_window_unsettled(
+    cx: &mut TestAppContext,
+    answer: StubAnswer,
+    snapshot: Option<DemoSnapshot>,
+    lock: Box<dyn PointerLock>,
+) -> (AnyWindowHandle, Entity<DemoViewport>, StubHandle) {
     super::init(cx);
     let mesh = Arc::new(load_map_mesh(&bsp(&BspOptions::default())).unwrap());
     let (renderer, handle) = stub(answer);
@@ -280,7 +293,6 @@ pub fn viewport_window_with(
             })
         })
         .unwrap();
-    super::settle(cx, win);
     let viewport = cx.update(|cx| host.read(cx).0.clone());
     (win, viewport, handle)
 }
