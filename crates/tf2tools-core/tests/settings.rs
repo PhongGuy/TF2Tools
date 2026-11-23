@@ -297,6 +297,24 @@ fn hud_maker_panel_defaults_to_none_and_round_trips() {
 }
 
 #[test]
+fn demo_viewer_bar_defaults_to_none_and_round_trips() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let db = Database::open(&dir).unwrap();
+    assert_eq!(db.settings().unwrap().demo_viewer_bar(), None);
+    db.set_demo_viewer_bar("0.500 0.940 collapsed").unwrap();
+    assert_eq!(
+        raw_setting(&dir, "demo_viewer_bar").as_deref(),
+        Some("0.500 0.940 collapsed")
+    );
+    drop(db);
+    let db = Database::open(&dir).unwrap();
+    assert_eq!(
+        db.settings().unwrap().demo_viewer_bar(),
+        Some("0.500 0.940 collapsed")
+    );
+}
+
+#[test]
 fn hud_maker_backdrop_defaults_to_none_round_trips_and_clears() {
     let (_tmp, dir) = common::temp_data_dir();
     let db = Database::open(&dir).unwrap();

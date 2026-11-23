@@ -26,6 +26,7 @@ pub struct Settings {
     show_log_nicknames: bool,
     hud_maker_panel: Option<String>,
     hud_maker_backdrop: Option<PathBuf>,
+    demo_viewer_bar: Option<String>,
     old_v4_asked: bool,
 }
 
@@ -80,6 +81,11 @@ impl Settings {
         self.hud_maker_panel.as_deref()
     }
 
+    /// Where the Demo Viewer's floating bar sits, as the app wrote it; `None` by default.
+    pub fn demo_viewer_bar(&self) -> Option<&str> {
+        self.demo_viewer_bar.as_deref()
+    }
+
     /// The picture the HUD Maker draws behind the HUD; `None` by default.
     pub fn hud_maker_backdrop(&self) -> Option<&Path> {
         self.hud_maker_backdrop.as_deref()
@@ -105,6 +111,7 @@ impl Default for Settings {
             show_log_nicknames: true,
             hud_maker_panel: None,
             hud_maker_backdrop: None,
+            demo_viewer_bar: None,
             old_v4_asked: false,
         }
     }
@@ -175,6 +182,7 @@ impl Database {
                     settings.show_log_nicknames = matches!(value.as_str(), "true" | "1")
                 }
                 "hud_maker_panel" => settings.hud_maker_panel = Some(value),
+                "demo_viewer_bar" => settings.demo_viewer_bar = Some(value),
                 "hud_maker_backdrop" => {
                     settings.hud_maker_backdrop = (!value.is_empty()).then(|| value.into())
                 }
@@ -267,6 +275,11 @@ impl Database {
     /// Stores where the HUD Maker's side panel sits; the text is the app's to read back.
     pub fn set_hud_maker_panel(&self, place: &str) -> Result<(), SettingsError> {
         self.save_setting("hud_maker_panel", place)
+    }
+
+    /// Stores where the Demo Viewer's floating bar sits; the text is the app's to read back.
+    pub fn set_demo_viewer_bar(&self, place: &str) -> Result<(), SettingsError> {
+        self.save_setting("demo_viewer_bar", place)
     }
 
     /// Stores the HUD Maker's backdrop picture; `None` deletes the key.
