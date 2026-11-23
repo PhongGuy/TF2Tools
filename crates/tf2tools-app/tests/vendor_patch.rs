@@ -9,7 +9,12 @@ fn repo() -> PathBuf {
 
 /// The `[[package]]` blocks of Cargo.lock whose name is exactly `name`.
 fn lock_blocks(name: &str) -> Vec<String> {
-    let lock = std::fs::read_to_string(repo().join("Cargo.lock")).unwrap();
+    lock_blocks_in("Cargo.lock", name)
+}
+
+/// The `[[package]]` blocks named `name` in the lock file at `lock`, relative to the repo.
+fn lock_blocks_in(lock: &str, name: &str) -> Vec<String> {
+    let lock = std::fs::read_to_string(repo().join(lock)).unwrap();
     let line = format!("name = \"{name}\"");
     lock.split("[[package]]")
         .filter(|block| block.lines().any(|l| l.trim() == line))
@@ -28,6 +33,20 @@ fn the_build_uses_the_vendored_gpui_pre_crates_0_3_12() {
         assert!(
             !block.contains("source ="),
             "resolved from a registry: {block}"
+        );
+    }
+}
+
+// The pilot harness is its own workspace, so it needs the same patches or pilot builds break.
+#[test]
+fn the_pilot_harness_uses_the_vendored_gpui_pre_crates_too() {
+    for name in ["gpui-pre-linux", "gpui-pre-scheduler"] {
+        let blocks = lock_blocks_in("tools/tf2tools-pilot/Cargo.lock", name);
+        assert_eq!(blocks.len(), 1, "{name}: {blocks:?}");
+        assert!(
+            !blocks[0].contains("source ="),
+            "pilot resolves {name} from a registry: {}",
+            blocks[0]
         );
     }
 }
