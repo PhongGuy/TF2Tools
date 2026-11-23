@@ -228,7 +228,8 @@ impl Render for ViewportHost {
     }
 }
 
-/// A 1200x900 window holding only a viewport (in its top-left quarter) over the synthetic map, drawn by an `answer` stub.
+/// A 1200x900 window holding only a viewport, in its top-left quarter, over the synthetic map,
+/// drawn by an `answer` stub.
 pub fn viewport_window(
     cx: &mut TestAppContext,
     answer: StubAnswer,

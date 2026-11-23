@@ -334,7 +334,6 @@ fn a_release_outside_the_viewport_ends_the_drag(cx: &mut TestAppContext) {
     support::settle(cx, win);
     let before = yaw_pitch(cx, &viewport);
     // A later button-held move over the viewport must not turn: the drag ended at the release outside.
-    // (On the current code the outside release is missed, so this move turns the camera.)
     let to = point(bounds.center().x + px(100.), bounds.center().y);
     cx.update_window(win, |_, w, cx| {
         w.pointer_move(to, Some(MouseButton::Left), cx)
