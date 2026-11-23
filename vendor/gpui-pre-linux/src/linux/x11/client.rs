@@ -53,6 +53,7 @@ use crate::linux::{
     is_within_click_distance, keystroke_from_xkb, keystroke_underlying_dead_key,
     log_cursor_icon_warning, modifiers_from_xkb, new_xkb_context, open_uri_internal,
     platform::{DOUBLE_CLICK_INTERVAL, SCROLL_LINES},
+    pointer_lock::{PointerLockState, PointerLockTarget, VirtualPointer, WarpTracker},
     reveal_path_internal,
     xdg_desktop_portal::{Event as XDPEvent, XDPEventSource},
 };
@@ -209,6 +210,9 @@ pub struct X11ClientState {
     pub(crate) atoms: XcbAtoms,
     pub(crate) windows: HashMap<xproto::Window, WindowRef>,
     pub(crate) mouse_focused_window: Option<xproto::Window>,
+    /// The pointer's last position in the mouse-focused window, in logical pixels.
+    mouse_location: Option<Point<Pixels>>,
+    pointer_lock: Option<X11PointerLock>,
     pub(crate) keyboard_focused_window: Option<xproto::Window>,
     pub(crate) xkb: xkbc::State,
     keyboard_layout: LinuxKeyboardLayout,
@@ -241,16 +245,81 @@ pub struct X11ClientState {
     pub(crate) xdnd_state: Xdnd,
 }
 
+/// A held pointer lock: the grabbed master pointer, where the lock began, and the warp-to-centre
+/// bookkeeping that turns absolute motion into the virtual position's deltas.
+struct X11PointerLock {
+    window: xproto::Window,
+    device: xinput::DeviceId,
+    start: Point<Pixels>,
+    position: VirtualPointer,
+    tracker: WarpTracker,
+    /// The window centre in logical pixels, as the tracker sees positions.
+    centre: (f32, f32),
+    /// The same centre in device pixels, as `WarpPointer` takes it.
+    centre_device: (i16, i16),
+}
+
 #[derive(Clone)]
 pub struct X11ClientStatePtr(pub Weak<RefCell<X11ClientState>>);
 
-// Filled in when the X11 lock lands; until then this client cannot lock.
-impl crate::linux::pointer_lock::PointerLockTarget for X11ClientStatePtr {
-    fn lock(&self) -> crate::linux::pointer_lock::PointerLockState {
-        crate::linux::pointer_lock::PointerLockState::Unsupported
+// The registry may outlive the client, so both upgrade the handle themselves and do nothing once it is gone.
+impl PointerLockTarget for X11ClientStatePtr {
+    fn lock(&self) -> PointerLockState {
+        let Some(client) = self.0.upgrade() else {
+            return PointerLockState::Unsupported;
+        };
+        let Ok(mut state) = client.try_borrow_mut() else {
+            log::warn!("x11: pointer lock requested while the client is busy");
+            return PointerLockState::Unsupported;
+        };
+        state.begin_pointer_lock()
     }
 
-    fn unlock(&self) {}
+    fn unlock(&self) {
+        if let Some(client) = self.0.upgrade() {
+            end_pointer_lock(&client);
+        }
+    }
+}
+
+/// Releases the lock, if one is held: ungrabs the pointer, warps it back to the lock's start and
+/// sends one buttonless MouseMove there; returns that start. The client state must not be
+/// borrowed, since the window's input callback runs (and may call `unlock_pointer` again).
+fn end_pointer_lock(client: &Rc<RefCell<X11ClientState>>) -> Option<Point<Pixels>> {
+    let Ok(mut state) = client.try_borrow_mut() else {
+        log::warn!("x11: pointer unlock requested while the client is busy");
+        return None;
+    };
+    let lock = state.pointer_lock.take()?;
+    state.release_pointer_grab(&lock);
+    let (start_x, start_y) = to_device_point(lock.start, state.scale_factor);
+    check_reply(
+        || "X11: failed to warp the pointer back after a lock",
+        state
+            .xcb_connection
+            .warp_pointer(x11rb::NONE, lock.window, 0, 0, 0, 0, start_x, start_y),
+    )
+    .log_err();
+    state.restore_cursor_after_hide();
+    state.xcb_connection.flush().log_err();
+    state.mouse_location = Some(lock.start);
+    let window = state.windows.get(&lock.window).map(|w| w.window.clone());
+    let modifiers = state.modifiers;
+    drop(state);
+    if let Some(window) = window {
+        window.handle_input(PlatformInput::MouseMove(gpui::MouseMoveEvent {
+            position: lock.start,
+            pressed_button: None,
+            modifiers,
+        }));
+    }
+    Some(lock.start)
+}
+
+// Logical pixels to the device pixels X requests take, saturating at i16's range.
+fn to_device_point(point: Point<Pixels>, scale_factor: f32) -> (i16, i16) {
+    let device = |v: Pixels| (v.as_f32() * scale_factor).round() as i16;
+    (device(point.x), device(point.y))
 }
 
 impl X11ClientStatePtr {
@@ -273,6 +342,11 @@ impl X11ClientStatePtr {
         }
         if state.mouse_focused_window == Some(x_window) {
             state.mouse_focused_window = None;
+        }
+        // A lock on a closed window has nobody left to tell, so it only lets go of the pointer.
+        if let Some(lock) = state.pointer_lock.take_if(|lock| lock.window == x_window) {
+            state.release_pointer_grab(&lock);
+            state.xcb_connection.flush().log_err();
         }
         if state.keyboard_focused_window == Some(x_window) {
             state.keyboard_focused_window = None;
@@ -539,6 +613,8 @@ impl X11Connection {
                 atoms,
                 windows: HashMap::default(),
                 mouse_focused_window: None,
+                mouse_location: None,
+                pointer_lock: None,
                 keyboard_focused_window: None,
                 xkb: xkb_state,
                 keyboard_layout,
@@ -1080,6 +1156,7 @@ impl X11Client {
             }
             Event::FocusOut(event) => {
                 let window = self.get_window(event.event)?;
+                end_pointer_lock(&self.0);
                 window.set_active(false);
                 let mut state = self.0.borrow_mut();
                 // Set last scroll values to `None` so that a large delta isn't created if scrolling is done outside the window (the valuator is global)
@@ -1323,12 +1400,18 @@ impl X11Client {
                 let modifiers = modifiers_from_xinput_info(event.mods);
                 state.modifiers = modifiers;
 
-                let position = point(
+                let mut position = point(
                     px(event.event_x as f32 / u16::MAX as f32 / state.scale_factor),
                     px(event.event_y as f32 / u16::MAX as f32 / state.scale_factor),
                 );
                 match button_or_scroll_from_event_detail(event.detail) {
                     Some(ButtonOrScroll::Button(button)) => {
+                        // A release ends a lock first, so it lands where the freed pointer now is.
+                        if state.pointer_lock.is_some() {
+                            drop(state);
+                            position = end_pointer_lock(&self.0).unwrap_or(position);
+                            state = self.0.borrow_mut();
+                        }
                         let click_count = state.current_count;
                         drop(state);
                         window.handle_input(PlatformInput::MouseUp(gpui::MouseUpEvent {
@@ -1374,15 +1457,46 @@ impl X11Client {
                     };
                 }
                 let pressed_button = pressed_button_from_mask(event.button_mask[0]);
-                let position = point(
+                let mut position = point(
                     px(event.event_x as f32 / u16::MAX as f32 / state.scale_factor),
                     px(event.event_y as f32 / u16::MAX as f32 / state.scale_factor),
                 );
                 let modifiers = modifiers_from_xinput_info(event.mods);
                 state.modifiers = modifiers;
+                let mut moved = event.valuator_mask[0] & 3 != 0;
+                let x_window = window.x_window;
+                match state.pointer_lock.as_mut() {
+                    // Every motion feeds the tracker, so the warp's echo is consumed even without
+                    // x/y valuators; only real deltas move the virtual pointer.
+                    Some(lock) if lock.window == x_window => {
+                        let (dx, dy) = lock
+                            .tracker
+                            .motion((position.x.as_f32(), position.y.as_f32()));
+                        moved = dx != 0.0 || dy != 0.0;
+                        let (x, y) = if moved {
+                            lock.position.apply(dx, dy)
+                        } else {
+                            lock.position.position()
+                        };
+                        position = point(px(x), px(y));
+                        if lock.tracker.should_warp(lock.centre) {
+                            let (window, (cx, cy)) = (lock.window, lock.centre_device);
+                            state
+                                .xcb_connection
+                                .warp_pointer(x11rb::NONE, window, 0, 0, 0, 0, cx, cy)
+                                .map_err(handle_connection_error)
+                                .context("X11: failed to warp the locked pointer to the centre")
+                                .log_err();
+                            state.xcb_connection.flush().log_err();
+                        }
+                    }
+                    // Positions over another window are not in the lock's coordinates.
+                    Some(_) => moved = false,
+                    None => state.mouse_location = Some(position),
+                }
                 drop(state);
 
-                if event.valuator_mask[0] & 3 != 0 {
+                if moved {
                     window.handle_input(PlatformInput::MouseMove(gpui::MouseMoveEvent {
                         position,
                         pressed_button,
@@ -1408,9 +1522,14 @@ impl X11Client {
                 window.set_hovered(true);
                 let mut state = self.0.borrow_mut();
                 state.mouse_focused_window = Some(event.event);
+                state.mouse_location = Some(point(
+                    px(event.event_x as f32 / u16::MAX as f32 / state.scale_factor),
+                    px(event.event_y as f32 / u16::MAX as f32 / state.scale_factor),
+                ));
                 state.restore_cursor_after_hide();
             }
             Event::XinputLeave(event) if event.mode == xinput::NotifyMode::NORMAL => {
+                end_pointer_lock(&self.0);
                 let mut state = self.0.borrow_mut();
 
                 // Set last scroll values to `None` so that a large delta isn't created if scrolling is done outside the window (the valuator is global)
@@ -2170,6 +2289,102 @@ impl X11ClientState {
             .log_err()?;
         self.invisible_cursor_cache = Some(cursor);
         Some(cursor)
+    }
+
+    /// Grabs the master pointer for the mouse-focused window with the invisible cursor; motion then
+    /// warps it back to the window centre. A held lock reports `Locked` instead of grabbing twice.
+    fn begin_pointer_lock(&mut self) -> PointerLockState {
+        if self.pointer_lock.is_some() {
+            return PointerLockState::Locked;
+        }
+        let (Some(window), Some(start)) = (self.mouse_focused_window, self.mouse_location) else {
+            return PointerLockState::Unsupported;
+        };
+        let Some(cursor) = self.get_or_create_invisible_cursor() else {
+            return PointerLockState::Unsupported;
+        };
+        let Some(device) = self.master_pointer(window) else {
+            return PointerLockState::Unsupported;
+        };
+        let Some(geometry) = get_reply(
+            || "X11: failed to read the window size for a pointer lock",
+            self.xcb_connection.get_geometry(window),
+        )
+        .log_err() else {
+            return PointerLockState::Unsupported;
+        };
+        // Owner events keep XI2 motion and buttons flowing through the window's usual handlers.
+        let mask = [u32::from(
+            xinput::XIEventMask::MOTION
+                | xinput::XIEventMask::BUTTON_PRESS
+                | xinput::XIEventMask::BUTTON_RELEASE
+                | xinput::XIEventMask::LEAVE,
+        )];
+        let grabbed = get_reply(
+            || "X11: failed to grab the pointer for a lock",
+            self.xcb_connection.xinput_xi_grab_device(
+                window,
+                x11rb::CURRENT_TIME,
+                cursor,
+                device,
+                xproto::GrabMode::ASYNC,
+                xproto::GrabMode::ASYNC,
+                xinput::GrabOwner::OWNER,
+                &mask,
+            ),
+        )
+        .log_err();
+        if grabbed.is_none_or(|reply| reply.status != xproto::GrabStatus::SUCCESS) {
+            return PointerLockState::Unsupported;
+        }
+        let centre_device = ((geometry.width / 2) as i16, (geometry.height / 2) as i16);
+        let centre = (
+            centre_device.0 as f32 / self.scale_factor,
+            centre_device.1 as f32 / self.scale_factor,
+        );
+        let at = (start.x.as_f32(), start.y.as_f32());
+        self.pointer_lock = Some(X11PointerLock {
+            window,
+            device,
+            start,
+            position: VirtualPointer::new(at),
+            tracker: WarpTracker::new(at),
+            centre,
+            centre_device,
+        });
+        PointerLockState::Locked
+    }
+
+    /// The master pointer that drives `window`. The client pointer is unset until this client makes
+    /// a core pointer request, so the first master pointer stands in for it then.
+    fn master_pointer(&self, window: xproto::Window) -> Option<xinput::DeviceId> {
+        let client_pointer = get_reply(
+            || "X11: failed to read the client pointer",
+            self.xcb_connection.xinput_xi_get_client_pointer(window),
+        )
+        .log_err()?;
+        if client_pointer.set && client_pointer.deviceid != XINPUT_ALL_DEVICES {
+            return Some(client_pointer.deviceid);
+        }
+        get_reply(
+            || "X11: failed to list the master pointers",
+            self.xcb_connection
+                .xinput_xi_query_device(XINPUT_ALL_DEVICE_GROUPS),
+        )
+        .log_err()?
+        .infos
+        .iter()
+        .find(|info| info.type_ == xinput::DeviceType::MASTER_POINTER)
+        .map(|info| info.deviceid)
+    }
+
+    fn release_pointer_grab(&self, lock: &X11PointerLock) {
+        check_reply(
+            || "X11: failed to release the pointer lock's grab",
+            self.xcb_connection
+                .xinput_xi_ungrab_device(x11rb::CURRENT_TIME, lock.device),
+        )
+        .log_err();
     }
 
     fn hide_cursor_until_mouse_moves(&mut self) {
