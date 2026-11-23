@@ -433,3 +433,97 @@ fn the_compare_pill_calls_the_profile_s_side_this_profile(cx: &mut TestAppContex
         Some("Slide between the preset's picture and this profile's")
     );
 }
+
+// Opens the Graphics profile's editor at `width` with every row on screen, and waits for fpscap.
+fn gfx_editor_at(cx: &mut TestAppContext, width: f32, collapse: bool) -> support::ShellWindow {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    let p = gfx_profile(&s, &env);
+    if collapse {
+        support::click_id(cx, s.win, ids::SIDEBAR_TOGGLE);
+    }
+    cx.simulate_window_resize(s.win, size(px(width), px(4000.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let gfx = ids::IdScope::PROFILE_GRAPHICS;
+    support::wait_real(cx, "the rows", |cx| {
+        support::present(cx, s.win, gfx.id(ids::graphics_row("fpscap")))
+    });
+    s
+}
+
+// Whether the rows are narrow, read off fpscap's controls: under its name at the name's left
+// edge when narrow, right-aligned past the name when wide; anything else fails.
+fn rows_narrow(cx: &mut TestAppContext, s: &support::ShellWindow, what: &str) -> bool {
+    let gfx = ids::IdScope::PROFILE_GRAPHICS;
+    let name = support::bounds_of(cx, s.win, gfx.id(ids::graphics_module("fpscap"))).unwrap();
+    let lead = support::bounds_of(cx, s.win, gfx.id(ids::graphics_module_preset("fpscap")));
+    let lead = lead.unwrap();
+    let row = support::bounds_of(cx, s.win, gfx.id(ids::graphics_row("fpscap"))).unwrap();
+    if (lead.left() - name.left()).abs() <= px(1.) && lead.top() >= name.bottom() {
+        return true;
+    }
+    assert!(
+        lead.left() > name.right() && lead.right() <= row.right(),
+        "{what}: the controls are neither under the text nor right-aligned: {name:?} {lead:?} {row:?}"
+    );
+    false
+}
+
+fn rail_beside(cx: &mut TestAppContext, s: &support::ShellWindow) -> bool {
+    let rail = support::bounds_of(cx, s.win, ids::PROFILE_RAIL).unwrap();
+    let card = support::bounds_of(cx, s.win, ids::profile_slot("hud")).unwrap();
+    rail.right() <= card.left()
+}
+
+fn assert_layout_at(cx: &mut TestAppContext, s: &support::ShellWindow, width: f32, beside: bool) {
+    cx.simulate_window_resize(s.win, size(px(width), px(4000.)));
+    support::settle(cx, s.win);
+    assert_eq!(rail_beside(cx, s), beside, "the rail's place at {width} px");
+}
+
+// Beside the rail a card is 740 px at a 1334 px window; one pixel less and the rows go narrow.
+#[gpui_kit::test]
+fn rows_beside_the_rail_go_narrow_one_pixel_under_a_740_px_card(cx: &mut TestAppContext) {
+    let s = gfx_editor_at(cx, 1334., false);
+    assert_layout_at(cx, &s, 1334., true);
+    assert!(
+        !rows_narrow(cx, &s, "1334 px"),
+        "a 740 px card keeps wide rows"
+    );
+    assert_layout_at(cx, &s, 1333., true);
+    assert!(
+        rows_narrow(cx, &s, "1333 px"),
+        "a 739 px card makes them narrow"
+    );
+}
+
+// With the rail above, the card takes the lane's width: 740 px at a 1126 px window.
+#[gpui_kit::test]
+fn rows_under_the_rail_row_go_narrow_one_pixel_under_a_740_px_card(cx: &mut TestAppContext) {
+    let s = gfx_editor_at(cx, 1126., false);
+    assert_layout_at(cx, &s, 1126., false);
+    assert!(
+        !rows_narrow(cx, &s, "1126 px"),
+        "a 740 px card keeps wide rows"
+    );
+    assert_layout_at(cx, &s, 1125., false);
+    assert!(
+        rows_narrow(cx, &s, "1125 px"),
+        "a 739 px card makes them narrow"
+    );
+}
+
+// A collapsed sidebar gives the editor its width back: at 1200 px the rail stays beside an
+// 814 px card with wide rows.
+#[gpui_kit::test]
+fn a_collapsed_sidebar_keeps_the_rail_beside_and_the_rows_wide(cx: &mut TestAppContext) {
+    let s = gfx_editor_at(cx, 1200., true);
+    assert_layout_at(cx, &s, 1200., true);
+    assert!(
+        !rows_narrow(cx, &s, "1200 px collapsed"),
+        "the rows stay wide"
+    );
+}
