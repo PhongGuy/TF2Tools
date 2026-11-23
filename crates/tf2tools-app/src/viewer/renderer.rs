@@ -11,12 +11,14 @@ use gpui_kit::RenderImage;
 use tf2tools_core::MapMesh;
 use wgpu::util::DeviceExt as _;
 
-use super::math::{padded_row_bytes, unpad_rows};
-use super::{DrawRequest, FrameStats, RenderEvent, RendererError, RendererFactory, SceneRenderer};
+use super::math::{padded_row_bytes, player_box_vertices, unpad_rows};
+use super::{
+    DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
+};
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-/// `[position; 3, normal; 3]` as f32.
+/// `[position; 3, normal or colour; 3]` as f32, for map and box vertices alike.
 const VERTEX_STRIDE: u64 = 24;
 /// The view-projection, then the light direction as a vec4.
 const UNIFORM_BYTES: u64 = 80;
@@ -49,12 +51,42 @@ fn fs(in: Out) -> @location(0) vec4<f32> {
 }
 ";
 
+// Flat-shaded boxes: the face normal comes from screen-space derivatives of the world
+// position, and the sRGB vertex colour is linearised for the sRGB target.
+const BOX_SHADER: &str = r"
+struct Uniforms { view_proj: mat4x4<f32>, light: vec4<f32> };
+@group(0) @binding(0) var<uniform> u: Uniforms;
+
+struct Out {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) world: vec3<f32>,
+    @location(1) color: vec3<f32>,
+};
+
+@vertex
+fn vs(@location(0) pos: vec3<f32>, @location(1) color: vec3<f32>) -> Out {
+    var out: Out;
+    out.pos = u.view_proj * vec4<f32>(pos, 1.0);
+    out.world = pos;
+    out.color = color;
+    return out;
+}
+
+@fragment
+fn fs(in: Out) -> @location(0) vec4<f32> {
+    let normal = normalize(cross(dpdx(in.world), dpdy(in.world)));
+    let shade = 0.35 + 0.65 * abs(dot(normal, u.light.xyz));
+    return vec4<f32>(pow(in.color, vec3<f32>(2.2)) * shade, 1.0);
+}
+";
+
 // Every worker spawned and not yet joined, so app quit can wait for their device teardown.
 static WORKERS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
 
 enum Command {
     LoadScene(Arc<MapMesh>),
     Draw(DrawRequest),
+    SetPlayers(Arc<[PlayerBox]>),
 }
 
 /// The real renderer. Dropping it ends the worker without waiting for it.
@@ -107,6 +139,10 @@ impl SceneRenderer for Renderer {
 
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.events.clone()
+    }
+
+    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
+        let _ = self.commands.send(Command::SetPlayers(boxes));
     }
 }
 
@@ -210,6 +246,7 @@ fn step(
         match command {
             Command::LoadScene(mesh) => gpu.load_scene(&mesh),
             Command::Draw(request) => draw = Some(request),
+            Command::SetPlayers(boxes) => gpu.set_players(&boxes),
         }
         next = match inbox.try_recv() {
             Ok(command) => Some(command),
@@ -258,9 +295,11 @@ struct Gpu {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
+    box_pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertices: Option<(wgpu::Buffer, u32)>,
+    players: Option<(wgpu::Buffer, u32)>,
     targets: Option<Targets>,
     next_slot: usize,
 }
@@ -314,55 +353,80 @@ impl Gpu {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
+        let box_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("viewer boxes"),
+            source: wgpu::ShaderSource::Wgsl(BOX_SHADER.into()),
+        });
+        // Both pipelines read the same `[vec3; 2]` vertices, uniforms and targets; only the
+        // shader and the culling differ.
         let attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("viewer"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: VERTEX_STRIDE,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &attributes,
-                })],
-            },
-            // No culling: vbsp's triangle winding is not consistent, and both sides draw.
-            primitive: wgpu::PrimitiveState {
+        let build = |label, shader: &wgpu::ShaderModule, primitive| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: shader,
+                    entry_point: Some("vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_STRIDE,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &attributes,
+                    })],
+                },
+                primitive,
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH_FORMAT,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                fragment: Some(wgpu::FragmentState {
+                    module: shader,
+                    entry_point: Some("fs"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: COLOR_FORMAT,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        // No culling: vbsp's triangle winding is not consistent, and both sides draw.
+        let pipeline = build(
+            "viewer",
+            &shader,
+            wgpu::PrimitiveState {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: COLOR_FORMAT,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        );
+        // Boxes wind counter-clockwise from outside, so a camera inside one sees out of it.
+        let box_pipeline = build(
+            "viewer boxes",
+            &box_shader,
+            wgpu::PrimitiveState {
+                cull_mode: Some(wgpu::Face::Back),
+                front_face: wgpu::FrontFace::Ccw,
+                ..Default::default()
+            },
+        );
         Ok(Self {
             instance,
             adapter,
             device,
             queue,
             pipeline,
+            box_pipeline,
             uniforms,
             bind_group,
             vertices: None,
+            players: None,
             targets: None,
             next_slot: 0,
         })
@@ -377,16 +441,20 @@ impl Gpu {
             device,
             queue,
             pipeline,
+            box_pipeline,
             uniforms,
             bind_group,
             vertices,
+            players,
             targets,
             next_slot: _,
         } = self;
         drop(targets);
+        drop(players);
         drop(vertices);
         drop(bind_group);
         drop(uniforms);
+        drop(box_pipeline);
         drop(pipeline);
         drop(queue);
         drop(device);
@@ -408,6 +476,27 @@ impl Gpu {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("viewer vertices"),
+                    contents: &bytes,
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            (buffer, count)
+        });
+    }
+
+    // Uploads 36 `[position, colour]` vertices a box; no boxes leaves nothing to draw.
+    fn set_players(&mut self, boxes: &[PlayerBox]) {
+        let mut bytes = Vec::with_capacity(boxes.len() * 36 * VERTEX_STRIDE as usize);
+        for vertex in boxes.iter().flat_map(player_box_vertices) {
+            for value in vertex.position.iter().chain(&vertex.color) {
+                bytes.extend_from_slice(&value.to_ne_bytes());
+            }
+        }
+        let count = u32::try_from(boxes.len() * 36).unwrap_or(u32::MAX);
+        self.players = (count > 0).then(|| {
+            let buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("viewer players"),
                     contents: &bytes,
                     usage: wgpu::BufferUsages::VERTEX,
                 });
@@ -531,6 +620,13 @@ impl Gpu {
             });
             if let Some((vertices, count)) = &self.vertices {
                 pass.set_pipeline(&self.pipeline);
+                pass.set_bind_group(0, &self.bind_group, &[]);
+                pass.set_vertex_buffer(0, vertices.slice(..));
+                pass.draw(0..*count, 0..1);
+            }
+            // The boxes share the map's depth, so walls hide the players behind them.
+            if let Some((vertices, count)) = &self.players {
+                pass.set_pipeline(&self.box_pipeline);
                 pass.set_bind_group(0, &self.bind_group, &[]);
                 pass.set_vertex_buffer(0, vertices.slice(..));
                 pass.draw(0..*count, 0..1);

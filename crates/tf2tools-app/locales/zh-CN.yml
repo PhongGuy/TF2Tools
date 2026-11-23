@@ -164,7 +164,9 @@ demo_viewer:
   open: "打开录像"
   empty: "打开 TF2 录像，即可在 3D 中查看其地图。"
   loading: "正在加载地图…"
-  caption: "%{map}。玩家与回放功能将在之后加入。"
+  caption: "%{map}。回放功能将在之后加入。"
+  caption_players: "%{map}，%{time} 时的 %{count} 名玩家。回放功能将在之后加入。"
+  players_note: "无法从此录像中读取玩家。"
   hint: "拖动以环顾，WASD 移动，Shift 减速。"
   error:
     not_a_demo: "此文件不是 TF2 录像。"

@@ -2673,3 +2673,15 @@ pub enum DemoHeaderError {
         name: String,
     },
 }
+
+/// Why a demo's players could not be read for the viewer.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoSnapshotError {
+    /// The parser failed on the demo's packets.
+    #[error("the demo's players cannot be read: {0}")]
+    Unreadable(String),
+    /// No tick in the read part of the demo has a RED or BLU player to draw.
+    #[error("the demo shows no players to draw")]
+    NoPlayers,
+}

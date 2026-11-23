@@ -3509,6 +3509,8 @@ pub const DEMO_VIEWER_PREVIEW_BADGE: &str = "demo-viewer-preview-badge";
 pub const DEMO_VIEWER_CAPTION: &str = "demo-viewer-caption";
 /// The hint line under the 3D view about its controls.
 pub const DEMO_VIEWER_HINT: &str = "demo-viewer-hint";
+/// The muted note under the caption when a demo's players could not be read.
+pub const DEMO_VIEWER_PLAYERS_NOTE: &str = "demo-viewer-players-note";
 
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";

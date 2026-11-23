@@ -5,9 +5,13 @@ use std::io::Read as _;
 use std::path::Path;
 
 use gpui_kit::SharedString;
-use tf2tools_core::{DemoHeaderError, MapMesh, Tf2Install, find_installed_map, load_map_file};
+use tf2tools_core::{
+    DemoHeader, DemoHeaderError, DemoSnapshot, MapMesh, Tf2Install, find_installed_map,
+    load_map_file,
+};
 
 use crate::i18n::tr;
+use crate::viewer::SnapshotReader;
 
 /// The most of a demo the loader reads: its fixed-size header.
 const HEADER_BYTES: u64 = 1072;
@@ -38,12 +42,63 @@ impl LoadError {
     }
 }
 
+/// Seconds per tick when the header has no tick count, as an unfinished recording's does.
+const DEFAULT_SECONDS_PER_TICK: f32 = 0.015;
+
+/// A demo ready to show: its map's name and mesh, its players if they could be read, and how
+/// long one tick lasts.
+pub struct LoadedDemo {
+    pub map: String,
+    pub mesh: MapMesh,
+    pub snapshot: Option<DemoSnapshot>,
+    pub seconds_per_tick: f32,
+}
+
 /// Reads `dem`'s header and loads the map it names from `install`. Blocking; returns the map's
 /// name with its mesh.
 pub fn load_demo_map(
     dem: &Path,
     install: Option<&Tf2Install>,
 ) -> Result<(String, MapMesh), LoadError> {
+    let (_, map, mesh) = load_header_and_map(dem, install)?;
+    Ok((map, mesh))
+}
+
+/// `load_demo_map`'s steps, then the players only when the map loaded. A snapshot error is
+/// logged at warn and becomes `None`. Seconds per tick: duration / ticks, or 0.015 for 0 ticks.
+pub fn load_demo(
+    dem: &Path,
+    install: Option<&Tf2Install>,
+    snapshots: &SnapshotReader,
+) -> Result<LoadedDemo, LoadError> {
+    let (header, map, mesh) = load_header_and_map(dem, install)?;
+    // Missing players still leave a map to fly around, so the error only reaches the log.
+    let snapshot = snapshots(dem)
+        .inspect_err(|error| tracing::warn!(%error, "the demo viewer could not read the players"))
+        .ok();
+    let seconds_per_tick = match header.ticks() {
+        0 => DEFAULT_SECONDS_PER_TICK,
+        ticks => header.duration_seconds() / ticks as f32,
+    };
+    Ok(LoadedDemo {
+        map,
+        mesh,
+        snapshot,
+        seconds_per_tick,
+    })
+}
+
+/// `tick * seconds_per_tick`, floored to whole seconds, as m:ss.
+pub fn snapshot_time(tick: u32, seconds_per_tick: f32) -> String {
+    let seconds = (f64::from(tick) * f64::from(seconds_per_tick)).floor() as u64;
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+// Reads the header and meshes the map it names; the shared body of both loaders.
+fn load_header_and_map(
+    dem: &Path,
+    install: Option<&Tf2Install>,
+) -> Result<(DemoHeader, String, MapMesh), LoadError> {
     let mut head = Vec::new();
     std::fs::File::open(dem)
         .and_then(|file| file.take(HEADER_BYTES).read_to_end(&mut head))
@@ -62,5 +117,5 @@ pub fn load_demo_map(
         tracing::warn!(%error, map = %map, "the demo viewer could not load a map");
         LoadError::MapUnreadable
     })?;
-    Ok((map, mesh))
+    Ok((header, map, mesh))
 }

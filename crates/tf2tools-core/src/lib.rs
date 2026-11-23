@@ -45,8 +45,9 @@ pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use demo_view::{
-    DemoHeader, FlyInput, FreeFly, MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MapMesh, load_map_file,
-    load_map_file_capped, load_map_mesh, read_demo_header,
+    DemoHeader, DemoSnapshot, FlyInput, FreeFly, MAX_MAP_BYTES, MAX_MAP_TRIANGLES,
+    MAX_SNAPSHOT_BYTES, MapMesh, SnapshotPlayer, load_map_file, load_map_file_capped,
+    load_map_mesh, read_demo_header, read_demo_snapshot,
 };
 pub use demostf::{
     DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,
@@ -54,18 +55,18 @@ pub use demostf::{
 };
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
-    BrowseError, CatalogError, CopyHudError, DataDirError, DemoHeaderError, DemosError,
-    DetectError, DownloadError, FilesError, FontCheckError, FontInstallError, GbAddonCheckError,
-    GbAddonFetchError, GbAddonInstallError, GbMapInstallError, GbMapRemoveError, HistoryError,
-    HudFilesError, HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError,
-    KeepHudError, KvParseError, LibraryError, LogError, LogParseError, LogsCacheError,
-    LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
-    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
-    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
-    SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError, UpdateApplyError,
-    UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
-    WeaponIconsError, WeaponNamesError,
+    BrowseError, CatalogError, CopyHudError, DataDirError, DemoHeaderError, DemoSnapshotError,
+    DemosError, DetectError, DownloadError, FilesError, FontCheckError, FontInstallError,
+    GbAddonCheckError, GbAddonFetchError, GbAddonInstallError, GbMapInstallError, GbMapRemoveError,
+    HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogParseError,
+    LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError,
+    MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError,
+    PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError, ProfileError,
+    QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, ResolveError,
+    RestoreMastercomfigError, SchemaError, SettingPicturesError, SettingsError, StorageError,
+    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,

@@ -553,4 +553,5 @@ fn the_maps_section_mentions_the_preview_demo_viewer() {
     let (maps, _) = maps.split_once("\n### ").expect("a section after it");
     assert!(maps.contains("Demo Viewer"), "Maps section: {maps}");
     assert!(maps.contains("preview"), "Maps section: {maps}");
+    assert!(maps.contains("RED and BLU boxes"), "Maps section: {maps}");
 }

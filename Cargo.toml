@@ -39,6 +39,8 @@ bzip2 = "=0.6.1"
 vpk = "0.3"
 # Reads map BSPs for the demo viewer; vendored without zip-lzma's `lzma`, see vendor/vbsp/README.md.
 vbsp = "=0.9.2"
+# Reads demo packets for the viewer's players.
+tf-demo-parser = "=0.7.2"
 rars = { version = "=0.12.4", default-features = false }
 vtf = "0.4.1"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }

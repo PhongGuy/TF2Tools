@@ -165,7 +165,9 @@ demo_viewer:
   open: "Abrir demo"
   empty: "Abre una demo de TF2 para ver su mapa en 3D."
   loading: "Cargando mapa..."
-  caption: "%{map}. Los jugadores y la reproducción llegarán más adelante."
+  caption: "%{map}. La reproducción llegará más adelante."
+  caption_players: "%{map}, %{count} jugadores en %{time}. La reproducción llegará más adelante."
+  players_note: "No se pudieron leer los jugadores de esta demo."
   hint: "Arrastra para mirar, WASD para moverte, Shift para ir más despacio."
   error:
     not_a_demo: "Este archivo no es una demo de TF2."

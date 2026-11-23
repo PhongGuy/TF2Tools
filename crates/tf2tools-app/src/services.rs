@@ -18,7 +18,7 @@ use crate::audio::AudioOut;
 use crate::i18n::tr;
 use crate::local_messages;
 use crate::picker::PathPicker;
-use crate::viewer::{RendererFactory, wgpu_renderers};
+use crate::viewer::{RendererFactory, SnapshotReader, core_snapshots, wgpu_renderers};
 
 /// Finds a TF2 install; injected so tests and the pilot never touch the real Steam library.
 pub type Tf2Detector = Arc<dyn Fn() -> Result<Vec<Tf2Install>, DetectError> + Send + Sync>;
@@ -49,6 +49,8 @@ pub struct Services {
     pub demos: DemosClient,
     /// Makes the Demo Viewer's map renderers; tests swap in a stub.
     pub renderers: RendererFactory,
+    /// Reads a demo's players for the Demo Viewer; tests swap in a fixed answer.
+    pub demo_snapshots: SnapshotReader,
 }
 
 impl Global for Services {}
@@ -116,6 +118,7 @@ impl Services {
             logs,
             demos,
             renderers: wgpu_renderers(),
+            demo_snapshots: core_snapshots(),
         })
     }
 
@@ -140,6 +143,14 @@ impl Services {
     /// The same services with `renderers` making the Demo Viewer's renderers.
     pub fn with_renderers(self, renderers: RendererFactory) -> Self {
         Self { renderers, ..self }
+    }
+
+    /// The same services with `demo_snapshots` reading the Demo Viewer's players.
+    pub fn with_demo_snapshots(self, demo_snapshots: SnapshotReader) -> Self {
+        Self {
+            demo_snapshots,
+            ..self
+        }
     }
 
     /// The same services with `host` as the font host; `open` leaves it `None`.

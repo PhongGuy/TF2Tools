@@ -5,12 +5,12 @@ use std::time::Instant;
 
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
     Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     TestSupportExt as _, Window, div,
 };
-use tf2tools_core::MapMesh;
 
 use crate::i18n::tr;
 use crate::ids;
@@ -18,7 +18,7 @@ use crate::picker::PickKind;
 use crate::services::{Services, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
-use crate::viewer::load::{LoadError, load_demo_map};
+use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
 
 /// What the page shows below its caption row.
@@ -27,7 +27,10 @@ enum View {
     Loading,
     Failed(SharedString),
     Loaded {
-        map: String,
+        /// The map's name, with the players' count and moment when they were read.
+        caption: SharedString,
+        /// Whether the players could not be read, so a note says so.
+        players_note: bool,
         viewport: Entity<DemoViewport>,
         _failure_watch: Subscription,
     },
@@ -52,6 +55,7 @@ impl DemoViewerPage {
     /// changes nothing.
     pub fn open_demo(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let picking = cx.global::<Services>().picker.pick(PickKind::OpenDemo, cx);
+        let snapshots = Arc::clone(&cx.global::<Services>().demo_snapshots);
         cx.spawn_in(window, async move |page, cx| {
             let Some(path) = picking.await else { return };
             let Ok((generation, install)) = page.update(cx, |page, cx| {
@@ -65,7 +69,7 @@ impl DemoViewerPage {
             // A panic in the BSP reader is a map that cannot be shown, not a dead app.
             let loaded = cx
                 .background_spawn(async move {
-                    crate::crash::catching(|| load_demo_map(&path, install.as_ref()))
+                    crate::crash::catching(|| load_demo(&path, install.as_ref(), &snapshots))
                         .unwrap_or_else(|payload| {
                             let message = crate::crash::panic_text(&*payload);
                             tracing::warn!("the demo viewer's map loader panicked: {message}");
@@ -85,16 +89,35 @@ impl DemoViewerPage {
     // Puts a loaded map in a fresh viewport; the old one drops with its renderer.
     fn show(
         &mut self,
-        loaded: Result<(String, MapMesh), LoadError>,
+        loaded: Result<LoadedDemo, LoadError>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self.view = match loaded {
             Err(error) => View::Failed(error.message()),
-            Ok((map, mesh)) => {
+            Ok(loaded) => {
+                // A snapshot with nobody in it counts as no players read.
+                let players = loaded.snapshot.as_ref().filter(|s| !s.players().is_empty());
+                let caption = match players {
+                    Some(snapshot) => tr!(
+                        "demo_viewer.caption_players",
+                        map = loaded.map,
+                        count = snapshot.players().len(),
+                        time = snapshot_time(snapshot.tick(), loaded.seconds_per_tick)
+                    ),
+                    None => tr!("demo_viewer.caption", map = loaded.map),
+                };
+                let players_note = players.is_none();
                 let renderer = (cx.global::<Services>().renderers)();
                 let viewport = cx.new(|cx| {
-                    DemoViewport::new(Arc::new(mesh), renderer, Arc::new(Instant::now), window, cx)
+                    DemoViewport::new(
+                        Arc::new(loaded.mesh),
+                        loaded.snapshot.as_ref(),
+                        renderer,
+                        Arc::new(Instant::now),
+                        window,
+                        cx,
+                    )
                 });
                 // A renderer that stops leaves nothing to look at, so its viewport goes too.
                 let watch = cx.observe(&viewport, |page, viewport, cx| {
@@ -104,7 +127,8 @@ impl DemoViewerPage {
                     }
                 });
                 View::Loaded {
-                    map,
+                    caption,
+                    players_note,
                     viewport,
                     _failure_watch: watch,
                 }
@@ -129,12 +153,17 @@ impl Render for DemoViewerPage {
             .p(CONTENT_PADDING)
             .gap_4();
         let status = match &self.view {
-            // Loaded: the caption row names the map beside the controls hint, then the
-            // viewport fills the rest.
-            View::Loaded { map, viewport, .. } => {
-                let caption = tr!("demo_viewer.caption", map = map);
+            // Loaded: the caption row names the map beside the controls hint, with a note when
+            // the players could not be read, then the viewport fills the rest.
+            View::Loaded {
+                caption,
+                players_note,
+                viewport,
+                ..
+            } => {
+                let caption = caption.clone();
                 let hint = tr!("demo_viewer.hint");
-                let row = h_flex()
+                let line = h_flex()
                     .gap_3()
                     .child(
                         div()
@@ -152,7 +181,23 @@ impl Render for DemoViewerPage {
                             .text_sm()
                             .text_color(muted)
                             .child(hint),
+                    );
+                // The note goes under the caption line, so it never pushes Open off the row.
+                let text = v_flex().gap_1().child(line).when(*players_note, |text| {
+                    let note = tr!("demo_viewer.players_note");
+                    text.child(
+                        div()
+                            .id(ids::DEMO_VIEWER_PLAYERS_NOTE)
+                            .aria_label(note.clone())
+                            .test_support()
+                            .text_sm()
+                            .text_color(muted)
+                            .child(note),
                     )
+                });
+                let row = h_flex()
+                    .gap_3()
+                    .child(text)
                     .child(div().flex_1())
                     .child(open);
                 return page

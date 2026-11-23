@@ -1,11 +1,12 @@
 //! The demo viewer's 3D view: camera math and a renderer worker that draws a map offscreen and
 //! hands each frame back as a GPUI image.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::RenderImage;
-use tf2tools_core::MapMesh;
+use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, Team};
 
 pub mod load;
 pub mod math;
@@ -58,6 +59,15 @@ pub enum RendererError {
     Device(String),
 }
 
+/// One player drawn as a box: where its feet stand, which way it faces, and its team.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlayerBox {
+    pub feet: [f32; 3],
+    pub yaw_deg: f32,
+    pub ducked: bool,
+    pub team: Team,
+}
+
 /// A map renderer the viewport drives; the real one runs wgpu on its own thread.
 pub trait SceneRenderer {
     /// Replaces the scene drawn by later draws.
@@ -66,7 +76,19 @@ pub trait SceneRenderer {
     fn draw(&self, request: DrawRequest);
     /// The renderer's events; closed once the renderer has stopped.
     fn events(&self) -> async_channel::Receiver<RenderEvent>;
+    /// Replaces the player boxes drawn by later draws; an empty slice clears them.
+    fn set_players(&self, boxes: Arc<[PlayerBox]>);
 }
 
 /// Makes a renderer for a page; tests swap the wgpu one for a stub.
 pub type RendererFactory = Arc<dyn Fn() -> Box<dyn SceneRenderer> + Send + Sync>;
+
+/// Reads a demo's players; tests swap the core reader for a fixed answer.
+pub type SnapshotReader =
+    Arc<dyn Fn(&Path) -> Result<DemoSnapshot, DemoSnapshotError> + Send + Sync>;
+
+/// The reader `Services` holds in the real app: `tf2tools_core::read_demo_snapshot`.
+pub fn core_snapshots() -> SnapshotReader {
+    // A closure, because a fn item does not coerce to the higher-ranked `dyn Fn(&Path)` here.
+    Arc::new(|dem: &Path| tf2tools_core::read_demo_snapshot(dem))
+}

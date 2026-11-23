@@ -11,7 +11,7 @@ use gpui_kit::{
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point,
     Render, RenderImage, Styled as _, TestSupportExt as _, Window, canvas, div, img,
 };
-use tf2tools_core::{FlyInput, FreeFly, MapMesh};
+use tf2tools_core::{DemoSnapshot, FlyInput, FreeFly, MapMesh};
 
 use super::{DrawRequest, RenderEvent, RendererError, SceneRenderer, math};
 use crate::ids;
@@ -71,16 +71,19 @@ pub struct DemoViewport {
 }
 
 impl DemoViewport {
-    /// Loads `mesh` into `renderer`, puts the camera at the map's start and listens for frames.
+    /// Loads `mesh` and the snapshot's boxes into `renderer`, starts the camera at
+    /// `start_camera` and listens for frames.
     pub fn new(
         mesh: Arc<MapMesh>,
+        snapshot: Option<&DemoSnapshot>,
         renderer: Box<dyn SceneRenderer>,
         clock: Clock,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (origin, yaw) = math::start_camera(&mesh);
+        let (origin, yaw, pitch) = math::start_camera(&mesh, snapshot);
         renderer.load_scene(mesh);
+        renderer.set_players(math::player_boxes(snapshot));
         let events = renderer.events();
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(event) = events.recv().await {
@@ -114,7 +117,7 @@ impl DemoViewport {
         .detach();
         Self {
             renderer,
-            camera: FreeFly::new(origin, yaw, 0.0),
+            camera: FreeFly::new(origin, yaw, pitch),
             keys: HeldKeys::default(),
             shown: None,
             last_seq: 0,

@@ -5,8 +5,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::support::demo_view_fixtures::{BspOptions, bsp};
+use tf2tools_app::viewer::PlayerBox;
 use tf2tools_app::viewer::renderer::join_render_workers;
 use tf2tools_app::viewer::{DrawRequest, RenderEvent, Renderer, SceneRenderer, math};
+use tf2tools_core::Team;
 use tf2tools_core::load_map_mesh;
 
 fn next_event(events: &async_channel::Receiver<RenderEvent>, what: &str) -> RenderEvent {
@@ -115,5 +117,50 @@ fn a_dropped_renderer_leaves_no_worker_to_join() {
     assert!(
         join_render_workers(Duration::from_secs(10)),
         "a render worker is still running 10 s after its Renderer dropped"
+    );
+}
+
+// One frame of `view_proj` at 64x48 with a RED box standing at (50, 32, 100); the centre
+// pixel as (r, g, b) from the BGRA readback.
+fn centre_with_a_red_box(view_proj: [[f32; 4]; 4]) -> (u8, u8, u8) {
+    let (renderer, events) = ready_renderer();
+    renderer.set_players(Arc::from([PlayerBox {
+        feet: [50., 32., 100.],
+        yaw_deg: 0.,
+        ducked: false,
+        team: Team::Red,
+    }]));
+    renderer.draw(DrawRequest {
+        width: 64,
+        height: 48,
+        view_proj,
+        seq: 1,
+    });
+    let RenderEvent::Frame { image, .. } = next_event(&events, "the frame") else {
+        panic!("expected a frame");
+    };
+    let bytes = image.as_bytes(0).expect("one frame");
+    let at = (24 * 64 + 32) * 4;
+    let pixel = (bytes[at + 2], bytes[at + 1], bytes[at]);
+    drop(renderer);
+    wait_closed(&events);
+    pixel
+}
+
+#[test]
+fn a_red_box_under_the_camera_fills_the_centre_in_red() {
+    // From 18 units above the box's top (z 182), looking down.
+    let (r, g, b) = centre_with_a_red_box(math::view_proj([50., 32., 200.], 0., 89., 64. / 48.));
+    assert!(r > g && r > b, "centre pixel {:?}", (r, g, b));
+}
+
+#[test]
+fn a_camera_inside_a_box_sees_out_of_it() {
+    // At a standing eye inside the box, looking down: back faces are culled.
+    let (r, g, b) = centre_with_a_red_box(math::view_proj([50., 32., 168.], 0., 89., 64. / 48.));
+    assert!(
+        !(r > g && r > b),
+        "the inside of the box showed: {:?}",
+        (r, g, b)
     );
 }

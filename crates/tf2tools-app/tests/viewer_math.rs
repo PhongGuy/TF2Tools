@@ -1,8 +1,9 @@
 //! The viewer's camera math and readback unpadding, with no GPU.
 
 use crate::support::demo_view_fixtures::{BspOptions, bsp};
-use tf2tools_app::viewer::math::{self, EYE_HEIGHT, FAR, NEAR};
-use tf2tools_core::load_map_mesh;
+use tf2tools_app::viewer::PlayerBox;
+use tf2tools_app::viewer::math::{self, BLU, BoxVertex, EYE_HEIGHT, FAR, NEAR, RED};
+use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass, load_map_mesh};
 
 // `p` through `m`, divided by w: [x, y, depth].
 fn project(m: [[f32; 4]; 4], p: [f32; 3]) -> [f32; 3] {
@@ -124,13 +125,14 @@ fn unpad_rows_keeps_each_rows_pixels_across_a_padded_stride() {
 #[test]
 fn the_camera_starts_at_the_spawn_at_eye_height() {
     let mesh = load_map_mesh(&bsp(&BspOptions::default())).unwrap();
-    let (eye, yaw) = math::start_camera(&mesh);
+    let (eye, yaw, pitch) = math::start_camera(&mesh, None);
     assert!(
         (eye[0] - 10.).abs() < 1e-3 && (eye[1] - 20.).abs() < 1e-3,
         "{eye:?}"
     );
     assert!((eye[2] - (30. + EYE_HEIGHT)).abs() < 1e-3, "{eye:?}");
     assert!((yaw - 45.).abs() < 1e-3);
+    assert_eq!(pitch, 0.);
 }
 
 #[test]
@@ -140,10 +142,201 @@ fn a_map_without_spawns_starts_mid_bounds_looking_along_x() {
         ..BspOptions::default()
     }))
     .unwrap();
-    let (eye, yaw) = math::start_camera(&mesh);
+    let (eye, yaw, pitch) = math::start_camera(&mesh, None);
     assert!(
         (eye[0] - 50.).abs() < 1e-3 && (eye[1] - 32.).abs() < 1e-3 && eye[2].abs() < 1e-3,
         "{eye:?}"
     );
     assert_eq!(yaw, 0.);
+    assert_eq!(pitch, 0.);
+}
+
+fn player(team: Team, feet: [f32; 3], yaw: f32, pitch: f32, eye: f32) -> SnapshotPlayer {
+    SnapshotPlayer::new(team, TfClass::Soldier, feet, yaw, pitch, eye, false)
+}
+
+#[test]
+fn the_camera_starts_at_the_first_red_players_eye() {
+    let mesh = load_map_mesh(&bsp(&BspOptions::default())).unwrap();
+    let snapshot = DemoSnapshot::new(
+        1668,
+        vec![
+            player(Team::Blue, [0., 0., 64.], 90., 0., 75.),
+            player(Team::Red, [100., 200., 64.], 270., 12., 68.),
+            player(Team::Red, [300., 300., 64.], 0., 0., 65.),
+        ],
+    );
+    let (eye, yaw, pitch) = math::start_camera(&mesh, Some(&snapshot));
+    assert_eq!((eye, yaw, pitch), ([100., 200., 132.], 270., 12.));
+}
+
+#[test]
+fn with_no_red_player_the_camera_takes_the_first_and_clamps_its_pitch() {
+    let mesh = load_map_mesh(&bsp(&BspOptions::default())).unwrap();
+    for (pitch, want) in [(120., 89.), (-120., -89.)] {
+        let snapshot = DemoSnapshot::new(
+            9,
+            vec![
+                player(Team::Blue, [10., 20., 30.], 45., pitch, 45.),
+                player(Team::Blue, [0., 0., 0.], 0., 0., 68.),
+            ],
+        );
+        let (eye, yaw, got) = math::start_camera(&mesh, Some(&snapshot));
+        assert_eq!((eye, yaw, got), ([10., 20., 75.], 45., want));
+    }
+}
+
+#[test]
+fn a_snapshot_without_players_starts_at_the_spawn() {
+    let mesh = load_map_mesh(&bsp(&BspOptions::default())).unwrap();
+    let empty = DemoSnapshot::new(9, vec![]);
+    let (eye, yaw, pitch) = math::start_camera(&mesh, Some(&empty));
+    assert_eq!((eye, yaw, pitch), ([10., 20., 30. + EYE_HEIGHT], 45., 0.));
+}
+
+#[test]
+fn player_boxes_keep_the_snapshots_order_and_fields() {
+    assert!(math::player_boxes(None).is_empty());
+    let ducked = SnapshotPlayer::new(Team::Blue, TfClass::Spy, [1., 2., 3.], 30., 5., 45., true);
+    let snapshot = DemoSnapshot::new(
+        9,
+        vec![ducked, player(Team::Red, [4., 5., 6.], 60., 0., 68.)],
+    );
+    let boxes = math::player_boxes(Some(&snapshot));
+    assert_eq!(
+        &boxes[..],
+        [
+            PlayerBox {
+                feet: [1., 2., 3.],
+                yaw_deg: 30.,
+                ducked: true,
+                team: Team::Blue
+            },
+            PlayerBox {
+                feet: [4., 5., 6.],
+                yaw_deg: 60.,
+                ducked: false,
+                team: Team::Red
+            },
+        ]
+    );
+}
+
+fn a_box(team: Team, yaw_deg: f32, ducked: bool) -> PlayerBox {
+    PlayerBox {
+        feet: [100., 200., 64.],
+        yaw_deg,
+        ducked,
+        team,
+    }
+}
+
+fn lighter(c: [f32; 3]) -> [f32; 3] {
+    c.map(|v| v + (1. - v) * 0.25)
+}
+
+fn near(a: [f32; 3], b: [f32; 3]) -> bool {
+    (0..3).all(|i| (a[i] - b[i]).abs() < 1e-3)
+}
+
+fn extent(vertices: &[BoxVertex]) -> ([f32; 3], [f32; 3]) {
+    let mut min = [f32::INFINITY; 3];
+    let mut max = [f32::NEG_INFINITY; 3];
+    for v in vertices {
+        for i in 0..3 {
+            min[i] = min[i].min(v.position[i]);
+            max[i] = max[i].max(v.position[i]);
+        }
+    }
+    (min, max)
+}
+
+#[test]
+fn a_standing_box_is_48_wide_and_82_tall_on_the_feet() {
+    let vertices = math::player_box_vertices(&a_box(Team::Red, 0., false));
+    let (min, max) = extent(&vertices);
+    assert!(
+        near(min, [76., 176., 64.]) && near(max, [124., 224., 146.]),
+        "{min:?} {max:?}"
+    );
+}
+
+#[test]
+fn a_ducked_box_is_62_tall() {
+    let (min, max) = extent(&math::player_box_vertices(&a_box(Team::Red, 0., true)));
+    assert!(
+        (min[2] - 64.).abs() < 1e-3 && (max[2] - 126.).abs() < 1e-3,
+        "{min:?} {max:?}"
+    );
+}
+
+#[test]
+fn a_box_turns_with_its_yaw() {
+    // At 45 degrees a corner points along +X: half the diagonal, 24 * sqrt(2).
+    let (min, max) = extent(&math::player_box_vertices(&a_box(Team::Red, 45., false)));
+    let half = 24. * 2f32.sqrt();
+    assert!((max[0] - (100. + half)).abs() < 1e-2, "{max:?}");
+    assert!((min[1] - (200. - half)).abs() < 1e-2, "{min:?}");
+}
+
+#[test]
+fn the_lighter_face_looks_along_the_yaw() {
+    for (yaw, dir) in [
+        (0., [1., 0.]),
+        (90., [0., 1.]),
+        (180., [-1., 0.]),
+        (270., [0., -1.]),
+    ] {
+        let vertices = math::player_box_vertices(&a_box(Team::Red, yaw, false));
+        let front: Vec<&BoxVertex> = vertices
+            .iter()
+            .filter(|v| near(v.color, lighter(RED)))
+            .collect();
+        assert_eq!(front.len(), 6, "yaw {yaw}");
+        assert_eq!(
+            vertices.iter().filter(|v| v.color == RED).count(),
+            30,
+            "yaw {yaw}"
+        );
+        let mid = [0, 1, 2].map(|i| front.iter().map(|v| v.position[i]).sum::<f32>() / 6.);
+        let want = [100. + 24. * dir[0], 200. + 24. * dir[1], 64. + 41.];
+        assert!(near(mid, want), "yaw {yaw}: {mid:?} want {want:?}");
+    }
+}
+
+#[test]
+fn blu_boxes_are_blu() {
+    let vertices = math::player_box_vertices(&a_box(Team::Blue, 0., false));
+    assert_eq!(vertices.iter().filter(|v| v.color == BLU).count(), 30);
+    assert_eq!(
+        vertices
+            .iter()
+            .filter(|v| near(v.color, lighter(BLU)))
+            .count(),
+        6
+    );
+}
+
+#[test]
+fn every_triangle_faces_out_of_the_box() {
+    for (yaw, ducked) in [(0., false), (37., false), (200., true)] {
+        let vertices = math::player_box_vertices(&a_box(Team::Red, yaw, ducked));
+        let height = if ducked { 62. } else { 82. };
+        let centre = [100., 200., 64. + height / 2.];
+        for tri in vertices.chunks(3) {
+            let [a, b, c] = [tri[0].position, tri[1].position, tri[2].position];
+            let (u, v) = (
+                [0, 1, 2].map(|i| b[i] - a[i]),
+                [0, 1, 2].map(|i| c[i] - a[i]),
+            );
+            let normal = [
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            ];
+            let out = [0, 1, 2].map(|i| (a[i] + b[i] + c[i]) / 3. - centre[i]);
+            let facing: f32 = (0..3).map(|i| normal[i] * out[i]).sum();
+            assert!(facing > 0., "yaw {yaw} ducked {ducked}: {tri:?}");
+        }
+    }
 }

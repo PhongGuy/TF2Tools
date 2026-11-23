@@ -1,6 +1,7 @@
 //! The Demo Viewer page: where it sits, its Preview badge, its empty state and its Open button.
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use gpui_kit::TestAppContext;
 use gpui_kit::assets::IconName;
@@ -9,11 +10,15 @@ use tf2tools_app::picker::{PickKind, ScriptedPicker};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::nav_icon;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::Tf2Install;
+use tf2tools_app::viewer::load::snapshot_time;
+use tf2tools_core::{DemoSnapshot, DemoSnapshotError, SnapshotPlayer, Team, Tf2Install, TfClass};
 
 use crate::support;
 use crate::support::demo_view_fixtures::demo_header;
-use crate::support::demo_viewer::{StubAnswer, demo_file, demo_viewer_shell, install_map};
+use crate::support::demo_viewer::{
+    StubAnswer, counting_snapshots, demo_file, demo_viewer_shell, demo_viewer_shell_with,
+    install_map,
+};
 
 #[test]
 fn the_demo_viewer_follows_logs_tf_with_its_own_icon() {
@@ -124,11 +129,16 @@ fn an_installed_map_opens_in_the_viewport_under_its_caption(cx: &mut TestAppCont
     });
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
-        Some("cp_synthetic. Players and playback come later.")
+        Some("cp_synthetic. Playback comes later.")
     );
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_HINT).as_deref(),
         Some("Drag to look, WASD to move, Shift to slow down.")
+    );
+    // The core reader finds no players in a header-only demo, so the note shows.
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS_NOTE).as_deref(),
+        Some("Players couldn't be read from this demo.")
     );
     assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_STATUS));
     assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_OPEN));
@@ -283,7 +293,7 @@ fn a_second_open_replaces_the_load_in_flight(cx: &mut TestAppContext) {
     );
     support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
     support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
-    let want = "cp_second. Players and playback come later.";
+    let want = "cp_second. Playback comes later.";
     support::wait_real(cx, "the second map", |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref() == Some(want)
     });
@@ -313,4 +323,118 @@ fn leaving_the_page_drops_its_renderer(cx: &mut TestAppContext) {
     support::click_nav(cx, w.s.win, Page::Huds);
     support::settle(cx, w.s.win);
     assert!(!stub.is_alive(), "the renderer outlived its page");
+}
+
+fn three_players() -> DemoSnapshot {
+    let at =
+        |team, x| SnapshotPlayer::new(team, TfClass::Soldier, [x, 32., 0.], 0., 0., 68., false);
+    DemoSnapshot::new(
+        4100,
+        vec![at(Team::Blue, 0.), at(Team::Red, 20.), at(Team::Red, 40.)],
+    )
+}
+
+// Opens `header` with `reader` as the snapshot reader; waits for the viewport.
+fn open_with_players(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    header: Vec<u8>,
+    reader: tf2tools_app::viewer::SnapshotReader,
+) -> crate::support::demo_viewer::DemoViewerShell {
+    install_map(env, "cp_synthetic");
+    let demo = demo_file(env, "match.dem", &header);
+    let w = demo_viewer_shell_with(
+        cx,
+        env,
+        found(env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+    );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    w
+}
+
+#[test]
+fn the_snapshot_time_floors_to_whole_seconds() {
+    assert_eq!(snapshot_time(0, 0.015), "0:00");
+    assert_eq!(snapshot_time(4100, 0.015), "1:01");
+    assert_eq!(snapshot_time(1668, 1925.5 / 128_370.), "0:25");
+    assert_eq!(snapshot_time(66 * 605 + 33, 1. / 66.), "10:05");
+}
+
+#[gpui_kit::test]
+fn players_show_with_their_count_and_time_in_the_caption(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, asked) = counting_snapshots(|| Ok(three_players()));
+    // 60 s over the fixture's 3960 ticks puts tick 4100 at 62.1 s.
+    let w = open_with_players(cx, &env, demo_header("cp_synthetic", 60.0), reader);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic, 3 players at 1:02. Playback comes later.")
+    );
+    assert!(!support::present(
+        cx,
+        w.s.win,
+        ids::DEMO_VIEWER_PLAYERS_NOTE
+    ));
+    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    let boxes = w.stubs.lock().unwrap()[0].players();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].len(), 3);
+}
+
+#[gpui_kit::test]
+fn an_unfinalised_demo_counts_0_015_seconds_a_tick(cx: &mut TestAppContext) {
+    let env = support::env();
+    let mut header = demo_header("cp_synthetic", 60.0);
+    header[1060..1064].copy_from_slice(&0i32.to_le_bytes());
+    let (reader, _) = counting_snapshots(|| Ok(three_players()));
+    let w = open_with_players(cx, &env, header, reader);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic, 3 players at 1:01. Playback comes later.")
+    );
+}
+
+#[gpui_kit::test]
+fn unreadable_players_leave_the_map_with_a_note(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, _) =
+        counting_snapshots(|| Err(DemoSnapshotError::Unreadable("bad packet".into())));
+    let w = open_with_players(cx, &env, demo_header("cp_synthetic", 60.0), reader);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic. Playback comes later.")
+    );
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS_NOTE).as_deref(),
+        Some("Players couldn't be read from this demo.")
+    );
+    let boxes = w.stubs.lock().unwrap()[0].players();
+    assert!(boxes[0].is_empty());
+}
+
+#[gpui_kit::test]
+fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, asked) = counting_snapshots(|| Ok(three_players()));
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_missing", 60.0));
+    let w = demo_viewer_shell_with(
+        cx,
+        &env,
+        found(&env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+    );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    let want = "The map cp_missing isn't installed. Play it once in TF2, or get a custom map from the Maps page.";
+    support::wait_real(cx, want, |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
+    });
+    assert_eq!(asked.load(Ordering::SeqCst), 0);
 }

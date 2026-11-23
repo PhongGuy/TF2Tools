@@ -23,6 +23,7 @@ sevenz-rust2.workspace = true
 bzip2.workspace = true
 vpk.workspace = true
 vbsp.workspace = true
+tf-demo-parser.workspace = true
 rars.workspace = true
 vtf.workspace = true
 image = { workspace = true, features = ["jpeg"] }
