@@ -230,13 +230,11 @@ fn a_missing_map_that_serveme_cannot_send_ends_in_a_failure(cx: &mut TestAppCont
     let path = demo_file(&env, "match.dem", &demo_header("cp_missing", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![path], StubAnswer::Frames);
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
-    let pending = ["Open a TF2 demo to see its map in 3D.", "Loading map..."];
-    let settled = |status: &str| !status.starts_with("Downloading") && !pending.contains(&status);
+    let want = "Couldn't download cp_missing.";
     support::wait_real(cx, "the download to fail", |cx| {
-        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).is_some_and(|s| settled(&s))
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
     });
-    let status = support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).unwrap();
-    assert!(!status.contains("isn't installed"), "{status}");
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_RETRY));
     assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_PROGRESS));
     assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT));
 }

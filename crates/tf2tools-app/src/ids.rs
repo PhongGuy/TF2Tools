@@ -3521,6 +3521,10 @@ pub const DEMO_VIEWER_BAR_COLLAPSE: &str = "demo-viewer-bar-collapse";
 pub const DEMO_VIEWER_PROGRESS: &str = "demo-viewer-progress";
 /// The bytes received so far under the Demo Viewer's download bar.
 pub const DEMO_VIEWER_PROGRESS_LABEL: &str = "demo-viewer-progress-label";
+/// The muted line under a failed download's status, saying what went wrong.
+pub const DEMO_VIEWER_STATUS_DETAIL: &str = "demo-viewer-status-detail";
+/// The button that runs a failed map download again.
+pub const DEMO_VIEWER_RETRY: &str = "demo-viewer-retry";
 
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";
