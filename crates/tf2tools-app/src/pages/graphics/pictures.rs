@@ -110,6 +110,14 @@ pub enum ChoicesOwner {
     Profile,
 }
 
+/// The compare slider's accessible label, naming the owner's side as the pill does.
+pub fn wipe_label(owner: ChoicesOwner) -> SharedString {
+    match owner {
+        ChoicesOwner::Player => tr!("graphics.pictures.wipe"),
+        ChoicesOwner::Profile => tr!("graphics.pictures.wipe_profile"),
+    }
+}
+
 /// What the open row's compare view shows.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Compare {

@@ -3072,6 +3072,7 @@ graphics:
     zoom: "Zoom"
     full: "Full picture"
     wipe: "Slide between the preset's picture and yours"
+    wipe_profile: "Slide between the preset's picture and this profile's"
     caption: "Click a picture to use that setting."
     no_picture:
       performance_only: "No picture: this setting changes how the game runs, not how it looks."

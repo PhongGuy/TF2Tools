@@ -3097,6 +3097,7 @@ graphics:
     zoom: "Zoom"
     full: "Image entière"
     wipe: "Glisser entre l'image du préréglage et la vôtre"
+    wipe_profile: "Glisser entre l'image du préréglage et celle de ce profil"
     caption: "Cliquez sur une image pour utiliser ce réglage."
     no_picture:
       performance_only: "Pas d'image\u00A0: ce réglage change les performances, pas l'apparence du jeu."
