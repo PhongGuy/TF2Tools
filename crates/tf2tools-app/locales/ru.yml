@@ -456,10 +456,10 @@ logs_tf:
   stat:
     played: "Сыграно"
     logs: "Логи"
-    kills_min: "Убийств/мин"
+    kills_min: "Уб/мин"
     assists_min: "Помощь/мин"
     deaths_min: "Смерти/мин"
-    dmg_min: "Урон/мин"
+    dmg_min: "Урон/м"
     heals_min: "Леч./мин"
     ubers_10min: "Убер/10 мин"
   sort:

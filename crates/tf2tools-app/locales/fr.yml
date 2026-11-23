@@ -486,7 +486,7 @@ logs_tf:
     kills_min: "Vict./min"
     assists_min: "Coop./min"
     deaths_min: "Morts/min"
-    dmg_min: "Dégâts/min"
+    dmg_min: "Dég/min"
     heals_min: "Soins/min"
     ubers_10min: "Übers/10 min"
   sort:
