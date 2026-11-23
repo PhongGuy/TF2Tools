@@ -303,6 +303,9 @@ fn the_rail_stays_beside_a_list_at_its_minimum_width(cx: &mut TestAppContext) {
     cx.simulate_window_resize(s.win, size(px(1252.), px(900.)));
     support::settle(cx, s.win);
     assert!(rail_beside_list(cx, &s), "1252 px keeps the side rail");
+    // The page's unit tests take this column width as the full-sidebar switch point.
+    let column = at(cx, &s, ids::page(Page::Graphics));
+    assert_eq!(column.size.width, px(996.), "{column:?}");
     let section = at(cx, &s, ids::graphics_section("graphics"));
     assert!(section.size.width >= px(740.), "{section:?}");
 }
@@ -340,15 +343,15 @@ fn the_layout_settles_after_one_extra_frame(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::SIDEBAR_TOGGLE);
     cx.simulate_window_resize(s.win, size(px(1000.), px(900.)));
     support::settle(cx, s.win);
-    // Growing past the switch point: the frame after the resize measures the new column, and
-    // the one after that draws the rail beside the list, with no further frames.
+    // Growing past the switch point: only the frames the window asks for are drawn. The
+    // resize's own frame measures the new column and the next one moves the rail.
     cx.simulate_window_resize(s.win, size(px(1100.), px(900.)));
     cx.run_until_parked();
+    cx.update_window(s.win, |_, w, cx| w.simulate_next_frame(cx))
+        .unwrap();
+    cx.run_until_parked();
     let beside = cx
-        .update_window(s.win, |_, w, cx| {
-            w.render_frame(cx);
-            w.simulate_next_frame(cx);
-            w.render_frame(cx);
+        .update_window(s.win, |_, w, _| {
             let rail = w
                 .try_find(ids::graphics_rail("graphics"))
                 .map(|e| e.bounds());
@@ -359,4 +362,20 @@ fn the_layout_settles_after_one_extra_frame(cx: &mut TestAppContext) {
         })
         .unwrap();
     assert_eq!(beside, Some(true));
+}
+
+#[gpui_kit::test]
+fn a_page_shorter_than_the_window_does_not_scroll(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = full_page(cx, &env, "{}");
+    cx.simulate_window_resize(s.win, size(px(1400.), px(4000.)));
+    search(cx, &s, &page, "zzz");
+    let before = at(cx, &s, ids::GRAPHICS_STATUS);
+    let down = gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-500.)));
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(ids::page(Page::Graphics), down, cx)
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    assert_eq!(at(cx, &s, ids::GRAPHICS_STATUS), before);
 }

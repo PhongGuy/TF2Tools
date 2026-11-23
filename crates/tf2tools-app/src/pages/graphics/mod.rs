@@ -907,19 +907,8 @@ impl Render for GraphicsPage {
         self.section_items = items;
         self.toolbar_item = toolbar;
         // The column holds both rail and list, so its width never changes with the layout. It
-        // goes last so the rail's child indices stay put; a change asks for another frame.
-        let measured = Rc::clone(&self.column_width);
-        let watch = canvas(
-            move |bounds, window, _| {
-                if measured.get() != Some(bounds.size.width) {
-                    measured.set(Some(bounds.size.width));
-                    window.request_animation_frame();
-                }
-            },
-            |_, _, _, _| {},
-        )
-        .absolute()
-        .size_full();
+        // goes last so the rail's child indices stay put.
+        let watch = column_watch(&self.column_width);
         let content = v_flex()
             .id(ids::page(Page::Graphics))
             .test_support()
@@ -935,8 +924,28 @@ impl Render for GraphicsPage {
     }
 }
 
+/// Records the scroll column's width, padding included, in `cell`; a change asks for another
+/// frame. It has no height, so it never adds to the column's scroll extent.
+fn column_watch(cell: &Rc<Cell<Option<Pixels>>>) -> impl IntoElement {
+    let measured = Rc::clone(cell);
+    canvas(
+        move |bounds, window, _| {
+            if measured.get() != Some(bounds.size.width) {
+                measured.set(Some(bounds.size.width));
+                window.request_animation_frame();
+            }
+        },
+        |_, _, _, _| {},
+    )
+    .absolute()
+    .left_0()
+    .w_full()
+    .h_0()
+}
+
 /// Whether the rail sits above the list as chips, from the scroll column's measured width. Before
-/// the first measurement it estimates the column from the window with the full sidebar.
+/// the first measurement it estimates the column from the window with the full sidebar, so the
+/// first frame matches only then; with a collapsed sidebar it corrects itself one frame later.
 fn list_is_narrow(column: Option<Pixels>, viewport: Pixels) -> bool {
     let column = column.unwrap_or(viewport - SIDEBAR_WIDTH);
     column - px(2. * SIDE_PADDING) - px(RAIL_WIDTH + RAIL_GUTTER) < px(LIST_MIN_WIDTH)
@@ -945,21 +954,65 @@ fn list_is_narrow(column: Option<Pixels>, viewport: Pixels) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui_kit::component::h_flex;
+    use gpui_kit::test::TestWindowExt as _;
+    use gpui_kit::{TestAppContext, WindowOptions, div};
 
     #[test]
-    fn the_first_frame_after_opening_matches_the_settled_layout() {
-        // With the full sidebar the window estimate and the measured column agree on every
-        // width around the switch point, so the page never flips after its first frame.
-        for width in 1200..1300 {
-            let viewport = px(width as f32);
-            let measured = Some(viewport - SIDEBAR_WIDTH);
-            assert_eq!(
-                list_is_narrow(None, viewport),
-                list_is_narrow(measured, viewport),
-                "{width}"
-            );
-        }
+    fn the_window_estimate_switches_where_the_full_sidebar_column_does() {
+        // At 1252 px with the full sidebar the integration tests measure a 996 px column.
         assert!(!list_is_narrow(None, px(1252.)));
         assert!(list_is_narrow(None, px(1251.)));
+        assert!(!list_is_narrow(Some(px(996.)), px(1252.)));
+        assert!(list_is_narrow(Some(px(995.)), px(1252.)));
+    }
+
+    // A padded column with the watch as its last child; counts its renders.
+    struct Column {
+        width: Rc<Cell<Option<Pixels>>>,
+        renders: Rc<Cell<usize>>,
+    }
+
+    impl Render for Column {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            self.renders.set(self.renders.get() + 1);
+            h_flex().size_full().child(
+                v_flex()
+                    .w(px(500.))
+                    .py(CONTENT_PADDING)
+                    .px(px(SIDE_PADDING))
+                    .child(div().h(px(40.)))
+                    .child(column_watch(&self.width)),
+            )
+        }
+    }
+
+    #[gpui_kit::test]
+    fn the_column_watch_records_the_padded_width_then_asks_for_a_frame(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let width = Rc::new(Cell::new(None));
+        let renders = Rc::new(Cell::new(0));
+        let (w, r) = (Rc::clone(&width), Rc::clone(&renders));
+        let win = cx
+            .update(|cx| {
+                gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
+                    cx.new(|_| Column {
+                        width: w,
+                        renders: r,
+                    })
+                })
+            })
+            .unwrap()
+            .0;
+        cx.run_until_parked();
+        cx.update_window(win, |_, w, cx| w.render_frame(cx))
+            .unwrap();
+        assert_eq!(width.get(), Some(px(500.)));
+        // The first measurement must bring one more render, since a draw's own notify is dropped.
+        let before = renders.get();
+        cx.update_window(win, |_, w, cx| w.simulate_next_frame(cx))
+            .unwrap();
+        cx.run_until_parked();
+        assert!(renders.get() > before, "no frame was asked for");
     }
 }
