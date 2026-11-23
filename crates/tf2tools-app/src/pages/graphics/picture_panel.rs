@@ -19,7 +19,7 @@ use tf2tools_core::ModuleChoice;
 
 use super::GraphicsChoicesEditor;
 use super::model::preset_label;
-use super::pictures::{Compare, RowPictures};
+use super::pictures::{Compare, RowPictures, wipe_label};
 use crate::i18n::tr;
 use crate::ids::{self, IdScope};
 use crate::pages::huds::rounded_picture;
@@ -385,7 +385,7 @@ fn compare(
             // The track spans the picture's full width, so the thumb's centre is the line's x.
             let slider = div()
                 .id(s.id(ids::graphics_compare_slider(module)))
-                .aria_label(tr!("graphics.pictures.wipe"))
+                .aria_label(wipe_label(editor.owner()))
                 .test_support()
                 .w_full()
                 .h(px(SLIDER_HEIGHT))
@@ -393,7 +393,7 @@ fn compare(
                 .items_center()
                 .child(
                     Slider::new(editor.wipe_state())
-                        .accessibility_label(tr!("graphics.pictures.wipe")),
+                        .accessibility_label(wipe_label(editor.owner())),
                 )
                 .into_any_element();
             (

@@ -427,4 +427,9 @@ fn the_compare_pill_calls_the_profile_s_side_this_profile(cx: &mut TestAppContex
         support::label_of(cx, s.win, pill).as_deref(),
         Some("This profile: High")
     );
+    let slider = gfx.id(ids::graphics_compare_slider("lod"));
+    assert_eq!(
+        support::label_of(cx, s.win, slider).as_deref(),
+        Some("Slide between the preset's picture and this profile's")
+    );
 }

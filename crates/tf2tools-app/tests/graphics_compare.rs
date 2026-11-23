@@ -70,6 +70,10 @@ fn the_wipe_shows_yours_right_of_the_line_and_restarts_at_the_middle(cx: &mut Te
         label(cx, &s, ids::graphics_compare_pill("lod", "yours")).as_deref(),
         Some("Yours: High")
     );
+    assert_eq!(
+        label(cx, &s, ids::graphics_compare_slider("lod")).as_deref(),
+        Some("Slide between the preset's picture and yours")
+    );
     assert_eq!(cx.update(|cx| page.read(cx).wipe(cx)), 50.);
     let clip = at(cx, &s, ids::graphics_compare_clip("lod"));
     assert!(

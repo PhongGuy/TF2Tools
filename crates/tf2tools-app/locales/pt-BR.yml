@@ -3096,6 +3096,7 @@ graphics:
     zoom: "Ampliar"
     full: "Imagem inteira"
     wipe: "Deslize entre a imagem da predefinição e a sua"
+    wipe_profile: "Deslize entre a imagem da predefinição e a deste perfil"
     caption: "Clique em uma imagem para usar essa configuração."
     no_picture:
       performance_only: "Sem imagem: esta configuração muda o desempenho, não a aparência do jogo."
