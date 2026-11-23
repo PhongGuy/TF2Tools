@@ -28,8 +28,8 @@ const ICON_SIZE: f32 = 20.;
 const ROW_PAD: Pixels = px(8.);
 const GAP: Pixels = px(4.);
 // The class column grows to fill the box but keeps room for the longest class name in English
-// or Russian beside its icon; each number column fits its English title beside the sort
-// arrow's slot, and its widest value, on one line, so the table fits a 1200 px window.
+// or Russian beside its icon; each number column fits its title in every language beside the
+// sort arrow's slot, and its widest value, on one line, so the table fits a 1200 px window.
 const CLASS_MIN: Pixels = px(122.);
 const COLUMNS: [(ClassStat, Pixels); 9] = [
     (ClassStat::Played, px(72.)),

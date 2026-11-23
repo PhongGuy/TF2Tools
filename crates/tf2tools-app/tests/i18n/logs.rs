@@ -471,9 +471,9 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
     let heads = [
         ("Played", "Сыграно"),
         ("Logs", "Логи"),
-        ("Kills/min", "Убийств/мин"),
+        ("Kills/min", "Уб/мин"),
         ("Assists/min", "Помощь/мин"),
-        ("Dmg/min", "Урон/мин"),
+        ("Dmg/min", "Урон/м"),
         ("KA/D", "KA/D"),
         ("Heals/min", "Леч./мин"),
         ("Ubers/10 min", "Убер/10 мин"),
@@ -624,6 +624,97 @@ fn an_open_french_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn an_open_chinese_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     open_log_keeps_its_ids_and_fits(cx, "zh-CN");
+}
+
+// The sort arrow's 12 px slot and the 2 px gap before it, beside every header title.
+const ARROW_ROOM: f32 = 14.;
+
+// In `lang` at the 1200 px minimum window, every class-table and players-table title fits its
+// column beside the arrow slot, and both tables keep every column inside their box.
+fn logs_tf_titles_fit_their_columns(cx: &mut TestAppContext, lang: &str) {
+    use tf2tools_app::pages::logs_tf::sort::{ClassStat, PlayerColumn};
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(1200.), px(800.)));
+    let page = open_page(cx, &s);
+    let mut spills = Vec::new();
+    let mut check = |cx: &mut TestAppContext, head: gpui_kit::ElementId| -> Option<f32> {
+        let bounds = support::bounds_of(cx, s.win, head.clone())?;
+        let label = support::label_of(cx, s.win, head).expect("a labelled header");
+        let w = f32::from(text_width(cx, s.win, &label, 0.75, FontWeight::MEDIUM));
+        let room = f32::from(bounds.size.width);
+        if w + ARROW_ROOM > room + 0.5 {
+            spills.push(format!(
+                "{lang}: {label:?} needs {} px of {room}",
+                w + ARROW_ROOM
+            ));
+        }
+        Some(f32::from(bounds.right()))
+    };
+    let mut class_right = 0f32;
+    for stat in std::iter::once(ClassStat::Class).chain(ClassStat::ALL) {
+        let title = stat.title();
+        let right = check(cx, ids::logstf_class_head(title)).expect(title);
+        class_right = class_right.max(right);
+    }
+    // A row spans the table's full minimum width, padding included, unlike the title buttons.
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_TABLE).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    assert!(
+        class_right <= f32::from(table.right()) && row.right() <= table.right(),
+        "{lang}: the class table's {row:?} overflows its {table:?} at 1200 px"
+    );
+    open_log(cx, &s, &page, 3);
+    let mut players_right = 0f32;
+    for column in PlayerColumn::ALL {
+        if let Some(right) = check(cx, ids::logstf_sort(column.title())) {
+            players_right = players_right.max(right);
+        }
+    }
+    let head = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_HEAD).unwrap();
+    assert!(
+        players_right <= f32::from(head.right()),
+        "{lang}: the players table overflows at 1200 px"
+    );
+    assert!(spills.is_empty(), "{spills:#?}");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_english(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "en");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_russian(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_portuguese(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_spanish(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_german(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_french(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "fr");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_titles_fit_their_columns_in_chinese(cx: &mut TestAppContext) {
+    logs_tf_titles_fit_their_columns(cx, "zh-CN");
 }
 
 // French words the footer longest and German next; both must keep every button in the panel.
