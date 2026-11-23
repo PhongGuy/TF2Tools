@@ -397,6 +397,11 @@ impl Shell {
         self.hud_maker.clone()
     }
 
+    /// The Demo Viewer page while it shows.
+    pub fn demo_viewer_page(&self) -> Option<Entity<DemoViewerPage>> {
+        self.shown(Page::DemoViewer, self.demo_viewer.as_ref())
+    }
+
     /// The Settings page while it shows.
     pub fn settings_page(&self) -> Option<Entity<SettingsPage>> {
         self.shown(Page::Settings, self.settings.as_ref())
