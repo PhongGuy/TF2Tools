@@ -140,6 +140,37 @@ fn the_preset_s_own_value_shows_one_picture_and_the_strip_tags_it() {
 }
 
 #[test]
+fn the_player_model_row_wipes_between_its_two_bundled_pictures_with_zoom() {
+    // A HUD setting, outside mastercomfig's graphics category, with real pictures of both values.
+    let dir = bundled();
+    let row = pictures_of(
+        Preset::Medium,
+        &[("hud_player_model", value("off"))],
+        "hud_player_model",
+        false,
+    )
+    .unwrap();
+    assert_eq!(row.thumb, Some(dir.join("hud_player_model/off.webp")));
+    assert_eq!(
+        row.compare,
+        Compare::Wipe {
+            preset: dir.join("hud_player_model/on.webp"),
+            yours: dir.join("hud_player_model/off.webp"),
+            preset_pill: "Medium: On".into(),
+            yours_pill: "Yours: Off".into(),
+        }
+    );
+    let strip: Vec<(&str, bool, bool)> = row
+        .strip
+        .iter()
+        .map(|p| (p.value.as_str(), p.preset, p.chosen))
+        .collect();
+    assert_eq!(strip, [("off", false, true), ("on", true, false)]);
+    assert_eq!(row.strip[1].picture, dir.join("hud_player_model/on.webp"));
+    assert!(row.has_zoom);
+}
+
+#[test]
 fn a_changed_value_wipes_between_the_preset_s_picture_and_yours() {
     let dir = bundled();
     let lod = pictures_of(Preset::Medium, &[("lod", value("high"))], "lod", false).unwrap();

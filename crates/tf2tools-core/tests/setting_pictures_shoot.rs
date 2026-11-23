@@ -72,6 +72,15 @@ fn a_marker_matches_its_own_step_only() {
 }
 
 #[test]
+fn a_marker_counts_when_the_next_message_lands_on_its_line() {
+    // Seen in a real run: the console wrote the next line straight after the marker's space.
+    let log = "TFS_DONE_7 'tfs/step_8' not present; not executing.\n";
+    assert!(marker_seen(log, 7));
+    assert!(!marker_seen(log, 8));
+    assert!(!marker_seen("TFS_DONE_12 'tfs/step_13' not present\n", 1));
+}
+
+#[test]
 fn the_launch_is_a_private_local_server_on_the_map() {
     let args = launch_args("ctf_2fort");
     let joined = args.join(" ");
