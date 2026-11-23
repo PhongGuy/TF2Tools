@@ -273,6 +273,8 @@ mod updater_keys;
 mod updater_messages;
 mod updater_startup;
 mod vendor_patch;
+#[cfg(target_os = "linux")]
+mod vendor_pointer_lock;
 mod version;
 mod viewer_gpu;
 mod viewer_math;

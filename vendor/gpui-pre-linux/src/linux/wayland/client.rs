@@ -576,6 +576,15 @@ impl WaylandClientState {
 #[derive(Clone)]
 pub struct WaylandClientStatePtr(Weak<RefCell<WaylandClientState>>);
 
+// Filled in when the Wayland lock lands; until then this client cannot lock.
+impl crate::linux::pointer_lock::PointerLockTarget for WaylandClientStatePtr {
+    fn lock(&self) -> crate::linux::pointer_lock::PointerLockState {
+        crate::linux::pointer_lock::PointerLockState::Unsupported
+    }
+
+    fn unlock(&self) {}
+}
+
 impl WaylandClientStatePtr {
     pub fn get_client(&self) -> Rc<RefCell<WaylandClientState>> {
         self.0
@@ -1147,6 +1156,7 @@ impl WaylandConnection {
         // From here on, `Drop` removes whatever was registered if a later step fails.
         let client = Self(state);
         let pointer = WaylandClientStatePtr(Rc::downgrade(&client.0));
+        crate::linux::pointer_lock::register(Rc::new(pointer.clone()));
 
         client.register_source(
             handle.insert_source(frame_ping_source, {

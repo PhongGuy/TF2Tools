@@ -8243,6 +8243,7 @@ dependencies = [
  "gpui-base",
  "gpui-component",
  "gpui-kit",
+ "gpui-pre-linux",
  "gpui-pre-wgpu",
  "image",
  "minisign",

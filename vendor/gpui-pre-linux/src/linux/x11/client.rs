@@ -244,6 +244,15 @@ pub struct X11ClientState {
 #[derive(Clone)]
 pub struct X11ClientStatePtr(pub Weak<RefCell<X11ClientState>>);
 
+// Filled in when the X11 lock lands; until then this client cannot lock.
+impl crate::linux::pointer_lock::PointerLockTarget for X11ClientStatePtr {
+    fn lock(&self) -> crate::linux::pointer_lock::PointerLockState {
+        crate::linux::pointer_lock::PointerLockState::Unsupported
+    }
+
+    fn unlock(&self) {}
+}
+
 impl X11ClientStatePtr {
     pub fn get_client(&self) -> Option<X11Client> {
         self.0.upgrade().map(X11Client)
@@ -556,6 +565,7 @@ impl X11Connection {
                 xdnd_state: Xdnd::default(),
             })
         })));
+        crate::linux::pointer_lock::register(Rc::new(connection.0.0.borrow().this.clone()));
         // From here on, `Drop` removes whatever was registered if a later step fails.
         connection.register_sources(&handle, background_executor)?;
         let xcb_connection = connection.0.0.borrow().xcb_connection.clone();
