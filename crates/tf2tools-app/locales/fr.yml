@@ -3090,6 +3090,7 @@ graphics:
     show: "Afficher les images"
     hide: "Masquer les images"
     yours: "Le vôtre\u00A0: %{value}"
+    this_profile: "Ce profil\u00A0: %{value}"
     same: "%{value} (identique au préréglage %{preset})"
     zoom: "Zoom"
     full: "Image entière"

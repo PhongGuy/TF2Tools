@@ -5,7 +5,8 @@ use crate::support;
 use std::path::PathBuf;
 
 use tf2tools_app::pages::graphics::pictures::{
-    Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, no_picture_note, row_pictures,
+    ChoicesOwner, Compare, PictureIndex, RowPictures, ValuePicture, compared_pair, no_picture_note,
+    row_pictures,
 };
 use tf2tools_app::pages::graphics::view::row;
 use tf2tools_app::remote_images::local_image_url;
@@ -60,7 +61,12 @@ fn pictures_of(
         choices.set(&catalog, name, choice.clone());
     }
     let row = row(&catalog, &choices, catalog.module(module).unwrap());
-    row_pictures(&PictureIndex::open(&bundled()), &row, zoom)
+    row_pictures(
+        &PictureIndex::open(&bundled()),
+        &row,
+        zoom,
+        ChoicesOwner::Player,
+    )
 }
 
 #[test]
@@ -272,7 +278,7 @@ fn a_wipe_against_a_value_without_a_crop_stays_whole_under_zoom() {
     choices.set(&catalog, "lod", value("low"));
     let row = row(&catalog, &choices, catalog.module("lod").unwrap());
     let index = PictureIndex::open(tmp.path());
-    let zoomed = row_pictures(&index, &row, true).unwrap();
+    let zoomed = row_pictures(&index, &row, true, ChoicesOwner::Player).unwrap();
     assert_eq!(
         zoomed.compare.pictures(),
         [
@@ -295,7 +301,9 @@ fn the_zoom_toggle_shows_only_when_every_compared_side_has_a_crop() {
             choices.set(&catalog, "lod", value(v));
         }
         let row = row(&catalog, &choices, catalog.module("lod").unwrap());
-        row_pictures(&index, &row, false).unwrap().has_zoom
+        row_pictures(&index, &row, false, ChoicesOwner::Player)
+            .unwrap()
+            .has_zoom
     };
     assert!(has_zoom(Preset::Medium, Some("low")), "both sides cropped");
     assert!(

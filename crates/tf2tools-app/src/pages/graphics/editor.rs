@@ -23,7 +23,7 @@ use gpui_kit::{
 use tf2tools_core::{Choices, ModuleCatalog, Preset};
 
 use super::model::{ValueOption, preset_label, scoped_value_options, shown_choice};
-use super::pictures::{self, PictureIndex, RowPictures};
+use super::pictures::{self, ChoicesOwner, PictureIndex, RowPictures};
 use super::view::{self, BuiltRows};
 use crate::i18n::{self, counted_plural, tr};
 use crate::ids::{self, IdScope};
@@ -52,6 +52,8 @@ pub enum ChoicesEdit {
 /// Draws a set of Graphics choices under an id scope and proposes edits to them.
 pub struct GraphicsChoicesEditor {
     pub(super) scope: IdScope,
+    /// Whose choices these are, for the compare pill's wording.
+    owner: ChoicesOwner,
     pub(super) choices: Choices,
     pub(super) catalog: Option<Arc<ModuleCatalog>>,
     /// Every control draws disabled and proposes nothing.
@@ -119,6 +121,7 @@ impl GraphicsChoicesEditor {
         }
         let mut editor = Self {
             scope,
+            owner: ChoicesOwner::Player,
             choices,
             catalog: None,
             disabled: false,
@@ -154,7 +157,7 @@ impl GraphicsChoicesEditor {
                 self.built
                     .rows()
                     .filter_map(|row| {
-                        let pictures = pictures::row_pictures(index, row, false)?;
+                        let pictures = pictures::row_pictures(index, row, false, self.owner)?;
                         Some((row.module.clone(), pictures))
                     })
                     .collect()
@@ -305,6 +308,18 @@ impl GraphicsChoicesEditor {
         self.zoom
     }
 
+    /// Whose choices the editor shows; the player's unless the host said otherwise.
+    pub fn owner(&self) -> ChoicesOwner {
+        self.owner
+    }
+
+    /// The editor, naming its choices `owner`'s in the compare pill.
+    pub fn with_owner(mut self, owner: ChoicesOwner) -> Self {
+        self.owner = owner;
+        self.rebuild();
+        self
+    }
+
     /// How far across the compare view the preset's picture shows, 0 to 100.
     pub fn wipe(&self, cx: &App) -> f32 {
         self.wipe.read(cx).value().start()
@@ -364,7 +379,7 @@ impl GraphicsChoicesEditor {
             .open_row
             .as_deref()
             .and_then(|module| self.built.row(module))
-            .and_then(|row| pictures::row_pictures(index, row, self.zoom));
+            .and_then(|row| pictures::row_pictures(index, row, self.zoom, self.owner));
         let (compared, strip) = open
             .map(|p| (p.compare.pictures(), p.strip))
             .unwrap_or_default();

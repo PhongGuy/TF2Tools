@@ -3065,6 +3065,7 @@ graphics:
     show: "Show pictures"
     hide: "Hide pictures"
     yours: "Yours: %{value}"
+    this_profile: "This profile: %{value}"
     same: "%{value} (same as %{preset})"
     zoom: "Zoom"
     full: "Full picture"
