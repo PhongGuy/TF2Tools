@@ -266,7 +266,7 @@ pub(super) fn rail(
 }
 
 /// The wide rail's entry width, enough for the longest category name beside its count.
-const RAIL_WIDTH: f32 = 184.;
+pub(super) const RAIL_WIDTH: f32 = 184.;
 
 /// The space between the wide rail and the list it sits beside.
-const RAIL_GUTTER: f32 = 24.;
+pub(super) const RAIL_GUTTER: f32 = 24.;
