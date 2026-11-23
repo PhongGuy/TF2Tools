@@ -8,7 +8,7 @@ use gpui_kit::{AppContext as _, Keystroke, ScrollDelta, TestAppContext, point, p
 use support::graphics::found;
 use support::profiles::{FLAT, PYRO, addon, edit, game_files, low_fps60, page, seed, type_name};
 use tf2tools_app::ids;
-use tf2tools_core::{DraftItem, ProfileDraft, SlotMode};
+use tf2tools_core::{Choices, DraftItem, ModuleChoice, Preset, ProfileDraft, SlotMode};
 
 /// A slot card's padding plus its border, each side.
 const CARD_INSET: f32 = 17.;
@@ -374,4 +374,33 @@ fn clicking_an_addon_name_flips_its_switch(cx: &mut TestAppContext) {
     assert_eq!(draft.addons.len(), 1);
     assert!(!draft.only_these);
     assert_eq!(game_files(&env), before);
+}
+
+// The editor's compare view shows a profile's pick, not the player's own, so its pill says
+// whose side it is the way the Graphics mock does.
+#[gpui_kit::test]
+fn the_compare_pill_calls_the_profile_s_side_this_profile(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_full_mastercomfig_catalog(&env, "9.100.1");
+    let mut sharp = Choices::new(Preset::Medium);
+    let catalog = support::full_module_catalog();
+    sharp.set(&catalog, "lod", ModuleChoice::Value("high".into()));
+    let draft = ProfileDraft::new("Sharp").with_graphics(SlotMode::Set(sharp));
+    let p = s.services.library.create_profile(&draft).unwrap();
+    cx.simulate_window_resize(s.win, size(px(1280.), px(8000.)));
+    let page = page(cx, &s);
+    edit(cx, &s, &page, p.id());
+    let gfx = ids::IdScope::PROFILE_GRAPHICS;
+    let thumb = gfx.id(ids::graphics_thumb("lod"));
+    support::wait_real(cx, "lod's thumbnail", |cx| {
+        support::present(cx, s.win, thumb.clone())
+    });
+    support::click_id(cx, s.win, thumb);
+    let pill = gfx.id(ids::graphics_compare_pill("lod", "yours"));
+    assert_eq!(
+        support::label_of(cx, s.win, pill).as_deref(),
+        Some("This profile: High")
+    );
 }

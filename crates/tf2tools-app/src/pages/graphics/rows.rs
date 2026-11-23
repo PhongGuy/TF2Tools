@@ -103,7 +103,7 @@ impl GraphicsChoicesEditor {
             });
         let panel = index
             .filter(|_| self.open_row() == Some(name))
-            .and_then(|index| pictures::row_pictures(index, row, self.zoom()))
+            .and_then(|index| pictures::row_pictures(index, row, self.zoom(), self.owner()))
             .map(|p| picture_panel::panel(self, name, &p, cx));
         let border = cx.theme().border;
         let tint = Hsla::from(rgb(CHANGED));

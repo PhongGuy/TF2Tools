@@ -101,6 +101,15 @@ pub fn no_picture_note(reason: &str) -> Option<SharedString> {
     })
 }
 
+/// Whose choices an editor shows, which names the compare view's other side: the Graphics
+/// page shows the player's own, the Profiles editor a profile's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChoicesOwner {
+    #[default]
+    Player,
+    Profile,
+}
+
 /// What the open row's compare view shows.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Compare {
@@ -179,7 +188,12 @@ pub fn compared_pair(
 
 /// None when no value of the row's module has a picture. Thumb and strip use full pictures;
 /// `zoom` swaps the compare pictures for crops when every compared side has one (see `compared_pair`).
-pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<RowPictures> {
+pub fn row_pictures(
+    index: &PictureIndex,
+    row: &RowView,
+    zoom: bool,
+    owner: ChoicesOwner,
+) -> Option<RowPictures> {
     if !index.has_pictures(&row.module) {
         return None;
     }
@@ -194,7 +208,10 @@ pub fn row_pictures(index: &PictureIndex, row: &RowView, zoom: bool) -> Option<R
             .map(|o| o.label.clone())
             .unwrap_or_default()
     };
-    let yours_pill = || tr!("graphics.pictures.yours", value = label(&row.shown));
+    let yours_pill = || match owner {
+        ChoicesOwner::Player => tr!("graphics.pictures.yours", value = label(&row.shown)),
+        ChoicesOwner::Profile => tr!("graphics.pictures.this_profile", value = label(&row.shown)),
+    };
     // The same value on both sides shows once; otherwise the player's pick wipes over the
     // preset's, or whichever side has a picture stands alone.
     let (preset, yours) = (picture(&row.preset_value), picture(&row.shown));

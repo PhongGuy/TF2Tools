@@ -33,6 +33,7 @@ use crate::ids::{self, IdScope};
 use crate::keymap::{PROFILE_EDITOR_CONTEXT, ProfileEditorCancel};
 use crate::local_messages::describe_profile;
 use crate::pages::common::{badge_of, card_frame};
+use crate::pages::graphics::pictures::ChoicesOwner;
 use crate::pages::graphics::view::SectionView;
 use crate::pages::graphics::{ChoicesEdit, GraphicsChoicesEditor, pill};
 use crate::previews::CrosshairPreviews;
@@ -206,6 +207,7 @@ impl ProfileDraftEditor {
                 window,
                 cx,
             )
+            .with_owner(ChoicesOwner::Profile)
         });
         subscriptions.push(cx.observe(&graphics, |_, _, cx| cx.notify()));
         subscriptions.push(cx.subscribe_in(
