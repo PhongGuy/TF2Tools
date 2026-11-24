@@ -45,12 +45,18 @@ fn the_endpoints_name_demos_tf_or_one_loopback_base() {
     let live = DemosEndpoints::default();
     assert_eq!(live.api(), "https://api.demos.tf");
     assert_eq!(live.site(), "https://demos.tf");
-    assert_eq!(live.files(), "https://static.demos.tf");
+    assert_eq!(
+        live.files(),
+        ["https://static.demos.tf", "https://freezer.demos.tf"]
+    );
     assert_eq!(live.demo_page(1_536_965), "https://demos.tf/1536965");
     let local = DemosEndpoints::loopback("http://127.0.0.1:5/");
     assert_eq!(local.api(), "http://127.0.0.1:5");
     assert_eq!(local.site(), "http://127.0.0.1:5/site");
-    assert_eq!(local.files(), "http://127.0.0.1:5/files");
+    assert_eq!(
+        local.files(),
+        ["http://127.0.0.1:5/files", "http://127.0.0.1:5/freezer"]
+    );
     assert_eq!(
         DemosClient::default_config().request_spacing(),
         LOGS_SPACING
