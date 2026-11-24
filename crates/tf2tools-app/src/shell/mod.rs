@@ -18,7 +18,7 @@ pub use sidebar::icon as nav_icon;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
-    AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
     ParentElement as _, Pixels, Render, Styled as _, Subscription, Window, div, px,
 };
 
@@ -35,6 +35,7 @@ use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::crosshair_store::CrosshairStorePage;
 use crate::pages::crosshairs::{AddToProfile, CopyToMaker, CrosshairsPage, EditPainted};
 use crate::pages::demo_viewer::DemoViewerPage;
+use crate::pages::demos_tf::DemosTfPage;
 use crate::pages::graphics::GraphicsPage;
 use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
@@ -102,7 +103,7 @@ pub struct Shell {
     logs: Option<Entity<LogsPage>>,
     maps: Option<Entity<MapsPage>>,
     logs_tf: Option<Entity<LogsTfPage>>,
-    demo_viewer: Option<Entity<DemoViewerPage>>,
+    demos_tf: Option<Entity<DemosTfPage>>,
     addons: Option<Entity<AddonsPage>>,
     graphics: Option<Entity<GraphicsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
@@ -215,7 +216,7 @@ impl Shell {
             logs: None,
             maps: None,
             logs_tf: None,
-            demo_viewer: None,
+            demos_tf: None,
             addons: None,
             graphics: None,
             profiles: None,
@@ -273,7 +274,6 @@ impl Shell {
         self.addons = None;
         self.graphics = None;
         self.profiles = None;
-        self.demo_viewer = None;
         self.set_kept_hidden(page, false, cx);
         show_idle(page.shows_player(), cx);
         cx.notify();
@@ -303,6 +303,9 @@ impl Shell {
             Page::LogsTf => self.logs_tf.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
+            Page::DemosTf => self.demos_tf.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
             Page::Settings => self.settings.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
@@ -313,8 +316,7 @@ impl Shell {
             | Page::HudMaker
             | Page::Profiles
             | Page::Addons
-            | Page::Graphics
-            | Page::DemoViewer => None,
+            | Page::Graphics => None,
         };
     }
 
@@ -397,9 +399,14 @@ impl Shell {
         self.hud_maker.clone()
     }
 
-    /// The Demo Viewer page while it shows.
-    pub fn demo_viewer_page(&self) -> Option<Entity<DemoViewerPage>> {
-        self.shown(Page::DemoViewer, self.demo_viewer.as_ref())
+    /// The Demos.tf page while it shows.
+    pub fn demos_tf_page(&self) -> Option<Entity<DemosTfPage>> {
+        self.shown(Page::DemosTf, self.demos_tf.as_ref())
+    }
+
+    /// The Demo Viewer while the Demos.tf page shows a demo.
+    pub fn demo_viewer_page(&self, cx: &App) -> Option<Entity<DemoViewerPage>> {
+        self.demos_tf_page()?.read(cx).viewer().cloned()
     }
 
     /// The Settings page while it shows.
@@ -646,9 +653,9 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
-            Page::DemoViewer => self
-                .demo_viewer
-                .get_or_insert_with(|| cx.new(|cx| DemoViewerPage::new(window, cx)))
+            Page::DemosTf => self
+                .demos_tf
+                .get_or_insert_with(|| cx.new(|cx| DemosTfPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
             // The page asks to show another page by event; the subscription dies with the page.

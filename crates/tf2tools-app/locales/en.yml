@@ -137,10 +137,13 @@ updater:
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
 
+demos_tf:
+  open: "Open demo"
+  back: "Back to the demo list"
+  coming: "The demos.tf list is coming. For now, open a demo from your computer."
 demo_viewer:
   preview: "Preview"
   open: "Open demo"
-  empty: "Open a TF2 demo to see its map in 3D."
   loading: "Loading map..."
   downloading: "Downloading %{map} from serveme.tf..."
   received: "%{done} / %{total}"
@@ -180,7 +183,7 @@ nav:
   addon_store: "Addon Store"
   maps: "Maps"
   logs_tf: "logs.tf"
-  demo_viewer: "Demo Viewer"
+  demos_tf: "Demos.tf"
   settings: "Settings"
   logs: "Logs"
   activity_log: "Activity Log"

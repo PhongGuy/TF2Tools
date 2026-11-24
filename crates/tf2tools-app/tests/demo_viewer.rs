@@ -1,6 +1,5 @@
-//! The Demo Viewer page: where it sits, its Preview badge, its empty state and its Open button.
+//! The Demo Viewer: where it sits, its Preview badge, its status, bar and Open button.
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use gpui_kit::assets::IconName;
@@ -12,7 +11,7 @@ use gpui_kit::{
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::demo_viewer::BarPlace;
-use tf2tools_app::picker::{PickKind, ScriptedPicker};
+use tf2tools_app::picker::PickKind;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::nav_icon;
 use tf2tools_app::shell::route::Page;
@@ -24,46 +23,53 @@ use tf2tools_core::{
 use crate::support;
 use crate::support::demo_view_fixtures::demo_header;
 use crate::support::demo_viewer::{
-    LockCall, StubAnswer, counting_snapshots, demo_file, demo_viewer_shell,
-    demo_viewer_shell_locked, demo_viewer_shell_with, inside, install_map,
+    LockCall, NOT_A_DEMO, StubAnswer, counting_snapshots, demo_file, demo_viewer_shell,
+    demo_viewer_shell_locked, demo_viewer_shell_with, inside, install_map, not_a_demo,
+    open_not_a_demo,
 };
 
 #[test]
-fn the_demo_viewer_follows_logs_tf_with_its_own_icon() {
-    let at = Page::ALL
-        .iter()
-        .position(|p| *p == Page::DemoViewer)
-        .unwrap();
+fn demos_tf_follows_logs_tf_with_its_own_icon() {
+    let at = Page::ALL.iter().position(|p| *p == Page::DemosTf).unwrap();
     assert_eq!(Page::ALL[at - 1], Page::LogsTf);
     assert_eq!(Page::ALL[at + 1], Page::Settings);
-    let page = Page::DemoViewer;
+    let page = Page::DemosTf;
     assert_eq!(
         (page.slug(), page.label().as_ref(), page.title().as_ref()),
-        ("demo-viewer", "Demo Viewer", "Demo Viewer")
+        ("demos-tf", "Demos.tf", "Demos.tf")
     );
     assert_eq!(nav_icon(page), IconName::Clapperboard);
     assert!(!page.is_placeholder());
 }
 
 #[gpui_kit::test]
-fn the_page_opens_empty_with_a_preview_badge_beside_its_title(cx: &mut TestAppContext) {
+fn the_viewer_shows_a_preview_badge_beside_its_title(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
+    // The crumb stands in for the page title while a demo shows, and the badge follows it.
     assert_eq!(
-        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
-        Some("Demo Viewer")
+        support::label_of(cx, s.win, ids::DEMOS_TF_CRUMB).as_deref(),
+        Some("Back to the demo list")
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE).as_deref(),
         Some("Preview")
     );
-    let title = support::bounds_of(cx, s.win, ids::HEADER_TITLE).unwrap();
+    let title = support::bounds_of(cx, s.win, ids::DEMOS_TF_CRUMB_NAME).unwrap();
     let badge = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE).unwrap();
     assert!(badge.origin.x > title.origin.x + title.size.width);
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_STATUS).as_deref(),
-        Some("Open a TF2 demo to see its map in 3D.")
+        Some(NOT_A_DEMO)
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_OPEN).as_deref(),
@@ -73,7 +79,7 @@ fn the_page_opens_empty_with_a_preview_badge_beside_its_title(cx: &mut TestAppCo
 }
 
 #[gpui_kit::test]
-fn the_badge_shows_only_on_the_demo_viewer(cx: &mut TestAppContext) {
+fn the_badge_shows_only_on_the_demos_tf_page(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE));
@@ -82,20 +88,21 @@ fn the_badge_shows_only_on_the_demo_viewer(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn open_asks_for_a_demo_and_a_cancel_changes_nothing(cx: &mut TestAppContext) {
     let env = support::env();
-    let picker = Arc::new(ScriptedPicker::empty());
-    let s = support::shell_window_with(
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
         cx,
         &env,
-        Tf2State::Missing { saved: None },
-        Arc::clone(&picker),
-        support::no_steam(),
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
     );
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    open_not_a_demo(cx, w.s.win);
+    let (s, picker) = (&w.s, &w.picker);
     support::click_id(cx, s.win, ids::DEMO_VIEWER_OPEN);
-    assert_eq!(picker.asked(), [PickKind::OpenDemo]);
+    assert_eq!(picker.asked(), [PickKind::OpenDemo, PickKind::OpenDemo]);
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_STATUS).as_deref(),
-        Some("Open a TF2 demo to see its map in 3D.")
+        Some(NOT_A_DEMO)
     );
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_VIEWPORT));
 }
@@ -115,7 +122,7 @@ fn status_after_opening(
 ) {
     let path = demo_file(env, "match.dem", demo);
     let w = demo_viewer_shell(cx, env, state, vec![path], answer);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
     });
@@ -131,7 +138,7 @@ fn an_installed_map_opens_in_the_viewport_under_its_caption(cx: &mut TestAppCont
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -161,7 +168,7 @@ fn a_cancelled_second_open_keeps_the_map(cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -232,7 +239,7 @@ fn a_missing_map_that_serveme_cannot_send_ends_in_a_failure(cx: &mut TestAppCont
     let env = support::env();
     let path = demo_file(&env, "match.dem", &demo_header("cp_missing", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![path], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     let want = "Couldn't download cp_missing.";
     support::wait_real(cx, "the download to fail", |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
@@ -302,7 +309,10 @@ fn a_second_open_replaces_the_load_in_flight(cx: &mut TestAppContext) {
         vec![first, second],
         StubAnswer::Frames,
     );
-    support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_without_settling(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    support::wait_real(cx, "the viewer", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER)
+    });
     support::click_without_settling(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
     let want = "cp_second";
     support::wait_real(cx, "the second map", |cx| {
@@ -325,7 +335,7 @@ fn leaving_the_page_drops_its_renderer(cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -362,7 +372,7 @@ fn open_with_players(
         StubAnswer::Frames,
         Some(reader),
     );
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -444,7 +454,7 @@ fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
         StubAnswer::Frames,
         Some(reader),
     );
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     let want = "This map can't be shown.";
     support::wait_real(cx, want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
@@ -475,11 +485,11 @@ fn a_loaded_map_fills_the_page_under_a_bottom_bar(cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
-    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemoViewer)).unwrap();
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
     let viewport = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT).unwrap();
     assert_eq!(viewport, page);
     let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
@@ -501,11 +511,19 @@ fn a_loaded_map_fills_the_page_under_a_bottom_bar(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_empty_page_keeps_the_bar_and_centres_its_status(cx: &mut TestAppContext) {
+fn a_viewer_without_a_map_keeps_the_bar_and_centres_its_status(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
-    let page = support::bounds_of(cx, s.win, ids::page(Page::DemoViewer)).unwrap();
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
+    let page = support::bounds_of(cx, s.win, ids::page(Page::DemosTf)).unwrap();
     let bar = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_BAR).unwrap();
     assert_bar_at_bottom_centre(page, bar);
     for id in [
@@ -621,13 +639,21 @@ fn fractions(page: Bounds<Pixels>, bar: Bounds<Pixels>) -> (f32, f32) {
 #[gpui_kit::test]
 fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
     let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     hold_drag(cx, s.win, grip, (-200., -300.));
     assert_eq!(
-        saved_bar(&s),
+        saved_bar(s),
         None,
         "a move saved the place before the release"
     );
@@ -638,9 +664,9 @@ fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestApp
         (moved.x - px(-200.)).abs() <= px(1.) && (moved.y - px(-300.)).abs() <= px(1.),
         "{before:?} -> {after:?}"
     );
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let (x, y) = fractions(page, after);
-    let saved = saved_bar(&s).expect("a saved place");
+    let saved = saved_bar(s).expect("a saved place");
     assert!(
         (saved.x - x).abs() < 0.002 && (saved.y - y).abs() < 0.002,
         "{saved:?} vs {x} {y}"
@@ -651,10 +677,18 @@ fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestApp
 #[gpui_kit::test]
 fn minimising_hides_the_controls_and_expanding_brings_them_back(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
     support::click_id(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
-    assert_eq!(saved_bar(&s).map(|p| p.collapsed), Some(true));
+    assert_eq!(saved_bar(s).map(|p| p.collapsed), Some(true));
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
     assert!(support::present(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP));
     assert_eq!(
@@ -662,7 +696,7 @@ fn minimising_hides_the_controls_and_expanding_brings_them_back(cx: &mut TestApp
         Some("Show controls")
     );
     support::click_id(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
-    assert_eq!(saved_bar(&s).map(|p| p.collapsed), Some(false));
+    assert_eq!(saved_bar(s).map(|p| p.collapsed), Some(false));
     assert!(support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE).as_deref(),
@@ -676,7 +710,7 @@ fn minimising_a_loaded_bar_hides_its_caption_and_hint_until_expanded(cx: &mut Te
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -698,8 +732,16 @@ fn minimising_a_loaded_bar_hides_its_caption_and_hint_until_expanded(cx: &mut Te
 #[gpui_kit::test]
 fn a_press_on_the_grip_that_never_moves_saves_nothing(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
     let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     let press = MouseDownEvent {
@@ -711,7 +753,7 @@ fn a_press_on_the_grip_that_never_moves_saves_nothing(cx: &mut TestAppContext) {
     };
     send(cx, s.win, press);
     release(cx, s.win, grip);
-    assert_eq!(saved_bar(&s), None, "a still press saved the place");
+    assert_eq!(saved_bar(s), None, "a still press saved the place");
     assert_eq!(bounds(cx, s.win, ids::DEMO_VIEWER_BAR), before);
 }
 
@@ -720,7 +762,7 @@ fn yaw(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
         let page = s
             .shell
             .read(cx)
-            .demo_viewer_page()
+            .demo_viewer_page(cx)
             .expect("the Demo Viewer");
         let viewport = page.read(cx).viewport().expect("a viewport");
         viewport.read(cx).camera().yaw()
@@ -733,7 +775,7 @@ fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -746,7 +788,7 @@ fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
         "a drag from the bar turned the camera"
     );
     // The same drag on the open map does turn it, so the check above can fail.
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     drag(cx, w.s.win, page.center(), (100., 0.));
     assert_ne!(yaw(cx, &w.s), start);
 }
@@ -754,11 +796,19 @@ fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    open_not_a_demo(cx, w.s.win);
+    let s = &w.s;
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     drag(cx, s.win, grip, (2000., 2000.));
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     assert!(
         (bar.right() - page.right()).abs() <= px(1.)
@@ -767,7 +817,7 @@ fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppConte
     );
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     support::settle(cx, s.win);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     assert!(inside(bar, page), "{bar:?} leaves {page:?}");
 }
@@ -775,13 +825,21 @@ fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppConte
 #[gpui_kit::test]
 fn a_saved_place_is_where_the_bar_opens(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let missing = Tf2State::Missing { saved: None };
+    let w = demo_viewer_shell(
+        cx,
+        &env,
+        missing,
+        vec![not_a_demo(&env)],
+        StubAnswer::Frames,
+    );
+    let s = &w.s;
     s.services
         .db
         .set_demo_viewer_bar("0.250 0.300 collapsed")
         .unwrap();
-    support::click_nav(cx, s.win, Page::DemoViewer);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    open_not_a_demo(cx, s.win);
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let (x, y) = fractions(page, bar);
     assert!(
@@ -797,14 +855,14 @@ fn a_loaded_bar_fits_the_narrowest_window(cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
     // The app's minimum window size.
     cx.simulate_window_resize(w.s.win, size(px(800.), px(600.)));
     support::settle(cx, w.s.win);
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     for id in [
         ids::DEMO_VIEWER_BAR,
         ids::DEMO_VIEWER_HINT,
@@ -827,7 +885,7 @@ fn release_look(cx: &mut TestAppContext, s: &support::ShellWindow, percent: f32)
         let page = s
             .shell
             .read(cx)
-            .demo_viewer_page()
+            .demo_viewer_page(cx)
             .expect("the Demo Viewer");
         page.read(cx).look_slider().clone()
     });
@@ -844,14 +902,19 @@ fn release_look(cx: &mut TestAppContext, s: &support::ShellWindow, percent: f32)
 // The yaw change, wrapped to [-180, 180), of a 100 px rightward drag across the map.
 fn yaw_turn(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
     let start = yaw(cx, s);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     drag(cx, s.win, page.center(), (100., 0.));
     (yaw(cx, s) - start + 540.).rem_euclid(360.) - 180.
 }
 
-// Opens the next picked demo and waits for its viewport.
+// Opens the next picked demo, from the list the first time and the bar after, and waits for
+// its viewport.
 fn open_map(cx: &mut TestAppContext, s: &support::ShellWindow) {
-    support::click_id(cx, s.win, ids::DEMO_VIEWER_OPEN);
+    let open = match support::present(cx, s.win, ids::DEMOS_TF_LIST) {
+        true => ids::DEMOS_TF_OPEN,
+        false => ids::DEMO_VIEWER_OPEN,
+    };
+    support::click_id(cx, s.win, open);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
@@ -915,7 +978,7 @@ fn clicks_in_the_options_never_lock_the_pointer(cx: &mut TestAppContext) {
         .count();
     assert_eq!(locks, 0, "a click in the options reached the map");
     // A press on the map itself does lock, so the count above can fail.
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     drag(cx, w.s.win, page.center(), (10., 0.));
     assert!(lock.calls().contains(&LockCall::Lock));
 }
@@ -927,9 +990,10 @@ fn reset_puts_the_look_sensitivity_back_to_100_and_saves_it(cx: &mut TestAppCont
         cx,
         &env,
         Tf2State::Missing { saved: None },
-        vec![],
+        vec![not_a_demo(&env)],
         LookSensitivity::new(250),
     );
+    open_not_a_demo(cx, w.s.win);
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPTIONS);
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_LOOK_VALUE).as_deref(),
@@ -946,8 +1010,9 @@ fn reset_puts_the_look_sensitivity_back_to_100_and_saves_it(cx: &mut TestAppCont
 #[gpui_kit::test]
 fn letting_the_slider_go_saves_the_look_sensitivity(cx: &mut TestAppContext) {
     let env = support::env();
-    let (w, _lock) =
-        demo_viewer_shell_locked(cx, &env, Tf2State::Missing { saved: None }, vec![], None);
+    let missing = Tf2State::Missing { saved: None };
+    let (w, _lock) = demo_viewer_shell_locked(cx, &env, missing, vec![not_a_demo(&env)], None);
+    open_not_a_demo(cx, w.s.win);
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPTIONS);
     release_look(cx, &w.s, 150.);
     assert_eq!(saved_look(&w.s), 150);

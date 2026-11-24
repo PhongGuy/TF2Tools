@@ -830,7 +830,7 @@ fn page_loaded(shell: &Shell, page: Page, cx: &App) -> bool {
         | Page::CrosshairStore
         | Page::AddonStore
         | Page::Maps
-        | Page::DemoViewer
+        | Page::DemosTf
         | Page::Settings => false,
     }
 }

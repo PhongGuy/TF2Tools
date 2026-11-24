@@ -7,6 +7,7 @@ pub mod crosshair_maker;
 pub mod crosshair_store;
 pub mod crosshairs;
 pub mod demo_viewer;
+pub mod demos_tf;
 pub mod graphics;
 pub mod hud_maker;
 pub mod hud_store;

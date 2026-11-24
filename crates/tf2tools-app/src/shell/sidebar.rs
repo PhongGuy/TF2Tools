@@ -31,8 +31,8 @@ const STORES: [Page; 4] = [
     Page::AddonStore,
 ];
 const MAKERS: [Page; 2] = [Page::CrosshairMaker, Page::HudMaker];
-// Maps, logs.tf and the Demo Viewer get their own group under the makers: they are the least-used items.
-const MAPS: [Page; 3] = [Page::Maps, Page::LogsTf, Page::DemoViewer];
+// Maps, logs.tf and Demos.tf get their own group under the makers: they are the least-used items.
+const MAPS: [Page; 3] = [Page::Maps, Page::LogsTf, Page::DemosTf];
 const FOOTER: [Page; 2] = [Page::Settings, Page::Logs];
 // v5's nav item height, and the shorter one a short window uses so every item fits.
 const NAV_HEIGHT: f32 = 32.;
@@ -196,7 +196,7 @@ pub fn icon(page: Page) -> IconName {
         Page::Logs => IconName::ScrollText,
         Page::Maps => IconName::Map,
         Page::LogsTf => IconName::ChartLine,
-        Page::DemoViewer => IconName::Clapperboard,
+        Page::DemosTf => IconName::Clapperboard,
         Page::Graphics => IconName::Gauge,
     }
 }

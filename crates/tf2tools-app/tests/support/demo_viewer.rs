@@ -300,7 +300,7 @@ pub fn viewport_window_unsettled(
     (win, viewport, handle)
 }
 
-/// A shell on the Demo Viewer whose picker answers `picks` and whose renderers are `answer` stubs.
+/// A shell on the Demos.tf list whose picker answers `picks` and whose renderers are `answer` stubs.
 pub struct DemoViewerShell {
     pub s: super::ShellWindow,
     pub picker: Arc<ScriptedPicker>,
@@ -431,8 +431,25 @@ fn demo_viewer_shell_in(
     if let Some(look) = stored {
         s.services.db.set_look_sensitivity(look).unwrap();
     }
-    super::click_nav(cx, s.win, Page::DemoViewer);
+    super::click_nav(cx, s.win, Page::DemosTf);
     DemoViewerShell { s, picker, stubs }
+}
+
+/// The viewer's status after a file that is not a demo opens, which leaves it without a map.
+pub const NOT_A_DEMO: &str = "This file isn't a TF2 demo.";
+
+/// A file that is not a demo, for tests that want the viewer and its bar without a map.
+pub fn not_a_demo(env: &super::Env) -> PathBuf {
+    demo_file(env, "x.dem", b"not a demo")
+}
+
+/// Opens the next pick from the Demos.tf list and waits for the viewer to say it is no demo.
+pub fn open_not_a_demo(cx: &mut TestAppContext, win: AnyWindowHandle) {
+    super::click_id(cx, win, tf2tools_app::ids::DEMOS_TF_OPEN);
+    super::wait_real(cx, NOT_A_DEMO, |cx| {
+        super::label_of(cx, win, tf2tools_app::ids::DEMO_VIEWER_STATUS).as_deref()
+            == Some(NOT_A_DEMO)
+    });
 }
 
 /// A reader answering `answer()` every time, and how many times it was asked.
