@@ -79,8 +79,13 @@ fn yaw_pitch_and_eye_follow_source_angles() {
 
 #[test]
 fn dragging_right_turns_right_and_dragging_down_looks_down() {
-    assert_eq!(math::drag_look(100., 0.), (-22., 0.));
-    assert_eq!(math::drag_look(0., 50.), (0., 11.));
+    assert_eq!(math::drag_look(100., 0., 1.), (-22., 0.));
+    assert_eq!(math::drag_look(0., 50., 1.), (0., 11.));
+}
+
+#[test]
+fn a_look_scale_of_two_doubles_both_turns() {
+    assert_eq!(math::drag_look(100., 50., 2.), (-44., 22.));
 }
 
 #[test]

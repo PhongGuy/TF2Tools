@@ -478,6 +478,45 @@ fn a_locked_drag_turns_by_the_lock_motion(cx: &mut TestAppContext) {
     assert!((pitch2 - (pitch + 11.)).abs() < 1e-3, "{pitch} -> {pitch2}");
 }
 
+/// The yaw change, wrapped to [-180, 180), of one 100 px rightward drag at `scale`; the lock
+/// supplies the motion when `locked`, otherwise the viewport falls back to the event positions.
+fn yaw_turn_at_scale(cx: &mut TestAppContext, scale: f32, locked: bool) -> f32 {
+    let (win, viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    viewport.update(cx, |v, _| v.set_look_scale(scale));
+    let at = centre(cx, win);
+    press(cx, win, at);
+    let (yaw, _) = yaw_pitch(cx, &viewport);
+    let to = if locked {
+        lock.push_motion(point(px(100.), px(0.)));
+        at
+    } else {
+        point(at.x + px(100.), at.y)
+    };
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_move(to, Some(MouseButton::Right), cx)
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let (yaw2, _) = yaw_pitch(cx, &viewport);
+    (yaw2 - yaw + 540.).rem_euclid(360.) - 180.
+}
+
+#[gpui_kit::test]
+fn a_look_scale_of_two_turns_twice_as_far_with_the_lock_motion(cx: &mut TestAppContext) {
+    let once = yaw_turn_at_scale(cx, 1., true);
+    let twice = yaw_turn_at_scale(cx, 2., true);
+    assert!((once + 22.).abs() < 1e-3, "{once}");
+    assert!((twice - 2. * once).abs() < 1e-3, "{once} vs {twice}");
+}
+
+#[gpui_kit::test]
+fn a_look_scale_of_two_turns_twice_as_far_without_the_lock_motion(cx: &mut TestAppContext) {
+    let once = yaw_turn_at_scale(cx, 1., false);
+    let twice = yaw_turn_at_scale(cx, 2., false);
+    assert!((once + 22.).abs() < 1e-3, "{once}");
+    assert!((twice - 2. * once).abs() < 1e-3, "{once} vs {twice}");
+}
+
 #[gpui_kit::test]
 fn a_zero_lock_motion_leaves_the_camera_and_draws_nothing(cx: &mut TestAppContext) {
     let (win, viewport, stub, lock) = viewport_window_locked(cx, LockMode::Locked);

@@ -17,7 +17,7 @@ use gpui_kit::{
     Pixels, Point, Render, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
     Subscription, Task, TestSupportExt as _, Window, canvas, div, px,
 };
-use tf2tools_core::{DownloadPhase, MapDownloadError, Tf2Install};
+use tf2tools_core::{DownloadPhase, LookSensitivity, MapDownloadError, Tf2Install};
 
 use crate::i18n::tr;
 use crate::ids;
@@ -408,6 +408,7 @@ impl DemoViewerPage {
                         renderer,
                         lock,
                         Arc::new(Instant::now),
+                        LookSensitivity::default().scale(),
                         window,
                         cx,
                     )

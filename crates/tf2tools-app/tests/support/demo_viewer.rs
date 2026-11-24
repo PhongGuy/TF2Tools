@@ -287,6 +287,7 @@ pub fn viewport_window_unsettled(
                         renderer,
                         lock,
                         frame_clock(),
+                        1.0,
                         window,
                         cx,
                     )
