@@ -216,6 +216,10 @@ pub struct DemoPage {
 }
 
 impl DemoPage {
+    pub(crate) fn new(demos: Vec<DemoSummary>, next: Option<DemoCursor>) -> Self {
+        Self { demos, next }
+    }
+
     /// The demos on this page, after the client-side format filter.
     pub fn demos(&self) -> &[DemoSummary] {
         &self.demos
@@ -238,8 +242,6 @@ pub fn merge_demos(list: &mut Vec<DemoSummary>, page: &[DemoSummary]) -> usize {
 
 /// The query string pairs for one list request, in the order demos.tf is asked.
 /// The players filter cannot page by id (the server errors), so that pairing is refused.
-// Consumed by DemosClient::list in the next task.
-#[allow(dead_code)]
 pub(crate) fn query_pairs(
     query: &DemoListQuery,
     cursor: DemoCursor,
@@ -270,8 +272,6 @@ pub(crate) fn query_pairs(
 }
 
 /// Where the page after `raw` starts; `raw` is the unfiltered page the server sent.
-// Consumed by DemosClient::list in the next task.
-#[allow(dead_code)]
 pub(crate) fn next_cursor(
     query: &DemoListQuery,
     cursor: DemoCursor,
@@ -285,7 +285,7 @@ pub(crate) fn next_cursor(
         DemoCursor::Page(n) => n,
         DemoCursor::First | DemoCursor::BeforeId(_) => 1,
     };
-    Some(DemoCursor::Page(current + 1))
+    Some(DemoCursor::Page(current.saturating_add(1)))
 }
 
 #[cfg(test)]
