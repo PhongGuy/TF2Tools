@@ -1978,15 +1978,19 @@ impl HudsPage {
         } else if shown.is_empty() {
             Some(empty_library(!query.is_empty(), cx))
         } else {
-            // One store card makes every card tall enough for its 16:9 screenshot.
-            let any_store = shown.iter().any(|&ix| is_store(&self.huds[ix]));
+            // One card with a picture makes every card tall enough for its 16:9 picture,
+            // matching `hud_card`'s rule: a store HUD, or any HUD with a picture URL.
+            let any_picture = shown.iter().any(|&ix| {
+                let hud = &self.huds[ix];
+                is_store(hud) || self.image_urls.contains_key(hud.folder_name())
+            });
             let any_note = (shown.iter()).any(|&ix| {
                 let folder = self.huds[ix].folder_name();
                 matches!(self.updates.get(folder), Some(CopyUpdate::InStore))
                     || self.behind_store.contains(folder)
             });
             let height = move |width: Pixels| {
-                let image = if any_store {
+                let image = if any_picture {
                     width * (9. / 16.)
                 } else {
                     px(0.)
