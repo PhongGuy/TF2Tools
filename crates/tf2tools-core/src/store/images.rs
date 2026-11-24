@@ -149,7 +149,7 @@ impl DiskCache {
         tmp.persist(&path).map_err(|error| error.error)?;
         let grown = current.saturating_sub(replaced) + bytes.len() as u64;
         *size = Some(if grown > self.high {
-            sweep(&self.dir, self.low)?
+            sweep(&self.dir, self.low, &|_| false)?
         } else {
             grown
         });
@@ -158,7 +158,7 @@ impl DiskCache {
 }
 
 /// The total length of the files directly in `dir`.
-fn dir_size(dir: &Path) -> std::io::Result<u64> {
+pub(crate) fn dir_size(dir: &Path) -> std::io::Result<u64> {
     Ok(files(dir)?.iter().map(|(_, len, _)| len).sum())
 }
 
@@ -176,13 +176,18 @@ fn files(dir: &Path) -> std::io::Result<Vec<(PathBuf, u64, SystemTime)>> {
 }
 
 /// Deletes oldest-mtime files in `dir` until at most `low` bytes remain; returns the bytes left.
-pub(crate) fn sweep(dir: &Path, low: u64) -> std::io::Result<u64> {
+/// Files `keep` accepts count toward the total but are never deleted, so the total can stay
+/// above `low` when they alone exceed it.
+pub(crate) fn sweep(dir: &Path, low: u64, keep: &dyn Fn(&Path) -> bool) -> std::io::Result<u64> {
     let mut found = files(dir)?;
     found.sort_by_key(|(_, _, modified)| *modified);
     let mut total: u64 = found.iter().map(|(_, len, _)| len).sum();
     for (path, len, _) in found {
         if total <= low {
             break;
+        }
+        if keep(&path) {
+            continue;
         }
         // A file another writer already removed counts as removed.
         match std::fs::remove_file(&path) {
@@ -243,8 +248,21 @@ mod tests {
             std::fs::write(&path, [0u8; 100]).unwrap();
             age(&path, secs);
         }
-        assert_eq!(sweep(tmp.path(), 250).unwrap(), 200);
+        assert_eq!(sweep(tmp.path(), 250, &|_| false).unwrap(), 200);
         assert_eq!(names(tmp.path()), ["c", "d"]);
+    }
+
+    #[test]
+    fn sweep_never_deletes_a_kept_file_but_counts_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        for (name, secs) in [("a", 400), ("b", 300), ("c", 200), ("d", 100)] {
+            let path = tmp.path().join(name);
+            std::fs::write(&path, [0u8; 100]).unwrap();
+            age(&path, secs);
+        }
+        let keep_a = |p: &Path| p.file_name().is_some_and(|n| n == "a");
+        assert_eq!(sweep(tmp.path(), 250, &keep_a).unwrap(), 200);
+        assert_eq!(names(tmp.path()), ["a", "d"]);
     }
 
     #[test]

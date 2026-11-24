@@ -101,3 +101,17 @@ fn weapon_icons_cache_beside_the_store_images() {
         Path::new("/run/cache/tf2tools/weapon-icons")
     );
 }
+
+#[test]
+fn demos_cache_beside_the_store_images() {
+    assert_eq!(
+        DataDir::at("/data/com.tf2tools.app").demo_cache_dir(),
+        Path::new("/data/com.tf2tools.app/cache/demos")
+    );
+    assert_eq!(
+        DataDir::at("/run/data/com.tf2tools.app")
+            .with_cache_home("/run/cache")
+            .demo_cache_dir(),
+        Path::new("/run/cache/tf2tools/demos")
+    );
+}

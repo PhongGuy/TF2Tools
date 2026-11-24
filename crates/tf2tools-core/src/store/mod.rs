@@ -13,7 +13,7 @@ mod gb_map_download;
 mod gb_maps;
 mod github;
 pub(crate) mod http;
-mod images;
+pub(crate) mod images;
 mod items;
 mod maps;
 mod mastercomfig;
