@@ -517,6 +517,19 @@ fn a_look_scale_of_two_turns_twice_as_far_without_the_lock_motion(cx: &mut TestA
     assert!((twice - 2. * once).abs() < 1e-3, "{once} vs {twice}");
 }
 
+// A scale that is not a finite positive number must fall back to the neutral turn rather than
+// freeze, reverse or blow up the camera.
+#[gpui_kit::test]
+fn a_scale_that_is_not_finite_and_positive_turns_at_the_neutral_rate(cx: &mut TestAppContext) {
+    for locked in [true, false] {
+        let neutral = yaw_turn_at_scale(cx, 1., locked);
+        for bad in [f32::NAN, 0., -0., -2., f32::INFINITY, f32::NEG_INFINITY] {
+            let turn = yaw_turn_at_scale(cx, bad, locked);
+            assert!((turn - neutral).abs() < 1e-3, "{bad} {locked}: {turn} vs {neutral}");
+        }
+    }
+}
+
 #[gpui_kit::test]
 fn a_zero_lock_motion_leaves_the_camera_and_draws_nothing(cx: &mut TestAppContext) {
     let (win, viewport, stub, lock) = viewport_window_locked(cx, LockMode::Locked);

@@ -184,12 +184,17 @@ impl LookSensitivity {
         f32::from(self.0) / 100.0
     }
 
-    /// Out-of-range numbers clamp to the nearest bound; anything that is not a number,
+    /// Numbers snap to the nearest `STEP`, so the camera turns at the value the slider shows,
+    /// and out-of-range ones clamp to the nearest bound; anything that is not a number,
     /// negatives included, falls back to the default.
     fn parse_lenient(value: &str) -> Self {
-        value.parse::<u32>().map_or_else(
+        let step = u64::from(Self::STEP);
+        value.parse::<u64>().map_or_else(
             |_| Self::default(),
-            |v| Self(v.clamp(Self::MIN.into(), Self::MAX.into()) as u16),
+            |v| {
+                let snapped = v.saturating_add(step / 2) / step * step;
+                Self(snapped.clamp(Self::MIN.into(), Self::MAX.into()) as u16)
+            },
         )
     }
 }

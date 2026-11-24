@@ -410,7 +410,10 @@ fn a_stored_look_sensitivity_is_read_leniently() {
     drop(Database::open(&dir).unwrap());
     for (stored, expected) in [
         ("9999", 400),
+        ("99999999999", 400),
         ("10", 25),
+        ("102", 100),
+        ("103", 105),
         ("abc", 100),
         ("-5", 100),
         ("", 100),
