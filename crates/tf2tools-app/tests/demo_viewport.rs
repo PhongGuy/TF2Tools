@@ -525,7 +525,10 @@ fn a_scale_that_is_not_finite_and_positive_turns_at_the_neutral_rate(cx: &mut Te
         let neutral = yaw_turn_at_scale(cx, 1., locked);
         for bad in [f32::NAN, 0., -0., -2., f32::INFINITY, f32::NEG_INFINITY] {
             let turn = yaw_turn_at_scale(cx, bad, locked);
-            assert!((turn - neutral).abs() < 1e-3, "{bad} {locked}: {turn} vs {neutral}");
+            assert!(
+                (turn - neutral).abs() < 1e-3,
+                "{bad} {locked}: {turn} vs {neutral}"
+            );
         }
     }
 }
