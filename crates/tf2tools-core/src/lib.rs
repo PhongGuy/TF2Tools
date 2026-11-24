@@ -51,8 +51,8 @@ pub use demo_view::{
     load_map_mesh, read_demo_header, read_demo_snapshot,
 };
 pub use demostf::{
-    DEMO_LIMIT, DemoDetail, DemoPlayer, DemoQuery, DemoSummary, DemosClient, DemosEndpoints,
-    pick_demo,
+    DEMO_LIMIT, DemoDetail, DemoFormat, DemoPlayer, DemoQuery, DemoSummary, DemosClient,
+    DemosEndpoints, pick_demo,
 };
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
