@@ -3499,9 +3499,17 @@ pub fn addon_detail_map(index: usize) -> ElementId {
     keyed("addon-detail-map", &index.to_string())
 }
 
+/// The Demos.tf page's list, shown until a demo opens.
+pub const DEMOS_TF_LIST: &str = "demos-tf-list";
+/// The Demos.tf list's "Open demo" button, which opens a demo from the computer.
+pub const DEMOS_TF_OPEN: &str = "demos-tf-open";
+/// The Demos.tf list's placeholder line, saying the demos.tf list is coming.
+pub const DEMOS_TF_COMING: &str = "demos-tf-coming";
+/// The Demo Viewer's root, which fills the Demos.tf page while a demo shows.
+pub const DEMO_VIEWER: &str = "demo-viewer";
 /// The Demo Viewer's "Open demo" button.
 pub const DEMO_VIEWER_OPEN: &str = "demo-viewer-open";
-/// The Demo Viewer's status line: the empty prompt, the loading or downloading text, or an error.
+/// The Demo Viewer's status line: the loading or downloading text, or an error.
 pub const DEMO_VIEWER_STATUS: &str = "demo-viewer-status";
 /// The "Preview" badge beside the header title, present only on the Demo Viewer.
 pub const DEMO_VIEWER_PREVIEW_BADGE: &str = "demo-viewer-preview-badge";

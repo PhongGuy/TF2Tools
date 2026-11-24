@@ -159,10 +159,12 @@ updater:
     installed: "已安装 TF2Tools v%{version}"
     installer_started: "已启动 TF2Tools v%{version} 安装程序"
 
+demos_tf:
+  open: "打开录像"
+  coming: "demos.tf 列表即将推出。目前请从你的电脑打开录像。"
 demo_viewer:
   preview: "预览"
   open: "打开录像"
-  empty: "打开 TF2 录像，即可在 3D 中查看其地图。"
   loading: "正在加载地图…"
   downloading: "正在从 serveme.tf 下载 %{map}…"
   received: "%{done} / %{total}"

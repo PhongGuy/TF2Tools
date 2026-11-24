@@ -19,7 +19,7 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
     install_map(&env, "cp_synthetic");
     let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
     let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });

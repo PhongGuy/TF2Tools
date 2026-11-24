@@ -23,7 +23,7 @@ fn open_missing(
     server.mount_bytes_after(&route, bsp(&BspOptions::default()), delay);
     let demo = demo_file(env, "match.dem", &demo_header(MAP, 60.0));
     let w = demo_viewer_shell_served(cx, env, server, vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     w
 }
 
@@ -64,7 +64,7 @@ fn a_map_serveme_does_not_have_points_to_gamebanana_without_retry(cx: &mut TestA
     server.mount_status_after(&route, 404, Duration::from_millis(50));
     let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
     let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     let want =
         format!("serveme.tf doesn't have {MAP}. Look for it on the Maps page's GameBanana tab.");
     support::wait_real(cx, &want, |cx| {
@@ -85,7 +85,7 @@ fn a_failed_download_explains_itself_and_retry_loads_the_map(cx: &mut TestAppCon
     server.mount_status(&route, 500);
     let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
     let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     let want = format!("Couldn't download {MAP}.");
     support::wait_real(cx, &want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
@@ -167,7 +167,7 @@ fn open_stalled(
     let route = format!("/fastdl/maps/{MAP}.bsp");
     server.mount_bytes_after(&route, bsp(&BspOptions::default()), Duration::from_secs(60));
     let w = demo_viewer_shell_served(cx, env, server, picks, StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     let want = format!("Downloading {MAP} from serveme.tf...");
     support::wait_real(cx, "the download and its partial file", |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
@@ -251,7 +251,7 @@ fn a_map_the_maps_page_finishes_first_is_simply_shown(cx: &mut TestAppContext) {
         !partial_files(&env).is_empty()
     });
 
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });

@@ -135,10 +135,12 @@ updater:
     installed: "Установлено обновление TF2Tools v%{version}"
     installer_started: "Запущен установщик TF2Tools v%{version}"
 
+demos_tf:
+  open: "Открыть демо"
+  coming: "Список demos.tf скоро появится. А пока откройте демо со своего компьютера."
 demo_viewer:
   preview: "Предпросмотр"
   open: "Открыть демо"
-  empty: "Откройте демо TF2, чтобы увидеть его карту в 3D."
   loading: "Загрузка карты..."
   downloading: "Загрузка %{map} с serveme.tf..."
   received: "%{done} / %{total}"

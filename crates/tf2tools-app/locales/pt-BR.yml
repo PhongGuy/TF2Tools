@@ -161,10 +161,12 @@ updater:
     installed: "TF2Tools v%{version} instalado"
     installer_started: "Instalador do TF2Tools v%{version} iniciado"
 
+demos_tf:
+  open: "Abrir demo"
+  coming: "A lista do demos.tf está chegando. Por enquanto, abra uma demo do seu computador."
 demo_viewer:
   preview: "Prévia"
   open: "Abrir demo"
-  empty: "Abra uma demo do TF2 para ver o mapa dela em 3D."
   loading: "Carregando mapa..."
   downloading: "Baixando %{map} do serveme.tf..."
   received: "%{done} / %{total}"

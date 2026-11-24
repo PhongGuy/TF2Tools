@@ -1,4 +1,4 @@
-//! The Demo Viewer page: opens a local TF2 demo and shows its map in 3D.
+//! The Demo Viewer: shows a local TF2 demo's map in 3D inside the Demos.tf page.
 
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
@@ -28,7 +28,6 @@ use crate::local_messages::describe_settings;
 use crate::map_messages::{describe_map_download, map_stopped};
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, run_blocking, tf2_state};
-use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
 use crate::store_download::{Progress, format_bytes, progress_percent};
 use crate::tokio_bridge;
@@ -40,13 +39,19 @@ mod bar;
 
 pub use bar::BarPlace;
 
+// A demo's file name without its extension, for the title before its map is read.
+fn stem(path: &std::path::Path) -> SharedString {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned().into())
+        .unwrap_or_default()
+}
+
 /// The bar's frame is the page width less this at each side; a bar dragged to an edge can
 /// still touch it.
 const BAR_MARGIN: Pixels = px(8.);
 
 /// What the page shows under its control bar.
 enum View {
-    Empty,
     Loading,
     /// The demo's map is being fetched from serveme.tf: bytes so far and the announced size.
     Downloading {
@@ -145,9 +150,11 @@ fn look_at(v: f32) -> LookSensitivity {
     LookSensitivity::new(snapped as u16).unwrap_or_default()
 }
 
-/// The Demo Viewer page: the chosen demo's map over the whole page, under a floating control bar.
+/// The Demo Viewer: the chosen demo's map over the whole page, under a floating control bar.
 pub struct DemoViewerPage {
     view: View,
+    /// The open demo's file stem until its map is known, then the map's name.
+    title: SharedString,
     /// Bumped by every resolved pick, so a slower earlier load cannot land over a later one.
     generation: u64,
     /// The page's size from the last frame, which places and caps the bar.
@@ -173,7 +180,7 @@ pub struct DemoViewerPage {
 }
 
 impl DemoViewerPage {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // A missing, damaged or unreadable place leaves the bar at its default; the stored
         // sensitivity comes in the same read.
         let stored = run_blocking(cx, |s| {
@@ -220,7 +227,8 @@ impl DemoViewerPage {
             ),
         ];
         Self {
-            view: View::Empty,
+            view: View::Loading,
+            title: SharedString::default(),
             generation: 0,
             area: Rc::default(),
             bar_size: Rc::default(),
@@ -238,6 +246,20 @@ impl DemoViewerPage {
         }
     }
 
+    /// A viewer loading the demo at `path` at once.
+    pub fn open_path(path: PathBuf, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut page = Self::new(window, cx);
+        page.generation = 1;
+        page.title = stem(&path);
+        page.load(path, 1, false, window, cx);
+        page
+    }
+
+    /// The open demo's file stem until its map is known, then the map's name.
+    pub fn title(&self) -> SharedString {
+        self.title.clone()
+    }
+
     /// The options popover's look sensitivity slider, in percent.
     pub fn look_slider(&self) -> &Entity<SliderState> {
         &self.look_slider
@@ -247,8 +269,7 @@ impl DemoViewerPage {
     pub fn viewport(&self) -> Option<&Entity<DemoViewport>> {
         match &self.view {
             View::Loaded { viewport, .. } => Some(viewport),
-            View::Empty
-            | View::Loading
+            View::Loading
             | View::Downloading { .. }
             | View::Failed(_)
             | View::DownloadFailed { .. } => None,
@@ -264,6 +285,7 @@ impl DemoViewerPage {
             let _ = page.update_in(cx, |page, window, cx| {
                 page.generation += 1;
                 page.download = None;
+                page.title = stem(&path);
                 page.load(path, page.generation, false, window, cx);
             });
         })
@@ -563,6 +585,7 @@ impl DemoViewerPage {
         self.view = match loaded {
             Err(error) => View::Failed(error.message()),
             Ok(loaded) => {
+                self.title = loaded.map.clone().into();
                 // A snapshot with nobody in it counts as no players read.
                 let players = loaded.snapshot.as_ref().filter(|s| !s.players().is_empty());
                 let caption = match players {
@@ -696,7 +719,6 @@ impl Render for DemoViewerPage {
                 viewport.clone().into_any_element(),
                 Some((caption.clone(), *players_note)),
             ),
-            View::Empty => status(tr!("demo_viewer.empty")),
             View::Loading => status(tr!("demo_viewer.loading")),
             View::Downloading { map, done, total } => downloading(map, *done, *total),
             View::Failed(message) => status(message.clone()),
@@ -842,7 +864,7 @@ impl Render for DemoViewerPage {
             .items_start()
             .child(bar);
         div()
-            .id(ids::page(Page::DemosTf))
+            .id(ids::DEMO_VIEWER)
             .test_support()
             .relative()
             .size_full()

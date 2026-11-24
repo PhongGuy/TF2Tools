@@ -55,6 +55,7 @@ mod demo_viewer;
 mod demo_viewer_bar;
 mod demo_viewer_download;
 mod demo_viewport;
+mod demos_tf;
 mod diagnostics;
 mod dialog_frame;
 mod external_huds;
