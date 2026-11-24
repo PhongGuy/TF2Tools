@@ -70,10 +70,10 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 wiremock = "0.6.5"
 # Windows resources for the exe icon; the version gpui-pre already resolves.
 embed-resource = "=3.0.12"
-# UI: the kit trio is pinned exactly at 0.10.0, so a kit bump is a deliberate change.
-gpui-kit = "=0.10.0"
-gpui-component = "=0.10.0"
-gpui-base = "=0.10.0"
+# UI: the kit trio is pinned exactly at 0.11.0, so a kit bump is a deliberate change.
+gpui-kit = "=0.11.0"
+gpui-component = "=0.11.0"
+gpui-base = "=0.11.0"
 # Already locked through the kit; the app's generated translation code names `rust_i18n::`.
 rust-i18n = "=4.2.4"
 # Already locked through cosmic-text and the kit; the app reads the system's preferred locales.

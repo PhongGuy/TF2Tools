@@ -89,7 +89,8 @@ fn learn_more_sits_under_the_description_and_opens_the_docs(cx: &mut TestAppCont
     );
 }
 
-// The solid fills the last frame painted exactly over `id`'s box, read from its quads.
+// The distinct solid fills the last frame painted exactly over `id`'s box. The scene splits
+// a rounded or bordered fill into same-bounds pieces, so the pieces count as one fill.
 fn fills_at(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
@@ -109,7 +110,12 @@ fn fills_at(
             })
             .filter_map(|q| q.background.as_solid())
             .filter(|c| c.a > 0.)
-            .collect()
+            .fold(Vec::new(), |mut seen, c| {
+                if !seen.contains(&c) {
+                    seen.push(c);
+                }
+                seen
+            })
     })
     .unwrap()
 }
