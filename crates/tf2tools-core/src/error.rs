@@ -2584,6 +2584,9 @@ pub enum DemosError {
     /// demos.tf no longer has the demo.
     #[error("demos.tf no longer has this demo")]
     Gone,
+    /// A players-filtered list was asked to page by id, which demos.tf cannot do.
+    #[error("this demo list cannot page by id")]
+    Cursor,
     /// The body grew past its size cap.
     #[error("{url} sent more than {limit} bytes")]
     TooLarge {
