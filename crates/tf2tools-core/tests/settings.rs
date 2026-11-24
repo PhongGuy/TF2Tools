@@ -2,7 +2,7 @@ use crate::common;
 
 use rusqlite::Connection;
 use std::path::Path;
-use tf2tools_core::{Database, Volume};
+use tf2tools_core::{Database, LookSensitivity, Volume};
 
 fn raw_setting(dir: &tf2tools_core::DataDir, key: &str) -> Option<String> {
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -386,4 +386,56 @@ fn a_stored_language_is_read_as_written() {
         Database::open(&dir).unwrap().settings().unwrap().language(),
         Some("xx")
     );
+}
+
+#[test]
+fn look_sensitivity_defaults_to_100_and_round_trips() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let db = Database::open(&dir).unwrap();
+    assert_eq!(db.settings().unwrap().look_sensitivity().get(), 100);
+    db.set_look_sensitivity(LookSensitivity::new(250).unwrap())
+        .unwrap();
+    drop(db);
+    assert_eq!(
+        raw_setting(&dir, "look_sensitivity").as_deref(),
+        Some("250")
+    );
+    let s = Database::open(&dir).unwrap().settings().unwrap();
+    assert_eq!(s.look_sensitivity().get(), 250);
+}
+
+#[test]
+fn a_stored_look_sensitivity_is_read_leniently() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).unwrap());
+    for (stored, expected) in [
+        ("9999", 400),
+        ("10", 25),
+        ("abc", 100),
+        ("-5", 100),
+        ("", 100),
+    ] {
+        let conn = Connection::open(dir.db_path()).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('look_sensitivity', ?1)",
+            [stored],
+        )
+        .unwrap();
+        drop(conn);
+        let s = Database::open(&dir).unwrap().settings().unwrap();
+        assert_eq!(s.look_sensitivity().get(), expected, "stored {stored:?}");
+    }
+}
+
+#[test]
+fn look_sensitivity_accepts_25_to_400_only() {
+    assert_eq!(LookSensitivity::new(24), None);
+    assert_eq!(LookSensitivity::new(401), None);
+    assert_eq!(LookSensitivity::new(25).map(LookSensitivity::get), Some(25));
+    assert_eq!(
+        LookSensitivity::new(400).map(LookSensitivity::get),
+        Some(400)
+    );
+    assert_eq!(LookSensitivity::default().get(), 100);
+    assert_eq!(LookSensitivity::new(200).unwrap().scale(), 2.0);
 }
