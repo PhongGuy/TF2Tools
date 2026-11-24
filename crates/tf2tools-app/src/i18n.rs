@@ -1579,6 +1579,7 @@ mod tests {
         "pages/demo_viewer/mod.rs",
         "pages/demo_viewer/bar.rs",
         "pages/demos_tf/mod.rs",
+        "pages/demos_tf/crumb.rs",
         "audio/player.rs",
         "widgets/profile_menu.rs",
         "pages/crosshairs.rs",

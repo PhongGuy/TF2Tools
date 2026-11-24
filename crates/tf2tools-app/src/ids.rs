@@ -3505,6 +3505,10 @@ pub const DEMOS_TF_LIST: &str = "demos-tf-list";
 pub const DEMOS_TF_OPEN: &str = "demos-tf-open";
 /// The Demos.tf list's placeholder line, saying the demos.tf list is coming.
 pub const DEMOS_TF_COMING: &str = "demos-tf-coming";
+/// The Demos.tf header crumb's "Demos.tf" link, which closes the viewer back to the list.
+pub const DEMOS_TF_CRUMB: &str = "demos-tf-crumb";
+/// The Demos.tf header crumb's name of the open demo: its map, or its file until the map is known.
+pub const DEMOS_TF_CRUMB_NAME: &str = "demos-tf-crumb-name";
 /// The Demo Viewer's root, which fills the Demos.tf page while a demo shows.
 pub const DEMO_VIEWER: &str = "demo-viewer";
 /// The Demo Viewer's "Open demo" button.

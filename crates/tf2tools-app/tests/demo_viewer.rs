@@ -55,15 +55,16 @@ fn the_viewer_shows_a_preview_badge_beside_its_title(cx: &mut TestAppContext) {
     );
     open_not_a_demo(cx, w.s.win);
     let s = &w.s;
+    // The crumb stands in for the page title while a demo shows, and the badge follows it.
     assert_eq!(
-        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
-        Some("Demos.tf")
+        support::label_of(cx, s.win, ids::DEMOS_TF_CRUMB).as_deref(),
+        Some("Back to the demo list")
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE).as_deref(),
         Some("Preview")
     );
-    let title = support::bounds_of(cx, s.win, ids::HEADER_TITLE).unwrap();
+    let title = support::bounds_of(cx, s.win, ids::DEMOS_TF_CRUMB_NAME).unwrap();
     let badge = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE).unwrap();
     assert!(badge.origin.x > title.origin.x + title.size.width);
     assert_eq!(

@@ -161,6 +161,7 @@ updater:
 
 demos_tf:
   open: "打开录像"
+  back: "返回录像列表"
   coming: "demos.tf 列表即将推出。目前请从你的电脑打开录像。"
 demo_viewer:
   preview: "预览"

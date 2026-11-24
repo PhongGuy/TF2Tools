@@ -164,6 +164,7 @@ updater:
 
 demos_tf:
   open: "Ouvrir la démo"
+  back: "Retour à la liste des démos"
   coming: "La liste demos.tf arrive bientôt. En attendant, ouvrez une démo depuis votre ordinateur."
 demo_viewer:
   preview: "Aperçu"
