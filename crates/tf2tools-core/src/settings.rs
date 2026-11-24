@@ -27,6 +27,7 @@ pub struct Settings {
     hud_maker_panel: Option<String>,
     hud_maker_backdrop: Option<PathBuf>,
     demo_viewer_bar: Option<String>,
+    look_sensitivity: LookSensitivity,
     old_v4_asked: bool,
 }
 
@@ -86,6 +87,11 @@ impl Settings {
         self.demo_viewer_bar.as_deref()
     }
 
+    /// How fast the Demo Viewer's camera turns under the pointer, 100% by default.
+    pub fn look_sensitivity(&self) -> LookSensitivity {
+        self.look_sensitivity
+    }
+
     /// The picture the HUD Maker draws behind the HUD; `None` by default.
     pub fn hud_maker_backdrop(&self) -> Option<&Path> {
         self.hud_maker_backdrop.as_deref()
@@ -112,6 +118,7 @@ impl Default for Settings {
             hud_maker_panel: None,
             hud_maker_backdrop: None,
             demo_viewer_bar: None,
+            look_sensitivity: LookSensitivity::default(),
             old_v4_asked: false,
         }
     }
@@ -144,6 +151,57 @@ impl Volume {
 impl Default for Volume {
     fn default() -> Self {
         Self(50)
+    }
+}
+
+/// The Demo Viewer's look sensitivity in percent, `MIN..=MAX`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct LookSensitivity(u16);
+
+impl LookSensitivity {
+    /// The slowest sensitivity, in percent.
+    pub const MIN: u16 = 25;
+    /// The fastest sensitivity, in percent.
+    pub const MAX: u16 = 400;
+    /// The step the app's control moves by, in percent.
+    pub const STEP: u16 = 5;
+
+    /// A sensitivity of `percent`, or `None` outside `MIN..=MAX`.
+    pub fn new(percent: u16) -> Option<Self> {
+        (Self::MIN..=Self::MAX)
+            .contains(&percent)
+            .then_some(Self(percent))
+    }
+
+    /// The sensitivity in percent.
+    pub fn get(self) -> u16 {
+        self.0
+    }
+
+    /// The factor to multiply pointer motion by, 1.0 at 100%.
+    pub fn scale(self) -> f32 {
+        f32::from(self.0) / 100.0
+    }
+
+    /// Numbers snap to the nearest `STEP`, so the camera turns at the value the slider shows,
+    /// and out-of-range ones clamp to the nearest bound; anything that is not a number,
+    /// negatives included, falls back to the default.
+    fn parse_lenient(value: &str) -> Self {
+        let step = u64::from(Self::STEP);
+        value.parse::<u64>().map_or_else(
+            |_| Self::default(),
+            |v| {
+                let snapped = v.saturating_add(step / 2) / step * step;
+                Self(snapped.clamp(Self::MIN.into(), Self::MAX.into()) as u16)
+            },
+        )
+    }
+}
+
+impl Default for LookSensitivity {
+    fn default() -> Self {
+        Self(100)
     }
 }
 
@@ -183,6 +241,9 @@ impl Database {
                 }
                 "hud_maker_panel" => settings.hud_maker_panel = Some(value),
                 "demo_viewer_bar" => settings.demo_viewer_bar = Some(value),
+                "look_sensitivity" => {
+                    settings.look_sensitivity = LookSensitivity::parse_lenient(&value)
+                }
                 "hud_maker_backdrop" => {
                     settings.hud_maker_backdrop = (!value.is_empty()).then(|| value.into())
                 }
@@ -280,6 +341,11 @@ impl Database {
     /// Stores where the Demo Viewer's floating bar sits; the text is the app's to read back.
     pub fn set_demo_viewer_bar(&self, place: &str) -> Result<(), SettingsError> {
         self.save_setting("demo_viewer_bar", place)
+    }
+
+    /// Stores the Demo Viewer's look sensitivity.
+    pub fn set_look_sensitivity(&self, sensitivity: LookSensitivity) -> Result<(), SettingsError> {
+        self.save_setting("look_sensitivity", &sensitivity.get().to_string())
     }
 
     /// Stores the HUD Maker's backdrop picture; `None` deletes the key.

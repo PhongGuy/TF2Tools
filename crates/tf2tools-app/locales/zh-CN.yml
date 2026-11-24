@@ -173,6 +173,9 @@ demo_viewer:
   bar_collapse: "收起控制栏"
   bar_expand: "显示控制栏"
   bar_grip: "拖动以移动"
+  options: "查看器选项"
+  look_sensitivity: "视角灵敏度"
+  look_reset: "重置为 %{percent}"
   error:
     not_a_demo: "此文件不是 TF2 录像。"
     damaged: "此录像已损坏，无法读取。"
@@ -2883,6 +2886,7 @@ messages:
     save_panel_place: "无法保存侧面板的位置"
     load_bar_place: "无法加载录像查看器控制栏的位置"
     save_bar_place: "无法保存录像查看器控制栏的位置"
+    save_look_sensitivity: "无法保存录像查看器的视角灵敏度"
     change_hud_options: "更改 HUD 选项失败"
     save_hud: "保存 HUD 失败"
     list_presets: "无法读取预设"
