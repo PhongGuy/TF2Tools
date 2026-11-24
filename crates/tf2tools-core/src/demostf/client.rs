@@ -14,7 +14,10 @@ use crate::store::http::{API_BODY_LIMIT, Http, NetFailure, RATE_LIMITS, Redirect
 use crate::store::pacer::{Pacer, Priority};
 
 use super::demo::{parse_detail, parse_list};
-use super::{DEMO_LIMIT, DemoDetail, DemoQuery, DemoSummary, pick_demo};
+use super::list::{next_cursor, query_pairs};
+use super::{
+    DEMO_LIMIT, DemoCursor, DemoDetail, DemoListQuery, DemoPage, DemoQuery, DemoSummary, pick_demo,
+};
 
 /// How far either side of a log's upload time a search looks, in seconds.
 const SEARCH_WINDOW: i64 = 3600;
@@ -161,6 +164,31 @@ impl DemosClient {
         let body = self.get(url.as_str()).await?;
         let candidates = parse_list(&body)?;
         Ok(pick_demo(query, &candidates).cloned())
+    }
+
+    /// One page of demos for `query` from `cursor`. A players filter pages by number, so a
+    /// `BeforeId` cursor with one fails with `Cursor` before any request.
+    pub async fn list(
+        &self,
+        query: &DemoListQuery,
+        cursor: DemoCursor,
+    ) -> Result<DemoPage, DemosError> {
+        let pairs = query_pairs(query, cursor)?;
+        let base = format!("{}/demos/", self.endpoints.api);
+        let url =
+            reqwest::Url::parse_with_params(&base, pairs).map_err(|e| DemosError::Network {
+                url: base.clone(),
+                message: e.to_string(),
+            })?;
+        let body = self.get(url.as_str()).await?;
+        let raw = parse_list(&body)?;
+        // The cursor follows the raw page so a format filter that empties it keeps paging.
+        let next = next_cursor(query, cursor, &raw);
+        let demos = match query.format() {
+            Some(f) => raw.into_iter().filter(|d| d.format() == f).collect(),
+            None => raw,
+        };
+        Ok(DemoPage::new(demos, next))
     }
 
     /// Demo `id` with its players; a 404 means demos.tf no longer has it.

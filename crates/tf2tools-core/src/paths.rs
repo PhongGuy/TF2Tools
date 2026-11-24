@@ -93,6 +93,12 @@ impl DataDir {
     pub fn weapon_icon_dir(&self) -> PathBuf {
         self.image_cache.with_file_name("weapon-icons")
     }
+
+    /// The downloaded demos.tf demo cache: `<cache home>/tf2tools/demos` beside the store's
+    /// image cache, `<root>/cache/demos` from `at`.
+    pub fn demo_cache_dir(&self) -> PathBuf {
+        self.image_cache.with_file_name("demos")
+    }
 }
 
 /// A kind of installable item with its own library directory.

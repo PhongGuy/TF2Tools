@@ -3,11 +3,11 @@
 use std::time::Duration;
 
 use serde_json::json;
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::{DemosClient, DemosEndpoints};
-use crate::demostf::DemoQuery;
+use crate::demostf::{DemoCursor, DemoFormat, DemoListQuery, DemoQuery, DemosRange};
 use crate::error::DemosError;
 use crate::logstf::{LOGS_SPACING, STEAM_ID64_BASE, SteamId};
 use crate::store::StoreConfig;
@@ -166,4 +166,88 @@ async fn a_missing_demo_is_gone_and_a_strange_one_unreadable() {
         .await;
     assert!(matches!(client.demo(8).await, Err(DemosError::Gone)));
     assert!(matches!(client.demo(9).await, Err(DemosError::Unreadable)));
+}
+
+#[tokio::test]
+async fn a_list_asks_with_its_filters_and_returns_the_next_cursor() {
+    let (server, client) = env().await;
+    let base = server.uri();
+    Mock::given(method("GET"))
+        .and(path("/demos/"))
+        .and(query_param("map", MAP))
+        .and(query_param("type", "6v6"))
+        .and(query_param("before_id", "900"))
+        .and(query_param_is_missing("page"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!([demo_json(899, &base), demo_json(850, &base)])),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let q = DemoListQuery::new(DemosRange::All, DATE)
+        .with_map(MAP)
+        .with_format(Some(DemoFormat::Sixes));
+    let page = client.list(&q, DemoCursor::BeforeId(900)).await.unwrap();
+    assert_eq!(
+        page.demos().iter().map(|d| d.id()).collect::<Vec<_>>(),
+        [899, 850]
+    );
+    assert_eq!(page.next(), Some(DemoCursor::BeforeId(850)));
+}
+
+#[tokio::test]
+async fn a_format_filtered_page_keeps_paging_when_nothing_matches() {
+    let (server, client) = env().await;
+    let base = server.uri();
+    Mock::given(method("GET"))
+        .and(path("/demos/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([demo_json(40, &base)])))
+        .mount(&server)
+        .await;
+    let q = DemoListQuery::new(DemosRange::All, DATE).with_format(Some(DemoFormat::BBall));
+    let page = client.list(&q, DemoCursor::First).await.unwrap();
+    assert!(page.demos().is_empty());
+    assert_eq!(page.next(), Some(DemoCursor::BeforeId(40)));
+}
+
+#[tokio::test]
+async fn a_players_list_pages_by_number_and_never_by_id() {
+    let (server, client) = env().await;
+    let base = server.uri();
+    Mock::given(method("GET"))
+        .and(path("/demos/"))
+        .and(query_param("page", "2"))
+        .and(query_param_is_missing("before_id"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([demo_json(7, &base)])))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let q = DemoListQuery::new(DemosRange::All, DATE).with_players(&query().players);
+    assert_eq!(
+        client.list(&q, DemoCursor::Page(2)).await.unwrap().next(),
+        Some(DemoCursor::Page(3))
+    );
+    assert!(matches!(
+        client.list(&q, DemoCursor::BeforeId(7)).await,
+        Err(DemosError::Cursor)
+    ));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn an_unreadable_list_is_unreadable() {
+    let (server, client) = env().await;
+    Mock::given(method("GET"))
+        .and(path("/demos/"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string("{\"error\":\"column id is ambiguous\"}"),
+        )
+        .mount(&server)
+        .await;
+    let q = DemoListQuery::new(DemosRange::All, DATE);
+    assert!(matches!(
+        client.list(&q, DemoCursor::First).await,
+        Err(DemosError::Unreadable)
+    ));
 }
