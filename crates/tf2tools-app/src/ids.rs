@@ -3515,7 +3515,7 @@ pub const DEMO_VIEWER: &str = "demo-viewer";
 pub const DEMO_VIEWER_OPEN: &str = "demo-viewer-open";
 /// The Demo Viewer's status line: the loading or downloading text, or an error.
 pub const DEMO_VIEWER_STATUS: &str = "demo-viewer-status";
-/// The "Preview" badge beside the header title, present only on the Demo Viewer.
+/// The "Preview" badge beside the header title, present only on the Demos.tf page.
 pub const DEMO_VIEWER_PREVIEW_BADGE: &str = "demo-viewer-preview-badge";
 /// The caption in the control bar, naming the demo's map.
 pub const DEMO_VIEWER_CAPTION: &str = "demo-viewer-caption";

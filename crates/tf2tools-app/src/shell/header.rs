@@ -140,7 +140,7 @@ fn content(
         )
 }
 
-// The Demo Viewer's "Preview" pill beside its title, in the TF2 badge's shape.
+// The Demos.tf page's "Preview" pill beside its title, in the TF2 badge's shape.
 fn preview_badge() -> impl IntoElement + use<> {
     let text = tr!("demo_viewer.preview");
     div()

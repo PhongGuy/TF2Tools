@@ -79,7 +79,7 @@ fn the_viewer_shows_a_preview_badge_beside_its_title(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_badge_shows_only_on_the_demo_viewer(cx: &mut TestAppContext) {
+fn the_badge_shows_only_on_the_demos_tf_page(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE));
