@@ -1,28 +1,34 @@
 //! The Demo Viewer page: opens a local TF2 demo and shows its map in 3D.
 
 use std::cell::{Cell, RefCell};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::progress::Progress as ProgressBar;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AppContext as _, Context, CursorStyle, DispatchPhase, Entity, Hsla, InteractiveElement as _,
     IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _,
     Pixels, Point, Render, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, Window, canvas, div, px,
+    Subscription, Task, TestSupportExt as _, Window, canvas, div, px,
 };
+use tf2tools_core::{DownloadPhase, MapDownloadError, Tf2Install};
 
 use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::describe_settings;
+use crate::map_messages::{describe_map_download, map_stopped};
 use crate::picker::PickKind;
 use crate::services::{Services, run_blocking, tf2_state};
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
+use crate::store_download::{Progress, format_bytes, progress_percent};
+use crate::tokio_bridge;
 use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
 use crate::widgets::Named as _;
@@ -39,7 +45,19 @@ const BAR_MARGIN: Pixels = px(8.);
 enum View {
     Empty,
     Loading,
+    /// The demo's map is being fetched from serveme.tf: bytes so far and the announced size.
+    Downloading {
+        map: String,
+        done: u64,
+        total: Option<u64>,
+    },
     Failed(SharedString),
+    /// A map download that may work if tried again: what went wrong, and what to retry.
+    DownloadFailed {
+        path: PathBuf,
+        map: String,
+        detail: SharedString,
+    },
     Loaded {
         /// The map's name, with the players' count and moment when they were read.
         caption: SharedString,
@@ -81,6 +99,8 @@ pub struct DemoViewerPage {
     bar_touched: bool,
     bar_drag: Option<BarDrag>,
     bar_saves: Rc<RefCell<BarSaves>>,
+    /// The running map download; dropping it aborts the transfer and its partial file.
+    download: Option<Task<()>>,
 }
 
 impl DemoViewerPage {
@@ -111,6 +131,7 @@ impl DemoViewerPage {
             bar_touched: false,
             bar_drag: None,
             bar_saves: Rc::default(),
+            download: None,
         }
     }
 
@@ -118,43 +139,163 @@ impl DemoViewerPage {
     pub fn viewport(&self) -> Option<&Entity<DemoViewport>> {
         match &self.view {
             View::Loaded { viewport, .. } => Some(viewport),
-            View::Empty | View::Loading | View::Failed(_) => None,
+            View::Empty
+            | View::Loading
+            | View::Downloading { .. }
+            | View::Failed(_)
+            | View::DownloadFailed { .. } => None,
         }
     }
 
-    /// Asks the player for a demo and loads its map off the UI thread. A cancelled pick
-    /// changes nothing.
+    /// Asks the player for a demo and loads its map off the UI thread, fetching a missing map
+    /// from serveme.tf first. A cancelled pick changes nothing.
     pub fn open_demo(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let picking = cx.global::<Services>().picker.pick(PickKind::OpenDemo, cx);
-        let snapshots = Arc::clone(&cx.global::<Services>().demo_snapshots);
         cx.spawn_in(window, async move |page, cx| {
             let Some(path) = picking.await else { return };
-            let Ok((generation, install)) = page.update(cx, |page, cx| {
-                page.generation += 1;
-                page.view = View::Loading;
-                cx.notify();
-                (page.generation, tf2_state(cx).read(cx).install().cloned())
-            }) else {
-                return;
-            };
-            // A panic in the BSP reader is a map that cannot be shown, not a dead app.
-            let loaded = cx
-                .background_spawn(async move {
-                    crate::crash::catching(|| load_demo(&path, install.as_ref(), &snapshots))
-                        .unwrap_or_else(|payload| {
-                            let message = crate::crash::panic_text(&*payload);
-                            tracing::warn!("the demo viewer's map loader panicked: {message}");
-                            Err(LoadError::MapUnreadable)
-                        })
-                })
-                .await;
             let _ = page.update_in(cx, |page, window, cx| {
-                if page.generation == generation {
-                    page.show(loaded, window, cx);
+                page.generation += 1;
+                page.download = None;
+                page.load(path, page.generation, false, window, cx);
+            });
+        })
+        .detach();
+    }
+
+    // Reads the demo and meshes its map off the UI thread. A map that is missing the first time
+    // is downloaded and loaded once more; missing again after that, it shows as missing.
+    fn load(
+        &mut self,
+        path: PathBuf,
+        generation: u64,
+        downloaded: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.view = View::Loading;
+        cx.notify();
+        let install = tf2_state(cx).read(cx).install().cloned();
+        let snapshots = Arc::clone(&cx.global::<Services>().demo_snapshots);
+        let reading = path.clone();
+        let found = install.clone();
+        // A panic in the BSP reader is a map that cannot be shown, not a dead app.
+        let loading = cx.background_spawn(async move {
+            crate::crash::catching(|| load_demo(&reading, found.as_ref(), &snapshots))
+                .unwrap_or_else(|payload| {
+                    let message = crate::crash::panic_text(&*payload);
+                    tracing::warn!("the demo viewer's map loader panicked: {message}");
+                    Err(LoadError::MapUnreadable)
+                })
+        });
+        cx.spawn_in(window, async move |page, cx| {
+            let loaded = loading.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                if page.generation != generation {
+                    return;
+                }
+                match (loaded, install) {
+                    (Err(LoadError::MapMissing(map)), Some(install)) if !downloaded => {
+                        page.download_map(path, map, install, generation, window, cx);
+                    }
+                    (loaded, _) => page.show(loaded, window, cx),
                 }
             });
         })
         .detach();
+    }
+
+    // Runs a failed download again under a new generation; a TF2 install gone since then
+    // loads the demo instead, which says so.
+    fn retry(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let View::DownloadFailed { path, map, .. } = &self.view else {
+            return;
+        };
+        let (path, map) = (path.clone(), map.clone());
+        self.generation += 1;
+        let generation = self.generation;
+        match tf2_state(cx).read(cx).install().cloned() {
+            Some(install) => self.download_map(path, map, install, generation, window, cx),
+            None => self.load(path, generation, false, window, cx),
+        }
+    }
+
+    // Fetches `map` into the game with live progress, then loads the demo again. Only the newest
+    // byte count is kept, so a slow frame skips counts rather than queueing them.
+    fn download_map(
+        &mut self,
+        path: PathBuf,
+        map: String,
+        install: Tf2Install,
+        generation: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.view = View::Downloading {
+            map: map.clone(),
+            done: 0,
+            total: None,
+        };
+        cx.notify();
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let store = cx.global::<Services>().store.clone();
+        let (tx, mut rx) = tokio::sync::watch::channel((0u64, None::<u64>));
+        let name = map.clone();
+        let failed_map = map.clone();
+        let job = tokio_bridge::spawn(cx, async move {
+            let report = move |done, total| {
+                tx.send_replace((done, total));
+            };
+            store.download_map(&install, &name, &report).await
+        });
+        self.download = Some(cx.spawn_in(window, async move |page, cx| {
+            while rx.changed().await.is_ok() {
+                let (now, size) = *rx.borrow_and_update();
+                let _ = page.update(cx, |page, cx| {
+                    if page.generation != generation {
+                        return;
+                    }
+                    if let View::Downloading { done, total, .. } = &mut page.view {
+                        (*done, *total) = (now, size);
+                        cx.notify();
+                    }
+                });
+            }
+            let joined = job.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                if page.generation != generation {
+                    return;
+                }
+                // A 404 means serveme.tf lacks the map, so retrying is pointless; any other
+                // failure may pass, so it keeps its reason and a Retry.
+                let (failure, absent) = match joined {
+                    // A map that landed meanwhile, say from the Maps page, is simply shown.
+                    Ok(Ok(()))
+                    | Ok(Err(
+                        MapDownloadError::AlreadyDownloaded { .. }
+                        | MapDownloadError::InGame { .. },
+                    )) => return page.load(path, generation, true, window, cx),
+                    Ok(Err(e)) => (
+                        describe_map_download(&e),
+                        matches!(e, MapDownloadError::Http { status: 404, .. }),
+                    ),
+                    // Only a panic in the download joins as an error; a dropped task has
+                    // no one left to join it.
+                    Err(e) => (map_stopped(e.to_string()), false),
+                };
+                failure.log("map download");
+                page.view = match absent {
+                    true => View::Failed(tr!("demo_viewer.error.not_on_serveme", map = failed_map)),
+                    false => View::DownloadFailed {
+                        path,
+                        map: failed_map,
+                        detail: failure.message.into(),
+                    },
+                };
+                cx.notify();
+            });
+        }));
     }
 
     // The drag starts from the bar's centre as drawn, so a bar pulled inside the page by the
@@ -312,6 +453,62 @@ impl Render for DemoViewerPage {
             let status = line(ids::DEMO_VIEWER_STATUS, words, Some(muted), false);
             (centre.child(status).into_any_element(), None)
         };
+        // A download shows its status over a bar and the bytes so far, centred like the status.
+        // The label holds only the bytes, since the status already says what is happening.
+        let downloading = |map: &str, done: u64, total: Option<u64>| {
+            let progress = Some(Progress {
+                phase: DownloadPhase::Downloading,
+                downloaded: done,
+                total,
+            });
+            let words = tr!("demo_viewer.downloading", map = map);
+            let received = match total {
+                Some(total) => tr!(
+                    "demo_viewer.received",
+                    done = format_bytes(done),
+                    total = format_bytes(total)
+                ),
+                None => format_bytes(done).into(),
+            };
+            let column = v_flex()
+                .items_center()
+                .gap_2()
+                .child(line(ids::DEMO_VIEWER_STATUS, words, Some(muted), false))
+                .child(div().w(px(240.)).child(
+                    ProgressBar::new(ids::DEMO_VIEWER_PROGRESS).value(progress_percent(progress)),
+                ))
+                .child(line(
+                    ids::DEMO_VIEWER_PROGRESS_LABEL,
+                    received,
+                    Some(muted),
+                    false,
+                ));
+            let centre = div().size_full().flex().items_center().justify_center();
+            (centre.child(column).into_any_element(), None)
+        };
+        // A download that may still work names the map, its reason, and a Retry beneath.
+        let download_failed = |map: &str, detail: SharedString, cx: &mut Context<Self>| {
+            let retry = Button::new(ids::DEMO_VIEWER_RETRY)
+                .outline()
+                .small()
+                .label(tr!("widgets.store_error.retry"))
+                .on_click(cx.listener(|page, _, window, cx| page.retry(window, cx)));
+            let words = tr!("demo_viewer.error.download_failed", map = map);
+            let column = v_flex()
+                .items_center()
+                .gap_2()
+                .max_w(px(420.))
+                .child(line(ids::DEMO_VIEWER_STATUS, words, Some(muted), false))
+                .child(line(
+                    ids::DEMO_VIEWER_STATUS_DETAIL,
+                    detail,
+                    Some(muted),
+                    true,
+                ))
+                .child(retry);
+            let centre = div().size_full().flex().items_center().justify_center();
+            (centre.child(column).into_any_element(), None)
+        };
         let (body, caption) = match &self.view {
             View::Loaded {
                 caption,
@@ -324,7 +521,9 @@ impl Render for DemoViewerPage {
             ),
             View::Empty => status(tr!("demo_viewer.empty")),
             View::Loading => status(tr!("demo_viewer.loading")),
+            View::Downloading { map, done, total } => downloading(map, *done, *total),
             View::Failed(message) => status(message.clone()),
+            View::DownloadFailed { map, detail, .. } => download_failed(map, detail.clone(), cx),
         };
         let collapsed = self.bar.collapsed;
         let open = Button::new(ids::DEMO_VIEWER_OPEN)

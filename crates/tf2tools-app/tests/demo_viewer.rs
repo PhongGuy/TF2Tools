@@ -223,17 +223,20 @@ fn no_tf2_install_says_maps_cannot_load(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_map_that_is_not_installed_names_it(cx: &mut TestAppContext) {
+fn a_missing_map_that_serveme_cannot_send_ends_in_a_failure(cx: &mut TestAppContext) {
+    // Shell tests point serveme.tf at a dead loopback port, so the download is refused.
+    cx.executor().allow_parking();
     let env = support::env();
-    let demo = demo_header("cp_missing", 60.0);
-    status_after_opening(
-        cx,
-        &env,
-        found(&env),
-        &demo,
-        StubAnswer::Frames,
-        "The map cp_missing isn't installed. Play it once in TF2, or get a custom map from the Maps page.",
-    );
+    let path = demo_file(&env, "match.dem", &demo_header("cp_missing", 60.0));
+    let w = demo_viewer_shell(cx, &env, found(&env), vec![path], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
+    let want = "Couldn't download cp_missing.";
+    support::wait_real(cx, "the download to fail", |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
+    });
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_RETRY));
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_PROGRESS));
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT));
 }
 
 #[gpui_kit::test]
@@ -427,7 +430,9 @@ fn unreadable_players_leave_the_map_with_a_note(cx: &mut TestAppContext) {
 fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
     let env = support::env();
     let (reader, asked) = counting_snapshots(|| Ok(three_players()));
-    let demo = demo_file(&env, "match.dem", &demo_header("cp_missing", 60.0));
+    std::fs::create_dir_all(env.game.join("tf/maps")).unwrap();
+    std::fs::write(env.game.join("tf/maps/cp_bad.bsp"), b"VBSP but not a map").unwrap();
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_bad", 60.0));
     let w = demo_viewer_shell_with(
         cx,
         &env,
@@ -437,7 +442,7 @@ fn a_map_that_fails_never_reads_the_players(cx: &mut TestAppContext) {
         Some(reader),
     );
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPEN);
-    let want = "The map cp_missing isn't installed. Play it once in TF2, or get a custom map from the Maps page.";
+    let want = "This map can't be shown.";
     support::wait_real(cx, want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want)
     });

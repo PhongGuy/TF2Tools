@@ -20,7 +20,9 @@ use tf2tools_app::viewer::{
     DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
     SnapshotReader,
 };
-use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, load_map_mesh};
+use tf2tools_core::{
+    DemoSnapshot, DemoSnapshotError, Endpoints, MapMesh, Tf2Install, load_map_mesh,
+};
 
 use super::demo_view_fixtures::{BspOptions, bsp};
 
@@ -323,6 +325,38 @@ pub fn demo_viewer_shell_with(
     answer: StubAnswer,
     snapshots: Option<SnapshotReader>,
 ) -> DemoViewerShell {
+    demo_viewer_shell_in(cx, env, state, picks, answer, snapshots, None)
+}
+
+/// `demo_viewer_shell` with TF2 found at the env's game and the store's serveme.tf map
+/// downloads served by `server` at `/fastdl/maps/<name>.bsp`.
+pub fn demo_viewer_shell_served(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    server: &super::StoreServer,
+    picks: Vec<PathBuf>,
+    answer: StubAnswer,
+) -> DemoViewerShell {
+    // The download crosses the tokio bridge, so the test executor may park on it.
+    cx.executor().allow_parking();
+    let uri = server.uri();
+    let endpoints = server
+        .endpoints()
+        .with_serveme(format!("{uri}/serveme"))
+        .with_map_downloads(format!("{uri}/fastdl/maps"));
+    let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    demo_viewer_shell_in(cx, env, state, picks, answer, None, Some(endpoints))
+}
+
+fn demo_viewer_shell_in(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    answer: StubAnswer,
+    snapshots: Option<SnapshotReader>,
+    endpoints: Option<Endpoints>,
+) -> DemoViewerShell {
     let picker = Arc::new(ScriptedPicker::new(picks));
     let (factory, stubs) = stub_factory(answer);
     let s = super::open_shell(
@@ -339,6 +373,9 @@ pub fn demo_viewer_shell_with(
             services.pointer_lock = fallback;
             if let Some(snapshots) = snapshots {
                 services.demo_snapshots = snapshots;
+            }
+            if let Some(endpoints) = endpoints {
+                *services = services.clone().with_endpoints(endpoints);
             }
         },
     );

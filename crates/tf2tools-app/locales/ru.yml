@@ -140,6 +140,8 @@ demo_viewer:
   open: "Открыть демо"
   empty: "Откройте демо TF2, чтобы увидеть его карту в 3D."
   loading: "Загрузка карты..."
+  downloading: "Загрузка %{map} с serveme.tf..."
+  received: "%{done} / %{total}"
   caption: "%{map}"
   caption_players: "%{map}, игроков: %{count}, момент %{time}"
   players_note: "Не удалось прочитать игроков из этого демо."
@@ -154,6 +156,8 @@ demo_viewer:
     no_tf2: "TF2 не найдена, поэтому её карты нельзя загрузить."
     map_missing: "Карта %{map} не установлена. Сыграйте на ней один раз в TF2 или скачайте пользовательскую карту на странице «Карты»."
     map_unreadable: "Эту карту нельзя показать."
+    not_on_serveme: "На serveme.tf нет карты %{map}. Поищите её на вкладке GameBanana страницы «Карты»."
+    download_failed: "Не удалось скачать %{map}."
     unsupported: "3D-просмотр не поддерживается этой графической конфигурацией."
 
 nav:
