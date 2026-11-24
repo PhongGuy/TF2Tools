@@ -547,11 +547,13 @@ fn the_readme_says_tf2tools_5_cannot_read_a_compressed_library() {
 }
 
 #[test]
-fn the_maps_section_mentions_the_preview_demo_viewer() {
+fn the_maps_section_mentions_the_demos_tf_page() {
     let readme = repo_file("README.md");
     let (_, maps) = readme.split_once("### Maps").expect("a Maps section");
     let (maps, _) = maps.split_once("\n### ").expect("a section after it");
-    assert!(maps.contains("Demo Viewer"), "Maps section: {maps}");
+    assert!(maps.contains("Demos.tf page"), "Maps section: {maps}");
+    assert!(maps.contains("Open demo"), "Maps section: {maps}");
+    assert!(!maps.contains("Demo Viewer"), "Maps section: {maps}");
     assert!(maps.contains("preview"), "Maps section: {maps}");
     assert!(maps.contains("RED and BLU boxes"), "Maps section: {maps}");
 }
