@@ -1,4 +1,4 @@
-//! demos.tf: finding the STV demo recorded for a logs.tf log.
+//! demos.tf: browsing its demo list, finding the demo recorded for a logs.tf log, and caching downloads.
 
 mod cache;
 mod client;
