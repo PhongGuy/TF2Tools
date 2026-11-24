@@ -176,6 +176,9 @@ demo_viewer:
   bar_collapse: "Réduire les commandes"
   bar_expand: "Afficher les commandes"
   bar_grip: "Faites glisser pour déplacer"
+  options: "Options de la visionneuse"
+  look_sensitivity: "Sensibilité de la vue"
+  look_reset: "Rétablir à %{percent}"
   error:
     not_a_demo: "Ce fichier n'est pas une démo TF2."
     damaged: "Cette démo est endommagée et ne peut pas être lue."
@@ -2886,6 +2889,7 @@ messages:
     save_panel_place: "Impossible d'enregistrer la position du panneau latéral"
     load_bar_place: "Impossible de charger la position des commandes de la visionneuse de démos"
     save_bar_place: "Impossible d'enregistrer la position des commandes de la visionneuse de démos"
+    save_look_sensitivity: "Impossible d'enregistrer la sensibilité de la vue de la visionneuse de démos"
     change_hud_options: "Impossible de modifier les options du HUD"
     save_hud: "Impossible d'enregistrer le HUD"
     list_presets: "Impossible de lire vos préréglages"

@@ -3525,6 +3525,16 @@ pub const DEMO_VIEWER_PROGRESS_LABEL: &str = "demo-viewer-progress-label";
 pub const DEMO_VIEWER_STATUS_DETAIL: &str = "demo-viewer-status-detail";
 /// The button that runs a failed map download again.
 pub const DEMO_VIEWER_RETRY: &str = "demo-viewer-retry";
+/// The bar's options button, which opens the viewer's options popover.
+pub const DEMO_VIEWER_OPTIONS: &str = "demo-viewer-options-button";
+/// The options popover itself.
+pub const DEMO_VIEWER_OPTIONS_POPOVER: &str = "demo-viewer-options";
+/// The look sensitivity slider in the options popover.
+pub const DEMO_VIEWER_LOOK_SLIDER: &str = "demo-viewer-look-slider";
+/// The look sensitivity's percent beside its slider.
+pub const DEMO_VIEWER_LOOK_VALUE: &str = "demo-viewer-look-value";
+/// The button that puts the look sensitivity back to 100%.
+pub const DEMO_VIEWER_LOOK_RESET: &str = "demo-viewer-look-reset";
 
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";

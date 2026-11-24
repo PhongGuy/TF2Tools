@@ -8,30 +8,33 @@ use std::time::Instant;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::popover::Popover;
 use gpui_kit::component::progress::Progress as ProgressBar;
+use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AppContext as _, Context, CursorStyle, DispatchPhase, Entity, Hsla, InteractiveElement as _,
-    IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _,
-    Pixels, Point, Render, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Task, TestSupportExt as _, Window, canvas, div, px,
+    Anchor, AnyElement, AppContext as _, Context, CursorStyle, DispatchPhase, Entity, Hsla,
+    InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, ParentElement as _, Pixels, Point, Render, SharedString, Size,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    canvas, div, px,
 };
 use tf2tools_core::{DownloadPhase, LookSensitivity, MapDownloadError, Tf2Install};
 
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::local_messages::describe_settings;
 use crate::map_messages::{describe_map_download, map_stopped};
 use crate::picker::PickKind;
-use crate::services::{Services, run_blocking, tf2_state};
+use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
 use crate::store_download::{Progress, format_bytes, progress_percent};
 use crate::tokio_bridge;
 use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
-use crate::widgets::Named as _;
+use crate::widgets::{Named as _, labelled};
 
 mod bar;
 
@@ -77,11 +80,69 @@ struct BarDrag {
     start: BarPlace,
 }
 
-/// The newest bar setting waiting to be written, and whether a write is running.
-#[derive(Default)]
-struct BarSaves {
-    latest: Option<String>,
+/// The newest value of one setting waiting to be written, and whether a write is running.
+struct SerialSaves<T> {
+    latest: Option<T>,
     writing: bool,
+}
+
+impl<T> Default for SerialSaves<T> {
+    fn default() -> Self {
+        Self {
+            latest: None,
+            writing: false,
+        }
+    }
+}
+
+/// Writes one setting's value off the UI thread.
+type SaveFn<T> = fn(&Services, T) -> Result<(), OpError>;
+
+// One writer per setting at a time, each taking the newest value, so quick changes never land
+// out of order. A failed write toasts; the value shown stays as the player set it.
+fn save_serially<T: Send + 'static>(
+    saves: &Rc<RefCell<SerialSaves<T>>>,
+    value: T,
+    write: SaveFn<T>,
+    window: &mut Window,
+    cx: &mut Context<DemoViewerPage>,
+) {
+    let mut queued = saves.borrow_mut();
+    queued.latest = Some(value);
+    if std::mem::replace(&mut queued.writing, true) {
+        return;
+    }
+    drop(queued);
+    let saves = Rc::clone(saves);
+    cx.spawn_in(window, async move |_, cx| {
+        loop {
+            let next = {
+                let mut saves = saves.borrow_mut();
+                let next = saves.latest.take();
+                saves.writing = next.is_some();
+                next
+            };
+            let Some(value) = next else { break };
+            let Ok(save) = cx.update(|_, cx| run_blocking(cx, move |s| write(s, value))) else {
+                break;
+            };
+            if let Err(err) = save.await {
+                let _ = cx.update(|window, cx| toast_error(window, cx, &err));
+            }
+        }
+    })
+    .detach();
+}
+
+// A slider value as a sensitivity on its 5 % steps; a NaN reads as the default.
+fn look_at(v: f32) -> LookSensitivity {
+    if v.is_nan() {
+        return LookSensitivity::default();
+    }
+    let step = f32::from(LookSensitivity::STEP);
+    let range = f32::from(LookSensitivity::MIN)..=f32::from(LookSensitivity::MAX);
+    let snapped = ((v / step).round() * step).clamp(*range.start(), *range.end());
+    LookSensitivity::new(snapped as u16).unwrap_or_default()
 }
 
 /// The Demo Viewer page: the chosen demo's map over the whole page, under a floating control bar.
@@ -98,30 +159,66 @@ pub struct DemoViewerPage {
     /// Set once the player moves or minimises the bar, so a slow stored place cannot undo it.
     bar_touched: bool,
     bar_drag: Option<BarDrag>,
-    bar_saves: Rc<RefCell<BarSaves>>,
+    bar_saves: Rc<RefCell<SerialSaves<String>>>,
     /// The running map download; dropping it aborts the transfer and its partial file.
     download: Option<Task<()>>,
+    /// How fast a drag turns the camera; every new viewport starts with it.
+    look: LookSensitivity,
+    /// Set once the player picks a sensitivity, so a slow stored one cannot undo it.
+    look_touched: bool,
+    look_saves: Rc<RefCell<SerialSaves<LookSensitivity>>>,
+    look_slider: Entity<SliderState>,
+    options_open: bool,
+    _look_watch: [Subscription; 2],
 }
 
 impl DemoViewerPage {
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // A missing, damaged or unreadable place leaves the bar at its default.
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // A missing, damaged or unreadable place leaves the bar at its default; the stored
+        // sensitivity comes in the same read.
         let stored = run_blocking(cx, |s| {
             s.db.settings()
-                .map(|st| st.demo_viewer_bar().and_then(BarPlace::from_setting))
+                .map(|st| {
+                    let place = st.demo_viewer_bar().and_then(BarPlace::from_setting);
+                    (place, st.look_sensitivity())
+                })
                 .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_bar_place")))
         });
-        cx.spawn(async move |page, cx| {
-            if let Ok(Some(place)) = stored.await {
-                let _ = page.update(cx, |page, cx| {
-                    if !page.bar_touched {
+        cx.spawn_in(window, async move |page, cx| {
+            if let Ok((place, look)) = stored.await {
+                let _ = page.update_in(cx, |page, window, cx| {
+                    if let Some(place) = place.filter(|_| !page.bar_touched) {
                         page.bar = place;
-                        cx.notify();
                     }
+                    if !page.look_touched {
+                        page.show_look(look, window, cx);
+                    }
+                    cx.notify();
                 });
             }
         })
         .detach();
+        let look = LookSensitivity::default();
+        let look_slider = cx.new(|_| {
+            SliderState::new()
+                .min(f32::from(LookSensitivity::MIN))
+                .max(f32::from(LookSensitivity::MAX))
+                .step(f32::from(LookSensitivity::STEP))
+                .default_value(f32::from(look.get()))
+        });
+        // The percent beside the slider follows a drag; letting go applies and saves it.
+        let look_watch = [
+            cx.observe(&look_slider, |_, _, cx| cx.notify()),
+            cx.subscribe_in(
+                &look_slider,
+                window,
+                |page, _, ev: &SliderEvent, window, cx| {
+                    if let SliderEvent::Release(v) = ev {
+                        page.set_look(look_at(v.start()), window, cx);
+                    }
+                },
+            ),
+        ];
         Self {
             view: View::Empty,
             generation: 0,
@@ -132,7 +229,18 @@ impl DemoViewerPage {
             bar_drag: None,
             bar_saves: Rc::default(),
             download: None,
+            look,
+            look_touched: false,
+            look_saves: Rc::default(),
+            look_slider,
+            options_open: false,
+            _look_watch: look_watch,
         }
+    }
+
+    /// The options popover's look sensitivity slider, in percent.
+    pub fn look_slider(&self) -> &Entity<SliderState> {
+        &self.look_slider
     }
 
     /// The viewport over the loaded map, if one shows.
@@ -342,39 +450,107 @@ impl DemoViewerPage {
         cx.notify();
     }
 
-    // One writer at a time, each taking the newest text, so quick toggles never land out of order.
     fn save_bar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let mut saves = self.bar_saves.borrow_mut();
-        saves.latest = Some(self.bar.to_setting());
-        if std::mem::replace(&mut saves.writing, true) {
-            return;
+        save_serially(
+            &self.bar_saves,
+            self.bar.to_setting(),
+            |s, text| {
+                s.db.set_demo_viewer_bar(&text).map_err(|e| {
+                    describe_settings(&e).into_op(tr!("messages.action.save_bar_place"))
+                })
+            },
+            window,
+            cx,
+        );
+    }
+
+    // The player's pick: the slider, the shown viewport and later ones follow it, and it saves.
+    fn set_look(&mut self, look: LookSensitivity, window: &mut Window, cx: &mut Context<Self>) {
+        self.look_touched = true;
+        self.show_look(look, window, cx);
+        save_serially(
+            &self.look_saves,
+            look,
+            |s, look| {
+                s.db.set_look_sensitivity(look).map_err(|e| {
+                    describe_settings(&e).into_op(tr!("messages.action.save_look_sensitivity"))
+                })
+            },
+            window,
+            cx,
+        );
+    }
+
+    fn show_look(&mut self, look: LookSensitivity, window: &mut Window, cx: &mut Context<Self>) {
+        self.look = look;
+        let at = f32::from(look.get());
+        self.look_slider
+            .update(cx, |st, cx| st.set_value(at, window, cx));
+        if let Some(viewport) = self.viewport() {
+            viewport.update(cx, |v, _| v.set_look_scale(look.scale()));
         }
-        drop(saves);
-        let saves = Rc::clone(&self.bar_saves);
-        cx.spawn_in(window, async move |_, cx| {
-            loop {
-                let next = {
-                    let mut saves = saves.borrow_mut();
-                    let next = saves.latest.take();
-                    saves.writing = next.is_some();
-                    next
-                };
-                let Some(text) = next else { break };
-                let Ok(save) = cx.update(|_, cx| {
-                    run_blocking(cx, move |s| {
-                        s.db.set_demo_viewer_bar(&text).map_err(|e| {
-                            describe_settings(&e).into_op(tr!("messages.action.save_bar_place"))
-                        })
-                    })
-                }) else {
-                    break;
-                };
-                if let Err(err) = save.await {
-                    let _ = cx.update(|window, cx| toast_error(window, cx, &err));
-                }
-            }
-        })
-        .detach();
+        cx.notify();
+    }
+
+    // The options button and its popover, opening upward from the bar.
+    fn options(&self, cx: &mut Context<Self>) -> AnyElement {
+        let muted = cx.theme().muted_foreground;
+        let shown = look_at(self.look_slider.read(cx).value().start());
+        let reset = Button::new(ids::DEMO_VIEWER_LOOK_RESET)
+            .ghost()
+            .xsmall()
+            .label(tr!(
+                "demo_viewer.look_reset",
+                percent = format::percent(u64::from(LookSensitivity::default().get()))
+            ))
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.set_look(LookSensitivity::default(), window, cx);
+            }));
+        let body = v_flex()
+            .w(px(240.))
+            .gap_2()
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(tr!("demo_viewer.look_sensitivity")),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .id(ids::DEMO_VIEWER_LOOK_SLIDER)
+                            .test_support()
+                            .flex_1()
+                            .child(Slider::new(&self.look_slider)),
+                    )
+                    .child(labelled(
+                        div().w_12().text_xs().text_color(muted),
+                        ids::DEMO_VIEWER_LOOK_VALUE,
+                        format::percent(u64::from(shown.get())),
+                    )),
+            )
+            .child(div().child(reset));
+        let trigger = Button::new(ids::DEMO_VIEWER_OPTIONS)
+            .ghost()
+            .small()
+            .icon(IconName::Settings)
+            .named(tr!("demo_viewer.options"));
+        let page = cx.entity().downgrade();
+        Popover::new(ids::DEMO_VIEWER_OPTIONS_POPOVER)
+            .anchor(Anchor::BottomRight)
+            .open(self.options_open)
+            .on_open_change(move |&open, _, cx| {
+                let _ = page.update(cx, |page, cx| {
+                    page.options_open = open;
+                    cx.notify();
+                });
+            })
+            .trigger(trigger)
+            .child(body)
+            .into_any_element()
     }
 
     // Puts a loaded map in a fresh viewport; the old one drops with its renderer.
@@ -408,7 +584,7 @@ impl DemoViewerPage {
                         renderer,
                         lock,
                         Arc::new(Instant::now),
-                        LookSensitivity::default().scale(),
+                        self.look.scale(),
                         window,
                         cx,
                     )
@@ -554,6 +730,7 @@ impl Render for DemoViewerPage {
             .icon(icon)
             .named(tip)
             .on_click(cx.listener(|page, _, window, cx| page.toggle_bar(window, cx)));
+        let options = (!collapsed).then(|| self.options(cx));
 
         // Both watchers keep last frame's sizes and ask for one more frame when either moves,
         // so the bar settles at its place a frame after it first draws.
@@ -651,6 +828,9 @@ impl Render for DemoViewerPage {
                     bar.child(words)
                 })
                 .child(div().flex_none().child(open))
+                .when_some(options, |bar, options| {
+                    bar.child(div().flex_none().child(options))
+                })
             })
             .child(div().flex_none().child(collapse));
         let frame = div()
