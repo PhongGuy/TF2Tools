@@ -141,6 +141,26 @@ async fn a_demo_past_the_cap_stops_and_leaves_no_part_file() {
     assert_eq!(entries(dir.path()), ["m.dem"]);
 }
 
+// demos.tf moves demos older than about a month to its freezer host.
+#[tokio::test]
+async fn an_archived_demo_downloads_from_the_freezer_host() {
+    let (server, client, _) = serving(ResponseTemplate::new(404)).await;
+    Mock::given(method("GET"))
+        .and(path("/freezer/aa/7.dem"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes()))
+        .mount(&server)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("m.dem");
+    let url = format!("{}/freezer/aa/7.dem", server.uri());
+    client
+        .download_demo(&summary(&url), &dest, &no_progress)
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(&dest).unwrap(), bytes());
+    assert_eq!(entries(dir.path()), ["m.dem"]);
+}
+
 #[tokio::test]
 async fn a_url_off_the_files_host_is_refused_unasked() {
     let (server, client, _) = serving(ResponseTemplate::new(200).set_body_bytes(bytes())).await;
@@ -150,6 +170,7 @@ async fn a_url_off_the_files_host_is_refused_unasked() {
     for url in [
         "https://evil.example/aa/7.dem".to_owned(),
         format!("{base}/filesx/aa/7.dem"),
+        format!("{base}/freezerx/aa/7.dem"),
         format!("{base}/demos/7"),
     ] {
         let failed = client

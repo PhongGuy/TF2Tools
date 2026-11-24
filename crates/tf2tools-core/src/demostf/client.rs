@@ -25,7 +25,7 @@ const SEARCH_WINDOW: i64 = 3600;
 pub struct DemosEndpoints {
     api: String,
     site: String,
-    files: String,
+    files: Vec<String>,
 }
 
 impl Default for DemosEndpoints {
@@ -33,18 +33,22 @@ impl Default for DemosEndpoints {
         DemosEndpoints {
             api: "https://api.demos.tf".to_owned(),
             site: "https://demos.tf".to_owned(),
-            files: "https://static.demos.tf".to_owned(),
+            // Demos older than about a month move from static to the freezer host.
+            files: vec![
+                "https://static.demos.tf".to_owned(),
+                "https://freezer.demos.tf".to_owned(),
+            ],
         }
     }
 }
 
 impl DemosEndpoints {
-    /// All three under one test server: the api at `base`, pages and files beneath it.
+    /// All under one test server: the api at `base`, pages and both file bases beneath it.
     pub fn loopback(base: &str) -> Self {
         let api = base.trim_end_matches('/').to_owned();
         DemosEndpoints {
             site: format!("{api}/site"),
-            files: format!("{api}/files"),
+            files: vec![format!("{api}/files"), format!("{api}/freezer")],
             api,
         }
     }
@@ -59,8 +63,8 @@ impl DemosEndpoints {
         &self.site
     }
 
-    /// The base every demo file downloads from, without a trailing slash.
-    pub fn files(&self) -> &str {
+    /// The bases demo files may download from, without trailing slashes.
+    pub fn files(&self) -> &[String] {
         &self.files
     }
 
@@ -69,9 +73,15 @@ impl DemosEndpoints {
         format!("{}/{demo_id}", self.site)
     }
 
+    /// True when `url` lies under one of the file bases.
+    fn serves_file(&self, url: &str) -> bool {
+        self.files.iter().any(|base| under_prefix(url, base))
+    }
+
     /// Redirects may only stay on the api and file bases.
     fn redirects(&self) -> Redirects {
-        Redirects::Only([self.api.clone(), self.files.clone()].as_slice().into())
+        let bases = std::iter::once(&self.api).chain(&self.files).cloned();
+        Redirects::Only(bases.collect::<Vec<_>>().into())
     }
 }
 
@@ -165,7 +175,7 @@ impl DemosClient {
 
     /// Streams `demo`'s file into a part file beside `dest`, reporting (bytes so far,
     /// Content-Length) after each chunk, then replaces `dest`. ForeignUrl when the url is not
-    /// under the files base; TooLarge past the limit; 404 Gone; I/O failures Write. On any
+    /// under a files base; TooLarge past the limit; 404 Gone; I/O failures Write. On any
     /// failure the part file is gone and an existing `dest` is untouched.
     pub async fn download_demo(
         &self,
@@ -174,7 +184,7 @@ impl DemosClient {
         progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
     ) -> Result<(), DemosError> {
         let url = demo.url();
-        if !under_prefix(url, &self.endpoints.files) {
+        if !self.endpoints.serves_file(url) {
             return Err(DemosError::ForeignUrl {
                 url: url.to_owned(),
             });
