@@ -178,3 +178,5 @@ make check    # formatting, lints and the tests
 ```
 
 `cargo run -p tf2tools-app` runs it against your real library and game instead. Building, testing, packaging and the screenshot script are all in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Issues and pull requests from anyone are welcome. See [Sending a change](CONTRIBUTING.md#sending-a-change) for what to run first.

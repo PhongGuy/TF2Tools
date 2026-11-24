@@ -284,6 +284,13 @@ fn a_local_hud_with_a_menu_background_shows_its_own_picture(cx: &mut TestAppCont
     assert!(support::present(cx, s.win, ids::hud_image("mine")));
     assert!(!support::present(cx, s.win, ids::hud_image("plain")));
     assert!(!support::present(cx, s.win, ids::hud_shot("plain")));
+    // With no store HUD shown, the row still makes room for the 16:9 picture.
+    let card = support::bounds_of(cx, s.win, ids::hud_card("mine")).unwrap();
+    let expected = (card.size.width * (9. / 16.)).floor() + gpui_kit::px(136.);
+    assert!(
+        (card.size.height - expected).abs() <= gpui_kit::px(1.),
+        "{card:?}"
+    );
 }
 
 #[gpui_kit::test]
