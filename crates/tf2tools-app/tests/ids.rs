@@ -30,7 +30,7 @@ fn page_ids_use_kebab_slugs() {
             "hud-maker",
             "maps",
             "logs-tf",
-            "demo-viewer",
+            "demos-tf",
             "settings",
             "logs"
         ]
@@ -96,7 +96,7 @@ fn labels_and_titles_match_v5() {
             ("HUD Maker", "HUD Maker"),
             ("Maps", "Maps"),
             ("logs.tf", "logs.tf"),
-            ("Demo Viewer", "Demo Viewer"),
+            ("Demos.tf", "Demos.tf"),
             ("Settings", "Settings"),
             ("Logs", "Activity Log"),
         ]

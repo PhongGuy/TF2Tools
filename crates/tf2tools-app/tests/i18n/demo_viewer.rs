@@ -31,7 +31,7 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
         hint.is_some_and(|h| h != ENGLISH_HINT),
         "{lang}: the hint is not translated"
     );
-    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemoViewer)).unwrap();
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
     let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
     assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
     for id in [

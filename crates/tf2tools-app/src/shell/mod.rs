@@ -314,7 +314,7 @@ impl Shell {
             | Page::Profiles
             | Page::Addons
             | Page::Graphics
-            | Page::DemoViewer => None,
+            | Page::DemosTf => None,
         };
     }
 
@@ -399,7 +399,7 @@ impl Shell {
 
     /// The Demo Viewer page while it shows.
     pub fn demo_viewer_page(&self) -> Option<Entity<DemoViewerPage>> {
-        self.shown(Page::DemoViewer, self.demo_viewer.as_ref())
+        self.shown(Page::DemosTf, self.demo_viewer.as_ref())
     }
 
     /// The Settings page while it shows.
@@ -646,7 +646,7 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
-            Page::DemoViewer => self
+            Page::DemosTf => self
                 .demo_viewer
                 .get_or_insert_with(|| cx.new(|cx| DemoViewerPage::new(window, cx)))
                 .clone()

@@ -29,17 +29,14 @@ use crate::support::demo_viewer::{
 };
 
 #[test]
-fn the_demo_viewer_follows_logs_tf_with_its_own_icon() {
-    let at = Page::ALL
-        .iter()
-        .position(|p| *p == Page::DemoViewer)
-        .unwrap();
+fn demos_tf_follows_logs_tf_with_its_own_icon() {
+    let at = Page::ALL.iter().position(|p| *p == Page::DemosTf).unwrap();
     assert_eq!(Page::ALL[at - 1], Page::LogsTf);
     assert_eq!(Page::ALL[at + 1], Page::Settings);
-    let page = Page::DemoViewer;
+    let page = Page::DemosTf;
     assert_eq!(
         (page.slug(), page.label().as_ref(), page.title().as_ref()),
-        ("demo-viewer", "Demo Viewer", "Demo Viewer")
+        ("demos-tf", "Demos.tf", "Demos.tf")
     );
     assert_eq!(nav_icon(page), IconName::Clapperboard);
     assert!(!page.is_placeholder());
@@ -49,10 +46,10 @@ fn the_demo_viewer_follows_logs_tf_with_its_own_icon() {
 fn the_page_opens_empty_with_a_preview_badge_beside_its_title(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     assert_eq!(
         support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
-        Some("Demo Viewer")
+        Some("Demos.tf")
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMO_VIEWER_PREVIEW_BADGE).as_deref(),
@@ -90,7 +87,7 @@ fn open_asks_for_a_demo_and_a_cancel_changes_nothing(cx: &mut TestAppContext) {
         Arc::clone(&picker),
         support::no_steam(),
     );
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     support::click_id(cx, s.win, ids::DEMO_VIEWER_OPEN);
     assert_eq!(picker.asked(), [PickKind::OpenDemo]);
     assert_eq!(
@@ -479,7 +476,7 @@ fn a_loaded_map_fills_the_page_under_a_bottom_bar(cx: &mut TestAppContext) {
     support::wait_real(cx, "the viewport", |cx| {
         support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
     });
-    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemoViewer)).unwrap();
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
     let viewport = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT).unwrap();
     assert_eq!(viewport, page);
     let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
@@ -504,8 +501,8 @@ fn a_loaded_map_fills_the_page_under_a_bottom_bar(cx: &mut TestAppContext) {
 fn the_empty_page_keeps_the_bar_and_centres_its_status(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
-    let page = support::bounds_of(cx, s.win, ids::page(Page::DemoViewer)).unwrap();
+    support::click_nav(cx, s.win, Page::DemosTf);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::DemosTf)).unwrap();
     let bar = support::bounds_of(cx, s.win, ids::DEMO_VIEWER_BAR).unwrap();
     assert_bar_at_bottom_centre(page, bar);
     for id in [
@@ -622,7 +619,7 @@ fn fractions(page: Bounds<Pixels>, bar: Bounds<Pixels>) -> (f32, f32) {
 fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     hold_drag(cx, s.win, grip, (-200., -300.));
@@ -638,7 +635,7 @@ fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestApp
         (moved.x - px(-200.)).abs() <= px(1.) && (moved.y - px(-300.)).abs() <= px(1.),
         "{before:?} -> {after:?}"
     );
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let (x, y) = fractions(page, after);
     let saved = saved_bar(&s).expect("a saved place");
     assert!(
@@ -652,7 +649,7 @@ fn dragging_the_grip_moves_the_bar_and_saves_it_once_on_release(cx: &mut TestApp
 fn minimising_hides_the_controls_and_expanding_brings_them_back(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     support::click_id(cx, s.win, ids::DEMO_VIEWER_BAR_COLLAPSE);
     assert_eq!(saved_bar(&s).map(|p| p.collapsed), Some(true));
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_OPEN));
@@ -699,7 +696,7 @@ fn minimising_a_loaded_bar_hides_its_caption_and_hint_until_expanded(cx: &mut Te
 fn a_press_on_the_grip_that_never_moves_saves_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     let before = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     let press = MouseDownEvent {
@@ -746,7 +743,7 @@ fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
         "a drag from the bar turned the camera"
     );
     // The same drag on the open map does turn it, so the check above can fail.
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     drag(cx, w.s.win, page.center(), (100., 0.));
     assert_ne!(yaw(cx, &w.s), start);
 }
@@ -755,10 +752,10 @@ fn a_drag_on_the_bar_never_turns_the_camera(cx: &mut TestAppContext) {
 fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_nav(cx, s.win, Page::DemoViewer);
+    support::click_nav(cx, s.win, Page::DemosTf);
     let grip = bounds(cx, s.win, ids::DEMO_VIEWER_BAR_GRIP).center();
     drag(cx, s.win, grip, (2000., 2000.));
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     assert!(
         (bar.right() - page.right()).abs() <= px(1.)
@@ -767,7 +764,7 @@ fn a_bar_left_in_the_corner_stays_inside_a_shrunken_window(cx: &mut TestAppConte
     );
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     support::settle(cx, s.win);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     assert!(inside(bar, page), "{bar:?} leaves {page:?}");
 }
@@ -780,8 +777,8 @@ fn a_saved_place_is_where_the_bar_opens(cx: &mut TestAppContext) {
         .db
         .set_demo_viewer_bar("0.250 0.300 collapsed")
         .unwrap();
-    support::click_nav(cx, s.win, Page::DemoViewer);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    support::click_nav(cx, s.win, Page::DemosTf);
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     let bar = bounds(cx, s.win, ids::DEMO_VIEWER_BAR);
     let (x, y) = fractions(page, bar);
     assert!(
@@ -804,7 +801,7 @@ fn a_loaded_bar_fits_the_narrowest_window(cx: &mut TestAppContext) {
     // The app's minimum window size.
     cx.simulate_window_resize(w.s.win, size(px(800.), px(600.)));
     support::settle(cx, w.s.win);
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     for id in [
         ids::DEMO_VIEWER_BAR,
         ids::DEMO_VIEWER_HINT,
@@ -844,7 +841,7 @@ fn release_look(cx: &mut TestAppContext, s: &support::ShellWindow, percent: f32)
 // The yaw change, wrapped to [-180, 180), of a 100 px rightward drag across the map.
 fn yaw_turn(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
     let start = yaw(cx, s);
-    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, s.win, ids::page(Page::DemosTf));
     drag(cx, s.win, page.center(), (100., 0.));
     (yaw(cx, s) - start + 540.).rem_euclid(360.) - 180.
 }
@@ -915,7 +912,7 @@ fn clicks_in_the_options_never_lock_the_pointer(cx: &mut TestAppContext) {
         .count();
     assert_eq!(locks, 0, "a click in the options reached the map");
     // A press on the map itself does lock, so the count above can fail.
-    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    let page = bounds(cx, w.s.win, ids::page(Page::DemosTf));
     drag(cx, w.s.win, page.center(), (10., 0.));
     assert!(lock.calls().contains(&LockCall::Lock));
 }

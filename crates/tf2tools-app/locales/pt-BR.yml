@@ -204,7 +204,7 @@ nav:
   addon_store: "Loja de add-ons"
   maps: "Mapas"
   logs_tf: "logs.tf"
-  demo_viewer: "Visualizador de demos"
+  demos_tf: "Demos.tf"
   settings: "Configurações"
   logs: "Logs"
   activity_log: "Registro de atividades"

@@ -202,7 +202,7 @@ nav:
   addon_store: "插件商店"
   maps: "地图"
   logs_tf: "logs.tf"
-  demo_viewer: "录像查看器"
+  demos_tf: "Demos.tf"
   settings: "设置"
   logs: "日志"
   activity_log: "活动日志"

@@ -178,7 +178,7 @@ nav:
   addon_store: "Магазин дополнений"
   maps: "Карты"
   logs_tf: "logs.tf"
-  demo_viewer: "Просмотр демо"
+  demos_tf: "Demos.tf"
   settings: "Настройки"
   logs: "Журнал"
   activity_log: "Журнал действий"

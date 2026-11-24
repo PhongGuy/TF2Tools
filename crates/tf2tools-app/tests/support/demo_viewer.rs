@@ -431,7 +431,7 @@ fn demo_viewer_shell_in(
     if let Some(look) = stored {
         s.services.db.set_look_sensitivity(look).unwrap();
     }
-    super::click_nav(cx, s.win, Page::DemoViewer);
+    super::click_nav(cx, s.win, Page::DemosTf);
     DemoViewerShell { s, picker, stubs }
 }
 

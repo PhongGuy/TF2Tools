@@ -126,7 +126,7 @@ fn content(
                 .child(title)
                 .into_any_element(),
         })
-        .children((page == Page::DemoViewer).then(preview_badge))
+        .children((page == Page::DemosTf).then(preview_badge))
         .children((page == Page::HudMaker).then(|| shortcuts_button(cx)))
         // v5's status slot: the rings in their own `gap-1.5` row, then the TF2 badge.
         .child(

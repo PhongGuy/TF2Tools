@@ -842,7 +842,7 @@ impl Render for DemoViewerPage {
             .items_start()
             .child(bar);
         div()
-            .id(ids::page(Page::DemoViewer))
+            .id(ids::page(Page::DemosTf))
             .test_support()
             .relative()
             .size_full()
