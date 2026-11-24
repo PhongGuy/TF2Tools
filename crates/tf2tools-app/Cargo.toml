@@ -49,7 +49,7 @@ pollster.workspace = true
 
 # The vendored platform crate's pointer lock, which the demo viewer's mouselook uses.
 [target.'cfg(target_os = "linux")'.dependencies]
-gpui-pre-linux = "=0.3.12"
+gpui-pre-linux = "=0.3.14"
 
 [build-dependencies]
 embed-resource.workspace = true
@@ -67,7 +67,7 @@ wiremock.workspace = true
 sha2.workspace = true
 minisign.workspace = true
 # The real cosmic-text system, so a test can resolve the bundled font weights.
-gpui-pre-wgpu = "=0.3.12"
+gpui-pre-wgpu = "=0.3.14"
 
 # A single test executable keeps the link count (and the target dir) small.
 [[test]]
