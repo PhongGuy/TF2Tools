@@ -1,7 +1,7 @@
-# Vendored gpui-pre-linux 0.3.12
+# Vendored gpui-pre-linux 0.3.14
 
-A copy of `gpui-pre-linux` 0.3.12 from crates.io (a snapshot of
-zed@d2a4fb6ded7c470be25d1541281da3882495b65b, Apache-2.0, see `LICENSE-APACHE`),
+A copy of `gpui-pre-linux` 0.3.14 from crates.io (a snapshot of
+zed@f126950f9d3b62666f97437ae5d4ccac2272c4db, Apache-2.0, see `LICENSE-APACHE`),
 used through `[patch.crates-io]` in the workspace `Cargo.toml`.
 
 ## The changes

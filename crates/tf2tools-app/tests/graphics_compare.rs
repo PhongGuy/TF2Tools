@@ -312,7 +312,8 @@ fn without_a_wipe_zoom_keeps_its_corner_and_no_slider_shows(cx: &mut TestAppCont
 }
 
 // The solid fill and the top-left radius of the quad painted exactly over `id`'s box, in
-// window pixels.
+// window pixels. The scene splits a rounded fill into a square interior and strips that keep
+// the radii, so the roundest piece stands for the quad.
 fn pill_look(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
@@ -329,7 +330,7 @@ fn pill_look(
                     && close(q.bounds.origin.y.0, b.origin.y)
                     && close(q.bounds.size.height.0, b.size.height)
             })
-            .find_map(|q| {
+            .filter_map(|q| {
                 q.background.as_solid().filter(|c| c.a > 0.).map(|c| {
                     (
                         c,
@@ -338,6 +339,7 @@ fn pill_look(
                     )
                 })
             })
+            .max_by(|a, b| a.1.total_cmp(&b.1))
             .unwrap_or_else(|| panic!("no fill painted for {id:?}"))
     })
     .unwrap()
