@@ -13,7 +13,7 @@ mod gb_map_download;
 mod gb_maps;
 mod github;
 pub(crate) mod http;
-pub(crate) mod images;
+mod images;
 mod items;
 mod maps;
 mod mastercomfig;
@@ -47,6 +47,7 @@ pub use gb_map_cards::{GbMapCard, GbMapCursor, GbMapLibrary, GbMapQuery, GbMapSh
 pub use gb_map_download::GbMapDownload;
 pub use gb_maps::GbMapGamemode;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
+pub(crate) use images::{dir_size, sweep};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub(crate) use maps::{BSP_MAGIC, is_map_name};
 pub use maps::{

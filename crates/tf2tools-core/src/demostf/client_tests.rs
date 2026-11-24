@@ -232,6 +232,7 @@ async fn a_players_list_pages_by_number_and_never_by_id() {
         client.list(&q, DemoCursor::BeforeId(7)).await,
         Err(DemosError::Cursor)
     ));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
 }
 
 #[tokio::test]

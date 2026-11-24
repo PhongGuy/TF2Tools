@@ -2612,6 +2612,24 @@ pub enum DemosError {
     },
 }
 
+/// Why a demo could not be opened from the demo cache.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoCacheError {
+    /// The demo is private on demos.tf and has no download address.
+    #[error("this demo is private on demos.tf")]
+    Private,
+    /// The cache folder could not be created or used.
+    #[error("the demo cache folder could not be used: {message}")]
+    Folder {
+        /// What went wrong.
+        message: String,
+    },
+    /// The download failed.
+    #[error(transparent)]
+    Download(#[from] DemosError),
+}
+
 /// Why a stored logs.tf body could not be read as a log.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
