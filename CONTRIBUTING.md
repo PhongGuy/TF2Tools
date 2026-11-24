@@ -2,6 +2,18 @@
 
 This is the developer guide; the player-facing page is [README.md](README.md).
 
+## Sending a change
+
+TF2Tools is MIT-licensed and outside help is welcome: bug reports, ideas, translations and pull requests from anyone, including first PRs. You don't need to ask first; open an issue if you want to talk a change through before writing it.
+
+Before you open a pull request:
+
+- Keep it to one change, with a test that shows it when it changes behaviour.
+- Run `make check` (formatting, lints and the tests). CI runs the same on Linux and Windows.
+- Leave AI credit out of commits and the PR description; the person sending the change takes the credit.
+
+Every PR gets read, and if something needs changing we'll say what and help get it over the line.
+
 ## Requirements
 
 - Rust 1.99 or newer (the `rust-version` in `Cargo.toml`).
