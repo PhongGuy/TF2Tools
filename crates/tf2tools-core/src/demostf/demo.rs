@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use super::list::DemoFormat;
 use crate::error::DemosError;
 use crate::logstf::{LogDetail, SteamId};
 
@@ -62,6 +63,9 @@ pub struct DemoSummary {
     time: i64,
     duration: u32,
     server: String,
+    red: String,
+    blue: String,
+    player_count: u32,
 }
 
 impl DemoSummary {
@@ -92,6 +96,22 @@ impl DemoSummary {
     /// The server's name.
     pub fn server(&self) -> &str {
         &self.server
+    }
+    /// The RED team's name, empty when the list gave none.
+    pub fn red(&self) -> &str {
+        &self.red
+    }
+    /// The BLU team's name, empty when the list gave none.
+    pub fn blue(&self) -> &str {
+        &self.blue
+    }
+    /// How many players the demo recorded, 0 when the list gave none.
+    pub fn player_count(&self) -> u32 {
+        self.player_count
+    }
+    /// The match format, derived from the map and the player count.
+    pub fn format(&self) -> DemoFormat {
+        DemoFormat::derive(&self.map, self.player_count)
     }
 }
 
@@ -163,6 +183,12 @@ struct WireDemo {
     map: Option<String>,
     #[serde(default)]
     server: Option<String>,
+    #[serde(default)]
+    red: Option<String>,
+    #[serde(default)]
+    blue: Option<String>,
+    #[serde(default, rename = "playerCount")]
+    player_count: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -191,6 +217,9 @@ impl From<WireDemo> for DemoSummary {
             time: w.time,
             duration: w.duration,
             server: w.server.unwrap_or_default(),
+            red: w.red.unwrap_or_default(),
+            blue: w.blue.unwrap_or_default(),
+            player_count: w.player_count.unwrap_or_default(),
         }
     }
 }

@@ -2584,6 +2584,9 @@ pub enum DemosError {
     /// demos.tf no longer has the demo.
     #[error("demos.tf no longer has this demo")]
     Gone,
+    /// A players-filtered list was asked to page by id, which demos.tf cannot do.
+    #[error("this demo list cannot page by id")]
+    Cursor,
     /// The body grew past its size cap.
     #[error("{url} sent more than {limit} bytes")]
     TooLarge {
@@ -2607,6 +2610,24 @@ pub enum DemosError {
         /// What the filesystem reported.
         message: String,
     },
+}
+
+/// Why a demo could not be opened from the demo cache.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoCacheError {
+    /// The demo is private on demos.tf and has no download address.
+    #[error("this demo is private on demos.tf")]
+    Private,
+    /// The cache folder could not be created or used.
+    #[error("the demo cache folder could not be used: {message}")]
+    Folder {
+        /// What went wrong.
+        message: String,
+    },
+    /// The download failed.
+    #[error(transparent)]
+    Download(#[from] DemosError),
 }
 
 /// Why a stored logs.tf body could not be read as a log.
