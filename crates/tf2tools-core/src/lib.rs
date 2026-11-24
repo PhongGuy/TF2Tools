@@ -146,7 +146,7 @@ pub use setting_pictures::{
     Crop, PictureManifest, REASON_KEYS, Reload, SettingPicture, SettingPictures, SettingShot,
     ShotStep, ValueShot,
 };
-pub use settings::{Settings, Volume};
+pub use settings::{LookSensitivity, Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,

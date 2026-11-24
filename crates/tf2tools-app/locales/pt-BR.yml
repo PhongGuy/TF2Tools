@@ -175,6 +175,9 @@ demo_viewer:
   bar_collapse: "Minimizar controles"
   bar_expand: "Mostrar controles"
   bar_grip: "Arraste para mover"
+  options: "Opções do visualizador"
+  look_sensitivity: "Sensibilidade da visão"
+  look_reset: "Redefinir para %{percent}"
   error:
     not_a_demo: "Este arquivo não é uma demo do TF2."
     damaged: "Esta demo está danificada e não pode ser lida."
@@ -2885,6 +2888,7 @@ messages:
     save_panel_place: "Não foi possível salvar a posição do painel lateral"
     load_bar_place: "Não foi possível carregar a posição dos controles do visualizador de demos"
     save_bar_place: "Não foi possível salvar a posição dos controles do visualizador de demos"
+    save_look_sensitivity: "Não foi possível salvar a sensibilidade da visão do visualizador de demos"
     change_hud_options: "Não foi possível alterar as opções do HUD"
     save_hud: "Não foi possível salvar o HUD"
     list_presets: "Não foi possível ler suas predefinições"

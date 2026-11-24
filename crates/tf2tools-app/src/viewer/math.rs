@@ -81,9 +81,11 @@ pub fn view_proj(eye: [f32; 3], yaw_deg: f32, pitch_deg: f32, aspect: f32) -> [[
     m
 }
 
-/// The `(d_yaw, d_pitch)` in degrees for a drag: right turns right, down looks down.
-pub fn drag_look(dx_px: f32, dy_px: f32) -> (f32, f32) {
-    (-dx_px * LOOK_DEG_PER_PX, dy_px * LOOK_DEG_PER_PX)
+/// The `(d_yaw, d_pitch)` in degrees for a drag: right turns right, down looks down, and
+/// `scale` multiplies the turn per pixel.
+pub fn drag_look(dx_px: f32, dy_px: f32, scale: f32) -> (f32, f32) {
+    let per_px = LOOK_DEG_PER_PX * scale;
+    (-dx_px * per_px, dy_px * per_px)
 }
 
 /// Bytes in one readback row: `width * 4` rounded up to wgpu's 256-byte copy alignment.

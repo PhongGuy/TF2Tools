@@ -151,6 +151,9 @@ demo_viewer:
   bar_collapse: "Minimise controls"
   bar_expand: "Show controls"
   bar_grip: "Drag to move"
+  options: "Viewer options"
+  look_sensitivity: "Look sensitivity"
+  look_reset: "Reset to %{percent}"
   error:
     not_a_demo: "This file isn't a TF2 demo."
     damaged: "This demo is damaged and can't be read."
@@ -2861,6 +2864,7 @@ messages:
     save_panel_place: "Couldn't save the side panel's place"
     load_bar_place: "Couldn't load the Demo Viewer controls' place"
     save_bar_place: "Couldn't save the Demo Viewer controls' place"
+    save_look_sensitivity: "Couldn't save the Demo Viewer's look sensitivity"
     change_hud_options: "Failed to change the HUD's options"
     save_hud: "Failed to save HUD"
     list_presets: "Couldn't read your presets"

@@ -50,11 +50,22 @@ fn axis(plus: bool, minus: bool) -> f32 {
     f32::from(u8::from(plus)) - f32::from(u8::from(minus))
 }
 
+/// A look scale the camera can use: finite and positive, else the neutral 1.0.
+fn sane_scale(scale: f32) -> f32 {
+    if scale.is_finite() && scale > 0. {
+        scale
+    } else {
+        1.
+    }
+}
+
 /// A free-fly view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
 pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
     lock: Box<dyn PointerLock>,
     camera: FreeFly,
+    /// Multiplies the turn per dragged pixel; always finite and positive.
+    look_scale: f32,
     keys: HeldKeys,
     shown: Option<(Arc<RenderImage>, u64)>,
     last_seq: u64,
@@ -78,12 +89,17 @@ pub struct DemoViewport {
 impl DemoViewport {
     /// Loads `mesh` and the snapshot's boxes into `renderer`, starts the camera at
     /// `start_camera` and listens for frames.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "each seam a test swaps plus GPUI's window and context"
+    )]
     pub fn new(
         mesh: Arc<MapMesh>,
         snapshot: Option<&DemoSnapshot>,
         renderer: Box<dyn SceneRenderer>,
         lock: Box<dyn PointerLock>,
         clock: Clock,
+        look_scale: f32,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -128,6 +144,7 @@ impl DemoViewport {
             renderer,
             lock,
             camera: FreeFly::new(origin, yaw, pitch),
+            look_scale: sane_scale(look_scale),
             keys: HeldKeys::default(),
             shown: None,
             last_seq: 0,
@@ -142,6 +159,12 @@ impl DemoViewport {
             clock,
             taken: Rc::new(Cell::new(None)),
         }
+    }
+
+    /// Sets how far a dragged pixel turns the camera; a scale that is not a finite positive
+    /// number falls back to 1.0.
+    pub fn set_look_scale(&mut self, scale: f32) {
+        self.look_scale = sane_scale(scale);
     }
 
     pub fn camera(&self) -> &FreeFly {
@@ -242,7 +265,7 @@ impl DemoViewport {
         if by == Point::default() {
             return;
         }
-        let (d_yaw, d_pitch) = math::drag_look(by.x.as_f32(), by.y.as_f32());
+        let (d_yaw, d_pitch) = math::drag_look(by.x.as_f32(), by.y.as_f32(), self.look_scale);
         self.camera.look(d_yaw, d_pitch);
         self.draw();
         cx.notify();

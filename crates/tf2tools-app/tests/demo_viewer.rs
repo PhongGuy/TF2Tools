@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use gpui_kit::assets::IconName;
+use gpui_kit::component::slider::{SliderEvent, SliderValue};
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Bounds, ElementId, InputEvent, Modifiers, MouseButton,
@@ -16,13 +17,15 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::nav_icon;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::load::snapshot_time;
-use tf2tools_core::{DemoSnapshot, DemoSnapshotError, SnapshotPlayer, Team, Tf2Install, TfClass};
+use tf2tools_core::{
+    DemoSnapshot, DemoSnapshotError, LookSensitivity, SnapshotPlayer, Team, Tf2Install, TfClass,
+};
 
 use crate::support;
 use crate::support::demo_view_fixtures::demo_header;
 use crate::support::demo_viewer::{
-    StubAnswer, counting_snapshots, demo_file, demo_viewer_shell, demo_viewer_shell_with, inside,
-    install_map,
+    LockCall, StubAnswer, counting_snapshots, demo_file, demo_viewer_shell,
+    demo_viewer_shell_locked, demo_viewer_shell_with, inside, install_map,
 };
 
 #[test]
@@ -811,4 +814,145 @@ fn a_loaded_bar_fits_the_narrowest_window(cx: &mut TestAppContext) {
         let part = bounds(cx, w.s.win, id);
         assert!(inside(part, page), "{id} at {part:?} leaves {page:?}");
     }
+}
+
+// The look sensitivity the database holds, in percent.
+fn saved_look(s: &support::ShellWindow) -> u16 {
+    s.services.db.settings().unwrap().look_sensitivity().get()
+}
+
+// Lets the options slider go at `percent`, as a drag on it ending there would.
+fn release_look(cx: &mut TestAppContext, s: &support::ShellWindow, percent: f32) {
+    let slider = cx.update(|cx| {
+        let page = s
+            .shell
+            .read(cx)
+            .demo_viewer_page()
+            .expect("the Demo Viewer");
+        page.read(cx).look_slider().clone()
+    });
+    cx.update_window(s.win, |_, window, cx| {
+        slider.update(cx, |st, cx| {
+            st.set_value(percent, window, cx);
+            cx.emit(SliderEvent::Release(SliderValue::Single(percent)));
+        })
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+// The yaw change, wrapped to [-180, 180), of a 100 px rightward drag across the map.
+fn yaw_turn(cx: &mut TestAppContext, s: &support::ShellWindow) -> f32 {
+    let start = yaw(cx, s);
+    let page = bounds(cx, s.win, ids::page(Page::DemoViewer));
+    drag(cx, s.win, page.center(), (100., 0.));
+    (yaw(cx, s) - start + 540.).rem_euclid(360.) - 180.
+}
+
+// Opens the next picked demo and waits for its viewport.
+fn open_map(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    support::click_id(cx, s.win, ids::DEMO_VIEWER_OPEN);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+}
+
+#[gpui_kit::test]
+fn a_stored_look_sensitivity_turns_the_first_map_by_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let stored = LookSensitivity::new(200);
+    let (w, _lock) = demo_viewer_shell_locked(cx, &env, found(&env), vec![demo], stored);
+    open_map(cx, &w.s);
+    let turn = yaw_turn(cx, &w.s);
+    assert!((turn + 44.).abs() < 1e-3, "{turn}");
+}
+
+#[gpui_kit::test]
+fn a_set_look_sensitivity_reaches_the_next_map_loaded(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let first = demo_file(&env, "first.dem", &demo_header("cp_synthetic", 60.0));
+    let second = demo_file(&env, "second.dem", &demo_header("cp_synthetic", 60.0));
+    let (w, _lock) = demo_viewer_shell_locked(cx, &env, found(&env), vec![first, second], None);
+    open_map(cx, &w.s);
+    release_look(cx, &w.s, 200.);
+    let live = yaw_turn(cx, &w.s);
+    assert!((live + 44.).abs() < 1e-3, "the shown map turned {live}");
+    let before = w.stubs.lock().unwrap().len();
+    open_map(cx, &w.s);
+    support::wait_real(cx, "a second viewport", |_| {
+        w.stubs.lock().unwrap().len() > before
+    });
+    let next = yaw_turn(cx, &w.s);
+    assert!((next + 44.).abs() < 1e-3, "the next map turned {next}");
+}
+
+#[gpui_kit::test]
+fn clicks_in_the_options_never_lock_the_pointer(cx: &mut TestAppContext) {
+    let env = support::env();
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let (w, lock) = demo_viewer_shell_locked(cx, &env, found(&env), vec![demo], None);
+    open_map(cx, &w.s);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPTIONS);
+    for id in [
+        ids::DEMO_VIEWER_LOOK_VALUE,
+        ids::DEMO_VIEWER_LOOK_SLIDER,
+        ids::DEMO_VIEWER_LOOK_RESET,
+    ] {
+        assert!(
+            support::present(cx, w.s.win, id),
+            "{id} is not in the options"
+        );
+        support::click_id(cx, w.s.win, id);
+    }
+    let locks = lock
+        .calls()
+        .iter()
+        .filter(|c| **c == LockCall::Lock)
+        .count();
+    assert_eq!(locks, 0, "a click in the options reached the map");
+    // A press on the map itself does lock, so the count above can fail.
+    let page = bounds(cx, w.s.win, ids::page(Page::DemoViewer));
+    drag(cx, w.s.win, page.center(), (10., 0.));
+    assert!(lock.calls().contains(&LockCall::Lock));
+}
+
+#[gpui_kit::test]
+fn reset_puts_the_look_sensitivity_back_to_100_and_saves_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (w, _lock) = demo_viewer_shell_locked(
+        cx,
+        &env,
+        Tf2State::Missing { saved: None },
+        vec![],
+        LookSensitivity::new(250),
+    );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPTIONS);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_LOOK_VALUE).as_deref(),
+        Some("250%")
+    );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_LOOK_RESET);
+    assert_eq!(saved_look(&w.s), 100);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_LOOK_VALUE).as_deref(),
+        Some("100%")
+    );
+}
+
+#[gpui_kit::test]
+fn letting_the_slider_go_saves_the_look_sensitivity(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (w, _lock) =
+        demo_viewer_shell_locked(cx, &env, Tf2State::Missing { saved: None }, vec![], None);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_OPTIONS);
+    release_look(cx, &w.s, 150.);
+    assert_eq!(saved_look(&w.s), 150);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_LOOK_VALUE).as_deref(),
+        Some("150%")
+    );
 }

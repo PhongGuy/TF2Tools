@@ -21,7 +21,7 @@ use tf2tools_app::viewer::{
     SnapshotReader,
 };
 use tf2tools_core::{
-    DemoSnapshot, DemoSnapshotError, Endpoints, MapMesh, Tf2Install, load_map_mesh,
+    DemoSnapshot, DemoSnapshotError, Endpoints, LookSensitivity, MapMesh, Tf2Install, load_map_mesh,
 };
 
 use super::demo_view_fixtures::{BspOptions, bsp};
@@ -287,6 +287,7 @@ pub fn viewport_window_unsettled(
                         renderer,
                         lock,
                         frame_clock(),
+                        1.0,
                         window,
                         cx,
                     )
@@ -325,7 +326,42 @@ pub fn demo_viewer_shell_with(
     answer: StubAnswer,
     snapshots: Option<SnapshotReader>,
 ) -> DemoViewerShell {
-    demo_viewer_shell_in(cx, env, state, picks, answer, snapshots, None)
+    demo_viewer_shell_in(cx, env, state, picks, answer, snapshots, None, None, None)
+}
+
+/// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
+/// with `stored` saved as the look sensitivity before the page opens.
+pub fn demo_viewer_shell_locked(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    stored: Option<LookSensitivity>,
+) -> (DemoViewerShell, FakeLockHandle) {
+    let handle = FakeLockHandle {
+        calls: Arc::default(),
+        motions: Arc::default(),
+    };
+    let shared = handle.clone();
+    let locks: PointerLockFactory = Arc::new(move || {
+        Box::new(FakeLock {
+            handle: shared.clone(),
+            mode: LockMode::Grabbed,
+            locked: false,
+        })
+    });
+    let w = demo_viewer_shell_in(
+        cx,
+        env,
+        state,
+        picks,
+        StubAnswer::Frames,
+        None,
+        None,
+        Some(locks),
+        stored,
+    );
+    (w, handle)
 }
 
 /// `demo_viewer_shell` with TF2 found at the env's game and the store's serveme.tf map
@@ -345,9 +381,20 @@ pub fn demo_viewer_shell_served(
         .with_serveme(format!("{uri}/serveme"))
         .with_map_downloads(format!("{uri}/fastdl/maps"));
     let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
-    demo_viewer_shell_in(cx, env, state, picks, answer, None, Some(endpoints))
+    demo_viewer_shell_in(
+        cx,
+        env,
+        state,
+        picks,
+        answer,
+        None,
+        Some(endpoints),
+        None,
+        None,
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn demo_viewer_shell_in(
     cx: &mut TestAppContext,
     env: &super::Env,
@@ -356,6 +403,8 @@ fn demo_viewer_shell_in(
     answer: StubAnswer,
     snapshots: Option<SnapshotReader>,
     endpoints: Option<Endpoints>,
+    locks: Option<PointerLockFactory>,
+    stored: Option<LookSensitivity>,
 ) -> DemoViewerShell {
     let picker = Arc::new(ScriptedPicker::new(picks));
     let (factory, stubs) = stub_factory(answer);
@@ -370,7 +419,7 @@ fn demo_viewer_shell_in(
             services.renderers = factory;
             // Shell tests never reach a real OS lock.
             let fallback: PointerLockFactory = Arc::new(|| Box::new(FallbackLock));
-            services.pointer_lock = fallback;
+            services.pointer_lock = locks.unwrap_or(fallback);
             if let Some(snapshots) = snapshots {
                 services.demo_snapshots = snapshots;
             }
@@ -379,6 +428,9 @@ fn demo_viewer_shell_in(
             }
         },
     );
+    if let Some(look) = stored {
+        s.services.db.set_look_sensitivity(look).unwrap();
+    }
     super::click_nav(cx, s.win, Page::DemoViewer);
     DemoViewerShell { s, picker, stubs }
 }
