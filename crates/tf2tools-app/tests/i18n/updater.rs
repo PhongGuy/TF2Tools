@@ -1,20 +1,22 @@
-use gpui_kit::TestAppContext;
+use gpui_kit::{AppContext as _, TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::route::Page;
 use tf2tools_app::updater::backend::{describe_apply, describe_check, describe_download};
+use tf2tools_app::widgets::scroll::BAR_WIDTH;
 use tf2tools_core::{UpdateApplyError, UpdateCheckError, UpdateDownloadError};
 
 use crate::LocaleGuard;
 use crate::messages::assert_russian;
-use crate::settings::open_settings;
+use crate::settings::{open_settings, pick};
 use crate::support::{
     self,
     update_fake::{
-        act, fake_updater, offer, reach_available, reach_ready, update_rows, wait_state,
-        with_services,
+        act, fake_updater, long_notes, offer, offer_with_notes, reach_available, reach_ready,
+        sample_notes, update_rows, wait_state, with_services,
     },
 };
-use tf2tools_app::updater::{AfterInstall, UpdateState};
+use tf2tools_app::updater::{AfterInstall, NotesState, UpdateState, whats_new};
 
 #[gpui_kit::test]
 fn the_app_updates_card_speaks_russian(cx: &mut TestAppContext) {
@@ -156,4 +158,111 @@ fn a_failed_update_check_follows_a_language_switch(cx: &mut TestAppContext) {
             "Не удалось связаться с сервером обновлений. Проверьте подключение к интернету и попробуйте снова."
         )
     );
+}
+
+#[gpui_kit::test]
+fn the_dialog_says_the_notes_are_in_english_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let (u, fake) = fake_updater(cx, true);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let offer = offer_with_notes("6.0.2", true, sample_notes(NotesState::Complete));
+    reach_available(cx, &u, &fake, offer.clone());
+    cx.update_window(s.win, |_, window, cx| whats_new::open(offer, window, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::UPDATE_NOTES_ENGLISH).as_deref(),
+        Some("Примечания к выпуску на английском.")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::update_notes_group(0, 0)).as_deref(),
+        Some("Новые функции")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::update_notes_group(0, 2)).as_deref(),
+        Some("Odds and ends"),
+        "an Other group keeps its published title"
+    );
+    // These kinds' sample titles equal their English text, so only a translation proves the arm.
+    for (r, g, want) in [
+        (0, 1, "Производительность"),
+        (1, 0, "Исправления"),
+        (1, 1, "Удобство"),
+        (1, 2, "Thanks"),
+    ] {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::update_notes_group(r, g)).as_deref(),
+            Some(want),
+            "group {r}.{g}"
+        );
+    }
+    assert_russian(&support::label_of(cx, s.win, ids::UPDATE_NOTES_TITLE).unwrap());
+}
+
+// German, Russian and Portuguese run longest; at 800 px the banner, the card and the dialog must hold them.
+#[gpui_kit::test]
+fn whats_new_fits_at_800_px_in_long_languages(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let (u, fake) = fake_updater(cx, true);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    reach_available(
+        cx,
+        &u,
+        &fake,
+        offer_with_notes("6.0.12", true, long_notes()),
+    );
+    open_settings(cx, &s);
+    for lang in ["de", "ru", "pt-BR"] {
+        pick(cx, s.win, lang);
+        let at =
+            |cx: &mut TestAppContext, id: &'static str| support::bounds_of(cx, s.win, id).unwrap();
+        let banner = at(cx, ids::UPDATE_BANNER);
+        let notes = at(cx, ids::UPDATE_BANNER_WHATS_NEW);
+        let action = at(cx, ids::UPDATE_BANNER_ACTION);
+        let dismiss = at(cx, ids::UPDATE_BANNER_DISMISS);
+        assert!(
+            notes.right() <= action.left() && action.right() <= dismiss.left(),
+            "{lang}: banner buttons overlap"
+        );
+        assert!(
+            dismiss.right() <= banner.right(),
+            "{lang}: banner runs past the window"
+        );
+        assert_eq!(
+            notes.size.height, action.size.height,
+            "{lang}: What's new wraps"
+        );
+        let page = support::bounds_of(cx, s.win, ids::page(Page::Settings)).unwrap();
+        for id in [
+            ids::SETTINGS_UPDATE_CHECK,
+            ids::SETTINGS_UPDATE_NOTES,
+            ids::SETTINGS_UPDATE_INSTALL,
+        ] {
+            let b = at(cx, id);
+            assert!(
+                b.left() >= page.left() && b.right() <= page.right() - BAR_WIDTH,
+                "{lang}: {id} {b:?} runs past {page:?}"
+            );
+        }
+        support::click_id(cx, s.win, ids::UPDATE_BANNER_WHATS_NEW);
+        support::settle(cx, s.win);
+        let view = support::viewport(cx, s.win);
+        let update = at(cx, ids::UPDATE_NOTES_UPDATE);
+        assert!(
+            update.bottom() <= view.height,
+            "{lang}: Update now is below the window"
+        );
+        support::scroll::assert_track_scrolls(
+            cx,
+            s.win,
+            ids::UPDATE_NOTES_SCROLLBAR,
+            ids::update_notes_release(0),
+        );
+        support::click_id(cx, s.win, ids::UPDATE_NOTES_LATER);
+        support::settle(cx, s.win);
+    }
 }

@@ -11,8 +11,9 @@ use gpui_kit::{App, Context, Entity, TestAppContext};
 use tf2tools_app::i18n::Phrase;
 use tf2tools_app::services::Services;
 use tf2tools_app::updater::{
-    AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, Offer, Restart,
-    UpdateBackend, UpdateEvent, UpdateSource, UpdateState, Updater,
+    AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, GroupKind, Notes, NotesGroup,
+    NotesItem, NotesRelease, NotesState, Offer, Restart, UpdateBackend, UpdateEvent, UpdateSource,
+    UpdateState, Updater,
 };
 use tf2tools_core::LogLevel;
 use tokio::sync::oneshot;
@@ -23,12 +24,90 @@ pub type DownloadReply = oneshot::Sender<Result<(), Failure>>;
 pub const CURRENT: &str = "6.0.0";
 pub const RELEASES: &str = "https://github.com/PhongGuy/TF2Tools/releases/latest";
 pub const APPIMAGE: &str = "/apps/tf2tools_6.0.0_x86_64.AppImage";
+pub const HISTORY: &str = "https://github.com/PhongGuy/TF2Tools/releases";
 
 pub fn offer(version: &str, installable: bool) -> Offer {
     Offer {
         version: version.to_owned(),
         release_page: format!("https://github.com/PhongGuy/TF2Tools/releases/tag/v{version}"),
+        history_page: HISTORY.to_owned(),
         installable,
+        notes: Notes::not_published(),
+    }
+}
+
+pub fn offer_with_notes(version: &str, installable: bool, notes: Notes) -> Offer {
+    Offer {
+        notes,
+        ..offer(version, installable)
+    }
+}
+
+/// Two releases whose groups cover every kind, a kindless group and a non-date date.
+pub fn sample_notes(status: NotesState) -> Notes {
+    let group = |kind: Option<GroupKind>, title: &str, items: &[&str]| NotesGroup {
+        kind,
+        title: title.to_owned(),
+        items: items
+            .iter()
+            .map(|t| NotesItem {
+                text: (*t).to_owned(),
+            })
+            .collect(),
+    };
+    Notes {
+        status,
+        releases: Arc::from(vec![
+            NotesRelease {
+                version: "6.0.2".into(),
+                date: "2026-11-20".into(),
+                intro: Some("Faster stores.".into()),
+                groups: vec![
+                    group(Some(GroupKind::Features), "Features", &["Demo browser"]),
+                    group(
+                        Some(GroupKind::Performance),
+                        "Performance",
+                        &["Quicker grids"],
+                    ),
+                    group(Some(GroupKind::Other), "Odds and ends", &["New icon"]),
+                ],
+            },
+            NotesRelease {
+                version: "6.0.1".into(),
+                date: "soon".into(),
+                intro: None,
+                groups: vec![
+                    group(Some(GroupKind::Fixes), "Fixes", &["Crash on start"]),
+                    group(Some(GroupKind::Usability), "Usability", &["Bigger buttons"]),
+                    group(None, "Thanks", &["Everyone"]),
+                ],
+            },
+        ]),
+    }
+}
+
+/// Twelve releases of four fixes each, newest first: more than the dialog shows at once.
+pub fn long_notes() -> Notes {
+    let releases: Vec<NotesRelease> = (1..=12)
+        .rev()
+        .map(|patch| NotesRelease {
+            version: format!("6.0.{patch}"),
+            date: format!("2026-11-{patch:02}"),
+            intro: None,
+            groups: vec![NotesGroup {
+                kind: Some(GroupKind::Fixes),
+                title: "Fixes".to_owned(),
+                items: (1..=4)
+                    .map(|n| NotesItem {
+                        text: format!("Fix {n} in 6.0.{patch}"),
+                    })
+                    .collect(),
+            }],
+        })
+        .collect();
+    Notes {
+        status: NotesState::Complete,
+        releases: Arc::from(releases),
     }
 }
 

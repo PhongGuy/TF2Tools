@@ -274,6 +274,7 @@ mod toast;
 mod toast_layer;
 mod tokio_bridge;
 mod update_banner;
+mod update_notes;
 mod update_settings;
 mod updater;
 mod updater_backend;

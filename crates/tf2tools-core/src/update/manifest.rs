@@ -335,7 +335,7 @@ pub(crate) fn select(
         pub_date: manifest.pub_date.clone(),
         asset,
         releases: Vec::new(),
-        notes_status: NotesStatus::Unavailable,
+        notes_status: NotesStatus::NotPublished,
     }))
 }
 
@@ -853,7 +853,7 @@ mod select_tests {
         assert!(offer.releases().is_empty());
         assert_eq!(
             offer.notes_status(),
-            crate::update::NotesStatus::Unavailable
+            crate::update::NotesStatus::NotPublished
         );
     }
 

@@ -134,6 +134,20 @@ updater:
     downloaded: "Скачано обновление TF2Tools v%{version}"
     installed: "Установлено обновление TF2Tools v%{version}"
     installer_started: "Запущен установщик TF2Tools v%{version}"
+  notes:
+    button: "Что нового"
+    title: "Что нового"
+    since: "Изменения с v%{current}, сначала новые."
+    english: "Примечания к выпуску на английском."
+    partial: "Для некоторых версий нет примечаний. Все они есть на странице релиза."
+    unavailable: "Не удалось загрузить примечания к выпуску. Обновиться всё равно можно."
+    later: "Позже"
+    update: "Обновить сейчас"
+    kind:
+      features: "Новые функции"
+      fixes: "Исправления"
+      usability: "Удобство"
+      performance: "Производительность"
 
 demos_tf:
   open: "Открыть демо"

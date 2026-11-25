@@ -159,6 +159,20 @@ updater:
     downloaded: "TF2Tools v%{version} descargado"
     installed: "TF2Tools v%{version} instalado"
     installer_started: "Instalador de TF2Tools v%{version} iniciado"
+  notes:
+    button: "Novedades"
+    title: "Novedades"
+    since: "Cambios desde la v%{current}, primero los más recientes."
+    english: "Las notas de la versión están en inglés."
+    partial: "Faltan notas de algunas versiones. Consulta todas en la página de la versión."
+    unavailable: "No se pudieron cargar las notas de la versión. Aún puedes actualizar."
+    later: "Más tarde"
+    update: "Actualizar ahora"
+    kind:
+      features: "Nuevas funciones"
+      fixes: "Correcciones"
+      usability: "Usabilidad"
+      performance: "Rendimiento"
 
 demos_tf:
   open: "Abrir demo"

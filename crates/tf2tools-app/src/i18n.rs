@@ -1678,6 +1678,7 @@ mod tests {
         "updater/view.rs",
         "updater/backend.rs",
         "updater/keys.rs",
+        "updater/whats_new.rs",
         "shell/header.rs",
         "sync.rs",
         "widgets/sync_ring.rs",

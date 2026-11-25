@@ -4,6 +4,7 @@
 pub mod backend;
 pub mod keys;
 pub mod view;
+pub mod whats_new;
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -26,7 +27,70 @@ use crate::{activity, tokio_bridge};
 pub struct Offer {
     pub version: String,
     pub release_page: String,
+    /// The page listing every release, for when some versions' notes are missing.
+    pub history_page: String,
     pub installable: bool,
+    pub notes: Notes,
+}
+
+/// The signed notes for the releases between the installed version and the offer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Notes {
+    pub status: NotesState,
+    /// Newest first; empty unless `status` is Complete or Partial.
+    pub releases: Arc<[NotesRelease]>,
+}
+
+impl Notes {
+    /// Notes for a release that published none.
+    pub fn not_published() -> Notes {
+        Notes {
+            status: NotesState::NotPublished,
+            releases: Arc::from(Vec::new()),
+        }
+    }
+}
+
+/// How fully the notes cover the gap; mirrors core's `NotesStatus`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotesState {
+    Complete,
+    Partial,
+    Unavailable,
+    NotPublished,
+}
+
+/// One release's notes as published.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesRelease {
+    pub version: String,
+    pub date: String,
+    pub intro: Option<String>,
+    pub groups: Vec<NotesGroup>,
+}
+
+/// A titled group of changes; `kind` is None when the notes give it none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesGroup {
+    pub kind: Option<GroupKind>,
+    pub title: String,
+    pub items: Vec<NotesItem>,
+}
+
+/// The kind of change a group holds; unknown kinds read as Other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupKind {
+    Features,
+    Fixes,
+    Usability,
+    Performance,
+    Other,
+}
+
+/// One change described in one line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesItem {
+    pub text: String,
 }
 
 /// A failure in player words: what happened and what to do next. `use_release_page` means
@@ -530,7 +594,9 @@ mod tests {
         let offer = Offer {
             version: "6.0.1".to_owned(),
             release_page: "https://example.invalid/v6.0.1".to_owned(),
+            history_page: "https://example.invalid/releases".to_owned(),
             installable: true,
+            notes: Notes::not_published(),
         };
         for busy in [
             UpdateState::Ready(offer.clone()),

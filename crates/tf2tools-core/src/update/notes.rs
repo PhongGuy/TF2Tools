@@ -14,7 +14,10 @@ pub enum NotesStatus {
     Complete,
     /// Some notes are shown, but the offer or an older release in the gap is missing.
     Partial,
-    /// No notes are shown: none were published, they failed a check, or none are in range.
+    /// No notes are shown because the release has no notes, or the verified notes list no
+    /// release in the gap.
+    NotPublished,
+    /// No notes are shown because fetching or checking them failed.
     Unavailable,
 }
 
@@ -229,7 +232,7 @@ pub(crate) fn in_range(
         .collect();
     shown.sort_by(|a, b| b.parsed.cmp_precedence(&a.parsed));
     let (Some(newest), Some(oldest)) = (shown.first(), shown.last()) else {
-        return (shown, NotesStatus::Unavailable);
+        return (shown, NotesStatus::NotPublished);
     };
     // Complete only when the offer itself is listed and the oldest entry reaches back to
     // the installed version, so no release in the gap is silently missing.
@@ -451,10 +454,10 @@ mod tests {
     }
 
     #[test]
-    fn nothing_in_range_is_unavailable() {
+    fn nothing_in_range_is_not_published() {
         let (list, status) = in_range(history(), &v("6.3.0"), &v("6.3.0"));
         assert!(list.is_empty());
-        assert_eq!(status, NotesStatus::Unavailable);
+        assert_eq!(status, NotesStatus::NotPublished);
     }
 
     #[test]

@@ -6,14 +6,14 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::leave;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::updater::backend::describe_download;
-use tf2tools_app::updater::{AfterInstall, UpdateState, Updater, reopen};
+use tf2tools_app::updater::{AfterInstall, NotesState, UpdateState, Updater, reopen};
 use tf2tools_core::UpdateDownloadError;
 
 use crate::support;
 use support::ShellWindow;
 use support::update_fake::{
-    APPIMAGE, FakeUpdates, failure, fake_updater, offer, reach_available, reach_ready, state,
-    wait_state,
+    APPIMAGE, FakeUpdates, failure, fake_updater, offer, offer_with_notes, reach_available,
+    reach_ready, sample_notes, state, wait_state,
 };
 
 struct Banner {
@@ -325,4 +325,61 @@ fn restart_waits_while_the_maker_has_unsaved_changes(cx: &mut TestAppContext) {
     support::click_id(cx, b.s.win, ids::UPDATE_BANNER_ACTION);
     support::click_id(cx, b.s.win, ids::CONFIRM_OK);
     support::wait_real(cx, "the relaunch", |_| !b.fake.restarts.borrow().is_empty());
+}
+
+#[gpui_kit::test]
+fn published_notes_put_whats_new_before_the_update_button(cx: &mut TestAppContext) {
+    let b = banner(cx);
+    reach_available(
+        cx,
+        &b.u,
+        &b.fake,
+        offer_with_notes("6.0.2", true, sample_notes(NotesState::Complete)),
+    );
+    assert_eq!(
+        label(cx, &b, ids::UPDATE_BANNER_WHATS_NEW).as_deref(),
+        Some("What's new")
+    );
+    let notes = support::bounds_of(cx, b.s.win, ids::UPDATE_BANNER_WHATS_NEW).unwrap();
+    let action = support::bounds_of(cx, b.s.win, ids::UPDATE_BANNER_ACTION).unwrap();
+    assert!(
+        notes.right() <= action.left(),
+        "{notes:?} sits before {action:?}"
+    );
+    support::click_id(cx, b.s.win, ids::UPDATE_BANNER_WHATS_NEW);
+    assert!(support::present(cx, b.s.win, ids::UPDATE_NOTES));
+}
+
+#[gpui_kit::test]
+fn notes_that_failed_to_load_still_get_the_button(cx: &mut TestAppContext) {
+    let b = banner(cx);
+    let notes = tf2tools_app::updater::Notes {
+        status: NotesState::Unavailable,
+        releases: std::sync::Arc::from(Vec::new()),
+    };
+    reach_available(cx, &b.u, &b.fake, offer_with_notes("6.0.2", true, notes));
+    assert!(support::present(cx, b.s.win, ids::UPDATE_BANNER_WHATS_NEW));
+}
+
+#[gpui_kit::test]
+fn a_release_without_notes_has_no_whats_new(cx: &mut TestAppContext) {
+    let b = banner(cx);
+    reach_available(cx, &b.u, &b.fake, offer("6.0.1", true));
+    assert!(support::present(cx, b.s.win, ids::UPDATE_BANNER_ACTION));
+    assert!(!support::present(cx, b.s.win, ids::UPDATE_BANNER_WHATS_NEW));
+}
+
+#[gpui_kit::test]
+fn whats_new_leaves_while_downloading(cx: &mut TestAppContext) {
+    let b = banner(cx);
+    reach_available(
+        cx,
+        &b.u,
+        &b.fake,
+        offer_with_notes("6.0.2", true, sample_notes(NotesState::Complete)),
+    );
+    support::click_id(cx, b.s.win, ids::UPDATE_BANNER_ACTION);
+    let _download = b.fake.next_download(cx);
+    support::settle(cx, b.s.win);
+    assert!(!support::present(cx, b.s.win, ids::UPDATE_BANNER_WHATS_NEW));
 }
