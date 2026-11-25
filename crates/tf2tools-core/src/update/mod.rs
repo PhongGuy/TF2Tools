@@ -21,12 +21,14 @@ use crate::error::{UpdateCheckError, UpdateDownloadError};
 use crate::store::http::{Http, NetFailure, Redirects};
 use crate::store::{Endpoints, StoreConfig, http_for};
 use keys::Keys;
-use manifest::{AssetKind, Manifest};
+use manifest::{AssetKind, Manifest, ManifestAsset};
 
 /// The manifest's cap; a real one is a few hundred bytes.
 const MANIFEST_LIMIT: u64 = 64 * 1024;
 /// The detached signature's cap; a .minisig file is about 300 bytes.
 const SIGNATURE_LIMIT: u64 = 4 * 1024;
+/// The notes.json cap; years of releases fit well under it.
+const NOTES_LIMIT: u64 = 64 * 1024;
 
 /// Checks the release feed for a newer version, trusting only manifests signed by its keys.
 #[derive(Debug, Clone)]
@@ -86,14 +88,55 @@ impl UpdateClient {
         // Nothing is parsed until the exact bytes served have verified.
         self.keys.verify(&manifest, &signature)?;
         let manifest = Manifest::parse(&manifest, &self.github)?;
-        manifest::select(
+        let Some(mut offer) = manifest::select(
             &manifest,
             current,
             target,
             std::env::consts::OS,
             std::env::consts::ARCH,
             &self.github,
-        )
+        )?
+        else {
+            return Ok(None);
+        };
+        // The notes only decorate the offer, so a failure here is logged, never returned.
+        if let Some(asset) = &manifest.notes_asset {
+            match self.notes(asset, current, &manifest.version).await {
+                Ok((releases, status)) => offer.set_notes(releases, status),
+                Err(e) => tracing::warn!("release notes unavailable: {e}"),
+            }
+        }
+        Ok(Some(offer))
+    }
+
+    /// Fetches the signed manifest's notes.json, and keeps it only if its size and sha256
+    /// match the manifest exactly; then picks the releases after `installed` up to `offered`.
+    async fn notes(
+        &self,
+        asset: &ManifestAsset,
+        installed: &str,
+        offered: &semver::Version,
+    ) -> Result<(Vec<ReleaseNotes>, NotesStatus), String> {
+        if asset.size > NOTES_LIMIT {
+            return Err(format!(
+                "{} bytes is over the {NOTES_LIMIT} byte cap",
+                asset.size
+            ));
+        }
+        let installed = semver::Version::parse(installed).map_err(|e| e.to_string())?;
+        let bytes = self
+            .fetch(&asset.url, asset.size)
+            .await
+            .map_err(|e| e.to_string())?;
+        if bytes.len() as u64 != asset.size {
+            return Err(format!("{} bytes, expected {}", bytes.len(), asset.size));
+        }
+        // Nothing is parsed until the bytes hash to what the signed manifest promised.
+        if hex(&Sha256::digest(&bytes)) != asset.sha256 {
+            return Err("sha256 does not match the manifest".to_owned());
+        }
+        let all = notes::parse(&bytes)?;
+        Ok(notes::in_range(all, &installed, offered))
     }
 
     /// Streams the offer's asset to a part file, stops past `size` bytes, checks size and

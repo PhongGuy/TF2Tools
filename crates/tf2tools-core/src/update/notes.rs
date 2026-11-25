@@ -156,7 +156,6 @@ const FIELD_MAX: usize = 64;
 
 /// Reads a notes.json document; Err with the cause unless `schema` is 1 and every version
 /// and present `previous` is semver. Every string comes back cleaned and capped.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn parse(bytes: &[u8]) -> Result<Vec<ReleaseNotes>, String> {
     let raw: RawNotes = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     match raw.schema {
@@ -214,7 +213,6 @@ fn kind(name: &str) -> NotesKind {
 
 /// Keeps the releases with `installed < version <= offered`, newest first, and rates how
 /// fully they cover that gap. A stable install never sees prerelease entries.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn in_range(
     all: Vec<ReleaseNotes>,
     installed: &semver::Version,

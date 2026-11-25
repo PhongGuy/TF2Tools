@@ -182,3 +182,60 @@ pub async fn installer_offer(feed: &Feed) -> UpdateOffer {
         .expect("check")
         .expect("an offer")
 }
+
+pub fn notes_path(version: &str) -> String {
+    format!("/gh/PhongGuy/TF2Tools/releases/download/v{version}/notes.json")
+}
+
+/// A schema 1 notes.json with one fixes item per (version, previous).
+pub fn notes_doc(entries: &[(&str, Option<&str>)]) -> Vec<u8> {
+    let releases: Vec<String> = entries
+        .iter()
+        .map(|(version, previous)| {
+            let previous = previous.map_or("null".to_owned(), |p| format!("\"{p}\""));
+            format!(r#"{{"version":"{version}","previous":{previous},"date":"2026-11-01","groups":[{{"kind":"fixes","title":"Fixes","items":[{{"text":"Fix in {version}","pr":7}}]}}]}}"#)
+        })
+        .collect();
+    format!(r#"{{"schema":1,"releases":[{}]}}"#, releases.join(",")).into_bytes()
+}
+
+/// Serves a signed AppImage manifest for `version` whose notes_asset declares `declared`,
+/// and `served` (when given) as that notes.json.
+pub async fn publish_with_notes(
+    feed: &Feed,
+    version: &str,
+    declared: &[u8],
+    served: Option<&[u8]>,
+) {
+    let key = appimage_key();
+    let uri = feed.server.uri();
+    let url = asset_url(&uri, version);
+    let sha = sha256_hex(b"payload");
+    let base = manifest_json(version, &[(key.as_str(), url.as_str(), sha.as_str(), 7)]);
+    let manifest = format!(
+        r#"{},"notes_asset":{{"url":"{uri}{}","sha256":"{}","size":{}}}}}"#,
+        &base[..base.len() - 1],
+        notes_path(version),
+        sha256_hex(declared),
+        declared.len()
+    );
+    serve_feed(&feed.server, &manifest, &feed.key.sign(manifest.as_bytes())).await;
+    if let Some(served) = served {
+        Mock::given(method("GET"))
+            .and(path(notes_path(version)))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(served.to_vec()))
+            .mount(&feed.server)
+            .await;
+    }
+}
+
+/// How many requests `feed` saw for a notes.json.
+pub async fn notes_requests(feed: &Feed) -> usize {
+    feed.server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|r| r.url.path().ends_with("/notes.json"))
+        .count()
+}

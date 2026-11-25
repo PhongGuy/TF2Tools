@@ -6,11 +6,11 @@ use std::path::PathBuf;
 
 use common::update::{
     MANIFEST, SIGNATURE, TestKey, appimage_key, asset_url, client_for, feed, manifest_json,
-    publish, serve_feed, sha256_hex,
+    notes_doc, notes_requests, publish, publish_with_notes, serve_feed, sha256_hex,
 };
 use tf2tools_core::{
-    Endpoints, InstallTarget, StoreConfig, UPDATE_PUBLIC_KEYS, UpdateAsset, UpdateCheckError,
-    UpdateClient, UpdateOffer,
+    Endpoints, InstallTarget, NotesStatus, ReleaseNotes, StoreConfig, UPDATE_PUBLIC_KEYS,
+    UpdateAsset, UpdateCheckError, UpdateClient, UpdateOffer,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -28,6 +28,8 @@ fn update_types_are_send_sync_debug() {
     assert_send_sync::<UpdateAsset>();
     assert_send_sync::<InstallTarget>();
     assert_send_sync::<UpdateCheckError>();
+    assert_send_sync::<ReleaseNotes>();
+    assert_send_sync::<NotesStatus>();
 }
 
 #[tokio::test]
@@ -279,4 +281,99 @@ async fn the_manifest_and_signature_follow_a_redirect_to_another_host() {
         .unwrap();
     assert_eq!(offer.version(), "6.0.1");
     assert_eq!(cdn.received_requests().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn an_offer_carries_the_notes_after_the_installed_version() {
+    let feed = feed().await;
+    let notes = notes_doc(&[
+        ("6.2.0", Some("6.1.0")),
+        ("6.1.0", Some("6.0.2")),
+        ("6.0.2", Some("6.0.1")),
+    ]);
+    publish_with_notes(&feed, "6.2.0", &notes, Some(&notes)).await;
+    let offer = feed
+        .client
+        .check("6.1.0", &appimage())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(offer.notes_status(), NotesStatus::Complete);
+    let versions: Vec<&str> = offer.releases().iter().map(ReleaseNotes::version).collect();
+    assert_eq!(versions, ["6.2.0"]);
+    assert_eq!(
+        offer.releases()[0].groups()[0].items()[0].text(),
+        "Fix in 6.2.0"
+    );
+}
+
+#[tokio::test]
+async fn notes_that_fail_a_check_leave_the_offer_without_notes() {
+    let good = notes_doc(&[("6.2.0", Some("6.1.0"))]);
+    // Same length and valid JSON, so only the sha256 check can refuse it.
+    let other = notes_doc(&[("6.2.0", Some("6.1.1"))]);
+    let longer = [good.clone(), b" ".to_vec()].concat();
+    let shorter = good[..good.len() - 1].to_vec();
+    let schema2 = br#"{"schema":2,"releases":[]}"#.to_vec();
+    // (name, bytes the manifest declares, bytes served when any)
+    type Case = (&'static str, Vec<u8>, Option<Vec<u8>>);
+    let cases: Vec<Case> = vec![
+        ("wrong sha256", good.clone(), Some(other)),
+        ("longer than declared", good.clone(), Some(longer)),
+        ("shorter than declared", good.clone(), Some(shorter)),
+        ("schema 2", schema2.clone(), Some(schema2)),
+        ("not json", b"nope".to_vec(), Some(b"nope".to_vec())),
+        ("missing", good.clone(), None),
+    ];
+    for (name, declared, served) in cases {
+        let feed = feed().await;
+        publish_with_notes(&feed, "6.2.0", &declared, served.as_deref()).await;
+        let offer = feed
+            .client
+            .check("6.1.0", &appimage())
+            .await
+            .unwrap_or_else(|e| panic!("{name}: {e:?}"))
+            .unwrap_or_else(|| panic!("{name}: no offer"));
+        assert_eq!(offer.version(), "6.2.0", "{name}");
+        assert_eq!(offer.notes_status(), NotesStatus::Unavailable, "{name}");
+        assert!(offer.releases().is_empty(), "{name}");
+    }
+}
+
+#[tokio::test]
+async fn a_manifest_without_notes_asset_offers_without_fetching_notes() {
+    let feed = feed().await;
+    publish(&feed, "6.0.1", b"x").await;
+    let offer = feed
+        .client
+        .check("6.0.0", &appimage())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(offer.notes_status(), NotesStatus::Unavailable);
+    assert_eq!(notes_requests(&feed).await, 0);
+}
+
+#[tokio::test]
+async fn notes_declared_over_64_kib_are_not_fetched() {
+    let feed = feed().await;
+    let big = vec![b' '; 64 * 1024 + 1];
+    publish_with_notes(&feed, "6.2.0", &big, Some(&big)).await;
+    let offer = feed
+        .client
+        .check("6.1.0", &appimage())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(offer.notes_status(), NotesStatus::Unavailable);
+    assert_eq!(notes_requests(&feed).await, 0);
+}
+
+#[tokio::test]
+async fn no_offer_fetches_no_notes() {
+    let feed = feed().await;
+    let notes = notes_doc(&[("6.2.0", Some("6.1.0"))]);
+    publish_with_notes(&feed, "6.2.0", &notes, Some(&notes)).await;
+    assert_eq!(feed.client.check("6.2.0", &appimage()).await.unwrap(), None);
+    assert_eq!(notes_requests(&feed).await, 0);
 }
