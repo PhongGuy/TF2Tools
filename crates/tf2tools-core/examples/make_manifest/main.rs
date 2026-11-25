@@ -14,7 +14,6 @@ use std::io::{Cursor, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-#[allow(dead_code)]
 #[cfg_attr(test, allow(clippy::panic, clippy::type_complexity))]
 mod notes;
 

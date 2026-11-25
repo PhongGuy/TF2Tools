@@ -1,5 +1,7 @@
 //! Turns a published GitHub release body into grouped, plain-text release notes.
 
+use std::path::Path;
+
 /// Release-note section titles from `.github/release.yml` and the kind each maps to.
 pub const KINDS: [(&str, &str); 5] = [
     ("New features", "features"),
@@ -10,6 +12,146 @@ pub const KINDS: [(&str, &str); 5] = [
 ];
 pub const ITEM_MAX: usize = 500;
 pub const INTRO_MAX: usize = 1000;
+
+/// The largest notes.json the release job ships, in bytes.
+#[allow(dead_code)]
+pub const NOTES_LIMIT: usize = 48 * 1024;
+/// The most releases one notes.json holds.
+pub const MAX_RELEASES: usize = 20;
+
+/// One release as `gh release view --json tagName,body,publishedAt,isPrerelease,isDraft` prints it.
+#[allow(dead_code)]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Published {
+    #[serde(rename = "tagName")]
+    pub tag: String,
+    pub body: String,
+    pub published_at: String,
+    pub is_prerelease: bool,
+    pub is_draft: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct Release {
+    version: String,
+    previous: Option<String>,
+    date: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    intro: Option<String>,
+    groups: Vec<Group>,
+}
+
+/// Reads every `*.json` file in `dir` as one published release, in file name order.
+#[allow(dead_code)]
+pub fn read_releases(dir: &Path) -> Result<Vec<Published>, String> {
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        let path = entry.map_err(|e| format!("{}: {e}", dir.display()))?.path();
+        if path.extension().is_some_and(|ext| ext == "json") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    paths
+        .iter()
+        .map(|path| {
+            let text =
+                std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+            serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
+        })
+        .collect()
+}
+
+/// Builds compact notes.json from the published v6 releases plus `page` as `version`, newest
+/// first, within `limit` bytes; fails naming the version whose body has no item or cannot fit.
+#[allow(dead_code)]
+pub fn build(
+    published: &[Published],
+    page: &str,
+    version: &str,
+    date: &str,
+    limit: usize,
+) -> Result<String, String> {
+    let target = semver::Version::parse(version).map_err(|e| format!("{version}: {e}"))?;
+    let floor = semver::Version::new(6, 0, 0);
+
+    // Filter before parsing so an old app's body never reaches the parser; the page always wins.
+    let mut entries: Vec<(semver::Version, String, &str)> = published
+        .iter()
+        .filter(|p| !p.is_draft && !p.is_prerelease)
+        .filter_map(|p| {
+            let found = semver::Version::parse(p.tag.strip_prefix('v').unwrap_or(&p.tag)).ok()?;
+            let keep =
+                found.cmp_precedence(&floor).is_ge() && found.cmp_precedence(&target).is_ne();
+            let day = p
+                .published_at
+                .get(..10)
+                .unwrap_or(&p.published_at)
+                .to_owned();
+            keep.then_some((found, day, p.body.as_str()))
+        })
+        .collect();
+    entries.push((target, date.to_owned(), page));
+    entries.sort_by(|a, b| b.0.cmp_precedence(&a.0));
+
+    // Links to the next older version are set over the whole set, before any release is cut.
+    let previous: Vec<Option<String>> = (0..entries.len())
+        .map(|i| entries.get(i + 1).map(|older| older.0.to_string()))
+        .collect();
+    let mut releases = Vec::new();
+    for ((found, day, body), previous) in entries.into_iter().zip(previous).take(MAX_RELEASES) {
+        let parsed = parse_body(body).map_err(|e| format!("{found}: {e}"))?;
+        releases.push(Release {
+            version: found.to_string(),
+            previous,
+            date: day,
+            intro: parsed.intro,
+            groups: parsed.groups,
+        });
+    }
+
+    let mut json = serialise(&releases)?;
+    while json.len() > limit && releases.len() > 1 {
+        releases.pop();
+        json = serialise(&releases)?;
+    }
+    // Trim the newest release from its end, keeping one count item in its last group.
+    let mut removed = 0;
+    while json.len() > limit {
+        let newest = &mut releases[0];
+        if removed > 0 {
+            newest.groups.last_mut().map(|group| group.items.pop());
+        }
+        let real: usize = newest.groups.iter().map(|group| group.items.len()).sum();
+        if real <= 1 {
+            return Err(format!(
+                "{version}: the release notes do not fit in {limit} bytes"
+            ));
+        }
+        if let Some(group) = newest.groups.last_mut() {
+            group.items.pop();
+            removed += 1;
+            if group.items.is_empty() {
+                newest.groups.pop();
+            }
+        }
+        if let Some(group) = newest.groups.last_mut() {
+            group.items.push(Item {
+                text: format!("...and {removed} more"),
+                pr: None,
+            });
+        }
+        json = serialise(&releases)?;
+    }
+    Ok(json)
+}
+
+fn serialise(releases: &[Release]) -> Result<String, String> {
+    serde_json::to_string(&serde_json::json!({ "schema": 1, "releases": releases }))
+        .map_err(|e| e.to_string())
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Item {
@@ -104,7 +246,7 @@ fn strip_comments(text: &str) -> String {
     out
 }
 
-/// Splits a trailing `by @login in URL` credit off an item, taking the PR number from the URL.
+/// Splits a trailing `by @login in <web URL>` credit off an item, taking the PR number from the URL.
 fn split_credit(item: &str) -> (&str, Option<u64>) {
     let Some(at) = item.rfind("by @") else {
         return (item, None);
@@ -116,6 +258,7 @@ fn split_credit(item: &str) -> (&str, Option<u64>) {
         return (item, None);
     };
     if login.is_empty()
+        || !(url.starts_with("http://") || url.starts_with("https://"))
         || login.contains(char::is_whitespace)
         || url.is_empty()
         || url.contains(char::is_whitespace)
@@ -188,12 +331,13 @@ fn unwrap_pairs(text: &str, mark: &str) -> String {
     out
 }
 
-/// Cuts text to at most `max` characters, the last three being `...` when it was cut.
+/// Cuts text to at most `max` characters, ending in `...` after any trailing whitespace is trimmed.
 fn cap(text: &str, max: usize) -> String {
     if text.chars().count() <= max {
         return text.to_owned();
     }
     let mut cut: String = text.chars().take(max - 3).collect();
+    cut.truncate(cut.trim_end().len());
     cut.push_str("...");
     cut
 }
@@ -201,7 +345,8 @@ fn cap(text: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::{Path, PathBuf};
+    use serde_json::json;
+    use std::path::PathBuf;
 
     pub(crate) fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/release-notes")
@@ -403,5 +548,228 @@ mod tests {
             ["features", "fixes", "usability", "performance", "other"]
         );
         assert_eq!(kind_for("Something new"), "other");
+    }
+
+    #[test]
+    fn a_credit_needs_a_web_address() {
+        let parsed = parse_body("## What's Changed\n\n- Done by @x in v6\n").unwrap();
+        assert_eq!(texts(&parsed.groups[0]), ["Done by @x in v6"]);
+        assert_eq!(parsed.groups[0].items[0].pr, None);
+    }
+
+    #[test]
+    fn a_cut_drops_trailing_whitespace_before_the_dots() {
+        assert_eq!(cap("abcd efgh", 8), "abcd...");
+        assert_eq!(cap("abcdefghij", 8), "abcde...");
+        assert_eq!(cap("short", 8), "short");
+    }
+
+    fn published(tag: &str, body: &str, date: &str, prerelease: bool, draft: bool) -> Published {
+        Published {
+            tag: tag.to_owned(),
+            body: body.to_owned(),
+            published_at: format!("{date}T12:00:00Z"),
+            is_prerelease: prerelease,
+            is_draft: draft,
+        }
+    }
+    const SMALL: &str = "## What's Changed\n\n- A change.\n\n## Downloads\n";
+    fn page() -> String {
+        std::fs::read_to_string(fixtures().join("page-6.3.0.md")).unwrap()
+    }
+    fn doc(json: &str) -> serde_json::Value {
+        serde_json::from_str(json).unwrap()
+    }
+    fn versions(value: &serde_json::Value) -> Vec<String> {
+        value["releases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["version"].as_str().unwrap().to_owned())
+            .collect()
+    }
+    fn body_of(items: usize, width: usize) -> String {
+        let mut body = String::from("## What's Changed\n\n### Fixes\n");
+        for n in 0..items {
+            body.push_str(&format!("* {n:04} {}\n", "x".repeat(width)));
+        }
+        body
+    }
+
+    #[test]
+    fn the_real_history_builds_newest_first_with_previous_links() {
+        let releases = read_releases(&fixtures().join("releases")).unwrap();
+        let json = build(&releases, &page(), "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap();
+        let value = doc(&json);
+        assert_eq!(value["schema"], 1);
+        assert_eq!(
+            versions(&value),
+            ["6.3.0", "6.2.0", "6.1.0", "6.0.2", "6.0.1"]
+        );
+        let previous: Vec<serde_json::Value> = value["releases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["previous"].clone())
+            .collect();
+        assert_eq!(
+            previous,
+            [
+                json!("6.2.0"),
+                json!("6.1.0"),
+                json!("6.0.2"),
+                json!("6.0.1"),
+                serde_json::Value::Null
+            ]
+        );
+        assert_eq!(value["releases"][0]["date"], "2026-12-01");
+        assert_eq!(
+            value["releases"][0]["intro"],
+            "Players can read what an update brings before they install it."
+        );
+        assert_eq!(value["releases"][1]["date"], "2026-11-25");
+        assert!(json.len() <= NOTES_LIMIT);
+        assert!(!json.contains('\n'), "compact JSON");
+    }
+
+    #[test]
+    fn old_apps_prereleases_drafts_and_odd_tags_are_left_out() {
+        let releases = vec![
+            published("v6.1.0", SMALL, "2026-11-14", false, false),
+            published("v6.1.1-rc.1", SMALL, "2026-11-15", true, false),
+            published("v6.1.1", SMALL, "2026-11-16", false, true),
+            published("v4.8.0", "Old app notes.", "2022-09-02", false, false),
+            published("not-a-version", SMALL, "2022-09-02", false, false),
+        ];
+        let value = doc(&build(&releases, SMALL, "6.2.0", "2026-11-25", NOTES_LIMIT).unwrap());
+        assert_eq!(versions(&value), ["6.2.0", "6.1.0"]);
+        assert_eq!(value["releases"][0]["previous"], "6.1.0");
+        assert_eq!(value["releases"][1]["previous"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn the_tag_being_built_is_kept_even_as_a_prerelease_and_replaces_a_published_copy() {
+        let releases = vec![
+            published("v6.2.0", SMALL, "2026-11-25", false, false),
+            published(
+                "v6.3.0-rc.1",
+                "## What's Changed\n\n- Stale text.\n",
+                "2026-11-30",
+                true,
+                false,
+            ),
+        ];
+        let value = doc(&build(
+            &releases,
+            "## What's Changed\n\n- Fresh text.\n",
+            "6.3.0-rc.1",
+            "2026-12-01",
+            NOTES_LIMIT,
+        )
+        .unwrap());
+        assert_eq!(versions(&value), ["6.3.0-rc.1", "6.2.0"]);
+        assert_eq!(
+            value["releases"][0]["groups"][0]["items"][0]["text"],
+            "Fresh text."
+        );
+        assert_eq!(value["releases"][0]["date"], "2026-12-01");
+    }
+
+    #[test]
+    fn at_most_20_releases_are_kept_and_previous_is_set_before_the_cut() {
+        let releases: Vec<Published> = (0..25)
+            .map(|minor| published(&format!("v6.{minor}.0"), SMALL, "2026-11-01", false, false))
+            .collect();
+        let value = doc(&build(&releases, SMALL, "6.25.0", "2026-12-01", NOTES_LIMIT).unwrap());
+        let kept = versions(&value);
+        assert_eq!(kept.len(), 20);
+        assert_eq!(kept[0], "6.25.0");
+        assert_eq!(kept[19], "6.6.0");
+        assert_eq!(value["releases"][19]["previous"], "6.5.0");
+    }
+
+    #[test]
+    fn over_the_cap_the_oldest_releases_go_first() {
+        let releases: Vec<Published> = (0..6)
+            .map(|minor| {
+                published(
+                    &format!("v6.{minor}.0"),
+                    &body_of(40, 300),
+                    "2026-11-01",
+                    false,
+                    false,
+                )
+            })
+            .collect();
+        let json = build(
+            &releases,
+            &body_of(40, 300),
+            "6.6.0",
+            "2026-12-01",
+            NOTES_LIMIT,
+        )
+        .unwrap();
+        assert!(json.len() <= NOTES_LIMIT, "{}", json.len());
+        let kept = versions(&doc(&json));
+        assert!((2..7).contains(&kept.len()), "{kept:?}");
+        let expected: Vec<String> = (0..=6)
+            .rev()
+            .take(kept.len())
+            .map(|m| format!("6.{m}.0"))
+            .collect();
+        assert_eq!(kept, expected);
+    }
+
+    #[test]
+    fn a_newest_release_over_the_cap_loses_items_and_says_how_many() {
+        let json = build(&[], &body_of(400, 300), "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap();
+        assert!(json.len() <= NOTES_LIMIT, "{}", json.len());
+        let value = doc(&json);
+        let items = value["releases"][0]["groups"][0]["items"]
+            .as_array()
+            .unwrap();
+        let last = items.last().unwrap();
+        let more: usize = last["text"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("...and ")
+            .unwrap()
+            .strip_suffix(" more")
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(more > 0);
+        assert_eq!(items.len() - 1 + more, 400);
+        assert!(last.get("pr").is_none());
+    }
+
+    #[test]
+    fn a_newest_release_that_cannot_fit_fails() {
+        let err = build(&[], &body_of(3, 300), "6.3.0", "2026-12-01", 200).unwrap_err();
+        assert!(err.contains("6.3.0"), "{err}");
+    }
+
+    #[test]
+    fn a_page_or_included_body_with_no_items_fails_naming_its_version() {
+        let empty = published(
+            "v6.2.0",
+            "## What's Changed\n\n## Downloads\n",
+            "2026-11-25",
+            false,
+            false,
+        );
+        let err = build(&[empty], SMALL, "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap_err();
+        assert!(err.contains("6.2.0"), "{err}");
+        let err = build(&[], "no section", "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap_err();
+        assert!(err.contains("6.3.0"), "{err}");
+    }
+
+    #[test]
+    fn read_releases_reads_every_json_file_in_the_dir() {
+        let releases = read_releases(&fixtures().join("releases")).unwrap();
+        let mut tags: Vec<&str> = releases.iter().map(|r| r.tag.as_str()).collect();
+        tags.sort();
+        assert_eq!(tags, ["v6.0.1", "v6.0.2", "v6.1.0", "v6.2.0"]);
+        assert!(releases.iter().all(|r| !r.is_draft && !r.is_prerelease));
     }
 }
