@@ -92,8 +92,7 @@ impl Services {
         if let Err(error) = library.retire_override_addons() {
             tracing::warn!(%error, "could not retire mastercomfig's override addons");
         }
-        // The demos client follows the boot's endpoints, so a loopback boot never leaves loopback.
-        let mut demos = DemosClient::new(endpoints.demos().clone());
+        let demos_endpoints = endpoints.demos().clone();
         // Offline narrows the client to loopback; online keeps the default config `new` built.
         let mut store = StoreClient::new(db.clone(), data.clone(), endpoints);
         if offline {
@@ -104,6 +103,8 @@ impl Services {
         if offline {
             logs = logs.with_config(LogsClient::default_config().with_loopback_only(true));
         }
+        // The demos client follows the boot's endpoints, so a loopback boot never leaves loopback.
+        let mut demos = DemosClient::new(demos_endpoints);
         if offline {
             demos = demos.with_config(DemosClient::default_config().with_loopback_only(true));
         }
