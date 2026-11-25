@@ -153,6 +153,8 @@ demos_tf:
     all: "Все"
   widen: "Искать дальше в прошлом"
   keep_looking: "Искать дальше"
+  map: "Карта"
+  all: "Все"
   column:
     date: "Дата"
     title: "Название"

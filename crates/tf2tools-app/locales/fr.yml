@@ -180,6 +180,8 @@ demos_tf:
     all: "Tout"
   widen: "Remonter plus loin"
   keep_looking: "Continuer à chercher"
+  map: "Carte"
+  all: "Tous"
   column:
     date: "Date"
     title: "Titre"

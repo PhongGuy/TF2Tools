@@ -3,6 +3,7 @@
 //! the page failed.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::select::Select;
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
@@ -18,6 +19,7 @@ use super::text::{demo_title, format_label, range_label, watch_label};
 use super::{DemoRow, DemosTfPage};
 use crate::i18n::tr;
 use crate::ids;
+use crate::pages::common::filter_badge;
 use crate::pages::logs_tf::list::{
     DATE, GAP, LENGTH, MAP, MAX_WIDTH, centred, date_cell, map_cell,
 };
@@ -41,6 +43,8 @@ const RANGE_WIDTH: f32 = STOP_CELL * DemosRange::STOPS.len() as f32;
 const LABEL_HEIGHT: f32 = 24.;
 // Fits the longest format label whole beside the kit's caret and padding.
 const FORMAT_SELECT: Pixels = px(176.);
+// Fits a long map name such as koth_product_final.
+const MAP_INPUT: Pixels = px(176.);
 
 /// How the rows fit the list's width: a narrow list moves format and map under the title,
 /// then the date too; title, length and Watch always keep their columns.
@@ -67,13 +71,13 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
     let this = cx.entity().downgrade();
     let fit = fit(&page.list);
     let rows = div().size_full().child(
-        list(page.list.clone(), move |ix, _window, cx| {
+        list(page.list.clone(), move |ix, window, cx| {
             let Some(page) = this.upgrade() else {
                 return div().into_any_element();
             };
             let item = if ix == 0 {
                 // The Open demo button takes a listener, so the top builds inside the page.
-                page.update(cx, |page, cx| top(page, fit, cx))
+                page.update(cx, |page, cx| top(page, fit, window, cx))
             } else {
                 let page = page.read(cx);
                 match page.feed.items().get(ix - 1) {
@@ -103,9 +107,15 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
     scroll_beside(ids::DEMOS_TF_LIST_SCROLLBAR, &page.list, rows)
 }
 
-// The format Select and range picker, Open demo at the right, then the column titles in
-// the rows' widths. A narrow list wraps the toolbar instead of squeezing it.
-fn top(page: &DemosTfPage, fit: Fit, cx: &mut Context<DemosTfPage>) -> AnyElement {
+// The format Select, map Input and range picker, Open demo at the right, the tracked
+// players' chips, then the column titles in the rows' widths. A narrow list wraps the toolbar
+// instead of squeezing it.
+fn top(
+    page: &DemosTfPage,
+    fit: Fit,
+    window: &mut Window,
+    cx: &mut Context<DemosTfPage>,
+) -> AnyElement {
     let open = Button::new(ids::DEMOS_TF_OPEN)
         .outline()
         .small()
@@ -116,20 +126,56 @@ fn top(page: &DemosTfPage, fit: Fit, cx: &mut Context<DemosTfPage>) -> AnyElemen
         .test_support()
         .w(FORMAT_SELECT)
         .child(Select::new(&page.format_select).small());
+    let map = div()
+        .id(ids::DEMOS_TF_MAP)
+        .test_support()
+        .w(MAP_INPUT)
+        .child(Input::new(&page.map_input).small());
     let tools = h_flex()
         .w_full()
         .flex_wrap()
         .items_start()
         .gap_4()
         .child(format)
+        .child(map)
         .child(range_picker(&page.range_slider, cx.entity().downgrade()))
         .child(h_flex().ml_auto().child(open));
     v_flex()
         .w_full()
         .gap_2()
         .child(tools)
+        .when(!page.players.is_empty(), |el| {
+            el.child(chips(page, window, cx))
+        })
         .child(column_header(fit, cx))
         .into_any_element()
+}
+
+// All, then one chip per tracked player, the one the list keeps to selected.
+fn chips(page: &DemosTfPage, window: &mut Window, cx: &mut Context<DemosTfPage>) -> Div {
+    let active = page.player();
+    let all = filter_badge(
+        ids::DEMOS_TF_ALL,
+        active.is_none(),
+        tr!("demos_tf.all"),
+        window,
+        cx,
+    )
+    .on_click(cx.listener(|page, _, _, cx| page.select_player(None, cx)));
+    let mut row = h_flex().flex_wrap().gap_2().child(all);
+    for player in &page.players {
+        let id = player.steam_id();
+        let chip = filter_badge(
+            ids::demos_tf_chip(id),
+            active == Some(id),
+            player.display_name().to_owned(),
+            window,
+            cx,
+        )
+        .on_click(cx.listener(move |page, _, _, cx| page.select_player(Some(id), cx)));
+        row = row.child(chip);
+    }
+    row
 }
 
 // The slider over its six stop labels, as logs.tf's; a label click picks its stop like a

@@ -179,6 +179,8 @@ demos_tf:
     all: "Tudo"
   widen: "Buscar mais para trás"
   keep_looking: "Continuar procurando"
+  map: "Mapa"
+  all: "Todos"
   column:
     date: "Data"
     title: "Título"

@@ -155,6 +155,8 @@ demos_tf:
     all: "All"
   widen: "Look further back"
   keep_looking: "Keep looking"
+  map: "Map"
+  all: "All"
   column:
     date: "Date"
     title: "Title"

@@ -8,26 +8,30 @@ mod watch;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{IndexPath, v_flex};
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ListAlignment,
-    ListState, ParentElement as _, Render, SharedString, Styled as _, Subscription,
+    ListState, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task,
     TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{
-    DemoCursor, DemoFormat, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange,
+    DemoCursor, DemoFormat, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange, SteamId,
+    TrackedPlayer,
 };
 
 use crate::i18n::{self, tr};
 use crate::ids;
+use crate::local_messages::describe_logs_cache;
 use crate::pages::demo_viewer::DemoViewerPage;
 use crate::picker::PickKind;
-use crate::services::Services;
+use crate::services::{Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::header_slot::HeaderSlot;
 use crate::shell::route::Page;
+use crate::store_grid::SEARCH_DEBOUNCE;
 use crate::store_grid::feed::{Feed, FeedItem};
 use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
@@ -124,12 +128,17 @@ pub struct DemosTfPage {
     stalled: bool,
     range_slider: Entity<SliderState>,
     format_select: Entity<SelectState<Vec<LabelOption>>>,
-    // The language the format Select was titled in.
+    map_input: Entity<InputState>,
+    // The map typed last, waiting out the debounce; a newer keystroke replaces it.
+    map_debounce: Option<Task<()>>,
+    // The players tracked on logs.tf, one chip each.
+    players: Vec<TrackedPlayer>,
+    // The language the format Select and map placeholder were titled in.
     language: &'static str,
     error: Option<SharedString>,
     // Watch downloads in flight by demo id, with their whole percent once known.
     downloads: HashMap<u64, Option<u8>>,
-    _subscriptions: [Subscription; 3],
+    _subscriptions: [Subscription; 4],
 }
 
 impl DemosTfPage {
@@ -170,6 +179,13 @@ impl DemosTfPage {
                 }
             },
         );
+        let map_input = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("demos_tf.map")));
+        let typed = cx.subscribe(&map_input, |page, input, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let text = input.read(cx).value().to_string();
+                page.map_typed(text, cx);
+            }
+        });
         let mut page = Self {
             mode: Mode::List,
             hidden: false,
@@ -180,12 +196,16 @@ impl DemosTfPage {
             stalled: false,
             range_slider,
             format_select,
+            map_input,
+            map_debounce: None,
+            players: Vec::new(),
             language: i18n::current(),
             error: None,
             downloads: HashMap::new(),
-            _subscriptions: [release, released, picked],
+            _subscriptions: [release, released, picked, typed],
         };
         page.restart(cx);
+        page.read_players(cx);
         page
     }
 
@@ -239,6 +259,67 @@ impl DemosTfPage {
     /// The format the list keeps, or None for any.
     pub fn format(&self) -> Option<DemoFormat> {
         self.query.format()
+    }
+
+    /// Lists only demos on `text`'s map once typing pauses for `SEARCH_DEBOUNCE`; a newer
+    /// keystroke replaces the pending one, and the current map after trimming changes nothing.
+    pub fn map_typed(&mut self, text: String, cx: &mut Context<Self>) {
+        let timer = cx.background_executor().timer(SEARCH_DEBOUNCE);
+        self.map_debounce = Some(cx.spawn(async move |page, cx| {
+            timer.await;
+            let _ = page.update(cx, |page, cx| {
+                let map = text.trim();
+                if page.query.map().unwrap_or_default() == map {
+                    return;
+                }
+                page.query = page.query.clone().with_map(map);
+                page.restart(cx);
+            });
+        }));
+    }
+
+    /// The tracked player the list keeps to, or None for All.
+    pub fn player(&self) -> Option<SteamId> {
+        self.query.players().first().copied()
+    }
+
+    // Keeps the list to `player`'s demos, or everyone's for None; the current pick does nothing.
+    fn select_player(&mut self, player: Option<SteamId>, cx: &mut Context<Self>) {
+        if player == self.player() {
+            return;
+        }
+        let players: Vec<SteamId> = player.into_iter().collect();
+        self.query = self.query.clone().with_players(&players);
+        self.restart(cx);
+        cx.notify();
+    }
+
+    // Rereads the players tracked on logs.tf off the UI thread; a player no longer tracked
+    // drops back to All. A failed read keeps the chips as they were.
+    fn read_players(&mut self, cx: &mut Context<Self>) {
+        let reading = run_blocking(cx, |s| {
+            s.logs.cache().players().map_err(|e| {
+                describe_logs_cache(&e).into_op(tr!("messages.action.load_logs_tf_players"))
+            })
+        });
+        cx.spawn(async move |page, cx| {
+            let players = match reading.await {
+                Ok(players) => players,
+                Err(error) => {
+                    tracing::warn!(%error, "reading the tracked players for demos.tf failed");
+                    return;
+                }
+            };
+            let _ = page.update(cx, |page, cx| {
+                page.players = players;
+                let tracked = |id: SteamId| page.players.iter().any(|p| p.steam_id() == id);
+                if page.player().is_some_and(|id| !tracked(id)) {
+                    page.select_player(None, cx);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// Reads on from where the skip limit stopped.
@@ -400,6 +481,9 @@ impl DemosTfPage {
         if hidden && self.viewer().is_some() {
             self.back(cx);
         }
+        if !hidden {
+            self.read_players(cx);
+        }
     }
 
     /// Closes the viewer back to the list, taking its header crumb along.
@@ -435,7 +519,7 @@ impl DemosTfPage {
     }
 
     // The page is kept while other pages show, so a language switched meanwhile retitles the
-    // format Select; the chosen format stays.
+    // format Select and map placeholder; the chosen format and typed map stay.
     fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.language == i18n::current() {
             return;
@@ -443,6 +527,9 @@ impl DemosTfPage {
         self.language = i18n::current();
         self.format_select
             .update(cx, |select, cx| select.set_items(format_rows(), window, cx));
+        self.map_input.update(cx, |input, cx| {
+            input.set_placeholder(tr!("demos_tf.map"), window, cx)
+        });
     }
 
     fn list(&self, cx: &mut Context<Self>) -> impl IntoElement {

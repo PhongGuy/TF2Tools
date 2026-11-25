@@ -3523,6 +3523,16 @@ pub const DEMOS_TF_RANGE: &str = "demos-tf-range";
 /// The Demos.tf toolbar's format Select wrapper.
 pub const DEMOS_TF_FORMAT: &str = "demos-tf-format";
 
+/// The Demos.tf toolbar's map Input wrapper.
+pub const DEMOS_TF_MAP: &str = "demos-tf-map";
+/// The Demos.tf "All" chip, selected while no tracked player filters the list.
+pub const DEMOS_TF_ALL: &str = "demos-tf-all";
+
+/// A tracked player's Demos.tf chip, selected while it filters the list: "demos-tf-chip:<id64>".
+pub fn demos_tf_chip(id: SteamId) -> ElementId {
+    keyed("demos-tf-chip", &id.id64().to_string())
+}
+
 /// One stop's label under the Demos.tf range slider, a click picks it:
 /// "demos-tf-range-stop:<key>", keys 1d 1w 1m 3m 1y all.
 pub fn demos_tf_range_stop(range: DemosRange) -> ElementId {

@@ -177,6 +177,8 @@ demos_tf:
     all: "全部"
   widen: "查看更早的录像"
   keep_looking: "继续查找"
+  map: "地图"
+  all: "全部"
   column:
     date: "日期"
     title: "标题"

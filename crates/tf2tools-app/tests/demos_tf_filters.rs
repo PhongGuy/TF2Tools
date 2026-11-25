@@ -2,16 +2,18 @@
 use std::collections::HashMap;
 
 use gpui_kit::component::slider::{SliderEvent, SliderValue};
-use gpui_kit::{AppContext as _, TestAppContext};
+use gpui_kit::{AppContext as _, ListOffset, TestAppContext, px};
 use tf2tools_app::ids;
-use tf2tools_core::{DemoFormat, DemosRange};
+use tf2tools_app::shell::route::Page;
+use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
+use tf2tools_core::{DemoFormat, DemosRange, TrackedPlayer};
 
 use crate::support;
 use crate::support::demostf::{
     Demo, DemosTf, demo, demos_tf_shell, first_queries, ids_down, list_body, list_queries,
-    mount_before, mount_first, shown_ids, wait_end, wait_ids,
+    mount_before, mount_first, mount_page, shown_ids, to_end, wait_end, wait_ids,
 };
-use crate::support::logstf::unix_now;
+use crate::support::logstf::{ARIE, sid, unix_now};
 
 fn release(cx: &mut TestAppContext, d: &DemosTf, stop: f32, emit: bool) {
     let slider = cx.update(|cx| d.page.read(cx).range_slider().clone());
@@ -190,4 +192,96 @@ fn the_skip_limit_offers_keep_looking_and_retry_resumes_there(cx: &mut TestAppCo
         "501",
         "Retry resumes at the failed page"
     );
+}
+
+#[gpui_kit::test]
+fn typing_a_map_lists_only_that_map(cx: &mut TestAppContext) {
+    let (_env, server, d) = one_demo(cx);
+    assert!(support::present(cx, d.s.win, ids::DEMOS_TF_MAP));
+    cx.update(|cx| {
+        d.page
+            .update(cx, |p, cx| p.map_typed(" cp_process_f12 ".to_owned(), cx))
+    });
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    assert_eq!(firsts(cx, &server, 2)[1]["map"], "cp_process_f12");
+    cx.update(|cx| {
+        d.page
+            .update(cx, |p, cx| p.map_typed("cp_process_f12".to_owned(), cx))
+    });
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::settle(cx, d.s.win);
+    assert_eq!(first_queries(&server).len(), 2, "the same map asks nothing");
+}
+
+#[gpui_kit::test]
+fn a_player_chip_lists_their_demos_by_page_number(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let uri = server.uri();
+    mount_first(&server, list_body(&uri, &ids_down(1000, 50)));
+    mount_before(&server, 951, 200, b"[]".to_vec());
+    mount_page(&server, 2, list_body(&uri, &[demo(10)]));
+    mount_page(&server, 3, b"[]".to_vec());
+    let d = demos_tf_shell(cx, &env, &uri, &[(ARIE, "Arie")]);
+    support::wait_real(cx, "fifty rows", |cx| shown_ids(cx, &d.page).len() == 50);
+    assert_eq!(
+        support::selected_of(cx, d.s.win, ids::DEMOS_TF_ALL),
+        Some(true)
+    );
+    assert_eq!(
+        support::label_of(cx, d.s.win, ids::demos_tf_chip(sid(ARIE))).as_deref(),
+        Some("Arie")
+    );
+    support::click_id(cx, d.s.win, ids::demos_tf_chip(sid(ARIE)));
+    let id64 = sid(ARIE).id64().to_string();
+    assert_eq!(firsts(cx, &server, 2)[1]["players"], id64);
+    assert_eq!(cx.update(|cx| d.page.read(cx).player()), Some(sid(ARIE)));
+    support::wait_real(cx, "the player's rows", |cx| {
+        shown_ids(cx, &d.page).len() == 50
+    });
+    to_end(cx, &d);
+    support::wait_real(cx, "page 2", |cx| shown_ids(cx, &d.page).contains(&10));
+    let theirs: Vec<_> = list_queries(&server)
+        .into_iter()
+        .filter(|q| q.contains_key("players"))
+        .collect();
+    assert!(
+        theirs
+            .iter()
+            .any(|q| q.get("page").map(String::as_str) == Some("2")),
+        "{theirs:?}"
+    );
+    assert!(
+        theirs.iter().all(|q| !q.contains_key("before_id")),
+        "{theirs:?}"
+    );
+    // The chips ride the list's first item, so scroll back up to reach All.
+    let state = cx.update(|cx| d.page.read(cx).list_state().clone());
+    state.scroll_to(ListOffset {
+        item_ix: 0,
+        offset_in_item: px(0.),
+    });
+    support::settle(cx, d.s.win);
+    support::click_id(cx, d.s.win, ids::DEMOS_TF_ALL);
+    let q = firsts(cx, &server, 3);
+    assert!(!q[2].contains_key("players"), "{:?}", q[2]);
+    assert_eq!(cx.update(|cx| d.page.read(cx).player()), None);
+}
+
+#[gpui_kit::test]
+fn a_player_tracked_on_logs_tf_shows_up_on_return(cx: &mut TestAppContext) {
+    let (_env, _server, d) = one_demo(cx);
+    assert!(
+        !support::present(cx, d.s.win, ids::DEMOS_TF_ALL),
+        "no chips without tracked players"
+    );
+    d.s.services
+        .logs
+        .cache()
+        .add_player(&TrackedPlayer::new(sid(ARIE), "Arie"))
+        .unwrap();
+    support::click_nav(cx, d.s.win, Page::Settings);
+    support::click_nav(cx, d.s.win, Page::DemosTf);
+    support::wait_real(cx, "the chip", |cx| {
+        support::present(cx, d.s.win, ids::demos_tf_chip(sid(ARIE)))
+    });
 }
