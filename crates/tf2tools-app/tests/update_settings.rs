@@ -5,12 +5,13 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::settings::SettingsPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_app::updater::{AfterInstall, UpdateState, Updater, reopen};
+use tf2tools_app::updater::{AfterInstall, NotesState, UpdateState, Updater, reopen};
 
 use crate::support;
 use support::ShellWindow;
 use support::update_fake::{
-    APPIMAGE, FakeUpdates, failure, fake_updater, offer, reach_available, reach_ready, wait_state,
+    APPIMAGE, FakeUpdates, failure, fake_updater, offer, offer_with_notes, reach_available,
+    reach_ready, sample_notes, wait_state,
 };
 
 struct Card {
@@ -211,4 +212,46 @@ fn a_long_line_puts_the_buttons_under_it(cx: &mut TestAppContext) {
     let line = support::bounds_of(cx, c.s.win, ids::SETTINGS_UPDATE_STATUS).unwrap();
     let button = support::bounds_of(cx, c.s.win, ids::SETTINGS_UPDATE_INSTALL).unwrap();
     assert!(button.top() >= line.bottom(), "{button:?} under {line:?}");
+}
+
+#[gpui_kit::test]
+fn the_card_offers_whats_new_between_check_and_install(cx: &mut TestAppContext) {
+    let c = card(cx, true);
+    reach_available(
+        cx,
+        &c.u,
+        &c.fake,
+        offer_with_notes("6.0.2", true, sample_notes(NotesState::Complete)),
+    );
+    support::settle(cx, c.s.win);
+    let at =
+        |cx: &mut TestAppContext, id: &'static str| support::bounds_of(cx, c.s.win, id).unwrap();
+    let check = at(cx, ids::SETTINGS_UPDATE_CHECK);
+    let notes = at(cx, ids::SETTINGS_UPDATE_NOTES);
+    let install = at(cx, ids::SETTINGS_UPDATE_INSTALL);
+    // The three buttons outgrow the card's column, so Install may wrap; it still reads after What's new.
+    assert!(
+        check.right() <= notes.left() && check.top() == notes.top(),
+        "{check:?} then {notes:?}"
+    );
+    assert!(
+        (install.top() == notes.top() && notes.right() <= install.left())
+            || install.top() >= notes.bottom(),
+        "{notes:?} then {install:?}"
+    );
+    assert_eq!(
+        support::label_of(cx, c.s.win, ids::SETTINGS_UPDATE_NOTES).as_deref(),
+        Some("What's new")
+    );
+    support::click_id(cx, c.s.win, ids::SETTINGS_UPDATE_NOTES);
+    assert!(support::present(cx, c.s.win, ids::UPDATE_NOTES));
+}
+
+#[gpui_kit::test]
+fn the_card_has_no_whats_new_without_published_notes(cx: &mut TestAppContext) {
+    let c = card(cx, true);
+    reach_available(cx, &c.u, &c.fake, offer("6.0.1", true));
+    support::settle(cx, c.s.win);
+    assert!(support::present(cx, c.s.win, ids::SETTINGS_UPDATE_INSTALL));
+    assert!(!support::present(cx, c.s.win, ids::SETTINGS_UPDATE_NOTES));
 }

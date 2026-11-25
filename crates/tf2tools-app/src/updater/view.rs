@@ -11,7 +11,7 @@ use gpui_kit::{
     ParentElement as _, Pixels, SharedString, Styled as _, TestSupportExt as _, Window, div, px,
 };
 
-use super::{UpdateState, Updater, reopen, updater};
+use super::{NotesState, UpdateState, Updater, reopen, updater, whats_new};
 use crate::i18n::{format, tr};
 use crate::ids;
 use crate::shell::leave;
@@ -29,6 +29,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
         u.state().clone()
     };
     let theme = cx.theme();
+    let notes = whats_new_button(&state, ids::UPDATE_BANNER_WHATS_NEW).map(|b| b.flex_none());
     let (icon, text, action) = match &state {
         UpdateState::Available(offer) => {
             let action = if offer.installable {
@@ -135,6 +136,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
             .child(text)
             .children(bar)
             .children(percent)
+            .children(notes)
             .children(action)
             .children(dismiss)
             .into_any_element(),
@@ -167,6 +169,24 @@ fn action_button(
         .flex_none()
         .on_click(move |_, window, cx| run(&u, window, cx))
         .into_any_element()
+}
+
+// The outline small "What's new" button, only for an offer whose release published notes.
+fn whats_new_button(state: &UpdateState, id: &'static str) -> Option<Button> {
+    let UpdateState::Available(offer) = state else {
+        return None;
+    };
+    if offer.notes.status == NotesState::NotPublished {
+        return None;
+    }
+    let offer = offer.clone();
+    Some(
+        Button::new(id)
+            .outline()
+            .small()
+            .label(tr!("updater.notes.button"))
+            .on_click(move |_, window, cx| whats_new::open(offer.clone(), window, cx)),
+    )
 }
 
 /// The App Updates card's body: the status line and its buttons; None without an updater.
@@ -249,6 +269,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
             )
         }
     });
+    let notes = whats_new_button(&state, ids::SETTINGS_UPDATE_NOTES);
     let restart = show_restart.then(|| {
         card_button(
             &u,
@@ -261,25 +282,25 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         Some(color) => div().text_color(color),
         None => div(),
     };
-    // v5's row holds a short line beside its buttons; a longer one would squeeze into a narrow
-    // column, so its buttons drop under it instead.
-    let stacked = text.chars().count() > STACK_AFTER;
+    // v5's row holds a short line beside its buttons; a longer one, or a third button, would
+    // squeeze the line into a narrow column, so the buttons drop under it and wrap there.
+    let stacked = notes.is_some() || text.chars().count() > STACK_AFTER;
     let line = labelled(line.text_sm(), ids::SETTINGS_UPDATE_STATUS, text);
     let actions = h_flex()
-        .flex_none()
         .gap_2()
         .children(check)
+        .children(notes)
         .children(install)
         .children(restart);
     let body = if stacked {
-        v_flex().gap_3().child(line).child(actions)
+        v_flex().gap_3().child(line).child(actions.flex_wrap())
     } else {
         h_flex()
             .items_center()
             .justify_between()
             .gap_4()
             .child(div().flex_1().min_w_0().child(line))
-            .child(actions)
+            .child(actions.flex_none())
     };
     Some(body.into_any_element())
 }

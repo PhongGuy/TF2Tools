@@ -38,6 +38,8 @@ pub const UPDATE_BANNER_PERCENT: &str = "update-banner-percent";
 /// "Update", "Open release page" or "Restart".
 pub const UPDATE_BANNER_ACTION: &str = "update-banner-action";
 pub const UPDATE_BANNER_DISMISS: &str = "update-banner-dismiss";
+/// "What's new", before the action while an offer has notes; opens `UPDATE_NOTES`.
+pub const UPDATE_BANNER_WHATS_NEW: &str = "update-banner-whats-new";
 /// The What's new dialog, listing the release notes between this version and the offer.
 pub const UPDATE_NOTES: &str = "update-notes";
 pub const UPDATE_NOTES_BODY: &str = "update-notes-body";
@@ -96,6 +98,8 @@ pub const SETTINGS_VERSION: &str = "settings-version";
 pub const SETTINGS_UPDATE_STATUS: &str = "settings-update-status";
 /// "Check for Updates".
 pub const SETTINGS_UPDATE_CHECK: &str = "settings-update-check";
+/// "What's new", between Check and Install while an offer has notes.
+pub const SETTINGS_UPDATE_NOTES: &str = "settings-update-notes";
 /// "Download & Install" or "Open release page".
 pub const SETTINGS_UPDATE_INSTALL: &str = "settings-update-install";
 /// "Restart Now".

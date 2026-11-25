@@ -160,6 +160,7 @@ updater:
     installed: "TF2Tools v%{version} instalado"
     installer_started: "Instalador de TF2Tools v%{version} iniciado"
   notes:
+    button: "Novedades"
     title: "Novedades"
     since: "Cambios desde la v%{current}, primero los más recientes."
     english: "Las notas de la versión están en inglés."

@@ -135,6 +135,7 @@ updater:
     installed: "Установлено обновление TF2Tools v%{version}"
     installer_started: "Запущен установщик TF2Tools v%{version}"
   notes:
+    button: "Что нового"
     title: "Что нового"
     since: "Изменения с v%{current}, сначала новые."
     english: "Примечания к выпуску на английском."

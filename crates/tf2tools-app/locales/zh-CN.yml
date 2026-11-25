@@ -159,6 +159,7 @@ updater:
     installed: "已安装 TF2Tools v%{version}"
     installer_started: "已启动 TF2Tools v%{version} 安装程序"
   notes:
+    button: "新内容"
     title: "新内容"
     since: "自 v%{current} 以来的更改，最新的在前。"
     english: "更新说明为英文。"

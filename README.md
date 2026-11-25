@@ -118,7 +118,7 @@ TF2Tools looks for Team Fortress 2 in your Steam libraries. The badge at the top
 
 ### Updates
 
-TF2Tools tells you when a new version is out. On Windows and with the AppImage it updates itself in one click. With the `.deb`, it opens the release page so you can download the new one the same way.
+TF2Tools tells you when a new version is out. On Windows and with the AppImage it updates itself in one click. With the `.deb`, it opens the release page so you can download the new one the same way. Before you update, **What's new** shows what changed in each version since yours.
 
 ## Quick start
 
