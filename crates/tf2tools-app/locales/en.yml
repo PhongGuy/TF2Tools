@@ -39,6 +39,7 @@ settings:
     logs_tf: "logs.tf cache"
     store_data: "Store data"
     image_cache: "Image cache"
+    demo_cache: "Demo cache"
   logs_tf:
     title: "logs.tf"
     description: "How opened match logs name players, and how long full logs are kept"

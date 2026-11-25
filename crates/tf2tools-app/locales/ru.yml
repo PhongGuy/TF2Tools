@@ -37,6 +37,7 @@ settings:
     logs_tf: "Кэш logs.tf"
     store_data: "Данные магазинов"
     image_cache: "Кэш изображений"
+    demo_cache: "Кэш демо"
   logs_tf:
     title: "logs.tf"
     description: "Как открытые логи матчей называют игроков и сколько хранятся полные логи"

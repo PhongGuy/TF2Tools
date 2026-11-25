@@ -193,8 +193,8 @@ pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedSt
 }
 
 /// Each kind of stored data in `StorageKind::ALL` order: its name's catalogue key and its colour.
-/// The first five are v5's dark chart colours; sky and lime extend them.
-pub const STORAGE_ROWS: [(StorageKind, &str, u32); 7] = [
+/// The first five are v5's dark chart colours; sky, lime and pink extend them.
+pub const STORAGE_ROWS: [(StorageKind, &str, u32); 8] = [
     (StorageKind::Huds, "settings.storage.huds", 0x1447e6),
     (StorageKind::Sounds, "settings.storage.sounds", 0x00bc7d),
     (
@@ -213,6 +213,11 @@ pub const STORAGE_ROWS: [(StorageKind, &str, u32); 7] = [
         StorageKind::ImageCache,
         "settings.storage.image_cache",
         0xa3e635,
+    ),
+    (
+        StorageKind::DemoCache,
+        "settings.storage.demo_cache",
+        0xfb64b6,
     ),
 ];
 

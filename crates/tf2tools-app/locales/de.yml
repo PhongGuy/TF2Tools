@@ -62,6 +62,7 @@ settings:
     logs_tf: "logs.tf-Cache"
     store_data: "Shop-Daten"
     image_cache: "Bilder-Cache"
+    demo_cache: "Demo-Cache"
   logs_tf:
     title: "logs.tf"
     description: "Wie Spieler in geöffneten Match-Logs heißen und wie lange vollständige Logs aufbewahrt werden"

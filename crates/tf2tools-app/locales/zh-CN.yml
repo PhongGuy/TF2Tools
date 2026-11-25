@@ -61,6 +61,7 @@ settings:
     logs_tf: "logs.tf 缓存"
     store_data: "商店数据"
     image_cache: "图片缓存"
+    demo_cache: "录像缓存"
   logs_tf:
     title: "logs.tf"
     description: "打开的比赛日志中玩家名称的显示方式，以及完整日志的保留时长"

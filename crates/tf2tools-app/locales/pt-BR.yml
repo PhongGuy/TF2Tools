@@ -63,6 +63,7 @@ settings:
     logs_tf: "Cache do logs.tf"
     store_data: "Dados das lojas"
     image_cache: "Cache de imagens"
+    demo_cache: "Cache de demos"
   logs_tf:
     title: "logs.tf"
     description: "Como os logs de partida abertos nomeiam os jogadores e por quanto tempo os logs completos ficam guardados"

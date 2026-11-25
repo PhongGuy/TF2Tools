@@ -860,7 +860,8 @@ fn the_storage_rows_read_their_size_and_any_unpacked_size() {
             "Add-ons",
             "logs.tf cache",
             "Store data",
-            "Image cache"
+            "Image cache",
+            "Demo cache"
         ]
     );
     assert_eq!(
@@ -882,7 +883,7 @@ fn every_storage_kind_has_its_own_colour() {
     let mut colours: Vec<u32> = STORAGE_ROWS.iter().map(|r| r.2).collect();
     colours.sort_unstable();
     colours.dedup();
-    assert_eq!(colours.len(), 7, "{colours:x?}");
+    assert_eq!(colours.len(), 8, "{colours:x?}");
 }
 
 #[test]
@@ -953,6 +954,32 @@ fn the_storage_card_lists_every_kind_with_its_size(cx: &mut TestAppContext) {
             .storage()
             .unwrap()
             .bytes(StorageKind::Huds)
+    );
+}
+
+#[gpui_kit::test]
+fn the_storage_card_counts_every_file_in_the_demo_folder(cx: &mut TestAppContext) {
+    use tf2tools_app::library_pack::LibraryPack;
+    use tf2tools_app::pages::settings::{storage_name, storage_row_label};
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let demos = env.data.demo_cache_dir();
+    std::fs::create_dir_all(&demos).unwrap();
+    std::fs::write(demos.join("7.dem"), [1u8; 3000]).unwrap();
+    std::fs::write(demos.join(".8.dem.abc123.part"), [2u8; 500]).unwrap();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::settings_storage(StorageKind::DemoCache));
+    let landed = cx
+        .update(|cx| LibraryPack::global(cx).read(cx).space())
+        .expect("figures");
+    assert_eq!(landed.bytes(StorageKind::DemoCache), 3500);
+    let want = storage_row_label(&storage_name(StorageKind::DemoCache), 3500, 3500);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_storage(StorageKind::DemoCache)).as_deref(),
+        Some(want.as_str())
     );
 }
 

@@ -64,6 +64,7 @@ settings:
     logs_tf: "Cache logs.tf"
     store_data: "Données des magasins"
     image_cache: "Cache des images"
+    demo_cache: "Cache des démos"
   logs_tf:
     title: "logs.tf"
     description: "L'affichage du nom des joueurs dans les logs de match ouverts et la durée de conservation des logs complets"
