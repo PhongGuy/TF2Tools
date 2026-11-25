@@ -576,3 +576,80 @@ fn a_store_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
         "{shown}"
     );
 }
+
+/// Wheels the Settings page a line at a time until `id` is fully in view.
+fn scroll_to(cx: &mut TestAppContext, s: &ShellWindow, id: gpui_kit::ElementId) {
+    for _ in 0..120 {
+        let page = support::bounds_of(cx, s.win, ids::page(Page::Settings)).unwrap();
+        let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        if b.top() >= page.top() && b.bottom() <= page.bottom() {
+            return;
+        }
+        let step = if b.top() < page.top() { 1. } else { -1. };
+        let turn = ScrollDelta::Lines(point(0., step));
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::page(Page::Settings), turn, cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    }
+    panic!("{id:?} never scrolled into the Settings page");
+}
+
+// The Demo cache row and its Clear button stay inside the Storage card at 800 px, translated.
+fn demo_cache_row_fits_an_800_px_window(cx: &mut TestAppContext, code: &str) {
+    use gpui_kit::{Bounds, Pixels, size};
+    use tf2tools_core::StorageKind;
+    fn inside(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
+        a.left() >= b.left()
+            && a.right() <= b.right()
+            && a.top() >= b.top()
+            && a.bottom() <= b.bottom()
+    }
+    let _guard = LocaleGuard::switch(code);
+    let env = support::env();
+    let demos = env.data.demo_cache_dir();
+    std::fs::create_dir_all(&demos).unwrap();
+    std::fs::write(demos.join("1.dem"), [1u8; 3000]).unwrap();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the storage measure", |cx| {
+        cx.update(|cx| {
+            tf2tools_app::library_pack::LibraryPack::global(cx)
+                .read(cx)
+                .space()
+                .is_some_and(|u| u.bytes(StorageKind::DemoCache) > 0)
+        })
+    });
+    support::settle(cx, s.win);
+    let clear = ids::settings_storage_clear(StorageKind::DemoCache);
+    scroll_to(cx, &s, clear.clone());
+    let card = support::bounds_of(cx, s.win, ids::SETTINGS_STORAGE).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::settings_storage(StorageKind::DemoCache)).unwrap();
+    let button = support::bounds_of(cx, s.win, clear).unwrap();
+    assert!(inside(row, card), "{code}: row {row:?} leaves {card:?}");
+    assert!(
+        inside(button, row),
+        "{code}: button {button:?} leaves {row:?}"
+    );
+    assert!(
+        card.right() <= px(800.),
+        "{code}: card {card:?} passes 800 px"
+    );
+}
+
+#[gpui_kit::test]
+fn the_german_demo_cache_row_fits_an_800_px_window(cx: &mut TestAppContext) {
+    demo_cache_row_fits_an_800_px_window(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_russian_demo_cache_row_fits_an_800_px_window(cx: &mut TestAppContext) {
+    demo_cache_row_fits_an_800_px_window(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_brazilian_demo_cache_row_fits_an_800_px_window(cx: &mut TestAppContext) {
+    demo_cache_row_fits_an_800_px_window(cx, "pt-BR");
+}
