@@ -50,7 +50,7 @@ pub const UPDATE_NOTES_TITLE: &str = "update-notes-title";
 pub const UPDATE_NOTES_SINCE: &str = "update-notes-since";
 /// Shown when the app's language is not English, as the notes are.
 pub const UPDATE_NOTES_ENGLISH: &str = "update-notes-english";
-/// Shown when some versions' notes are missing, beside `UPDATE_NOTES_HISTORY`.
+/// Shown when some versions' notes are missing, above `UPDATE_NOTES_HISTORY`.
 pub const UPDATE_NOTES_PARTIAL: &str = "update-notes-partial";
 /// Shown in place of the releases when no notes could be loaded.
 pub const UPDATE_NOTES_UNAVAILABLE: &str = "update-notes-unavailable";
