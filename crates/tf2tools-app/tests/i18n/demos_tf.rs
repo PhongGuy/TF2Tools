@@ -8,7 +8,9 @@ use crate::LocaleGuard;
 use crate::library::shown_text;
 use crate::support;
 use support::demo_viewer::inside;
-use support::demostf::{demos_tf_shell, mount_first, wait_end};
+use support::demostf::{
+    demo, demos_tf_shell, list_body, mount_before, mount_first, wait_end, wait_ids,
+};
 
 #[gpui_kit::test]
 fn the_german_toolbar_fits_an_800_px_window(cx: &mut TestAppContext) {
@@ -78,4 +80,52 @@ fn the_list_error_follows_a_language_switch(cx: &mut TestAppContext) {
         support::label_of(cx, d.s.win, ids::DEMOS_TF_ERROR).as_deref(),
         Some("demos.tf сейчас не отвечает. Попробуйте позже.")
     );
+}
+
+// Download and Watch share the row's action column; translated, both stay inside the list
+// at 800 px and to the right of Length.
+fn row_actions_fit_an_800_px_window(cx: &mut TestAppContext, code: &str) {
+    let _guard = LocaleGuard::switch(code);
+    let (env, server) = (support::env(), support::StoreServer::start());
+    mount_first(&server, list_body(&server.uri(), &[demo(7)]));
+    mount_before(&server, 7, 200, b"[]".to_vec());
+    let d = demos_tf_shell(cx, &env, &server.uri(), &[]);
+    wait_ids(cx, &d.page, &[7]);
+    wait_end(cx, &d.page);
+    cx.simulate_window_resize(d.s.win, size(px(800.), px(600.)));
+    support::settle(cx, d.s.win);
+    let list = support::bounds_of(cx, d.s.win, ids::DEMOS_TF_LIST).unwrap();
+    let length = support::bounds_of(cx, d.s.win, ids::demos_tf_row_duration(7)).unwrap();
+    for id in [ids::demos_tf_download(7), ids::demos_tf_watch(7)] {
+        let part = support::bounds_of(cx, d.s.win, id.clone()).unwrap();
+        assert!(
+            inside(part, list),
+            "{code}: {id:?} at {part:?} leaves {list:?}"
+        );
+    }
+    let download = support::bounds_of(cx, d.s.win, ids::demos_tf_download(7)).unwrap();
+    let watch = support::bounds_of(cx, d.s.win, ids::demos_tf_watch(7)).unwrap();
+    assert!(
+        download.left() >= length.right(),
+        "{code}: Download covers Length"
+    );
+    assert!(
+        watch.left() >= download.right(),
+        "{code}: Watch covers Download"
+    );
+}
+
+#[gpui_kit::test]
+fn the_german_row_actions_fit_an_800_px_window(cx: &mut TestAppContext) {
+    row_actions_fit_an_800_px_window(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_russian_row_actions_fit_an_800_px_window(cx: &mut TestAppContext) {
+    row_actions_fit_an_800_px_window(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_brazilian_row_actions_fit_an_800_px_window(cx: &mut TestAppContext) {
+    row_actions_fit_an_800_px_window(cx, "pt-BR");
 }

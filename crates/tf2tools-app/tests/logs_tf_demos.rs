@@ -7,6 +7,7 @@ use gpui_kit::{Entity, ListOffset, TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::{DemoLookup, LogsTfPage};
 use tf2tools_app::picker::{PickKind, ScriptedPicker};
+use tf2tools_core::DemoCache;
 
 use crate::support;
 use crate::support::logstf::{
@@ -308,4 +309,19 @@ fn the_footer_fits_an_800_px_window(cx: &mut TestAppContext) {
     let env = support::env();
     let f = demo_footer_at_800(cx, &env);
     assert_footer_fits(cx, &f.s, 3);
+}
+
+#[gpui_kit::test]
+fn a_demo_cached_by_watch_saves_without_a_file_request(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("m.dem");
+    let d = at_footer(cx, Some(sixes_list), vec![path.clone()]);
+    let cached = DemoCache::new(d._env.data.demo_cache_dir()).path_for(DEMO_ID);
+    std::fs::create_dir_all(cached.parent().unwrap()).unwrap();
+    std::fs::write(&cached, b"cached demo").unwrap();
+    support::click_id(cx, d.s.win, ids::logstf_demo_download(3));
+    let said = toast(cx, &d);
+    assert!(said.starts_with("Demo downloaded"), "{said}");
+    assert_eq!(std::fs::read(&path).unwrap(), b"cached demo");
+    assert_eq!(requests_to(&d.server, DEMO_ROUTE), 0, "no file request");
 }

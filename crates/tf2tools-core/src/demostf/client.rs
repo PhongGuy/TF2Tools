@@ -217,18 +217,8 @@ impl DemosClient {
                 url: url.to_owned(),
             });
         }
-        // The part file sits beside `dest` so the final rename never crosses a filesystem,
-        // and it is created before asking so an unwritable folder costs no request.
-        let dir = match dest.parent() {
-            Some(dir) if !dir.as_os_str().is_empty() => dir,
-            _ => Path::new("."),
-        };
-        let name = dest.file_name().unwrap_or_default().to_string_lossy();
-        let part = tempfile::Builder::new()
-            .prefix(&format!(".{name}."))
-            .suffix(".part")
-            .tempfile_in(dir)
-            .map_err(write_failure)?;
+        // Created before asking, so an unwritable folder costs no request.
+        let part = part_beside(dest)?;
 
         // As in `get`: each 429 widens the gate, and an answer with none helps ease it back.
         self.pacer.slot(Priority::Interactive).await;
@@ -317,8 +307,22 @@ fn unpaced_http(config: &StoreConfig, endpoints: &DemosEndpoints) -> Http {
     crate::store::http_for(&config, &endpoints.redirects())
 }
 
+/// A hidden part file beside `dest`, so the final rename never crosses a filesystem.
+pub(super) fn part_beside(dest: &Path) -> Result<tempfile::NamedTempFile, DemosError> {
+    let dir = match dest.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir,
+        _ => Path::new("."),
+    };
+    let name = dest.file_name().unwrap_or_default().to_string_lossy();
+    tempfile::Builder::new()
+        .prefix(&format!(".{name}."))
+        .suffix(".part")
+        .tempfile_in(dir)
+        .map_err(write_failure)
+}
+
 /// A filesystem failure while saving a demo.
-fn write_failure(error: std::io::Error) -> DemosError {
+pub(super) fn write_failure(error: std::io::Error) -> DemosError {
     DemosError::Write {
         message: error.to_string(),
     }

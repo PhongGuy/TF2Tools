@@ -2,6 +2,7 @@
 
 mod crumb;
 mod list;
+mod save;
 pub mod text;
 mod watch;
 
@@ -138,6 +139,8 @@ pub struct DemosTfPage {
     error: Option<Phrase>,
     // Watch downloads in flight by demo id, with their whole percent once known.
     downloads: HashMap<u64, Option<u8>>,
+    // Saves in flight by demo id, with their whole percent once known.
+    save_downloads: HashMap<u64, Option<u8>>,
     _subscriptions: [Subscription; 4],
 }
 
@@ -202,6 +205,7 @@ impl DemosTfPage {
             language: i18n::current(),
             error: None,
             downloads: HashMap::new(),
+            save_downloads: HashMap::new(),
             _subscriptions: [release, released, picked, typed],
         };
         page.restart(cx);

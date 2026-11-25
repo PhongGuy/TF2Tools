@@ -2,8 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use super::client::{part_beside, write_failure};
 use super::{DemoSummary, DemosClient};
-use crate::error::DemoCacheError;
+use crate::error::{DemoCacheError, DemosError};
 use crate::store::{dir_size, sweep};
 
 /// The cache size past which a download triggers a sweep.
@@ -70,6 +71,34 @@ impl DemoCache {
         Ok(path)
     }
 
+    /// Saves `demo` to `dest`: a cached copy when Watch already fetched it, else a fresh
+    /// download straight to `dest`. Never fills or sweeps the cache.
+    pub async fn save_to(
+        &self,
+        client: &DemosClient,
+        demo: &DemoSummary,
+        dest: &Path,
+        progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
+    ) -> Result<(), DemosError> {
+        let cached = self.path_for(demo.id());
+        let hit = std::fs::metadata(&cached).is_ok_and(|m| m.is_file() && m.len() > 0);
+        if !hit {
+            return client.download_demo(demo, dest, progress).await;
+        }
+        // The copy is blocking file work, so it runs off the small async runtime.
+        // Tokio turns a panic in it into a Write error, so it runs marked as handled.
+        let dest = dest.to_owned();
+        let len = tokio::task::spawn_blocking(move || {
+            crate::panic_mark::marked(|| copy_through_part(&cached, &dest))
+        })
+        .await
+        .map_err(|e| DemosError::Write {
+            message: e.to_string(),
+        })??;
+        progress(len, Some(len));
+        Ok(())
+    }
+
     /// Sweeps when over the high mark, sparing `keep` and in-flight dot files. Failures only warn.
     fn trim(&self, keep: &Path) {
         match dir_size(&self.dir) {
@@ -87,6 +116,24 @@ impl DemoCache {
             Err(e) => tracing::warn!("demo cache size check failed: {e}"),
         }
     }
+}
+
+/// Copies `src` to `dest` through a part file readable by all, returning the byte count.
+/// Same part-file scheme as a download, so a failed copy never touches `dest`.
+fn copy_through_part(src: &Path, dest: &Path) -> Result<u64, DemosError> {
+    let mut part = part_beside(dest)?;
+    let mut file = std::fs::File::open(src).map_err(write_failure)?;
+    let len = std::io::copy(&mut file, part.as_file_mut()).map_err(write_failure)?;
+    part.as_file().sync_all().map_err(write_failure)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        part.as_file()
+            .set_permissions(std::fs::Permissions::from_mode(0o644))
+            .map_err(write_failure)?;
+    }
+    part.persist(dest).map_err(|e| write_failure(e.error))?;
+    Ok(len)
 }
 
 #[cfg(test)]

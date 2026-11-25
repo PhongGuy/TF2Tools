@@ -2,6 +2,7 @@ use super::DemoCache;
 use crate::demostf::demo::parse_list;
 use crate::demostf::{DemoSummary, DemosClient, DemosEndpoints};
 use crate::error::DemoCacheError;
+use crate::error::DemosError;
 use crate::store::StoreConfig;
 use serde_json::json;
 use std::path::Path;
@@ -124,4 +125,73 @@ async fn a_failed_download_is_a_download_error() {
             crate::error::DemosError::ForeignUrl { .. }
         ))
     ));
+}
+
+#[tokio::test]
+async fn save_to_copies_a_cached_demo_without_asking() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_server, client, url) = serving(vec![], 0).await;
+    let cache = DemoCache::new(tmp.path().join("demos"));
+    std::fs::create_dir_all(tmp.path().join("demos")).unwrap();
+    std::fs::write(cache.path_for(7), b"cached demo").unwrap();
+    let out = tmp.path().join("out");
+    std::fs::create_dir(&out).unwrap();
+    let dest = out.join("saved.dem");
+    cache
+        .save_to(&client, &summary(7, &url), &dest, &no_progress)
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(&dest).unwrap(), b"cached demo");
+    assert_eq!(names(&out), ["saved.dem"], "no part file is left");
+    assert_eq!(std::fs::read(cache.path_for(7)).unwrap(), b"cached demo");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o644, "other tools and users can read the demo");
+    }
+}
+
+#[tokio::test]
+async fn save_to_downloads_a_missing_demo_and_leaves_the_cache_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_server, client, url) = serving(vec![2u8; 300], 1).await;
+    let cache = DemoCache::new(tmp.path().join("demos"));
+    let out = tmp.path().join("out");
+    std::fs::create_dir(&out).unwrap();
+    let dest = out.join("saved.dem");
+    cache
+        .save_to(&client, &summary(7, &url), &dest, &no_progress)
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(&dest).unwrap(), vec![2u8; 300]);
+    assert_eq!(names(&out), ["saved.dem"]);
+    assert!(
+        !tmp.path().join("demos").exists(),
+        "the cache is never filled"
+    );
+}
+
+#[tokio::test]
+async fn save_to_an_unwritable_folder_is_a_write_error_and_leaves_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_server, client, url) = serving(vec![2u8; 300], 0).await;
+    let cache = DemoCache::new(tmp.path().join("demos"));
+    let dest = tmp.path().join("missing").join("saved.dem");
+    // A miss fails on the part file before asking demos.tf.
+    let missed = cache
+        .save_to(&client, &summary(7, &url), &dest, &no_progress)
+        .await;
+    assert!(
+        matches!(missed, Err(DemosError::Write { .. })),
+        "{missed:?}"
+    );
+    // A hit fails the same way on the copy.
+    std::fs::create_dir_all(tmp.path().join("demos")).unwrap();
+    std::fs::write(cache.path_for(7), b"cached demo").unwrap();
+    let hit = cache
+        .save_to(&client, &summary(7, &url), &dest, &no_progress)
+        .await;
+    assert!(matches!(hit, Err(DemosError::Write { .. })), "{hit:?}");
+    assert!(!tmp.path().join("missing").exists(), "nothing is written");
 }

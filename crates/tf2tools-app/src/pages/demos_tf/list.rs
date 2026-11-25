@@ -2,6 +2,7 @@
 //! one row per demo, then a footer that says whether more is loading, nothing was found or
 //! the page failed.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::select::Select;
@@ -29,10 +30,10 @@ use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 
-// Column widths beyond the ones shared with logs.tf's rows; WATCH keeps room for the row's
-// Watch button.
+// Column widths beyond the ones shared with logs.tf's rows; ACTIONS keeps room for the row's
+// Download and Watch buttons.
 const FORMAT: Pixels = px(88.);
-const WATCH: Pixels = px(96.);
+const ACTIONS: Pixels = px(132.);
 const TITLE_MIN: Pixels = px(120.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
@@ -47,7 +48,7 @@ const FORMAT_SELECT: Pixels = px(176.);
 const MAP_INPUT: Pixels = px(176.);
 
 /// How the rows fit the list's width: a narrow list moves format and map under the title,
-/// then the date too; title, length and Watch always keep their columns.
+/// then the date too; title, length and the actions always keep their columns.
 #[derive(Clone, Copy)]
 struct Fit {
     side_columns: bool,
@@ -58,7 +59,7 @@ fn fit(list: &ListState) -> Fit {
     let width = list.viewport_bounds().size.width.min(MAX_WIDTH);
     // Before the first frame the list has no width yet, so it lays out in full.
     let unknown = width <= px(0.);
-    let dated = DATE + TITLE_MIN + LENGTH + WATCH + GAP * 3. + PADDING;
+    let dated = DATE + TITLE_MIN + LENGTH + ACTIONS + GAP * 3. + PADDING;
     Fit {
         side_columns: unknown || width >= dated + FORMAT + MAP + GAP * 2.,
         date_column: unknown || width >= dated,
@@ -82,8 +83,10 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
                 let page = page.read(cx);
                 match page.feed.items().get(ix - 1) {
                     Some(row) => {
-                        let downloading = page.download_progress(row.feed_id());
-                        demo_row(row, downloading, fit, this.clone(), cx)
+                        let id = row.feed_id();
+                        let (downloading, saving) =
+                            (page.download_progress(id), page.save_progress(id));
+                        demo_row(row, downloading, saving, fit, this.clone(), cx)
                     }
                     None => {
                         // Building the footer means it is near the view, so ask for the next
@@ -246,14 +249,15 @@ fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
                 .child(cell(MAP, tr!("demos_tf.column.map")))
         })
         .child(cell(LENGTH, tr!("demos_tf.column.length")).text_right())
-        .child(div().w(WATCH).flex_none())
+        .child(div().w(ACTIONS).flex_none())
 }
 
-// One demo: date, title, format, map, length and Watch, with whatever no longer fits beside
-// the title moved under it as one muted line.
+// One demo: date, title, format, map, length, Download and Watch, with whatever no longer
+// fits beside the title moved under it as one muted line.
 fn demo_row(
     row: &DemoRow,
     downloading: Option<Option<u8>>,
+    saving: Option<Option<u8>>,
     fit: Fit,
     this: WeakEntity<DemosTfPage>,
     cx: &App,
@@ -264,6 +268,17 @@ fn demo_row(
     let title = demo_title(demo.server(), demo.red(), demo.blue());
     let format = format_label(demo.format());
     let public = !demo.url().is_empty();
+    let save_page = this.clone();
+    let download = Button::new(ids::demos_tf_download(id))
+        .outline()
+        .small()
+        .icon(IconName::Download)
+        .named(demo_button_label(saving))
+        .loading(saving.is_some())
+        .disabled(!public || saving.is_some())
+        .on_click(move |_, window, cx| {
+            let _ = save_page.update(cx, |page, cx| page.save(id, window, cx));
+        });
     let watch = Button::new(ids::demos_tf_watch(id))
         .outline()
         .small()
@@ -341,7 +356,16 @@ fn demo_row(
             ids::demos_tf_row_duration(id),
             duration_text(demo.duration()),
         ))
-        .child(div().w(WATCH).flex_none().flex().justify_end().child(watch))
+        .child(
+            div()
+                .w(ACTIONS)
+                .flex_none()
+                .flex()
+                .justify_end()
+                .gap_1()
+                .child(download)
+                .child(watch),
+        )
         .into_any_element()
 }
 

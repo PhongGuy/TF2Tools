@@ -3576,6 +3576,11 @@ pub fn demos_tf_row_duration(id: u64) -> ElementId {
 pub fn demos_tf_watch(id: u64) -> ElementId {
     keyed("demos-tf-watch", &id.to_string())
 }
+
+/// A Demos.tf row's Download button, which saves the demo to a file the player picks.
+pub fn demos_tf_download(id: u64) -> ElementId {
+    keyed("demos-tf-download", &id.to_string())
+}
 /// The Demos.tf header crumb's "Demos.tf" link, which closes the viewer back to the list.
 pub const DEMOS_TF_CRUMB: &str = "demos-tf-crumb";
 /// The Demos.tf header crumb's name of the open demo: its map, or its file until the map is known.
