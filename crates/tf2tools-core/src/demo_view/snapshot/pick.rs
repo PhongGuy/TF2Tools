@@ -6,7 +6,7 @@ use crate::weapons::TfClass;
 
 /// Signon packets carry this tick; they come before the first real tick.
 pub(crate) const SENTINEL_TICK: u32 = 1 << 31;
-/// A pre-round to running edge later than this is not the match start.
+/// A pre-round to running edge later than this after the first tick is not the match start.
 const EDGE_SEARCH_TICKS: u32 = 20_000;
 /// The window opens this long after its anchor, once players have spawned and left spawn.
 const WINDOW_DELAY: u32 = 1000;
@@ -98,9 +98,14 @@ impl SnapshotPicker {
         if tick >= SENTINEL_TICK {
             return Step::Continue;
         }
-        let first = *self.first_tick.get_or_insert(tick);
+        // Every limit counts from the recording's first tick. Real demos open with one frame at
+        // the server's own tick before restarting near zero, so a lower tick moves the anchor.
+        let first = match self.first_tick {
+            Some(first) if first <= tick => first,
+            _ => *self.first_tick.insert(tick),
+        };
         if self.edge.is_none()
-            && tick < EDGE_SEARCH_TICKS
+            && tick - first < EDGE_SEARCH_TICKS
             && self.last_state == Some(PREROUND)
             && frame.round_state == RUNNING
         {
@@ -123,13 +128,13 @@ impl SnapshotPicker {
                 (false, _) => offer(&mut self.at_edge, tick, rows),
             }
         }
-        self.step(tick)
+        self.step(first, tick)
     }
 
-    fn step(&self, tick: u32) -> Step {
+    fn step(&self, first: u32, tick: u32) -> Step {
         let done = match self.edge {
             Some(edge) => tick.saturating_add(1) >= window_end(edge),
-            None => tick >= EDGE_SEARCH_TICKS,
+            None => tick - first >= EDGE_SEARCH_TICKS,
         };
         if done { Step::Done } else { Step::Continue }
     }
@@ -298,11 +303,45 @@ mod tests {
         assert_eq!(rows.len(), 4);
     }
 
+    // A real recording starts at the server's tick, so the same opening shifted far from zero
+    // must pick the same moment, shifted by the same amount.
+    #[test]
+    fn a_recording_that_starts_at_a_late_server_tick_picks_the_same_moment() {
+        const SHIFT: u32 = 186_593;
+        let mut picker = SnapshotPicker::new();
+        let done = feed(
+            &mut picker,
+            SHIFT + 1..=SHIFT + 10_000,
+            |tick| product_states(tick - SHIFT),
+            |_| teams(2, 2),
+        );
+        assert_eq!(done, Some(SHIFT + 668 + 1999));
+        let (tick, rows) = picker.finish().unwrap();
+        assert_eq!(tick, SHIFT + 1668);
+        assert_eq!(rows.len(), 4);
+    }
+
+    // Real demos open with one frame at the server's tick before the ticks restart from zero;
+    // that lone frame must not anchor the fallback window or end the edge search.
+    #[test]
+    fn a_leading_server_tick_frame_does_not_anchor_the_limits() {
+        let mut picker = SnapshotPicker::new();
+        assert_eq!(picker.push(frame(186_594, 0, Vec::new())), Step::Continue);
+        let done = feed(&mut picker, 0..=30_000, |_| RUNNING, |_| teams(1, 1));
+        assert_eq!(done, Some(EDGE_SEARCH_TICKS));
+        assert_eq!(picker.finish().unwrap().0, 1000);
+
+        let mut picker = SnapshotPicker::new();
+        picker.push(frame(186_594, 0, Vec::new()));
+        feed(&mut picker, 1..=10_000, product_states, |_| teams(2, 2));
+        assert_eq!(picker.finish().unwrap().0, 1668);
+    }
+
     #[test]
     fn the_opening_running_state_is_not_an_edge() {
         let mut picker = SnapshotPicker::new();
         let done = feed(&mut picker, 5..=30_000, |_| RUNNING, |_| teams(1, 1));
-        assert_eq!(done, Some(EDGE_SEARCH_TICKS));
+        assert_eq!(done, Some(5 + EDGE_SEARCH_TICKS));
         assert_eq!(picker.finish().unwrap().0, 1005);
     }
 
