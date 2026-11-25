@@ -449,6 +449,8 @@ fn the_sign_job_checks_the_notes_against_the_signed_manifest() {
         "\"https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/notes.json\"",
         "stat -c %s dist/notes.json",
         "sha256sum < dist/notes.json",
+        "\"$(stat -c %s dist/notes.json)\" -gt 49152",
+        "notes.json is larger than 49152 bytes",
         "notes: notes.json matches",
     ] {
         assert!(verify.contains(needle), "missing {needle}:\n{verify}");

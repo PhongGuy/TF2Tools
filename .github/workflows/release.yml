@@ -393,6 +393,10 @@ jobs:
             echo "notes.json does not match the manifest" >&2
             exit 1
           fi
+          if [ "$(stat -c %s dist/notes.json)" -gt 49152 ]; then
+            echo "notes.json is larger than 49152 bytes" >&2
+            exit 1
+          fi
           out+=$'\n'"notes: notes.json matches"
           printf '%s\n' "$out"
           if ! grep -qxF 'windows-x86_64-nsis: TF2Tools.exe matches' <<<"$out"; then

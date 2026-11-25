@@ -246,14 +246,14 @@ pub(crate) fn in_range(
     (shown, status)
 }
 
-/// Makes untrusted text safe to show on one line: tab and newline become a space, other
-/// control characters and bidi overrides are removed, and the result is cut to `max`
-/// characters ending in `...`.
+/// Makes untrusted text safe to show on one line: tab, newline, U+2028 and U+2029 become a
+/// space, other control characters and bidi overrides are removed, and the result is cut to
+/// `max` characters ending in `...`.
 pub(crate) fn clean(text: &str, max: usize) -> String {
     let kept: Vec<char> = text
         .chars()
         .filter_map(|c| match c {
-            '\t' | '\n' => Some(' '),
+            '\t' | '\n' | '\u{2028}' | '\u{2029}' => Some(' '),
             '\u{0}'..='\u{1f}' | '\u{7f}'..='\u{9f}' => None,
             '\u{061c}'
             | '\u{200e}'
@@ -384,6 +384,11 @@ mod tests {
         assert_eq!(long.chars().count(), 500);
         assert!(long.ends_with("..."));
         assert_eq!(clean("short", 500), "short");
+    }
+
+    #[test]
+    fn clean_turns_line_and_paragraph_separators_into_spaces() {
+        assert_eq!(clean("a\u{2028}b\u{2029}c", 100), "a b c");
     }
 
     #[test]
