@@ -130,6 +130,17 @@ pub fn demos_tf_shell(
     base: &str,
     players: &[(u64, &'static str)],
 ) -> DemosTf {
+    demos_tf_shell_picking(cx, env, base, players, Arc::new(ScriptedPicker::empty()))
+}
+
+/// [`demos_tf_shell`] with `picker` answering the file dialogs.
+pub fn demos_tf_shell_picking(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    base: &str,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> DemosTf {
     cx.executor().allow_parking();
     let (factory, stubs) = stub_factory(StubAnswer::Frames);
     let (base, players) = (base.to_owned(), players.to_vec());
@@ -137,7 +148,7 @@ pub fn demos_tf_shell(
         cx,
         env,
         super::graphics::found(env),
-        Arc::new(ScriptedPicker::empty()),
+        picker,
         super::no_steam(),
         None,
         move |services| {

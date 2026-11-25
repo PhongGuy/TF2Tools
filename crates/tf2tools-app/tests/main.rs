@@ -56,6 +56,7 @@ mod demo_viewer_bar;
 mod demo_viewer_download;
 mod demo_viewport;
 mod demos_tf;
+mod demos_tf_download;
 mod demos_tf_filters;
 mod demos_tf_list;
 mod demos_tf_text;
