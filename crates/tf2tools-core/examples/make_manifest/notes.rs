@@ -146,9 +146,20 @@ pub fn build(
     Ok(json)
 }
 
+/// The notes.json document. A struct, not `json!`, so the key order never depends on
+/// serde_json's `preserve_order` feature being unified in.
+#[derive(serde::Serialize)]
+struct Document<'a> {
+    schema: u32,
+    releases: &'a [Release],
+}
+
 fn serialise(releases: &[Release]) -> Result<String, String> {
-    serde_json::to_string(&serde_json::json!({ "schema": 1, "releases": releases }))
-        .map_err(|e| e.to_string())
+    serde_json::to_string(&Document {
+        schema: 1,
+        releases,
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -591,6 +602,17 @@ mod tests {
             body.push_str(&format!("* {n:04} {}\n", "x".repeat(width)));
         }
         body
+    }
+
+    #[test]
+    fn notes_json_keys_come_out_in_document_order() {
+        let releases = read_releases(&fixtures().join("releases")).unwrap();
+        let json = build(&releases, &page(), "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap();
+        assert!(
+            json.starts_with(r#"{"schema":1,"releases":[{"version":""#),
+            "{}",
+            &json[..json.len().min(80)]
+        );
     }
 
     #[test]
