@@ -292,3 +292,35 @@ fn open_keeps_the_demos_client_on_loopback_when_offline() {
         assert_eq!(services.demos.is_loopback_only(), offline);
     }
 }
+
+#[test]
+fn open_builds_the_demos_client_on_the_callers_endpoints() {
+    let env = support::env();
+    let open = |endpoints, offline| {
+        Services::open(
+            env.data.clone(),
+            support::repo_asset_root(),
+            Arc::new(ScriptedPicker::empty()),
+            support::no_steam(),
+            Arc::new(RecordingAudio::new()),
+            endpoints,
+            offline,
+        )
+        .unwrap()
+        .demos
+    };
+    let local = open(Endpoints::loopback("http://127.0.0.1:9"), true);
+    assert_eq!(local.endpoints().api(), "http://127.0.0.1:9/demostf");
+    assert_eq!(
+        local.endpoints().files(),
+        [
+            "http://127.0.0.1:9/demostf/files",
+            "http://127.0.0.1:9/demostf/freezer"
+        ]
+    );
+    assert!(local.is_loopback_only());
+
+    let live = open(Endpoints::default(), false);
+    assert_eq!(live.endpoints().api(), "https://api.demos.tf");
+    assert!(!live.is_loopback_only());
+}
