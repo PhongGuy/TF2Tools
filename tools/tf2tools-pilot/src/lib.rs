@@ -227,8 +227,8 @@ pub fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         // A QA run launched under another LANG starts in that language, as the real app does.
         locales: tf2tools_app::i18n::system_locales(),
     }
-    // A pilot QA run never reaches the real stores: its endpoints are a closed loopback port,
-    // and the offline mask refuses any other host on top.
+    // A pilot QA run never reaches the real stores: its endpoints are a closed loopback port
+    // (demos.tf goes to the loopback fake), and the offline mask refuses any other host on top.
     .offline(None);
     // `offline` replaces the endpoints, so the demos fake is pointed at only after it.
     let fake = shared_demos_fake();
@@ -236,8 +236,7 @@ pub fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         .as_ref()
         .map_err(|e| anyhow::anyhow!("demos fake: {e}"))?;
     Ok(Boot {
-        endpoints: Endpoints::loopback(tf2tools_app::app::CLOSED_BASE)
-            .with_demos(DemosEndpoints::loopback(fake.base())),
+        endpoints: boot.endpoints.with_demos(DemosEndpoints::loopback(fake.base())),
         ..boot
     })
 }
