@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::client::{part_beside, write_failure};
 use super::{DemoSummary, DemosClient};
-use crate::error::{DemoCacheError, DemosError};
+use crate::error::{DemoCacheError, DemoClearError, DemosError};
 use crate::store::{dir_size, sweep};
 
 /// The cache size past which a download triggers a sweep.
@@ -99,6 +99,52 @@ impl DemoCache {
         Ok(())
     }
 
+    /// Deletes every finished demo (`<id>.dem` files) and returns the bytes freed.
+    /// Partial downloads, links and anything else are kept; a missing folder frees 0.
+    ///
+    /// # Errors
+    /// `DemoClearError::Io` when the folder cannot be listed, or for the first demo that
+    /// could not be deleted; the rest are still tried.
+    pub fn clear(&self) -> Result<u64, DemoClearError> {
+        let folder_error = |source| DemoClearError::Io {
+            path: self.dir.clone(),
+            source,
+        };
+        let entries = match std::fs::read_dir(&self.dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => return Err(folder_error(e)),
+        };
+        let mut freed = 0_u64;
+        let mut first_error = None;
+        for entry in entries {
+            let path = entry.map_err(folder_error)?.path();
+            if !path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(is_demo_name)
+            {
+                continue;
+            }
+            // Only plain files go, so a link never deletes what it points at.
+            let len = match std::fs::symlink_metadata(&path) {
+                Ok(meta) if meta.file_type().is_file() => meta.len(),
+                _ => continue,
+            };
+            // A demo already gone was freed by someone else, so it still counts.
+            match std::fs::remove_file(&path) {
+                Ok(()) => freed = freed.saturating_add(len),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    freed = freed.saturating_add(len);
+                }
+                Err(source) => {
+                    first_error.get_or_insert(DemoClearError::Io { path, source });
+                }
+            }
+        }
+        first_error.map_or(Ok(freed), Err)
+    }
+
     /// Sweeps when over the high mark, sparing `keep` and in-flight dot files. Failures only warn.
     fn trim(&self, keep: &Path) {
         match dir_size(&self.dir) {
@@ -116,6 +162,12 @@ impl DemoCache {
             Err(e) => tracing::warn!("demo cache size check failed: {e}"),
         }
     }
+}
+
+/// Whether `name` is a finished demo, `<digits>.dem`; partial downloads never match.
+fn is_demo_name(name: &str) -> bool {
+    name.strip_suffix(".dem")
+        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// Copies `src` to `dest` through a part file readable by all, returning the byte count.

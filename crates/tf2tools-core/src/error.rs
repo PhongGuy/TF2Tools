@@ -2630,6 +2630,20 @@ pub enum DemoCacheError {
     Download(#[from] DemosError),
 }
 
+/// Why the demo cache could not be cleared.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoClearError {
+    /// The cache folder could not be listed or a demo in it could not be deleted.
+    #[error("cannot clear the demo cache at {}: {source}", path.display())]
+    Io {
+        /// The folder or demo that failed.
+        path: PathBuf,
+        /// What the filesystem reported.
+        source: std::io::Error,
+    },
+}
+
 /// Why a stored logs.tf body could not be read as a log.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

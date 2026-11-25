@@ -59,17 +59,17 @@ pub use demostf::{
 };
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
-    BrowseError, CatalogError, CopyHudError, DataDirError, DemoCacheError, DemoHeaderError,
-    DemoSnapshotError, DemosError, DetectError, DownloadError, FilesError, FontCheckError,
-    FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError, GbMapInstallError,
-    GbMapRemoveError, HistoryError, HudFilesError, HudLoadError, ImageError, ImportError,
-    InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError,
-    LogParseError, LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError,
-    MapMeshError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
-    PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
-    ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, ResolveError,
-    RestoreMastercomfigError, SchemaError, SettingPicturesError, SettingsError, StorageError,
-    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    BrowseError, CatalogError, CopyHudError, DataDirError, DemoCacheError, DemoClearError,
+    DemoHeaderError, DemoSnapshotError, DemosError, DetectError, DownloadError, FilesError,
+    FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
+    GbMapInstallError, GbMapRemoveError, HistoryError, HudFilesError, HudLoadError, ImageError,
+    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
+    LogError, LogParseError, LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError,
+    MapDownloadError, MapMeshError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError,
+    OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError,
+    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
+    ResolveError, RestoreMastercomfigError, SchemaError, SettingPicturesError, SettingsError,
+    StorageError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
     UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{

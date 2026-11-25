@@ -32,6 +32,7 @@ fn the_kinds_are_listed_in_card_order() {
             StorageKind::LogsTf,
             StorageKind::StoreData,
             StorageKind::ImageCache,
+            StorageKind::DemoCache,
         ]
     );
     assert_eq!(StorageUse::default().total(), 0);
@@ -47,6 +48,7 @@ fn an_empty_library_has_only_the_database() {
         StorageKind::Crosshairs,
         StorageKind::Addons,
         StorageKind::ImageCache,
+        StorageKind::DemoCache,
     ] {
         assert_eq!((s.bytes(kind), s.unpacked(kind)), (0, 0), "{kind:?}");
     }
@@ -54,6 +56,26 @@ fn an_empty_library_has_only_the_database() {
         s.bytes(StorageKind::StoreData) > 0,
         "the database has pages"
     );
+}
+
+#[test]
+fn downloaded_demos_are_the_demo_cache_and_partial_downloads_count() {
+    let env = library_env();
+    let demos = env.dir.demo_cache_dir();
+    write_file(&demos.join("7.dem"), &[1u8; 4000]);
+    write_file(&demos.join(".8.dem.abc123.part"), &[2u8; 600]);
+    let s = env.lib.storage().unwrap();
+    assert_eq!(s.bytes(StorageKind::DemoCache), 4600);
+    assert_eq!(s.unpacked(StorageKind::DemoCache), 4600);
+    assert_eq!(s.bytes(StorageKind::ImageCache), 0);
+    for kind in [
+        StorageKind::Huds,
+        StorageKind::Sounds,
+        StorageKind::Crosshairs,
+        StorageKind::Addons,
+    ] {
+        assert_eq!(s.bytes(kind), 0, "{kind:?}");
+    }
 }
 
 #[test]

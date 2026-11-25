@@ -195,3 +195,59 @@ async fn save_to_an_unwritable_folder_is_a_write_error_and_leaves_nothing() {
     assert!(matches!(hit, Err(DemosError::Write { .. })), "{hit:?}");
     assert!(!tmp.path().join("missing").exists(), "nothing is written");
 }
+
+#[test]
+fn clear_deletes_only_finished_demos_and_returns_the_bytes_freed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("demos");
+    std::fs::create_dir_all(dir.join("4.dem")).unwrap();
+    std::fs::write(dir.join("4.dem").join("3.dem"), [0u8; 10]).unwrap();
+    std::fs::write(dir.join("1.dem"), [0u8; 300]).unwrap();
+    std::fs::write(dir.join("22.dem"), [0u8; 200]).unwrap();
+    std::fs::write(dir.join(".5.dem.abc123.part"), [0u8; 50]).unwrap();
+    std::fs::write(dir.join("notes.txt"), b"x").unwrap();
+    std::fs::write(dir.join("7.dem.bak"), b"y").unwrap();
+    std::fs::write(dir.join("x1.dem"), b"z").unwrap();
+    let outside = tmp.path().join("kept.dem");
+    std::fs::write(&outside, [0u8; 40]).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, dir.join("9.dem")).unwrap();
+
+    let freed = DemoCache::new(&dir).clear().unwrap();
+
+    assert_eq!(freed, 500);
+    let mut kept = vec![".5.dem.abc123.part", "4.dem", "7.dem.bak"];
+    if cfg!(unix) {
+        kept.push("9.dem");
+    }
+    kept.extend(["notes.txt", "x1.dem"]);
+    assert_eq!(names(&dir), kept);
+    assert!(dir.join("4.dem").join("3.dem").exists());
+    assert!(outside.exists());
+}
+
+#[test]
+fn clear_on_a_missing_folder_frees_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = DemoCache::new(tmp.path().join("never-made"));
+    assert_eq!(cache.clear().unwrap(), 0);
+}
+
+// A folder that refuses deletes is a Unix permission feature.
+#[cfg(unix)]
+#[test]
+fn clear_reports_a_demo_it_could_not_delete() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("demos");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("1.dem"), [0u8; 30]).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let result = DemoCache::new(&dir).clear();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(
+        matches!(result, Err(crate::error::DemoClearError::Io { .. })),
+        "{result:?}"
+    );
+    assert!(dir.join("1.dem").exists());
+}
