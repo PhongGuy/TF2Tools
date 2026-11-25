@@ -14,13 +14,11 @@ pub const ITEM_MAX: usize = 500;
 pub const INTRO_MAX: usize = 1000;
 
 /// The largest notes.json the release job ships, in bytes.
-#[allow(dead_code)]
 pub const NOTES_LIMIT: usize = 48 * 1024;
 /// The most releases one notes.json holds.
 pub const MAX_RELEASES: usize = 20;
 
 /// One release as `gh release view --json tagName,body,publishedAt,isPrerelease,isDraft` prints it.
-#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Published {
@@ -43,7 +41,6 @@ struct Release {
 }
 
 /// Reads every `*.json` file in `dir` as one published release, in file name order.
-#[allow(dead_code)]
 pub fn read_releases(dir: &Path) -> Result<Vec<Published>, String> {
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let mut paths = Vec::new();
@@ -66,7 +63,6 @@ pub fn read_releases(dir: &Path) -> Result<Vec<Published>, String> {
 
 /// Builds compact notes.json from the published v6 releases plus `page` as `version`, newest
 /// first, within `limit` bytes; fails naming the version whose body has no item or cannot fit.
-#[allow(dead_code)]
 pub fn build(
     published: &[Published],
     page: &str,
@@ -121,8 +117,10 @@ pub fn build(
     let mut removed = 0;
     while json.len() > limit {
         let newest = &mut releases[0];
-        if removed > 0 {
-            newest.groups.last_mut().map(|group| group.items.pop());
+        if removed > 0
+            && let Some(group) = newest.groups.last_mut()
+        {
+            group.items.pop();
         }
         let real: usize = newest.groups.iter().map(|group| group.items.len()).sum();
         if real <= 1 {
@@ -260,7 +258,6 @@ fn split_credit(item: &str) -> (&str, Option<u64>) {
     if login.is_empty()
         || !(url.starts_with("http://") || url.starts_with("https://"))
         || login.contains(char::is_whitespace)
-        || url.is_empty()
         || url.contains(char::is_whitespace)
     {
         return (item, None);
@@ -741,6 +738,24 @@ mod tests {
         assert!(more > 0);
         assert_eq!(items.len() - 1 + more, 400);
         assert!(last.get("pr").is_none());
+    }
+
+    #[test]
+    fn a_cut_that_empties_the_last_group_drops_it_and_counts_on_the_group_before() {
+        let wide = "x".repeat(300);
+        let full = format!(
+            "## What's Changed\n\n### Fixes\n* fix 0 {wide}\n* fix 1 {wide}\n* fix 2 {wide}\n### Performance\n* fast 0\n* fast 1\n"
+        );
+        // The expected result is the first two fixes plus the count of the three removed items.
+        let kept = format!(
+            "## What's Changed\n\n### Fixes\n* fix 0 {wide}\n* fix 1 {wide}\n* ...and 3 more\n"
+        );
+        let expected = build(&[], &kept, "6.3.0", "2026-12-01", NOTES_LIMIT).unwrap();
+        let json = build(&[], &full, "6.3.0", "2026-12-01", expected.len()).unwrap();
+        assert_eq!(json, expected);
+        let groups = doc(&json)["releases"][0]["groups"].clone();
+        assert_eq!(groups.as_array().unwrap().len(), 1);
+        assert_eq!(groups[0]["items"][2]["text"], "...and 3 more");
     }
 
     #[test]

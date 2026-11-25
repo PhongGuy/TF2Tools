@@ -1,8 +1,9 @@
 //! Builds, signs and checks `tf2tools-update.json`, the manifest the app's updater trusts.
 //!
 //! Usage:
-//! `make_manifest sign --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339]`
-//! `make_manifest manifest --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339]`
+//! `make_manifest sign --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339] [--notes-file FILE]`
+//! `make_manifest manifest --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339] [--notes-file FILE]`
+//! `make_manifest notes --releases DIR --page FILE --version VERSION [--date YYYY-MM-DD] --out FILE`
 //! `make_manifest verify --dir DIR [--key BASE64]...`
 //! `make_manifest keygen --dir DIR` (a throwaway encrypted key pair for local runs only)
 //!
@@ -21,9 +22,11 @@ use chrono::{SecondsFormat, Utc};
 use sha2::{Digest, Sha256};
 
 const USAGE: &str = "usage: make_manifest sign --dir DIR --version VERSION [--base URL] \
-                     [--notes TEXT] [--pub-date RFC3339]\n       \
+                     [--notes TEXT] [--pub-date RFC3339] [--notes-file FILE]\n       \
                      make_manifest manifest --dir DIR --version VERSION [--base URL] \
-                     [--notes TEXT] [--pub-date RFC3339]\n       \
+                     [--notes TEXT] [--pub-date RFC3339] [--notes-file FILE]\n       \
+                     make_manifest notes --releases DIR --page FILE --version VERSION \
+                     [--date YYYY-MM-DD] --out FILE\n       \
                      make_manifest verify --dir DIR [--key BASE64]...\n       \
                      make_manifest keygen --dir DIR";
 const KEY_VAR: &str = "TF2TOOLS_MINISIGN_KEY";
@@ -34,6 +37,7 @@ const APPIMAGE_PLATFORM: &str = "linux-x86_64-appimage";
 /// The release asset name of the Windows installer and its key, as core selects it on Windows.
 const INSTALLER: &str = "TF2Tools.exe";
 const INSTALLER_PLATFORM: &str = "windows-x86_64-nsis";
+const NOTES_ASSET: &str = "notes.json";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -81,6 +85,42 @@ fn run(args: &[String], env: &dyn Fn(&str) -> Option<String>) -> Result<String, 
                 manifest_path.display(),
                 signature_path.display(),
                 platform_lines(&json)?
+            ))
+        }
+        "notes" => {
+            only(
+                &flags,
+                &["--releases", "--page", "--version", "--date", "--out"],
+            )?;
+            let releases = notes::read_releases(Path::new(required(&flags, "--releases")?))?;
+            let page_path = Path::new(required(&flags, "--page")?);
+            let page = String::from_utf8(read(page_path)?)
+                .map_err(|_| format!("{} is not UTF-8", page_path.display()))?;
+            let version = required(&flags, "--version")?;
+            let out = Path::new(required(&flags, "--out")?);
+            let date = match single(&flags, "--date")? {
+                Some(date) => {
+                    chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                        .map_err(|e| format!("--date {date:?} is not YYYY-MM-DD: {e}"))?;
+                    date.to_owned()
+                }
+                None => Utc::now().format("%Y-%m-%d").to_string(),
+            };
+            let json = notes::build(&releases, &page, version, &date, notes::NOTES_LIMIT)?;
+            write(out, json.as_bytes(), false)?;
+            let value: serde_json::Value =
+                serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            let versions: Vec<&str> = value["releases"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|release| release["version"].as_str())
+                .collect();
+            Ok(format!(
+                "wrote {}\nreleases {} ({} bytes)",
+                out.display(),
+                versions.join(" "),
+                json.len()
             ))
         }
         "verify" => {
@@ -136,7 +176,14 @@ fn manifest_from_flags<'a>(
 ) -> Result<(&'a Path, &'a str, String), String> {
     only(
         flags,
-        &["--dir", "--version", "--base", "--notes", "--pub-date"],
+        &[
+            "--dir",
+            "--version",
+            "--base",
+            "--notes",
+            "--pub-date",
+            "--notes-file",
+        ],
     )?;
     let dir = Path::new(required(flags, "--dir")?);
     let version = required(flags, "--version")?;
@@ -154,6 +201,7 @@ fn manifest_from_flags<'a>(
         single(flags, "--base")?.unwrap_or("https://github.com"),
         single(flags, "--notes")?.unwrap_or(""),
         &pub_date,
+        single(flags, "--notes-file")?.map(Path::new),
     )?;
     Ok((dir, version, json))
 }
@@ -177,14 +225,16 @@ fn platform_lines(json: &str) -> Result<String, String> {
 
 /// The manifest JSON for the one `tf2tools_<version>_x86_64.AppImage` in `dir`, plus the
 /// Windows installer when `TF2Tools.exe` is there too, each URL a release download under
-/// `base` (trailing slash dropped). Refuses a version that is not plain semver (no leading
-/// `v`) and a missing AppImage.
+/// `base` (trailing slash dropped), and a top-level `notes_asset` for `notes_file`. Refuses a
+/// version that is not plain semver (no leading `v`), a missing AppImage, and a notes file
+/// that is not a non-empty `notes.json`.
 fn build_manifest(
     dir: &Path,
     version: &str,
     base: &str,
     notes: &str,
     pub_date: &str,
+    notes_file: Option<&Path>,
 ) -> Result<String, String> {
     semver::Version::parse(version)
         .map_err(|e| format!("version {version:?} is not a semver version: {e}"))?;
@@ -209,12 +259,25 @@ fn build_manifest(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(format!("cannot read {INSTALLER} in {}: {e}", dir.display())),
     }
-    let manifest = serde_json::json!({
+    let mut manifest = serde_json::json!({
         "version": version,
         "pub_date": pub_date,
         "notes": notes,
         "platforms": platforms,
     });
+    if let Some(path) = notes_file {
+        if path.file_name().is_none_or(|name| name != NOTES_ASSET) {
+            return Err(format!(
+                "the notes file {} must be named {NOTES_ASSET}",
+                path.display()
+            ));
+        }
+        let bytes = read(path)?;
+        if bytes.is_empty() {
+            return Err(format!("the notes file {} is empty", path.display()));
+        }
+        manifest["notes_asset"] = asset(NOTES_ASSET, &bytes);
+    }
     serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())
 }
 
@@ -308,7 +371,7 @@ fn keygen(password: &str) -> Result<(String, String), String> {
 }
 
 /// Checks every platform's file (its URL's last segment) in `dir` against the manifest's
-/// size, then sha256.
+/// size, then sha256, and the `notes_asset` file the same way when the manifest has one.
 fn verify_files(dir: &Path, json: &[u8]) -> Result<String, String> {
     let value: serde_json::Value =
         serde_json::from_slice(json).map_err(|e| format!("{MANIFEST} is not JSON: {e}"))?;
@@ -316,25 +379,40 @@ fn verify_files(dir: &Path, json: &[u8]) -> Result<String, String> {
         .as_object()
         .ok_or_else(|| format!("{MANIFEST} has no platforms"))?;
     let mut out = format!("signature ok for version {}", value["version"]);
-    for (key, asset) in platforms {
-        let name = asset["url"]
-            .as_str()
-            .and_then(|url| url.rsplit('/').next())
-            .filter(|name| !name.is_empty() && *name != "." && *name != "..")
-            .ok_or_else(|| format!("{key}: no file name in its url"))?;
-        let bytes = read(&dir.join(name))?;
-        if Some(bytes.len() as u64) != asset["size"].as_u64() {
-            return Err(format!(
-                "{key}: {name} size {} does not match the manifest",
-                bytes.len()
-            ));
-        }
-        if Some(sha256_hex(&bytes).as_str()) != asset["sha256"].as_str() {
-            return Err(format!("{key}: {name} sha256 does not match the manifest"));
-        }
+    let notes = value.get("notes_asset").map(|asset| ("notes", asset));
+    for (key, asset) in platforms
+        .iter()
+        .map(|(key, asset)| (key.as_str(), asset))
+        .chain(notes)
+    {
+        let name = verify_asset(dir, key, asset)?;
         out.push_str(&format!("\n{key}: {name} matches"));
     }
     Ok(out)
+}
+
+/// Checks the file `asset` names in `dir` against its size, then sha256, returning its name.
+fn verify_asset<'a>(
+    dir: &Path,
+    key: &str,
+    asset: &'a serde_json::Value,
+) -> Result<&'a str, String> {
+    let name = asset["url"]
+        .as_str()
+        .and_then(|url| url.rsplit('/').next())
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .ok_or_else(|| format!("{key}: no file name in its url"))?;
+    let bytes = read(&dir.join(name))?;
+    if Some(bytes.len() as u64) != asset["size"].as_u64() {
+        return Err(format!(
+            "{key}: {name} size {} does not match the manifest",
+            bytes.len()
+        ));
+    }
+    if Some(sha256_hex(&bytes).as_str()) != asset["sha256"].as_str() {
+        return Err(format!("{key}: {name} sha256 does not match the manifest"));
+    }
+    Ok(name)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -464,7 +542,7 @@ mod tests {
     #[test]
     fn a_manifest_names_the_appimage_by_url_hash_and_size() {
         let dir = packages();
-        let json = build_manifest(dir.path(), VERSION, GH, "Fixes.", DATE).unwrap();
+        let json = build_manifest(dir.path(), VERSION, GH, "Fixes.", DATE, None).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["version"], VERSION);
         assert_eq!(value["pub_date"], DATE);
@@ -486,7 +564,15 @@ mod tests {
     #[test]
     fn the_base_loses_a_trailing_slash() {
         let dir = packages();
-        let json = build_manifest(dir.path(), VERSION, "http://127.0.0.1:8000/", "", DATE).unwrap();
+        let json = build_manifest(
+            dir.path(),
+            VERSION,
+            "http://127.0.0.1:8000/",
+            "",
+            DATE,
+            None,
+        )
+        .unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(
             value["platforms"]["linux-x86_64-appimage"]["url"],
@@ -497,11 +583,11 @@ mod tests {
     #[test]
     fn a_missing_appimage_or_a_bad_version_is_refused() {
         let dir = packages();
-        let err = build_manifest(dir.path(), "6.0.2", GH, "", DATE).unwrap_err();
+        let err = build_manifest(dir.path(), "6.0.2", GH, "", DATE, None).unwrap_err();
         assert!(err.contains("tf2tools_6.0.2_x86_64.AppImage"), "{err}");
         for bad in ["v6.0.1", "6.0", ""] {
             assert!(
-                build_manifest(dir.path(), bad, GH, "", DATE).is_err(),
+                build_manifest(dir.path(), bad, GH, "", DATE, None).is_err(),
                 "{bad:?}"
             );
         }
@@ -702,7 +788,7 @@ mod tests {
     fn an_installer_in_the_dir_adds_the_windows_entry() {
         let dir = packages();
         std::fs::write(dir.path().join("TF2Tools.exe"), b"installer").unwrap();
-        let json = build_manifest(dir.path(), VERSION, GH, "", DATE).unwrap();
+        let json = build_manifest(dir.path(), VERSION, GH, "", DATE, None).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         let platforms = value["platforms"].as_object().unwrap();
         assert_eq!(
@@ -764,7 +850,7 @@ mod tests {
         let json = std::fs::read_to_string(dir.path().join("tf2tools-update.json")).unwrap();
         assert_eq!(
             json,
-            build_manifest(dir.path(), VERSION, GH, "", DATE).unwrap()
+            build_manifest(dir.path(), VERSION, GH, "", DATE, None).unwrap()
         );
         assert!(!dir.path().join("tf2tools-update.json.minisig").exists());
     }
@@ -831,7 +917,7 @@ mod tests {
         let (public, secret) = key();
         // Endpoints::loopback serves github under /gh (tests/update_check.rs).
         let base = format!("{}/gh", server.uri());
-        let json = build_manifest(dir, VERSION, &base, "Fixes.", DATE).unwrap();
+        let json = build_manifest(dir, VERSION, &base, "Fixes.", DATE, None).unwrap();
         let signature =
             sign_manifest(json.as_bytes(), Some(secret.as_str()), Some(PASSWORD)).unwrap();
         let feed = "/gh/PhongGuy/TF2Tools/releases/latest/download/tf2tools-update.json";
@@ -894,5 +980,211 @@ mod tests {
         );
         assert_eq!(asset.sha256(), hex(b"installer"));
         assert_eq!(asset.size(), 9);
+    }
+
+    fn notes_fixtures() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/release-notes")
+    }
+
+    #[test]
+    fn the_golden_notes_json_is_what_the_builder_writes() {
+        let fixtures = notes_fixtures();
+        let out = tempfile::tempdir().unwrap();
+        let target = out.path().join("notes.json");
+        let printed = run(
+            &args(&[
+                "notes",
+                "--releases",
+                fixtures.join("releases").to_str().unwrap(),
+                "--page",
+                fixtures.join("page-6.3.0.md").to_str().unwrap(),
+                "--version",
+                "6.3.0",
+                "--date",
+                "2026-12-01",
+                "--out",
+                target.to_str().unwrap(),
+            ]),
+            &env(&[]),
+        )
+        .unwrap();
+        assert!(
+            printed.contains("releases 6.3.0 6.2.0 6.1.0 6.0.2 6.0.1"),
+            "{printed}"
+        );
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            std::fs::read(fixtures.join("notes.json")).unwrap(),
+            "regenerate tests/fixtures/release-notes/notes.json with the notes subcommand and review the diff"
+        );
+    }
+
+    #[test]
+    fn notes_refuses_a_bad_date_or_a_missing_flag() {
+        let fixtures = notes_fixtures();
+        let out = tempfile::tempdir().unwrap();
+        let target = out.path().join("notes.json");
+        let releases = fixtures.join("releases");
+        let page = fixtures.join("page-6.3.0.md");
+        let (releases, page, target) = (
+            releases.to_str().unwrap(),
+            page.to_str().unwrap(),
+            target.to_str().unwrap(),
+        );
+        let err = run(
+            &args(&[
+                "notes",
+                "--releases",
+                releases,
+                "--page",
+                page,
+                "--version",
+                "6.3.0",
+                "--date",
+                "01-12-2026",
+                "--out",
+                target,
+            ]),
+            &env(&[]),
+        )
+        .unwrap_err();
+        assert!(err.contains("--date"), "{err}");
+        let err = run(
+            &args(&[
+                "notes",
+                "--releases",
+                releases,
+                "--version",
+                "6.3.0",
+                "--out",
+                target,
+            ]),
+            &env(&[]),
+        )
+        .unwrap_err();
+        assert!(err.contains("--page"), "{err}");
+    }
+
+    #[test]
+    fn a_notes_file_adds_a_notes_asset_beside_the_platforms() {
+        let dir = packages();
+        let notes = br#"{"schema":1,"releases":[]}"#;
+        std::fs::write(dir.path().join("notes.json"), notes).unwrap();
+        let json = build_manifest(
+            dir.path(),
+            VERSION,
+            GH,
+            "",
+            DATE,
+            Some(&dir.path().join("notes.json")),
+        )
+        .unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value["notes_asset"]["url"],
+            "https://github.com/PhongGuy/TF2Tools/releases/download/v6.0.1/notes.json"
+        );
+        assert_eq!(value["notes_asset"]["sha256"], hex(notes));
+        assert_eq!(value["notes_asset"]["size"], notes.len());
+        assert_eq!(value["platforms"].as_object().unwrap().len(), 1);
+        let without = build_manifest(dir.path(), VERSION, GH, "", DATE, None).unwrap();
+        assert!(
+            serde_json::from_str::<serde_json::Value>(&without)
+                .unwrap()
+                .get("notes_asset")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_notes_file_must_be_named_notes_json_and_not_be_empty() {
+        let dir = packages();
+        std::fs::write(dir.path().join("other.json"), b"{}").unwrap();
+        std::fs::write(dir.path().join("notes.json"), b"").unwrap();
+        let err = build_manifest(
+            dir.path(),
+            VERSION,
+            GH,
+            "",
+            DATE,
+            Some(&dir.path().join("other.json")),
+        )
+        .unwrap_err();
+        assert!(err.contains("notes.json"), "{err}");
+        let err = build_manifest(
+            dir.path(),
+            VERSION,
+            GH,
+            "",
+            DATE,
+            Some(&dir.path().join("notes.json")),
+        )
+        .unwrap_err();
+        assert!(err.contains("empty"), "{err}");
+    }
+
+    #[test]
+    fn the_manifest_subcommand_takes_a_notes_file() {
+        let dir = packages();
+        std::fs::write(
+            dir.path().join("notes.json"),
+            br#"{"schema":1,"releases":[]}"#,
+        )
+        .unwrap();
+        let notes = dir.path().join("notes.json");
+        run(
+            &args(&[
+                "manifest",
+                "--dir",
+                dir.path().to_str().unwrap(),
+                "--version",
+                VERSION,
+                "--notes-file",
+                notes.to_str().unwrap(),
+            ]),
+            &env(&[]),
+        )
+        .unwrap();
+        let written: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(dir.path().join("tf2tools-update.json")).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            written["notes_asset"]["url"]
+                .as_str()
+                .unwrap()
+                .ends_with("/v6.0.1/notes.json")
+        );
+    }
+
+    #[test]
+    fn verify_checks_the_notes_file_too() {
+        let dir = packages();
+        std::fs::write(
+            dir.path().join("notes.json"),
+            br#"{"schema":1,"releases":[]}"#,
+        )
+        .unwrap();
+        let json = build_manifest(
+            dir.path(),
+            VERSION,
+            GH,
+            "",
+            DATE,
+            Some(&dir.path().join("notes.json")),
+        )
+        .unwrap();
+        let out = verify_files(dir.path(), json.as_bytes()).unwrap();
+        assert!(
+            out.lines().any(|l| l == "notes: notes.json matches"),
+            "{out}"
+        );
+        std::fs::write(
+            dir.path().join("notes.json"),
+            br#"{"schema":1,"releases":[1]}"#,
+        )
+        .unwrap();
+        let err = verify_files(dir.path(), json.as_bytes()).unwrap_err();
+        assert!(err.contains("notes"), "{err}");
     }
 }
