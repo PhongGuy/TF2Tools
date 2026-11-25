@@ -103,7 +103,10 @@ impl UpdateClient {
         if let Some(asset) = &manifest.notes_asset {
             match self.notes(asset, current, &manifest.version).await {
                 Ok((releases, status)) => offer.set_notes(releases, status),
-                Err(e) => tracing::warn!("release notes unavailable: {e}"),
+                Err(e) => {
+                    tracing::warn!("release notes unavailable: {e}");
+                    offer.set_notes(Vec::new(), NotesStatus::Unavailable);
+                }
             }
         }
         Ok(Some(offer))

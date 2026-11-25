@@ -350,8 +350,24 @@ async fn a_manifest_without_notes_asset_offers_without_fetching_notes() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(offer.notes_status(), NotesStatus::Unavailable);
+    assert_eq!(offer.notes_status(), NotesStatus::NotPublished);
     assert_eq!(notes_requests(&feed).await, 0);
+}
+
+#[tokio::test]
+async fn notes_with_no_release_in_the_gap_are_not_published() {
+    let feed = feed().await;
+    let notes = notes_doc(&[("6.1.0", Some("6.0.0"))]);
+    publish_with_notes(&feed, "6.2.0", &notes, Some(&notes)).await;
+    let offer = feed
+        .client
+        .check("6.1.0", &appimage())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(offer.notes_status(), NotesStatus::NotPublished);
+    assert!(offer.releases().is_empty());
+    assert_eq!(notes_requests(&feed).await, 1);
 }
 
 #[tokio::test]
