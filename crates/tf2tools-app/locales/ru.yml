@@ -3021,6 +3021,7 @@ activity_log:
     update_restart: "Перезапуск после обновления"
   row:
     started: "TF2Tools запущен"
+    freed: "Освобождено %{size}: удалены оставшиеся файлы"
     synced:
       huds: { one: "Синхронизирован %{count} HUD с GameBanana", few: "Синхронизировано %{count} HUD с GameBanana", many: "Синхронизировано %{count} HUD с GameBanana" }
       sounds: { one: "Синхронизирован %{count} звук с GameBanana", few: "Синхронизировано %{count} звука с GameBanana", many: "Синхронизировано %{count} звуков с GameBanana" }

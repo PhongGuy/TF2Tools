@@ -3047,6 +3047,7 @@ activity_log:
     update_restart: "Reiniciar para atualizar"
   row:
     started: "TF2Tools iniciado"
+    freed: "%{size} de arquivos residuais liberados"
     synced:
       huds: { one: "%{count} HUD sincronizado do GameBanana", other: "%{count} HUDs sincronizados do GameBanana" }
       sounds: { one: "%{count} som sincronizado do GameBanana", other: "%{count} sons sincronizados do GameBanana" }

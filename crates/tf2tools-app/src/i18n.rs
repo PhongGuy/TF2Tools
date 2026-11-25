@@ -1705,6 +1705,7 @@ mod tests {
         "log_nicknames.rs",
         "logs_sync.rs",
         "logs_trim.rs",
+        "leftovers.rs",
         "pages/logs_tf/list.rs",
         "pages/logs_tf/sort.rs",
         "pages/logs_tf/head.rs",

@@ -3023,6 +3023,7 @@ activity_log:
     update_restart: "Update-restart"
   row:
     started: "TF2Tools started"
+    freed: "Freed %{size} of leftover files"
     synced:
       huds: { one: "Synced %{count} HUDs from GameBanana", other: "Synced %{count} HUDs from GameBanana" }
       sounds: { one: "Synced %{count} sounds from GameBanana", other: "Synced %{count} sounds from GameBanana" }

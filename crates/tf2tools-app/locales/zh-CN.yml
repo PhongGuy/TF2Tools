@@ -3045,6 +3045,7 @@ activity_log:
     update_restart: "重启以更新"
   row:
     started: "TF2Tools 已启动"
+    freed: "已清理残留文件，释放 %{size}"
     synced:
       huds: { other: "已从 GameBanana 同步 %{count} 个 HUD" }
       sounds: { other: "已从 GameBanana 同步 %{count} 个音效" }
