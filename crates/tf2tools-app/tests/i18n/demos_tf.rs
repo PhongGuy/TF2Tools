@@ -1,9 +1,11 @@
-//! The Demos.tf toolbar and empty footer in German fit the narrowest window.
+//! The Demos.tf toolbar and empty footer in German fit the narrowest window, and the kept
+//! page's format Select follows a language switch.
 use gpui_kit::{TestAppContext, px, size};
 use tf2tools_app::ids;
 use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
+use crate::library::shown_text;
 use crate::support;
 use support::demo_viewer::inside;
 use support::demostf::{demos_tf_shell, mount_first, wait_end};
@@ -29,4 +31,24 @@ fn the_german_toolbar_fits_an_800_px_window(cx: &mut TestAppContext) {
         let part = support::bounds_of(cx, d.s.win, id).unwrap();
         assert!(inside(part, page), "{id} at {part:?} leaves {page:?}");
     }
+}
+
+// The page is kept across a switch, so its format Select's "any" row retitles in place.
+#[gpui_kit::test]
+fn the_kept_format_select_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    mount_first(&server, b"[]".to_vec());
+    let d = demos_tf_shell(cx, &env, &server.uri(), &[]);
+    wait_end(cx, &d.page);
+    assert_eq!(
+        shown_text(cx, d.s.win, ids::DEMOS_TF_FORMAT).as_deref(),
+        Some("Any format")
+    );
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    assert_eq!(
+        shown_text(cx, d.s.win, ids::DEMOS_TF_FORMAT).as_deref(),
+        Some("Любой формат")
+    );
 }

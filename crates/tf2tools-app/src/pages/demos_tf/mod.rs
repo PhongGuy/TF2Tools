@@ -20,7 +20,7 @@ use tf2tools_core::{
     DemoCursor, DemoFormat, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange,
 };
 
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::pages::demo_viewer::DemoViewerPage;
 use crate::picker::PickKind;
@@ -124,6 +124,8 @@ pub struct DemosTfPage {
     stalled: bool,
     range_slider: Entity<SliderState>,
     format_select: Entity<SelectState<Vec<LabelOption>>>,
+    // The language the format Select was titled in.
+    language: &'static str,
     error: Option<SharedString>,
     // Watch downloads in flight by demo id, with their whole percent once known.
     downloads: HashMap<u64, Option<u8>>,
@@ -178,6 +180,7 @@ impl DemosTfPage {
             stalled: false,
             range_slider,
             format_select,
+            language: i18n::current(),
             error: None,
             downloads: HashMap::new(),
             _subscriptions: [release, released, picked],
@@ -431,6 +434,17 @@ impl DemosTfPage {
         cx.notify();
     }
 
+    // The page is kept while other pages show, so a language switched meanwhile retitles the
+    // format Select; the chosen format stays.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.format_select
+            .update(cx, |select, cx| select.set_items(format_rows(), window, cx));
+    }
+
     fn list(&self, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .id(ids::DEMOS_TF_LIST)
@@ -442,7 +456,8 @@ impl DemosTfPage {
 }
 
 impl Render for DemosTfPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         let body = match &self.mode {
             Mode::List => self.list(cx).into_any_element(),
             Mode::Viewer(viewer) => viewer.clone().into_any_element(),
