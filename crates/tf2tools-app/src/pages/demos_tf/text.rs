@@ -1,7 +1,7 @@
 //! The Demos.tf list's wording, kept free of UI so tests read it without a window.
 
 use gpui_kit::SharedString;
-use tf2tools_core::{DemoFormat, DemosError};
+use tf2tools_core::{DemoFormat, DemosError, DemosRange};
 
 use crate::i18n::{format, tr};
 
@@ -28,6 +28,18 @@ pub fn format_label(format: DemoFormat) -> SharedString {
         DemoFormat::BBall => tr!("demos_tf.format.bball"),
         // Every known variant is named for the lint; a future one reads as Other.
         DemoFormat::Other | _ => tr!("demos_tf.format.misc"),
+    }
+}
+
+/// A range stop's label under the slider: one fixed text per stop.
+pub fn range_label(range: DemosRange) -> SharedString {
+    match range {
+        DemosRange::Day1 => tr!("demos_tf.range.day"),
+        DemosRange::Week1 => tr!("demos_tf.range.week"),
+        DemosRange::Month1 => tr!("demos_tf.range.month"),
+        DemosRange::Months3 => tr!("demos_tf.range.months3"),
+        DemosRange::Year1 => tr!("demos_tf.range.year"),
+        DemosRange::All | _ => tr!("demos_tf.range.all"),
     }
 }
 

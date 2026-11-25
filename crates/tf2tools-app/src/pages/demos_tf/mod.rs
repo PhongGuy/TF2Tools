@@ -8,13 +8,17 @@ mod watch;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use gpui_kit::component::v_flex;
+use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::slider::{SliderEvent, SliderState};
+use gpui_kit::component::{IndexPath, v_flex};
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ListAlignment,
     ListState, ParentElement as _, Render, SharedString, Styled as _, Subscription,
     TestSupportExt as _, Window, div, px,
 };
-use tf2tools_core::{DemoCursor, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange};
+use tf2tools_core::{
+    DemoCursor, DemoFormat, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange,
+};
 
 use crate::i18n::tr;
 use crate::ids;
@@ -26,9 +30,59 @@ use crate::shell::header_slot::HeaderSlot;
 use crate::shell::route::Page;
 use crate::store_grid::feed::{Feed, FeedItem};
 use crate::tokio_bridge;
+use crate::widgets::label_option::LabelOption;
 
 use crumb::DemosTfCrumb;
-use text::list_error;
+use text::{format_label, list_error};
+
+/// Raw pages one fetch reads past while the format filter keeps none of their demos.
+const SKIP_LIMIT: usize = 10;
+
+/// The format Select's values in menu order; "any" sends no format.
+const FORMATS: [(&str, Option<DemoFormat>); 11] = [
+    ("any", None),
+    ("hl", Some(DemoFormat::Highlander)),
+    ("prolander", Some(DemoFormat::Prolander)),
+    ("6v6", Some(DemoFormat::Sixes)),
+    ("4v4", Some(DemoFormat::Fours)),
+    ("3v3", Some(DemoFormat::Threes)),
+    ("2v2", Some(DemoFormat::Twos)),
+    ("1v1", Some(DemoFormat::Ones)),
+    ("ultiduo", Some(DemoFormat::Ultiduo)),
+    ("bball", Some(DemoFormat::BBall)),
+    ("other", Some(DemoFormat::Other)),
+];
+
+// The format Select's rows, titled in the current language.
+fn format_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::DEMOS_TF_FORMAT,
+        FORMATS.iter().map(|(value, format)| {
+            let label = format.map_or_else(|| tr!("demos_tf.format.any"), format_label);
+            (*value, label)
+        }),
+    )
+}
+
+// The slider stop of `range`.
+fn stop_index(range: DemosRange) -> usize {
+    DemosRange::STOPS
+        .iter()
+        .position(|stop| *stop == range)
+        .unwrap_or_default()
+}
+
+// The range at a slider value, rounded to the nearest stop; a NaN reads as the first.
+fn stop_at(value: f32) -> DemosRange {
+    let ix = if value.is_nan() {
+        0
+    } else {
+        value
+            .round()
+            .clamp(0., (DemosRange::STOPS.len() - 1) as f32) as usize
+    };
+    DemosRange::STOPS[ix]
+}
 
 /// One demo of the list with the cursor of the page it came on, so the feed's next page
 /// starts where demos.tf said, not after the last demo the format filter kept.
@@ -64,21 +118,56 @@ pub struct DemosTfPage {
     // Item 0 is the toolbar, then one item per row, then the footer.
     list: ListState,
     query: DemoListQuery,
-    // The cursor a failed page asked with, so Retry asks for that page again.
+    // The cursor a failed or skip-limited page stopped at, so the next ask starts there.
     resume: Option<DemoCursor>,
+    // True once a fetch hit the skip limit; the footer then waits for Keep looking.
+    stalled: bool,
+    range_slider: Entity<SliderState>,
+    format_select: Entity<SelectState<Vec<LabelOption>>>,
     error: Option<SharedString>,
     // Watch downloads in flight by demo id, with their whole percent once known.
     downloads: HashMap<u64, Option<u8>>,
-    _release: Subscription,
+    _subscriptions: [Subscription; 3],
 }
 
 impl DemosTfPage {
     /// A page on its list.
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // The crumb belongs to this page's viewer, so it goes when the page does.
         let release = cx.on_release(|_, cx| {
             HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::DemosTf, cx));
         });
+        // The slider commits on release only, so a drag across stops asks once.
+        let range_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max((DemosRange::STOPS.len() - 1) as f32)
+                .step(1.)
+                .default_value(stop_index(DemosRange::default()) as f32)
+        });
+        let released = cx.subscribe_in(
+            &range_slider,
+            window,
+            |page, _, event: &SliderEvent, window, cx| {
+                if let SliderEvent::Release(value) = event {
+                    page.set_range(stop_at(value.start()), window, cx);
+                }
+            },
+        );
+        let format_select =
+            cx.new(|cx| SelectState::new(format_rows(), Some(IndexPath::default()), window, cx));
+        let picked = cx.subscribe(
+            &format_select,
+            |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
+                if let SelectEvent::Confirm(Some(value)) = event
+                    && let Some((_, format)) = FORMATS.iter().find(|(v, _)| v == value)
+                    && *format != page.format()
+                {
+                    page.query = page.query.clone().with_format(*format);
+                    page.restart(cx);
+                }
+            },
+        );
         let mut page = Self {
             mode: Mode::List,
             hidden: false,
@@ -86,9 +175,12 @@ impl DemosTfPage {
             list: ListState::new(2, ListAlignment::Top, px(200.)),
             query: DemoListQuery::new(DemosRange::default(), 0),
             resume: None,
+            stalled: false,
+            range_slider,
+            format_select,
             error: None,
             downloads: HashMap::new(),
-            _release: release,
+            _subscriptions: [release, released, picked],
         };
         page.restart(cx);
         page
@@ -114,6 +206,45 @@ impl DemosTfPage {
         &self.list
     }
 
+    /// The range the list reaches back.
+    pub fn range(&self) -> DemosRange {
+        self.query.range()
+    }
+
+    /// The range slider: stops 0 to 5 in `DemosRange::STOPS` order, step 1.
+    pub fn range_slider(&self) -> &Entity<SliderState> {
+        &self.range_slider
+    }
+
+    /// Picks the range: the slider moves to it and the list starts over. The current range
+    /// does nothing.
+    pub fn set_range(&mut self, range: DemosRange, window: &mut Window, cx: &mut Context<Self>) {
+        if range == self.range() {
+            return;
+        }
+        let stop = stop_index(range) as f32;
+        self.range_slider
+            .update(cx, |slider, cx| slider.set_value(stop, window, cx));
+        let q = &self.query;
+        self.query = DemoListQuery::new(range, 0)
+            .with_format(q.format())
+            .with_map(q.map().unwrap_or_default())
+            .with_players(q.players());
+        self.restart(cx);
+    }
+
+    /// The format the list keeps, or None for any.
+    pub fn format(&self) -> Option<DemoFormat> {
+        self.query.format()
+    }
+
+    /// Reads on from where the skip limit stopped.
+    pub fn keep_looking(&mut self, cx: &mut Context<Self>) {
+        self.stalled = false;
+        self.next_page(cx);
+        cx.notify();
+    }
+
     /// Clears a failed page's error and asks for that page again.
     pub fn retry(&mut self, cx: &mut Context<Self>) {
         self.error = None;
@@ -131,15 +262,17 @@ impl DemosTfPage {
             .with_players(q.players());
         self.feed.reset();
         self.resume = None;
+        self.stalled = false;
         self.error = None;
         self.list.reset(2);
         self.next_page(cx);
     }
 
-    // True while the list may page on: no failed page waits for Retry, the end is not
+    // True while the list may page on: nothing waits for Retry or Keep looking, the end is not
     // reached and no page is in flight.
     fn wants_page(&self) -> bool {
         self.error.is_none()
+            && !self.stalled
             && self.resume.is_none()
             && !self.feed.is_end()
             && !self.feed.is_loading()
@@ -163,6 +296,11 @@ impl DemosTfPage {
                 return;
             }
         };
+        self.fetch(generation, cursor, 1, cx);
+    }
+
+    // Fetches the raw page at `cursor`, the `read`th of this ask, for `generation`.
+    fn fetch(&mut self, generation: u64, cursor: DemoCursor, read: usize, cx: &mut Context<Self>) {
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
@@ -172,7 +310,7 @@ impl DemosTfPage {
         cx.spawn(async move |page, cx| {
             let fetched = fetching.await;
             let _ = page.update(cx, |page, cx| match fetched {
-                Ok(Ok(fetched)) => page.landed(generation, &fetched, cx),
+                Ok(Ok(fetched)) => page.landed(generation, &fetched, read, cx),
                 Ok(Err(error)) => {
                     tracing::debug!(%error, "a page of demos.tf demos failed");
                     page.failed(generation, cursor, Some(&error), cx);
@@ -187,10 +325,14 @@ impl DemosTfPage {
     }
 
     // Keeps the page's demos the list lacks; a newer demo shifts the pages, so a later page
-    // can repeat ones already shown.
-    fn landed(&mut self, generation: u64, fetched: &DemoPage, cx: &mut Context<Self>) {
+    // can repeat ones already shown. A page the format filter emptied reads the next one, up
+    // to the skip limit, where the list stalls on its cursor until Keep looking.
+    fn landed(&mut self, generation: u64, fetched: &DemoPage, read: usize, cx: &mut Context<Self>) {
+        if generation != self.feed.generation() {
+            return;
+        }
         let seen: HashSet<u64> = self.demo_ids().into_iter().collect();
-        let rows = fetched
+        let rows: Vec<DemoRow> = fetched
             .demos()
             .iter()
             .filter(|demo| !seen.contains(&demo.id()))
@@ -199,7 +341,18 @@ impl DemosTfPage {
                 next: fetched.next(),
             })
             .collect();
-        self.land(generation, rows, cx);
+        match fetched.next() {
+            Some(next) if rows.is_empty() && read < SKIP_LIMIT => {
+                self.fetch(generation, next, read + 1, cx);
+            }
+            Some(next) if rows.is_empty() => {
+                self.feed.page_failed(generation);
+                self.resume = Some(next);
+                self.stalled = true;
+                cx.notify();
+            }
+            _ => self.land(generation, rows, cx),
+        }
     }
 
     // Appends rows of this generation before the footer, keeping the scroll where it was.

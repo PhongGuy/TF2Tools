@@ -168,6 +168,16 @@ demos_tf:
   watch: "Ver"
   private: "Privada"
   downloading: "Descargando..."
+  range_name: "Periodo"
+  range:
+    day: "1 día"
+    week: "1 semana"
+    month: "1 mes"
+    months3: "3 meses"
+    year: "1 año"
+    all: "Todo"
+  widen: "Buscar más atrás"
+  keep_looking: "Seguir buscando"
   column:
     date: "Fecha"
     title: "Título"
@@ -175,6 +185,7 @@ demos_tf:
     map: "Mapa"
     length: "Tiempo"
   format:
+    any: "Cualquier formato"
     hl: "Highlander"
     prolander: "Prolander"
     sixes: "6v6"

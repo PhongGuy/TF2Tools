@@ -143,6 +143,16 @@ demos_tf:
   watch: "Смотреть"
   private: "Закрыто"
   downloading: "Загрузка..."
+  range_name: "Период"
+  range:
+    day: "1 день"
+    week: "1 неделя"
+    month: "1 месяц"
+    months3: "3 месяца"
+    year: "1 год"
+    all: "Все"
+  widen: "Искать дальше в прошлом"
+  keep_looking: "Искать дальше"
   column:
     date: "Дата"
     title: "Название"
@@ -150,6 +160,7 @@ demos_tf:
     map: "Карта"
     length: "Время"
   format:
+    any: "Любой формат"
     hl: "Highlander"
     prolander: "Prolander"
     sixes: "6v6"

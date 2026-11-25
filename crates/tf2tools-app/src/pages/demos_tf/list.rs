@@ -2,15 +2,19 @@
 //! one row per demo, then a footer that says whether more is loading, nothing was found or
 //! the page failed.
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::select::Select;
+use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, Div, FontWeight, IntoElement, ListState, ParentElement as _, Pixels,
-    SharedString, Styled as _, WeakEntity, Window, div, list, px,
+    AnyElement, App, Context, Div, Entity, FontWeight, InteractiveElement as _, IntoElement,
+    ListState, ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _,
+    Styled as _, TestSupportExt as _, WeakEntity, Window, div, list, px,
 };
+use tf2tools_core::DemosRange;
 
-use super::text::{demo_title, format_label, watch_label};
+use super::text::{demo_title, format_label, range_label, watch_label};
 use super::{DemoRow, DemosTfPage};
 use crate::i18n::tr;
 use crate::ids;
@@ -30,6 +34,13 @@ const WATCH: Pixels = px(96.);
 const TITLE_MIN: Pixels = px(120.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
+// The stop labels sit one cell apart, each centred on its thumb stop. The slider's track is
+// inset half a cell on both sides, so the end labels fit inside the picker too.
+const STOP_CELL: f32 = 68.;
+const RANGE_WIDTH: f32 = STOP_CELL * DemosRange::STOPS.len() as f32;
+const LABEL_HEIGHT: f32 = 24.;
+// Fits the longest format label whole beside the kit's caret and padding.
+const FORMAT_SELECT: Pixels = px(176.);
 
 /// How the rows fit the list's width: a narrow list moves format and map under the title,
 /// then the date too; title, length and Watch always keep their columns.
@@ -62,7 +73,7 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
             };
             let item = if ix == 0 {
                 // The Open demo button takes a listener, so the top builds inside the page.
-                page.update(cx, |_, cx| top(fit, cx))
+                page.update(cx, |page, cx| top(page, fit, cx))
             } else {
                 let page = page.read(cx);
                 match page.feed.items().get(ix - 1) {
@@ -92,19 +103,76 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
     scroll_beside(ids::DEMOS_TF_LIST_SCROLLBAR, &page.list, rows)
 }
 
-// Open demo at the top right, then the column titles in the rows' widths.
-fn top(fit: Fit, cx: &mut Context<DemosTfPage>) -> AnyElement {
+// The format Select and range picker, Open demo at the right, then the column titles in
+// the rows' widths. A narrow list wraps the toolbar instead of squeezing it.
+fn top(page: &DemosTfPage, fit: Fit, cx: &mut Context<DemosTfPage>) -> AnyElement {
     let open = Button::new(ids::DEMOS_TF_OPEN)
         .outline()
         .small()
         .label(tr!("demos_tf.open"))
         .on_click(cx.listener(|page, _, window, cx| page.open_demo(window, cx)));
+    let format = div()
+        .id(ids::DEMOS_TF_FORMAT)
+        .test_support()
+        .w(FORMAT_SELECT)
+        .child(Select::new(&page.format_select).small());
+    let tools = h_flex()
+        .w_full()
+        .flex_wrap()
+        .items_start()
+        .gap_4()
+        .child(format)
+        .child(range_picker(&page.range_slider, cx.entity().downgrade()))
+        .child(h_flex().ml_auto().child(open));
     v_flex()
         .w_full()
         .gap_2()
-        .child(h_flex().w_full().justify_end().child(open))
+        .child(tools)
         .child(column_header(fit, cx))
         .into_any_element()
+}
+
+// The slider over its six stop labels, as logs.tf's; a label click picks its stop like a
+// release there, and being buttons the labels give the keyboard a way to pick.
+fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<DemosTfPage>) -> impl IntoElement {
+    let cells = DemosRange::STOPS.iter().enumerate().map(|(i, &range)| {
+        let page = page.clone();
+        let label = Button::new(ids::demos_tf_range_stop(range))
+            .ghost()
+            .xsmall()
+            .label(range_label(range))
+            .on_click(move |_, window, cx| {
+                let _ = page.update(cx, |page, cx| page.set_range(range, window, cx));
+            });
+        // Stop `i` lies `i` cells in from the first label's centre, under the kit's thumb.
+        h_flex()
+            .absolute()
+            .top_0()
+            .left(px(STOP_CELL * i as f32))
+            .w(px(STOP_CELL))
+            .h_full()
+            .justify_center()
+            .child(label)
+    });
+    v_flex()
+        .w(px(RANGE_WIDTH))
+        .gap_1()
+        .child(
+            div()
+                .id(ids::DEMOS_TF_RANGE)
+                .aria_label(tr!("demos_tf.range_name"))
+                .test_support()
+                .px(px(STOP_CELL / 2.))
+                .child(Slider::new(slider)),
+        )
+        .child(
+            div()
+                .relative()
+                .w_full()
+                .h(px(LABEL_HEIGHT))
+                .text_xs()
+                .children(cells),
+        )
 }
 
 fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
@@ -225,8 +293,8 @@ fn demo_row(
         .into_any_element()
 }
 
-// What follows the rows: the failed page's error with Retry, a loading line, or the empty
-// range's note once demos.tf has nothing for the query.
+// What follows the rows: the failed page's error with Retry, Keep looking past the skip
+// limit, a loading line, or the empty range's note with a way to look further back.
 fn footer(page: &DemosTfPage, this: WeakEntity<DemosTfPage>, cx: &App) -> AnyElement {
     let muted = cx.theme().muted_foreground;
     let line = || div().py_4().px_3().text_sm().text_color(muted);
@@ -246,13 +314,44 @@ fn footer(page: &DemosTfPage, this: WeakEntity<DemosTfPage>, cx: &App) -> AnyEle
             ))
             .into_any_element();
     }
+    if page.stalled {
+        let keep = Button::new(ids::DEMOS_TF_KEEP_LOOKING)
+            .outline()
+            .small()
+            .label(tr!("demos_tf.keep_looking"))
+            .on_click(move |_, _, cx| {
+                let _ = this.update(cx, |page, cx| page.keep_looking(cx));
+            });
+        return div().py_4().px_3().child(keep).into_any_element();
+    }
     // A footer about to page already says so: a footer drawn empty measures zero height at
     // the list's bottom edge, and the list would not draw it again to show what lands.
     if page.feed.is_loading() || page.wants_page() {
         return labelled(line(), ids::DEMOS_TF_LOADING, tr!("demos_tf.loading")).into_any_element();
     }
     if page.feed.is_end() && page.feed.items().is_empty() {
-        return labelled(line(), ids::DEMOS_TF_EMPTY, tr!("demos_tf.empty")).into_any_element();
+        let range = page.range();
+        let wider = DemosRange::STOPS
+            .iter()
+            .skip_while(|stop| **stop != range)
+            .nth(1)
+            .copied();
+        let widen = wider.map(|wider| {
+            Button::new(ids::DEMOS_TF_WIDEN)
+                .ghost()
+                .small()
+                .label(tr!("demos_tf.widen"))
+                .on_click(move |_, window, cx| {
+                    let _ = this.update(cx, |page, cx| page.set_range(wider, window, cx));
+                })
+        });
+        return h_flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .child(labelled(line(), ids::DEMOS_TF_EMPTY, tr!("demos_tf.empty")))
+            .children(widen)
+            .into_any_element();
     }
     div().into_any_element()
 }

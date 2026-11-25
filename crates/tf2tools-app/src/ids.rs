@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice, NewPart,
-    PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind,
-    SteamId, StorageKind, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, DemosRange, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice,
+    NewPart, PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch,
+    SoundKind, SteamId, StorageKind, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -3513,6 +3513,29 @@ pub const DEMOS_TF_EMPTY: &str = "demos-tf-empty";
 pub const DEMOS_TF_ERROR: &str = "demos-tf-error";
 /// The Demos.tf list's Retry beside its error.
 pub const DEMOS_TF_RETRY: &str = "demos-tf-retry";
+
+/// The Demos.tf list's footer button that widens an empty range by one stop.
+pub const DEMOS_TF_WIDEN: &str = "demos-tf-widen";
+/// The Demos.tf list's footer button that reads on past the skip limit of a format filter.
+pub const DEMOS_TF_KEEP_LOOKING: &str = "demos-tf-keep-looking";
+/// The Demos.tf toolbar's range slider, six stops from 1 day to All.
+pub const DEMOS_TF_RANGE: &str = "demos-tf-range";
+/// The Demos.tf toolbar's format Select wrapper.
+pub const DEMOS_TF_FORMAT: &str = "demos-tf-format";
+
+/// One stop's label under the Demos.tf range slider, a click picks it:
+/// "demos-tf-range-stop:<key>", keys 1d 1w 1m 3m 1y all.
+pub fn demos_tf_range_stop(range: DemosRange) -> ElementId {
+    let key = match range {
+        DemosRange::Day1 => "1d",
+        DemosRange::Week1 => "1w",
+        DemosRange::Month1 => "1m",
+        DemosRange::Months3 => "3m",
+        DemosRange::Year1 => "1y",
+        DemosRange::All | _ => "all",
+    };
+    keyed("demos-tf-range-stop", key)
+}
 
 /// A Demos.tf row's date, its own column or a line under the title, labelled with the date.
 pub fn demos_tf_row_date(id: u64) -> ElementId {
