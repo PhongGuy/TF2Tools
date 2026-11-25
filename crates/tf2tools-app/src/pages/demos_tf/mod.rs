@@ -131,6 +131,15 @@ impl DemosTfPage {
         self.next_page(cx);
     }
 
+    // True while the list may page on: no failed page waits for Retry, the end is not
+    // reached and no page is in flight.
+    fn wants_page(&self) -> bool {
+        self.error.is_none()
+            && self.resume.is_none()
+            && !self.feed.is_end()
+            && !self.feed.is_loading()
+    }
+
     // Asks demos.tf for the next page on tokio. A failed page's cursor wins over the feed's,
     // and a last page with no next cursor lands empty at once, which ends the list.
     fn next_page(&mut self, cx: &mut Context<Self>) {

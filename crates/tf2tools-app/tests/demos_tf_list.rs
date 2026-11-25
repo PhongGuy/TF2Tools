@@ -4,8 +4,8 @@ use tf2tools_app::ids;
 
 use crate::support;
 use crate::support::demostf::{
-    Demo, demo, demos_tf_shell, list_body, list_queries, mount_before, mount_first, wait_end,
-    wait_ids, wait_quiet,
+    Demo, demo, demos_tf_shell, ids_down, list_body, list_queries, mount_before, mount_first,
+    shown_ids, to_end, wait_end, wait_ids, wait_quiet,
 };
 use crate::support::logstf::{Gate, mount_held, unix_now};
 
@@ -121,4 +121,70 @@ fn a_failed_list_waits_for_retry(cx: &mut TestAppContext) {
     wait_ids(cx, &d.page, &[9]);
     wait_quiet(cx, &d);
     assert!(!support::present(cx, d.s.win, ids::DEMOS_TF_ERROR));
+}
+
+#[gpui_kit::test]
+fn scrolling_to_the_end_loads_older_demos_by_id_without_repeats(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let uri = server.uri();
+    mount_first(&server, list_body(&uri, &ids_down(1000, 50)));
+    // Two new demos shifted the list, so the next page repeats 952 and 951.
+    mount_before(&server, 951, 200, list_body(&uri, &ids_down(952, 5)));
+    mount_before(&server, 948, 200, b"[]".to_vec());
+    let d = demos_tf_shell(cx, &env, &uri, &[]);
+    let first: Vec<u64> = (951..=1000).rev().collect();
+    wait_ids(cx, &d.page, &first);
+    support::settle(cx, d.s.win);
+    assert_eq!(list_queries(&server).len(), 1, "fifty rows fill the window");
+    to_end(cx, &d);
+    let mut all = first.clone();
+    all.extend([950, 949, 948]);
+    wait_ids(cx, &d.page, &all);
+    to_end(cx, &d);
+    wait_end(cx, &d.page);
+    let q = list_queries(&server);
+    assert_eq!(q.len(), 3, "{q:?}");
+    assert_eq!(q[1]["before_id"], "951");
+    assert_eq!(q[2]["before_id"], "948");
+    assert_eq!(
+        q[1]["after"], q[0]["after"],
+        "paging keeps the range's start"
+    );
+    to_end(cx, &d);
+    assert_eq!(list_queries(&server).len(), 3, "the end asks no more");
+}
+
+#[gpui_kit::test]
+fn a_failed_next_page_keeps_the_rows_and_retries_that_page(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let uri = server.uri();
+    mount_first(&server, list_body(&uri, &ids_down(1000, 50)));
+    mount_before(&server, 951, 500, Vec::new());
+    let d = demos_tf_shell(cx, &env, &uri, &[]);
+    wait_ids(cx, &d.page, &(951..=1000).rev().collect::<Vec<_>>());
+    to_end(cx, &d);
+    support::wait_real(cx, "the error", |cx| {
+        support::present(cx, d.s.win, ids::DEMOS_TF_ERROR)
+    });
+    assert_eq!(shown_ids(cx, &d.page).len(), 50);
+    let asked = list_queries(&server).len();
+    to_end(cx, &d);
+    support::settle(cx, d.s.win);
+    assert_eq!(
+        list_queries(&server).len(),
+        asked,
+        "an error waits for Retry"
+    );
+    server.reset();
+    mount_before(&server, 951, 200, list_body(&uri, &ids_down(950, 2)));
+    mount_before(&server, 949, 200, b"[]".to_vec());
+    support::click_id(cx, d.s.win, ids::DEMOS_TF_RETRY);
+    support::wait_real(cx, "the retried page", |cx| {
+        shown_ids(cx, &d.page).len() == 52
+    });
+    assert_eq!(
+        list_queries(&server)[0]["before_id"],
+        "951",
+        "Retry asks for the failed page"
+    );
 }

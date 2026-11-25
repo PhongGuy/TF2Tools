@@ -67,7 +67,19 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
                 let page = page.read(cx);
                 match page.feed.items().get(ix - 1) {
                     Some(row) => demo_row(row, fit, cx),
-                    None => footer(page, this.clone(), cx),
+                    None => {
+                        // Building the footer means it is near the view, so ask for the next
+                        // page after this layout; a notify during layout would be dropped.
+                        let wants = page.wants_page();
+                        let footer = footer(page, this.clone(), cx);
+                        if wants {
+                            let this = this.clone();
+                            cx.defer(move |cx| {
+                                let _ = this.update(cx, |page, cx| page.next_page(cx));
+                            });
+                        }
+                        footer
+                    }
                 }
             };
             centred(item)
@@ -216,7 +228,9 @@ fn footer(page: &DemosTfPage, this: WeakEntity<DemosTfPage>, cx: &App) -> AnyEle
             ))
             .into_any_element();
     }
-    if page.feed.is_loading() {
+    // A footer about to page already says so: a footer drawn empty measures zero height at
+    // the list's bottom edge, and the list would not draw it again to show what lands.
+    if page.feed.is_loading() || page.wants_page() {
         return labelled(line(), ids::DEMOS_TF_LOADING, tr!("demos_tf.loading")).into_any_element();
     }
     if page.feed.is_end() && page.feed.items().is_empty() {
