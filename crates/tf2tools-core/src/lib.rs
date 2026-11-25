@@ -9,6 +9,7 @@
 
 mod activity;
 mod archive;
+mod cleanup;
 mod crosshair_catalog;
 pub mod cursor;
 mod db;
@@ -43,6 +44,7 @@ mod weapons;
 
 pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEntry};
 pub use archive::{extract_archive, find_content_root};
+pub use cleanup::{CleanupRoots, Freed, sweep_game_leftovers, sweep_leftovers};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use demo_view::{
