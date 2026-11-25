@@ -63,6 +63,9 @@ settings:
     store_data: "Shop-Daten"
     image_cache: "Bilder-Cache"
     demo_cache: "Demo-Cache"
+    clear_demo_cache: "Cache leeren"
+    demo_cache_cleared: "Demo-Cache geleert"
+    demo_cache_freed: "%{size} freigegeben"
   logs_tf:
     title: "logs.tf"
     description: "Wie Spieler in geöffneten Match-Logs heißen und wie lange vollständige Logs aufbewahrt werden"
@@ -984,6 +987,10 @@ confirm:
     title: "Altes TF2Tools entfernen"
     body: "TF2Tools wird geschlossen, während die alte Version entfernt wird. Öffne es danach wieder."
     ok: "Entfernen und schließen"
+  clear_demo_cache:
+    title: "Demo-Cache leeren"
+    body: "%{size} an heruntergeladenen Demos löschen? Demos, die noch heruntergeladen werden, bleiben erhalten, und jede Demo kann erneut heruntergeladen werden."
+    ok: "Leeren"
   clear_logs:
     title: "Alle Logs löschen"
     body: "Möchtest du wirklich alle Logs löschen? Das kann nicht rückgängig gemacht werden."
@@ -2767,6 +2774,8 @@ messages:
       closed: "Die Soundwiedergabe funktioniert nicht mehr. Starte TF2Tools neu, um wieder Sounds abzuspielen."
     log:
       database: "TF2Tools konnte das Aktivitätsprotokoll nicht öffnen. Starte TF2Tools neu und versuch es erneut."
+    demo_cache:
+      clear: "Einige heruntergeladene Demos konnten nicht gelöscht werden. Schließe jede geöffnete Demo und versuch es erneut."
     logs_cache:
       database: "TF2Tools konnte seine logs.tf-Daten nicht lesen oder speichern. Starte TF2Tools neu und versuch es erneut."
     startup:
@@ -2958,6 +2967,7 @@ messages:
     add_to_profile: "Hinzufügen zum Profil fehlgeschlagen"
     make_hud_pictures: "HUD-Bilder konnten nicht erstellt werden"
     load_more_logs: "Laden weiterer Logs fehlgeschlagen"
+    clear_demo_cache: "Leeren des Demo-Caches fehlgeschlagen"
     clear_logs: "Leeren der Logs fehlgeschlagen"
     load_logs: "Laden der Logs fehlgeschlagen"
     read_class_weapons: "Lesen der Klassenwaffen fehlgeschlagen"

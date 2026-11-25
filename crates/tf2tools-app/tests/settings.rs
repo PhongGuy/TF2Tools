@@ -1140,3 +1140,102 @@ fn storage_logs_tf_and_stores_follow_audio_in_that_order(cx: &mut TestAppContext
         "{order:?} at {tops:?}"
     );
 }
+
+// Fills the demo cache before the app starts: two finished demos, one in-flight part file.
+fn seed_demos(env: &support::Env) -> std::path::PathBuf {
+    let demos = env.data.demo_cache_dir();
+    std::fs::create_dir_all(&demos).unwrap();
+    std::fs::write(demos.join("1.dem"), [1u8; 3000]).unwrap();
+    std::fs::write(demos.join("22.dem"), [1u8; 2000]).unwrap();
+    std::fs::write(demos.join(".5.dem.abc123.part"), [2u8; 100]).unwrap();
+    demos
+}
+
+fn demo_bytes(cx: &mut TestAppContext) -> u64 {
+    use tf2tools_app::library_pack::LibraryPack;
+    cx.update(|cx| LibraryPack::global(cx).read(cx).space())
+        .expect("figures")
+        .bytes(tf2tools_core::StorageKind::DemoCache)
+}
+
+#[gpui_kit::test]
+fn clear_demo_cache_asks_then_deletes_finished_demos_and_measures_again(cx: &mut TestAppContext) {
+    use tf2tools_app::pages::settings::size_text;
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let demos = seed_demos(&env);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    assert_eq!(demo_bytes(cx), 5100);
+    let clear = ids::settings_storage_clear(StorageKind::DemoCache);
+    scroll_settings_to(cx, &s, clear.clone());
+    assert_eq!(
+        support::label_of(cx, s.win, clear.clone()).as_deref(),
+        Some("Clear demo cache")
+    );
+    assert!(!support::disabled_of(cx, s.win, clear.clone()));
+
+    support::click_id(cx, s.win, clear.clone());
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Clear demo cache")
+    );
+    let body = format!(
+        "Delete {} of downloaded demos? Demos still downloading are kept, and any demo can be downloaded again.",
+        size_text(5100)
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some(body.as_str())
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the demo cache to clear and measure", |cx| {
+        demo_bytes(cx) == 100
+    });
+    assert!(!demos.join("1.dem").exists());
+    assert!(!demos.join("22.dem").exists());
+    assert!(demos.join(".5.dem.abc123.part").exists());
+    let toasts = support::toast_labels(cx, s.win);
+    assert!(
+        toasts.iter().any(|t| t.contains("Demo cache cleared")
+            && t.contains(&format!("{} freed", size_text(5000)))),
+        "{toasts:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn cancelling_clear_demo_cache_keeps_every_demo(cx: &mut TestAppContext) {
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let demos = seed_demos(&env);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    let clear = ids::settings_storage_clear(StorageKind::DemoCache);
+    scroll_settings_to(cx, &s, clear.clone());
+    support::click_id(cx, s.win, clear);
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::settle(cx, s.win);
+    assert!(demos.join("1.dem").exists());
+    assert!(demos.join("22.dem").exists());
+    assert_eq!(demo_bytes(cx), 5100);
+}
+
+#[gpui_kit::test]
+fn clear_demo_cache_is_off_while_the_cache_is_empty(cx: &mut TestAppContext) {
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    assert_eq!(demo_bytes(cx), 0);
+    let clear = ids::settings_storage_clear(StorageKind::DemoCache);
+    scroll_settings_to(cx, &s, clear.clone());
+    assert!(support::disabled_of(cx, s.win, clear));
+}

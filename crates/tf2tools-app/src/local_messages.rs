@@ -2,10 +2,11 @@
 //! carry paths or raw error text; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
-    GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
-    LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError, PngWriteError,
-    ProfileError, QueryError, SettingsError, StorageError, UpdateCopyError, WavError,
+    ApplyProfileError, CopyHudError, DemoClearError, DetectError, FontInstallError,
+    GbAddonInstallError, GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError,
+    InstallError, KeepHudError, LibraryError, LogError, LogsCacheError, MakeHudError, PaintError,
+    PngReadError, PngWriteError, ProfileError, QueryError, SettingsError, StorageError,
+    UpdateCopyError, WavError,
 };
 
 use gpui_kit::SharedString;
@@ -709,6 +710,15 @@ pub fn log_phrase(err: &LogError) -> Phrase {
 pub fn describe_logs_cache(err: &LogsCacheError) -> LocalFailure {
     let message = match err {
         LogsCacheError::Database { .. } => tr!("messages.local.logs_cache.database"),
+        _ => unknown(),
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// A failed clear of the demo cache; `detail` is the error's own text.
+pub fn describe_demo_clear(err: &DemoClearError) -> LocalFailure {
+    let message = match err {
+        DemoClearError::Io { .. } => tr!("messages.local.demo_cache.clear"),
         _ => unknown(),
     };
     LocalFailure::new(message, err.to_string())

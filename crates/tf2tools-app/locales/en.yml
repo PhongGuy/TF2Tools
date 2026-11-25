@@ -40,6 +40,9 @@ settings:
     store_data: "Store data"
     image_cache: "Image cache"
     demo_cache: "Demo cache"
+    clear_demo_cache: "Clear demo cache"
+    demo_cache_cleared: "Demo cache cleared"
+    demo_cache_freed: "%{size} freed"
   logs_tf:
     title: "logs.tf"
     description: "How opened match logs name players, and how long full logs are kept"
@@ -961,6 +964,10 @@ confirm:
     title: "Remove the old TF2Tools"
     body: "TF2Tools closes while the old version is removed. Open it again when it's done."
     ok: "Remove and close"
+  clear_demo_cache:
+    title: "Clear demo cache"
+    body: "Delete %{size} of downloaded demos? Demos still downloading are kept, and any demo can be downloaded again."
+    ok: "Clear"
   clear_logs:
     title: "Clear All Logs"
     body: "Are you sure you want to clear all activity logs? This cannot be undone."
@@ -2744,6 +2751,8 @@ messages:
       closed: "Sound playback stopped working. Restart TF2Tools to play sounds again."
     log:
       database: "TF2Tools couldn't open the activity log. Restart TF2Tools and try again."
+    demo_cache:
+      clear: "Some downloaded demos could not be deleted. Close any demo that is open and try again."
     logs_cache:
       database: "TF2Tools couldn't read or save its logs.tf data. Restart TF2Tools and try again."
     startup:
@@ -2935,6 +2944,7 @@ messages:
     add_to_profile: "Couldn't add to profile"
     make_hud_pictures: "Couldn't make HUD pictures"
     load_more_logs: "Failed to load more logs"
+    clear_demo_cache: "Failed to clear the demo cache"
     clear_logs: "Failed to clear logs"
     load_logs: "Failed to load logs"
     read_class_weapons: "Failed to read class weapons"
