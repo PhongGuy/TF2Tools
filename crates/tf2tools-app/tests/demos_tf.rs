@@ -12,6 +12,8 @@ use crate::support::graphics::found;
 
 #[gpui_kit::test]
 fn the_page_starts_on_the_list_with_open_demo(cx: &mut TestAppContext) {
+    // The list asks demos.tf over the tokio bridge, so the test executor may park.
+    cx.executor().allow_parking();
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     support::click_nav(cx, s.win, Page::DemosTf);
@@ -19,10 +21,6 @@ fn the_page_starts_on_the_list_with_open_demo(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::DEMOS_TF_OPEN).as_deref(),
         Some("Open demo")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::DEMOS_TF_COMING).as_deref(),
-        Some("The demos.tf list is coming. For now, open a demo from your computer.")
     );
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER));
     assert!(!support::present(cx, s.win, ids::DEMO_VIEWER_BAR));

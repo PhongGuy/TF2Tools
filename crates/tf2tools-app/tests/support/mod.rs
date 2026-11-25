@@ -40,6 +40,7 @@ use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 pub mod demo_viewer;
+pub mod demostf;
 pub mod fonts;
 pub mod graphics;
 pub mod hud_copies;

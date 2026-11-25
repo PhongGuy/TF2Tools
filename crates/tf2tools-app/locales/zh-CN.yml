@@ -162,7 +162,14 @@ updater:
 demos_tf:
   open: "打开录像"
   back: "返回录像列表"
-  coming: "demos.tf 列表即将推出。目前请从你的电脑打开录像。"
+  loading: "正在加载录像…"
+  empty: "此时间范围内没有录像"
+  column:
+    date: "日期"
+    title: "标题"
+    format: "赛制"
+    map: "地图"
+    length: "时长"
   format:
     hl: "Highlander"
     prolander: "Prolander"

@@ -138,7 +138,14 @@ updater:
 demos_tf:
   open: "Открыть демо"
   back: "Назад к списку демо"
-  coming: "Список demos.tf скоро появится. А пока откройте демо со своего компьютера."
+  loading: "Загрузка демо..."
+  empty: "Нет демо за этот период"
+  column:
+    date: "Дата"
+    title: "Название"
+    format: "Формат"
+    map: "Карта"
+    length: "Время"
   format:
     hl: "Highlander"
     prolander: "Prolander"

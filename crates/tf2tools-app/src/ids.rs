@@ -3503,8 +3503,41 @@ pub fn addon_detail_map(index: usize) -> ElementId {
 pub const DEMOS_TF_LIST: &str = "demos-tf-list";
 /// The Demos.tf list's "Open demo" button, which opens a demo from the computer.
 pub const DEMOS_TF_OPEN: &str = "demos-tf-open";
-/// The Demos.tf list's placeholder line, saying the demos.tf list is coming.
-pub const DEMOS_TF_COMING: &str = "demos-tf-coming";
+/// The Demos.tf list's scrollbar.
+pub const DEMOS_TF_LIST_SCROLLBAR: &str = "demos-tf-list-scrollbar";
+/// The Demos.tf list's footer line while a page of demos loads.
+pub const DEMOS_TF_LOADING: &str = "demos-tf-loading";
+/// The Demos.tf list's footer line when the range holds no demos.
+pub const DEMOS_TF_EMPTY: &str = "demos-tf-empty";
+/// The Demos.tf list's footer error, labelled with why the page failed.
+pub const DEMOS_TF_ERROR: &str = "demos-tf-error";
+/// The Demos.tf list's Retry beside its error.
+pub const DEMOS_TF_RETRY: &str = "demos-tf-retry";
+
+/// A Demos.tf row's date, its own column or a line under the title, labelled with the date.
+pub fn demos_tf_row_date(id: u64) -> ElementId {
+    keyed("demos-tf-row-date", &id.to_string())
+}
+
+/// A Demos.tf row's title, labelled with its server and teams.
+pub fn demos_tf_row_title(id: u64) -> ElementId {
+    keyed("demos-tf-row-title", &id.to_string())
+}
+
+/// A Demos.tf row's format, labelled with the format's name.
+pub fn demos_tf_row_format(id: u64) -> ElementId {
+    keyed("demos-tf-row-format", &id.to_string())
+}
+
+/// A Demos.tf row's map, labelled with the map name.
+pub fn demos_tf_row_map(id: u64) -> ElementId {
+    keyed("demos-tf-row-map", &id.to_string())
+}
+
+/// A Demos.tf row's length, labelled as minutes and seconds.
+pub fn demos_tf_row_duration(id: u64) -> ElementId {
+    keyed("demos-tf-row-duration", &id.to_string())
+}
 /// The Demos.tf header crumb's "Demos.tf" link, which closes the viewer back to the list.
 pub const DEMOS_TF_CRUMB: &str = "demos-tf-crumb";
 /// The Demos.tf header crumb's name of the open demo: its map, or its file until the map is known.

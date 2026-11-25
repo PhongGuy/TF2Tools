@@ -165,7 +165,14 @@ updater:
 demos_tf:
   open: "Ouvrir la démo"
   back: "Retour à la liste des démos"
-  coming: "La liste demos.tf arrive bientôt. En attendant, ouvrez une démo depuis votre ordinateur."
+  loading: "Chargement des démos..."
+  empty: "Aucune démo sur cette période"
+  column:
+    date: "Date"
+    title: "Titre"
+    format: "Format"
+    map: "Carte"
+    length: "Durée"
   format:
     hl: "Highlander"
     prolander: "Prolander"

@@ -163,7 +163,14 @@ updater:
 demos_tf:
   open: "Abrir demo"
   back: "Volver a la lista de demos"
-  coming: "La lista de demos.tf llegará pronto. Por ahora, abre una demo desde tu ordenador."
+  loading: "Cargando demos..."
+  empty: "No hay demos en este periodo"
+  column:
+    date: "Fecha"
+    title: "Título"
+    format: "Formato"
+    map: "Mapa"
+    length: "Tiempo"
   format:
     hl: "Highlander"
     prolander: "Prolander"
