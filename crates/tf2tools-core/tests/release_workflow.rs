@@ -196,15 +196,26 @@ fn the_manifest_job_builds_the_notes_and_hashes_them_into_the_manifest() {
         "git cat-file -t",
         "%(contents:body)",
         "scripts/release-notes.sh \"$tag\" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md",
-        "gh release list --exclude-drafts --limit 100",
-        "--json tagName,body,publishedAt,isPrerelease,isDraft",
         "cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version \"$VERSION\" --out dist/notes.json",
     ] {
         assert!(notes.contains(needle), "missing {needle}:\n{notes}");
     }
     assert!(!notes.contains("secrets."), "{notes}");
+    // Only the dump step holds the token, so no cargo compile ever sees it.
+    let dump = step(&manifest, "Dump the published releases");
+    for needle in [
+        "mkdir -p releases",
+        "gh release list --exclude-drafts --limit 100",
+        "--json tagName,body,publishedAt,isPrerelease,isDraft",
+    ] {
+        assert!(dump.contains(needle), "missing {needle}:\n{dump}");
+    }
+    assert!(!dump.contains("cargo"), "{dump}");
+    assert!(!notes.contains("GH_TOKEN"), "{notes}");
     let write = step(&manifest, "Write the update manifest");
+    assert!(write.contains("make_manifest -- manifest"), "{write}");
     assert!(write.contains("--notes-file dist/notes.json"), "{write}");
+    assert!(!write.contains("GH_TOKEN"), "{write}");
     for needle in [
         "name: update-notes",
         "path: dist/notes.json",
@@ -216,6 +227,7 @@ fn the_manifest_job_builds_the_notes_and_hashes_them_into_the_manifest() {
     let at = |s: &str| manifest.find(s).unwrap_or_else(|| panic!("missing {s}"));
     assert!(at("Fetch the tag annotations") < at("Write the release page and notes"));
     assert!(at("name: generated-notes") < at("Write the release page and notes"));
+    assert!(at("Dump the published releases") < at("Write the release page and notes"));
     assert!(at("Write the release page and notes") < at("Write the update manifest"));
 }
 
@@ -434,7 +446,7 @@ fn the_sign_job_checks_the_notes_against_the_signed_manifest() {
     for needle in [
         "jq -e '.notes_asset | type == \"object\"'",
         "the signed manifest has no release notes",
-        "*/releases/download/$GITHUB_REF_NAME/notes.json",
+        "\"https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/notes.json\"",
         "stat -c %s dist/notes.json",
         "sha256sum < dist/notes.json",
         "notes: notes.json matches",

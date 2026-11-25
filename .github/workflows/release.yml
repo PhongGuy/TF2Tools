@@ -238,23 +238,28 @@ jobs:
             ls -l dist >&2
             exit 1
           fi
-      - name: Write the release page and notes
+      # The token lives only in this step, so the cargo compile below never sees it.
+      - name: Dump the published releases
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p releases
+          gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | while read -r name; do
+            gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "releases/$name.json" < /dev/null
+          done
+      - name: Write the release page and notes
+        env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           tag="v$VERSION"
-          mkdir -p page releases
+          mkdir -p page
           # Only an annotated tag carries a player intro; a lightweight one would give the commit message.
           : > page/intro.md
           if [ "$(git cat-file -t "refs/tags/$tag" 2> /dev/null)" = tag ]; then
             git for-each-ref "refs/tags/$tag" --format='%(contents:body)' > page/intro.md
           fi
           scripts/release-notes.sh "$tag" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md
-          gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | while read -r name; do
-            gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "releases/$name.json" < /dev/null
-          done
           cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version "$VERSION" --out dist/notes.json
       - name: Write the update manifest
         env:
@@ -380,7 +385,7 @@ jobs:
             exit 1
           fi
           IFS=$'\t' read -r notes_url notes_sha notes_size < <(jq -r '.notes_asset | [.url, .sha256, (.size | tostring)] | @tsv' dist/tf2tools-update.json)
-          if [[ $notes_url != */releases/download/$GITHUB_REF_NAME/notes.json ]]; then
+          if [ "$notes_url" != "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/notes.json" ]; then
             echo "the signed notes are '$notes_url', not this tag's notes.json" >&2
             exit 1
           fi
