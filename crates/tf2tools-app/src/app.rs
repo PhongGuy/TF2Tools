@@ -207,6 +207,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                         crate::library_pack::startup(cx);
                         detect_tf2(win, cx);
                         tokio_bridge::init(cx);
+                        crate::leftovers::sweep(cx);
                         updates.update(cx, |updates, cx| updates.check(cx));
                         // Trimming is local, so it runs whatever auto_sync says.
                         crate::logs_trim::LogsTrim::global(cx);
@@ -264,6 +265,7 @@ pub fn detect_tf2(win: AnyWindowHandle, cx: &mut App) {
         let resolved = resolve_tf2(services);
         if let Some(tf2) = resolved.0.install() {
             recover_live_link(services, tf2);
+            crate::leftovers::sweep_game(services, tf2);
         }
         Ok(resolved)
     });

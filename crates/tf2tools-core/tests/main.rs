@@ -14,6 +14,7 @@ mod addon_catalog;
 mod addon_null_movement;
 mod archive;
 mod ci_workflow;
+mod cleanup;
 mod common;
 mod crosshair_catalog;
 mod crosshair_import_clash;
