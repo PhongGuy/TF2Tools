@@ -5,10 +5,12 @@
 mod install;
 mod keys;
 mod manifest;
+mod notes;
 
 pub use install::{Applied, InstallTarget, apply};
 pub use keys::UPDATE_PUBLIC_KEYS;
 pub use manifest::{UpdateAsset, UpdateOffer};
+pub use notes::{NotesGroup, NotesItem, NotesKind, NotesStatus, ReleaseNotes};
 
 use std::path::{Path, PathBuf};
 
