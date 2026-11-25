@@ -236,7 +236,9 @@ pub fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         .as_ref()
         .map_err(|e| anyhow::anyhow!("demos fake: {e}"))?;
     Ok(Boot {
-        endpoints: boot.endpoints.with_demos(DemosEndpoints::loopback(fake.base())),
+        endpoints: boot
+            .endpoints
+            .with_demos(DemosEndpoints::loopback(fake.base())),
         ..boot
     })
 }
