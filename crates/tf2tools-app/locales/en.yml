@@ -136,6 +136,19 @@ updater:
     downloaded: "Downloaded TF2Tools v%{version}"
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
+  notes:
+    title: "What's new"
+    since: "Changes since v%{current}, newest first."
+    english: "Release notes are in English."
+    partial: "Notes for some versions are missing. See the release page for all of them."
+    unavailable: "Release notes couldn't be loaded. You can still update."
+    later: "Later"
+    update: "Update now"
+    kind:
+      features: "New features"
+      fixes: "Fixes"
+      usability: "Usability"
+      performance: "Performance"
 
 demos_tf:
   open: "Open demo"

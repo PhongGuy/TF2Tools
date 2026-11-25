@@ -38,6 +38,25 @@ pub const UPDATE_BANNER_PERCENT: &str = "update-banner-percent";
 /// "Update", "Open release page" or "Restart".
 pub const UPDATE_BANNER_ACTION: &str = "update-banner-action";
 pub const UPDATE_BANNER_DISMISS: &str = "update-banner-dismiss";
+/// The What's new dialog, listing the release notes between this version and the offer.
+pub const UPDATE_NOTES: &str = "update-notes";
+pub const UPDATE_NOTES_BODY: &str = "update-notes-body";
+pub const UPDATE_NOTES_SCROLLBAR: &str = "update-notes-scrollbar";
+/// Labelled "What's new".
+pub const UPDATE_NOTES_TITLE: &str = "update-notes-title";
+/// Labelled "Changes since v{current}, newest first."
+pub const UPDATE_NOTES_SINCE: &str = "update-notes-since";
+/// Shown when the app's language is not English, as the notes are.
+pub const UPDATE_NOTES_ENGLISH: &str = "update-notes-english";
+/// Shown when some versions' notes are missing, beside `UPDATE_NOTES_HISTORY`.
+pub const UPDATE_NOTES_PARTIAL: &str = "update-notes-partial";
+/// Shown in place of the releases when no notes could be loaded.
+pub const UPDATE_NOTES_UNAVAILABLE: &str = "update-notes-unavailable";
+/// "Open release page", to the list of every release.
+pub const UPDATE_NOTES_HISTORY: &str = "update-notes-history";
+pub const UPDATE_NOTES_LATER: &str = "update-notes-later";
+/// "Update now", or "Open release page" for a copy that cannot update itself.
+pub const UPDATE_NOTES_UPDATE: &str = "update-notes-update";
 /// The crash banner under the header, on the start after a crash.
 pub const CRASH_BANNER: &str = "crash-banner";
 /// Labelled "TF2Tools closed unexpectedly last time."
@@ -1270,6 +1289,31 @@ pub fn graphics_value(module: &str, choice: &ModuleChoice) -> ElementId {
 /// An id for one of many like elements, carrying its stable key: "<kind>:<key>".
 pub fn keyed(kind: &str, key: &str) -> ElementId {
     ElementId::Name(format!("{kind}:{key}").into())
+}
+
+/// A release's "v{version}" heading in the What's new dialog, by its place: "update-notes-release:<r>".
+pub fn update_notes_release(r: usize) -> ElementId {
+    keyed("update-notes-release", &r.to_string())
+}
+
+/// A release's date, when it parses: "update-notes-date:<r>".
+pub fn update_notes_date(r: usize) -> ElementId {
+    keyed("update-notes-date", &r.to_string())
+}
+
+/// A release's intro line, when it has one: "update-notes-intro:<r>".
+pub fn update_notes_intro(r: usize) -> ElementId {
+    keyed("update-notes-intro", &r.to_string())
+}
+
+/// A group's title within a release: "update-notes-group:<r>:<g>".
+pub fn update_notes_group(r: usize, g: usize) -> ElementId {
+    keyed("update-notes-group", &format!("{r}:{g}"))
+}
+
+/// One change in a group: "update-notes-item:<r>:<g>:<i>".
+pub fn update_notes_item(r: usize, g: usize, i: usize) -> ElementId {
+    keyed("update-notes-item", &format!("{r}:{g}:{i}"))
 }
 
 /// One notice's heading in the notices box, labelled with its title: "settings-notice:<file>".

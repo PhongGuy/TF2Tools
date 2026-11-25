@@ -191,7 +191,7 @@ pub fn core_backend(
                     };
                 let shown = found.as_ref().map(|o| {
                     let page = o.release_page();
-                    // The release list is the tag page's parent, for when no notes can be shown.
+                    // The release list is the tag page's parent, for versions whose notes are missing.
                     let history = page.split_once("/tag/").map_or(page, |(list, _)| list);
                     Offer {
                         version: o.version().to_owned(),

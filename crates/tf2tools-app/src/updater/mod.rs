@@ -4,6 +4,7 @@
 pub mod backend;
 pub mod keys;
 pub mod view;
+pub mod whats_new;
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -26,7 +27,7 @@ use crate::{activity, tokio_bridge};
 pub struct Offer {
     pub version: String,
     pub release_page: String,
-    /// The page listing every release, for when the notes cannot be shown.
+    /// The page listing every release, for when some versions' notes are missing.
     pub history_page: String,
     pub installable: bool,
     pub notes: Notes,
