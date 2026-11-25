@@ -6,6 +6,7 @@ pub(crate) mod common;
 pub mod crosshair_maker;
 pub mod crosshair_store;
 pub mod crosshairs;
+pub(crate) mod demo_save;
 pub mod demo_viewer;
 pub mod demos_tf;
 pub mod graphics;
