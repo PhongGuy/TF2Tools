@@ -372,13 +372,14 @@ fn only_the_packages_are_uploaded_and_released() {
     );
 }
 
-/// Every release file but SHA256SUMS, in upload order. The first four are what the updater and the
+/// Every release file but SHA256SUMS, in upload order. The first five are what the updater and the
 /// README depend on; the rest are the unversioned copies.
-const RELEASED: [&str; 7] = [
+const RELEASED: [&str; 8] = [
     "tf2tools_*",
     "TF2Tools.exe",
     "tf2tools-update.json",
     "tf2tools-update.json.minisig",
+    "notes.json",
     "tf2tools-windows-setup.exe",
     "tf2tools-linux-x86_64.AppImage",
     "tf2tools-linux-amd64.deb",
@@ -407,21 +408,40 @@ fn the_sign_job_adds_unversioned_copies_and_checksums_after_verifying() {
 }
 
 #[test]
-fn the_sign_job_writes_whats_changed_from_the_generated_notes() {
-    let draft = job(&workflow(), "sign");
-    // The previous tag comes from git history, so the checkout needs every tag.
-    assert!(draft.contains("fetch-depth: 0"), "{draft}");
-    let create = step(&draft, "Create the draft release");
+fn the_sign_job_publishes_the_page_the_manifest_job_wrote() {
+    let sign = job(&workflow(), "sign");
+    for gone in ["generate-notes", "fetch-depth", "scripts/release-notes.sh"] {
+        assert!(
+            !sign.contains(gone),
+            "the sign job still has {gone}:\n{sign}"
+        );
+    }
+    assert!(sign.contains("name: release-page"), "{sign}");
+    assert!(sign.contains("name: update-notes"), "{sign}");
+    let create = step(&sign, "Create the draft release");
     assert!(
-        create.contains("gh api \"repos/$GH_REPO/releases/generate-notes\""),
+        create.contains("--notes-file page/release-page.md"),
         "{create}"
     );
-    assert!(
-        create.contains(
-            "scripts/release-notes.sh \"$GITHUB_REF_NAME\" packaging/release-notes.md \"$RUNNER_TEMP/generated.md\" > \"$RUNNER_TEMP/notes.md\""
-        ),
-        "{create}"
-    );
+    let at = |s: &str| sign.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("name: update-notes") < at("Verify it against the compiled-in keys"));
+}
+
+#[test]
+fn the_sign_job_checks_the_notes_against_the_signed_manifest() {
+    let sign = job(&workflow(), "sign");
+    let verify = step(&sign, "Verify it against the compiled-in keys");
+    for needle in [
+        "jq -e '.notes_asset | type == \"object\"'",
+        "the signed manifest has no release notes",
+        "*/releases/download/$GITHUB_REF_NAME/notes.json",
+        "stat -c %s dist/notes.json",
+        "sha256sum < dist/notes.json",
+        "notes: notes.json matches",
+    ] {
+        assert!(verify.contains(needle), "missing {needle}:\n{verify}");
+    }
+    assert!(verify.find("notes: notes.json matches") < verify.find("printf '%s\\n' \"$out\""));
 }
 
 #[test]
@@ -510,7 +530,10 @@ fn the_sign_job_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
         draft.contains("gh release create \"$GITHUB_REF_NAME\" --draft --verify-tag"),
         "{draft}"
     );
-    assert!(draft.contains("packaging/release-notes.md"), "{draft}");
+    assert!(
+        draft.contains("--notes-file page/release-page.md"),
+        "{draft}"
+    );
 }
 
 #[test]
@@ -698,6 +721,9 @@ fn the_runbook_names_every_secret_and_gated_step() {
         "SHA256SUMS",
         "tf2tools-windows-setup.exe",
         "tf2tools-linux-x86_64.AppImage",
+        "notes.json",
+        "git tag -a",
+        "-F",
         "tf2tools-linux-amd64.deb",
     ] {
         assert!(runbook.contains(needle), "runbook lacks {needle:?}");

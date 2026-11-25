@@ -253,7 +253,7 @@ jobs:
           fi
           scripts/release-notes.sh "$tag" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md
           gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | while read -r name; do
-            gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "releases/$name.json"
+            gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "releases/$name.json" < /dev/null
           done
           cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version "$VERSION" --out dist/notes.json
       - name: Write the update manifest
@@ -295,8 +295,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The release notes compare against the previous v* tag.
-          fetch-depth: 0
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-packages
@@ -309,6 +307,14 @@ jobs:
         with:
           name: update-manifest
           path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: update-notes
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-page
+          path: page
       - name: The manifest is for this tag
         run: |
           version=$(jq -r .version dist/tf2tools-update.json)
@@ -369,6 +375,20 @@ jobs:
             fi
             out+=$'\n'"$platform: $name matches"
           done < <(jq -r '.platforms | to_entries[] | [.key, (.value.url | split("/") | last), .value.sha256, (.value.size | tostring)] | @tsv' dist/tf2tools-update.json)
+          if ! jq -e '.notes_asset | type == "object"' dist/tf2tools-update.json > /dev/null; then
+            echo "the signed manifest has no release notes" >&2
+            exit 1
+          fi
+          IFS=$'\t' read -r notes_url notes_sha notes_size < <(jq -r '.notes_asset | [.url, .sha256, (.size | tostring)] | @tsv' dist/tf2tools-update.json)
+          if [[ $notes_url != */releases/download/$GITHUB_REF_NAME/notes.json ]]; then
+            echo "the signed notes are '$notes_url', not this tag's notes.json" >&2
+            exit 1
+          fi
+          if [ ! -f dist/notes.json ] || [ "$(stat -c %s dist/notes.json)" != "$notes_size" ] || [ "$(sha256sum < dist/notes.json | cut -d' ' -f1)" != "$notes_sha" ]; then
+            echo "notes.json does not match the manifest" >&2
+            exit 1
+          fi
+          out+=$'\n'"notes: notes.json matches"
           printf '%s\n' "$out"
           if ! grep -qxF 'windows-x86_64-nsis: TF2Tools.exe matches' <<<"$out"; then
             echo "the signed manifest has no Windows installer" >&2
@@ -382,7 +402,7 @@ jobs:
           cp TF2Tools.exe tf2tools-windows-setup.exe
           cp tf2tools_*_x86_64.AppImage tf2tools-linux-x86_64.AppImage
           cp tf2tools_*_amd64.deb tf2tools-linux-amd64.deb
-          sha256sum tf2tools_* TF2Tools.exe tf2tools-update.json tf2tools-update.json.minisig tf2tools-windows-setup.exe tf2tools-linux-x86_64.AppImage tf2tools-linux-amd64.deb > SHA256SUMS
+          sha256sum tf2tools_* TF2Tools.exe tf2tools-update.json tf2tools-update.json.minisig notes.json tf2tools-windows-setup.exe tf2tools-linux-x86_64.AppImage tf2tools-linux-amd64.deb > SHA256SUMS
           cat SHA256SUMS
       # Players check a download with `gh attestation verify <file> --repo PhongGuy/TF2Tools`.
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -392,6 +412,7 @@ jobs:
             dist/TF2Tools.exe
             dist/tf2tools-update.json
             dist/tf2tools-update.json.minisig
+            dist/notes.json
             dist/tf2tools-windows-setup.exe
             dist/tf2tools-linux-x86_64.AppImage
             dist/tf2tools-linux-amd64.deb
@@ -402,16 +423,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           version=${GITHUB_REF_NAME#v}
-          # GitHub groups the merged PRs since the previous v* tag by label (.github/release.yml); the
-          # script wraps that list in the player-facing template.
-          notes_args=(-f tag_name="$GITHUB_REF_NAME")
-          if prev=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2> /dev/null); then
-            notes_args+=(-f previous_tag_name="$prev")
-          fi
-          gh api "repos/$GH_REPO/releases/generate-notes" "${notes_args[@]}" --jq .body > "$RUNNER_TEMP/generated.md"
-          scripts/release-notes.sh "$GITHUB_REF_NAME" packaging/release-notes.md "$RUNNER_TEMP/generated.md" > "$RUNNER_TEMP/notes.md"
+          # The page was rendered in the manifest job, from the generated notes and the tag's intro.
           prerelease=()
           case $version in *-*) prerelease=(--prerelease) ;; esac
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag "${prerelease[@]}" \
-            --title "TF2Tools $version" --notes-file "$RUNNER_TEMP/notes.md" \
-            dist/tf2tools_* dist/TF2Tools.exe dist/tf2tools-update.json dist/tf2tools-update.json.minisig dist/tf2tools-windows-setup.exe dist/tf2tools-linux-x86_64.AppImage dist/tf2tools-linux-amd64.deb dist/SHA256SUMS
+            --title "TF2Tools $version" --notes-file page/release-page.md \
+            dist/tf2tools_* dist/TF2Tools.exe dist/tf2tools-update.json dist/tf2tools-update.json.minisig dist/notes.json dist/tf2tools-windows-setup.exe dist/tf2tools-linux-x86_64.AppImage dist/tf2tools-linux-amd64.deb dist/SHA256SUMS
