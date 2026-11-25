@@ -14,15 +14,15 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{IndexPath, v_flex};
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ListAlignment,
-    ListState, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task,
-    TestSupportExt as _, Window, div, px,
+    ListState, ParentElement as _, Render, Styled as _, Subscription, Task, TestSupportExt as _,
+    Window, div, px,
 };
 use tf2tools_core::{
     DemoCursor, DemoFormat, DemoListQuery, DemoPage, DemoSummary, DemosError, DemosRange, SteamId,
     TrackedPlayer,
 };
 
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::local_messages::describe_logs_cache;
 use crate::pages::demo_viewer::DemoViewerPage;
@@ -37,7 +37,7 @@ use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
 
 use crumb::DemosTfCrumb;
-use text::{format_label, list_error};
+use text::{format_label, list_error_phrase};
 
 /// Raw pages one fetch reads past while the format filter keeps none of their demos.
 const SKIP_LIMIT: usize = 10;
@@ -135,7 +135,7 @@ pub struct DemosTfPage {
     players: Vec<TrackedPlayer>,
     // The language the format Select and map placeholder were titled in.
     language: &'static str,
-    error: Option<SharedString>,
+    error: Option<Phrase>,
     // Watch downloads in flight by demo id, with their whole percent once known.
     downloads: HashMap<u64, Option<u8>>,
     _subscriptions: [Subscription; 4],
@@ -462,7 +462,7 @@ impl DemosTfPage {
         }
         self.feed.page_failed(generation);
         self.resume = Some(cursor);
-        self.error = Some(error.map_or_else(|| tr!("logs_tf.demo.down"), list_error));
+        self.error = Some(list_error_phrase(error));
         cx.notify();
     }
 

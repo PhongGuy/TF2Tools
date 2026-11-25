@@ -3,7 +3,7 @@
 use gpui_kit::SharedString;
 use tf2tools_core::{DemoFormat, DemosError, DemosRange};
 
-use crate::i18n::{format, tr};
+use crate::i18n::{Phrase, format, tr};
 
 /// A demo's row title: its server and both teams, or the server alone when a team is unnamed.
 pub fn demo_title(server: &str, red: &str, blue: &str) -> String {
@@ -45,18 +45,27 @@ pub fn range_label(range: DemosRange) -> SharedString {
 
 /// Why a page of the list failed to load, worded as what the player can do about it.
 pub fn list_error(error: &DemosError) -> SharedString {
+    list_error_phrase(Some(error)).text()
+}
+
+/// `list_error` as a phrase worded each time it is read; a failure without an error (the
+/// task stopped) reads as demos.tf being down.
+pub fn list_error_phrase(error: Option<&DemosError>) -> Phrase {
     match error {
-        DemosError::Network { .. } => tr!("logs_tf.download.offline"),
-        DemosError::RateLimited { .. } => tr!("logs_tf.demo.busy"),
+        Some(DemosError::Network { .. }) => Phrase::new(|| tr!("logs_tf.download.offline")),
+        Some(DemosError::RateLimited { .. }) => Phrase::new(|| tr!("logs_tf.demo.busy")),
         // Every other failure is demos.tf's, so it shares the down text; the wildcard too.
-        DemosError::Http { .. }
-        | DemosError::Gone
-        | DemosError::Cursor
-        | DemosError::TooLarge { .. }
-        | DemosError::Unreadable
-        | DemosError::ForeignUrl { .. }
-        | DemosError::Write { .. }
-        | _ => tr!("logs_tf.demo.down"),
+        Some(
+            DemosError::Http { .. }
+            | DemosError::Gone
+            | DemosError::Cursor
+            | DemosError::TooLarge { .. }
+            | DemosError::Unreadable
+            | DemosError::ForeignUrl { .. }
+            | DemosError::Write { .. }
+            | _,
+        )
+        | None => Phrase::new(|| tr!("logs_tf.demo.down")),
     }
 }
 

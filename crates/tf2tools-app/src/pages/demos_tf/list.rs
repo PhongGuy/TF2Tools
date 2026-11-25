@@ -354,7 +354,7 @@ fn footer(page: &DemosTfPage, this: WeakEntity<DemosTfPage>, cx: &App) -> AnyEle
             .child(error_line(
                 ids::DEMOS_TF_ERROR,
                 ids::DEMOS_TF_RETRY,
-                error.clone(),
+                error.text(),
                 retry,
                 cx,
             ))

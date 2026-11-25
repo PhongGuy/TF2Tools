@@ -1,5 +1,5 @@
 //! The Demos.tf toolbar and empty footer in German fit the narrowest window, and the kept
-//! page's format Select follows a language switch.
+//! page's format Select, map placeholder and list error follow a language switch.
 use gpui_kit::{TestAppContext, px, size};
 use tf2tools_app::ids;
 use tf2tools_app::shell::route::Page;
@@ -50,5 +50,32 @@ fn the_kept_format_select_follows_a_language_switch(cx: &mut TestAppContext) {
     assert_eq!(
         shown_text(cx, d.s.win, ids::DEMOS_TF_FORMAT).as_deref(),
         Some("Любой формат")
+    );
+    assert_eq!(
+        shown_text(cx, d.s.win, ids::DEMOS_TF_MAP).as_deref(),
+        Some("Карта")
+    );
+}
+
+// A failed list's footer is worded at draw time, so a switch retitles the error in place.
+#[gpui_kit::test]
+fn the_list_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_status("/demos/", 500);
+    let d = demos_tf_shell(cx, &env, &server.uri(), &[]);
+    support::wait_real(cx, "the error", |cx| {
+        support::present(cx, d.s.win, ids::DEMOS_TF_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, d.s.win, ids::DEMOS_TF_ERROR).as_deref(),
+        Some("demos.tf isn't responding right now. Try again later.")
+    );
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    support::settle(cx, d.s.win);
+    assert_eq!(
+        support::label_of(cx, d.s.win, ids::DEMOS_TF_ERROR).as_deref(),
+        Some("demos.tf сейчас не отвечает. Попробуйте позже.")
     );
 }
