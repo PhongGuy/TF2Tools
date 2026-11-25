@@ -23,11 +23,11 @@ use crate::pages::common::filter_badge;
 use crate::pages::logs_tf::list::{
     DATE, GAP, LENGTH, MAP, MAX_WIDTH, centred, date_cell, map_cell,
 };
-use crate::pages::logs_tf::text::duration_text;
+use crate::pages::logs_tf::text::{demo_button_label, duration_text};
 use crate::store_grid::feed::FeedItem as _;
-use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
+use crate::widgets::{Named as _, labelled};
 
 // Column widths beyond the ones shared with logs.tf's rows; WATCH keeps room for the row's
 // Watch button.
@@ -267,7 +267,13 @@ fn demo_row(
     let watch = Button::new(ids::demos_tf_watch(id))
         .outline()
         .small()
-        .label(watch_label(public, downloading))
+        .when_some(watch_label(public, downloading), |button, label| {
+            button.label(label)
+        })
+        // A running download spins and gives its full wording to the tooltip and screen reader.
+        .when(public && downloading.is_some(), |button| {
+            button.loading(true).named(demo_button_label(downloading))
+        })
         .disabled(!public || downloading.is_some())
         .on_click(move |_, window, cx| {
             let _ = this.update(cx, |page, cx| page.watch(id, window, cx));

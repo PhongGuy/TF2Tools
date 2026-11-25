@@ -69,13 +69,14 @@ pub fn list_error_phrase(error: Option<&DemosError>) -> Phrase {
     }
 }
 
-/// A row's Watch button: Private for a demo without a file, the download's progress while
-/// one runs (a whole percent once its size is known), Watch otherwise.
-pub fn watch_label(public: bool, downloading: Option<Option<u8>>) -> SharedString {
+/// A row's Watch button text: Private for a demo without a file, Watch when idle, and while a
+/// download runs only its whole percent, or nothing before the size is known, so the label
+/// fits the 96 px column in every language beside the button's spinner.
+pub fn watch_label(public: bool, downloading: Option<Option<u8>>) -> Option<SharedString> {
     match (public, downloading) {
-        (false, _) => tr!("demos_tf.private"),
-        (true, None) => tr!("demos_tf.watch"),
-        (true, Some(None)) => tr!("demos_tf.downloading"),
-        (true, Some(Some(done))) => format::percent(u64::from(done)),
+        (false, _) => Some(tr!("demos_tf.private")),
+        (true, None) => Some(tr!("demos_tf.watch")),
+        (true, Some(None)) => None,
+        (true, Some(Some(done))) => Some(format::percent(u64::from(done))),
     }
 }

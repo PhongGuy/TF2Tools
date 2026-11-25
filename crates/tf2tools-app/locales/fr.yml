@@ -169,7 +169,6 @@ demos_tf:
   empty: "Aucune démo sur cette période"
   watch: "Regarder"
   private: "Privée"
-  downloading: "Téléchargement..."
   range_name: "Période"
   range:
     day: "1 jour"

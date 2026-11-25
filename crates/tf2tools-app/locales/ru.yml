@@ -142,7 +142,6 @@ demos_tf:
   empty: "Нет демо за этот период"
   watch: "Смотреть"
   private: "Закрыто"
-  downloading: "Загрузка..."
   range_name: "Период"
   range:
     day: "1 день"

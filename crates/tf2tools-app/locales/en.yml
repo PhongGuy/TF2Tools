@@ -144,7 +144,6 @@ demos_tf:
   empty: "No demos in this range"
   watch: "Watch"
   private: "Private"
-  downloading: "Downloading..."
   range_name: "Past"
   range:
     day: "1 day"

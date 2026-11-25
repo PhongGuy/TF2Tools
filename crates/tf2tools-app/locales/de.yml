@@ -167,7 +167,6 @@ demos_tf:
   empty: "Keine Demos in diesem Zeitraum"
   watch: "Ansehen"
   private: "Privat"
-  downloading: "Wird heruntergeladen..."
   range_name: "Zeitraum"
   range:
     day: "1 Tag"

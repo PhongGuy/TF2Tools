@@ -120,12 +120,32 @@ fn a_running_download_says_so_and_takes_no_second_click(cx: &mut TestAppContext)
     support::settle(cx, d.s.win);
     assert_eq!(
         support::label_of(cx, d.s.win, ids::demos_tf_watch(7)).as_deref(),
-        Some("Downloading...")
+        Some("Downloading demo")
     );
     assert!(support::disabled_of(cx, d.s.win, ids::demos_tf_watch(7)));
     gate.open();
     viewport(cx, &d);
     assert_eq!(gate.arrived(), 1);
+}
+
+#[gpui_kit::test]
+fn a_running_download_keeps_watch_inside_its_column(cx: &mut TestAppContext) {
+    let (_env, server, d) = served(cx, &[synthetic(7)]);
+    cx.simulate_window_resize(d.s.win, size(px(1280.), px(800.)));
+    let gate = Gate::default();
+    mount_held(&server, &gate, "/files/7.dem", None, file());
+    support::click_id(cx, d.s.win, ids::demos_tf_watch(7));
+    support::wait_real(cx, "the file request", |_| gate.arrived() == 1);
+    support::settle(cx, d.s.win);
+    let watch = support::bounds_of(cx, d.s.win, ids::demos_tf_watch(7)).unwrap();
+    let length = support::bounds_of(cx, d.s.win, ids::demos_tf_row_duration(7)).unwrap();
+    assert!(watch.size.width <= px(96.), "Watch is {watch:?}");
+    assert!(
+        watch.left() >= length.right(),
+        "Watch {watch:?} covers Length {length:?}"
+    );
+    gate.open();
+    viewport(cx, &d);
 }
 
 #[gpui_kit::test]
