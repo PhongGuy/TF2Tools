@@ -406,6 +406,8 @@ fn demo_viewer_shell_in(
     locks: Option<PointerLockFactory>,
     stored: Option<LookSensitivity>,
 ) -> DemoViewerShell {
+    // The Demos.tf list asks demos.tf over the tokio bridge, so the test executor may park.
+    cx.executor().allow_parking();
     let picker = Arc::new(ScriptedPicker::new(picks));
     let (factory, stubs) = stub_factory(answer);
     let s = super::open_shell(

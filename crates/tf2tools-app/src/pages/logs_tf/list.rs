@@ -6,9 +6,9 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, Div, FontWeight, InteractiveElement as _, IntoElement, ListState,
-    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
-    TestSupportExt as _, WeakEntity, div, list, px,
+    AnyElement, App, Context, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement,
+    ListState, ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _,
+    Styled as _, TestSupportExt as _, WeakEntity, div, list, px,
 };
 use tf2tools_core::{LogRow, LogState, SteamId};
 
@@ -30,13 +30,13 @@ pub const STAT_COLUMNS: [&str; 8] = ["K", "A", "D", "DA", "DA/M", "KA/D", "DT", 
 
 // The page's content stops growing here and centres, so a wide window keeps names, classes
 // and stats together instead of stretching the title across the screen.
-const MAX_WIDTH: Pixels = px(1400.);
+pub(crate) const MAX_WIDTH: Pixels = px(1400.);
 
 // Column widths shared by the header and every row, so the columns line up like a table.
 const CHEVRON: Pixels = px(16.);
-const DATE: Pixels = px(124.);
-const MAP: Pixels = px(160.);
-const LENGTH: Pixels = px(56.);
+pub(crate) const DATE: Pixels = px(124.);
+pub(crate) const MAP: Pixels = px(160.);
+pub(crate) const LENGTH: Pixels = px(56.);
 // Four icons on one line, or two in a narrow window, where the stats need the room.
 const CLASSES: Pixels = px(84.);
 const CLASSES_NARROW: Pixels = px(40.);
@@ -46,7 +46,7 @@ const STATS: [f32; 8] = [28., 28., 28., 48., 40., 40., 48., 40.];
 const STATS_NARROW: [f32; 8] = [18., 18., 18., 36., 30., 28., 36., 30.];
 const STAT_GAP: Pixels = px(8.);
 const STAT_GAP_NARROW: Pixels = px(2.);
-const GAP: Pixels = px(16.);
+pub(crate) const GAP: Pixels = px(16.);
 const ICON: Pixels = px(18.);
 const TITLE_MIN: Pixels = px(100.);
 // Below the core columns' width the rows tighten their gaps, title and stats, and the date
@@ -147,7 +147,7 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
 }
 
 // One list item at the page's width, up to MAX_WIDTH and centred beyond it.
-fn centred(item: AnyElement) -> AnyElement {
+pub(crate) fn centred(item: AnyElement) -> AnyElement {
     h_flex()
         .w_full()
         .justify_center()
@@ -267,7 +267,11 @@ fn log_item(
         .when(open, |el| el.bg(theme.muted))
         .child(chevron)
         .when(fit.date_column, |el| {
-            el.child(date_cell(div().w(DATE).flex_none(), id, row.date()))
+            el.child(date_cell(
+                div().w(DATE).flex_none(),
+                ids::logstf_log_date(id),
+                row.date(),
+            ))
         })
         .child(
             v_flex()
@@ -282,15 +286,19 @@ fn log_item(
                 )
                 .when(!fit.map_column, |el| {
                     let line = div().text_xs().text_color(theme.muted_foreground);
-                    el.child(map_cell(line, id, row.map()))
+                    el.child(map_cell(line, ids::logstf_log_map(id), row.map()))
                 })
                 .when(!fit.date_column, |el| {
                     let line = div().text_xs().text_color(theme.muted_foreground);
-                    el.child(date_cell(line, id, row.date()))
+                    el.child(date_cell(line, ids::logstf_log_date(id), row.date()))
                 }),
         )
         .when(fit.map_column, |el| {
-            el.child(map_cell(div().w(MAP).flex_none(), id, row.map()))
+            el.child(map_cell(
+                div().w(MAP).flex_none(),
+                ids::logstf_log_map(id),
+                row.map(),
+            ))
         });
     line = match row.state() {
         LogState::Ready | LogState::Trimmed => line.children(stats(row, fit, cx)),
@@ -327,20 +335,16 @@ fn log_item(
 }
 
 // The log's start date and minute in `base`, its own column or a muted line under the title.
-fn date_cell(base: Div, id: u64, date: i64) -> impl IntoElement {
-    labelled(
-        base.whitespace_nowrap(),
-        ids::logstf_log_date(id),
-        date_time_text(date),
-    )
+pub(crate) fn date_cell(base: Div, id: impl Into<ElementId>, date: i64) -> impl IntoElement {
+    labelled(base.whitespace_nowrap(), id, date_time_text(date))
 }
 
 // The log's map in `base`, truncated with the full name in a tooltip; `base` sizes it as its
 // own column or styles it as a muted line under the title.
-fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
+pub(crate) fn map_cell(base: Div, id: impl Into<ElementId>, map: &str) -> impl IntoElement {
     let map = SharedString::from(map.to_owned());
     let tip = map.clone();
-    base.id(ids::logstf_log_map(id))
+    base.id(id)
         .aria_label(map.clone())
         .truncate()
         .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))

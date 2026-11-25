@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice, NewPart,
-    PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind,
-    SteamId, StorageKind, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, DemosRange, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice,
+    NewPart, PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch,
+    SoundKind, SteamId, StorageKind, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -3503,8 +3503,79 @@ pub fn addon_detail_map(index: usize) -> ElementId {
 pub const DEMOS_TF_LIST: &str = "demos-tf-list";
 /// The Demos.tf list's "Open demo" button, which opens a demo from the computer.
 pub const DEMOS_TF_OPEN: &str = "demos-tf-open";
-/// The Demos.tf list's placeholder line, saying the demos.tf list is coming.
-pub const DEMOS_TF_COMING: &str = "demos-tf-coming";
+/// The Demos.tf list's scrollbar.
+pub const DEMOS_TF_LIST_SCROLLBAR: &str = "demos-tf-list-scrollbar";
+/// The Demos.tf list's footer line while a page of demos loads.
+pub const DEMOS_TF_LOADING: &str = "demos-tf-loading";
+/// The Demos.tf list's footer line when the range holds no demos.
+pub const DEMOS_TF_EMPTY: &str = "demos-tf-empty";
+/// The Demos.tf list's footer error, labelled with why the page failed.
+pub const DEMOS_TF_ERROR: &str = "demos-tf-error";
+/// The Demos.tf list's Retry beside its error.
+pub const DEMOS_TF_RETRY: &str = "demos-tf-retry";
+
+/// The Demos.tf list's footer button that widens an empty range by one stop.
+pub const DEMOS_TF_WIDEN: &str = "demos-tf-widen";
+/// The Demos.tf list's footer button that reads on past the skip limit of a format filter.
+pub const DEMOS_TF_KEEP_LOOKING: &str = "demos-tf-keep-looking";
+/// The Demos.tf toolbar's range slider, six stops from 1 day to All.
+pub const DEMOS_TF_RANGE: &str = "demos-tf-range";
+/// The Demos.tf toolbar's format Select wrapper.
+pub const DEMOS_TF_FORMAT: &str = "demos-tf-format";
+
+/// The Demos.tf toolbar's map Input wrapper.
+pub const DEMOS_TF_MAP: &str = "demos-tf-map";
+/// The Demos.tf "All" chip, selected while no tracked player filters the list.
+pub const DEMOS_TF_ALL: &str = "demos-tf-all";
+
+/// A tracked player's Demos.tf chip, selected while it filters the list: "demos-tf-chip:<id64>".
+pub fn demos_tf_chip(id: SteamId) -> ElementId {
+    keyed("demos-tf-chip", &id.id64().to_string())
+}
+
+/// One stop's label under the Demos.tf range slider, a click picks it:
+/// "demos-tf-range-stop:<key>", keys 1d 1w 1m 3m 1y all.
+pub fn demos_tf_range_stop(range: DemosRange) -> ElementId {
+    let key = match range {
+        DemosRange::Day1 => "1d",
+        DemosRange::Week1 => "1w",
+        DemosRange::Month1 => "1m",
+        DemosRange::Months3 => "3m",
+        DemosRange::Year1 => "1y",
+        DemosRange::All | _ => "all",
+    };
+    keyed("demos-tf-range-stop", key)
+}
+
+/// A Demos.tf row's date, its own column or a line under the title, labelled with the date.
+pub fn demos_tf_row_date(id: u64) -> ElementId {
+    keyed("demos-tf-row-date", &id.to_string())
+}
+
+/// A Demos.tf row's title, labelled with its server and teams.
+pub fn demos_tf_row_title(id: u64) -> ElementId {
+    keyed("demos-tf-row-title", &id.to_string())
+}
+
+/// A Demos.tf row's format, labelled with the format's name.
+pub fn demos_tf_row_format(id: u64) -> ElementId {
+    keyed("demos-tf-row-format", &id.to_string())
+}
+
+/// A Demos.tf row's map, labelled with the map name.
+pub fn demos_tf_row_map(id: u64) -> ElementId {
+    keyed("demos-tf-row-map", &id.to_string())
+}
+
+/// A Demos.tf row's length, labelled as minutes and seconds.
+pub fn demos_tf_row_duration(id: u64) -> ElementId {
+    keyed("demos-tf-row-duration", &id.to_string())
+}
+
+/// A Demos.tf row's Watch button, labelled Watch, Private or the download's progress.
+pub fn demos_tf_watch(id: u64) -> ElementId {
+    keyed("demos-tf-watch", &id.to_string())
+}
 /// The Demos.tf header crumb's "Demos.tf" link, which closes the viewer back to the list.
 pub const DEMOS_TF_CRUMB: &str = "demos-tf-crumb";
 /// The Demos.tf header crumb's name of the open demo: its map, or its file until the map is known.

@@ -38,6 +38,8 @@ fn the_shell_shows_every_shell_id_and_opens_on_huds(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 fn every_nav_item_opens_its_page_and_title(cx: &mut TestAppContext) {
+    // The Demos.tf list asks demos.tf over the tokio bridge, so the test executor may park.
+    cx.executor().allow_parking();
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     for page in Page::ALL {

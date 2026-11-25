@@ -93,6 +93,8 @@ fn visit(cx: &mut TestAppContext, s: &support::ShellWindow, page: Page) {
 
 #[gpui_kit::test]
 fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
+    // The Demos.tf list asks demos.tf over the tokio bridge, so the test executor may park.
+    cx.executor().allow_parking();
     let env = support::env();
     let found = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
     let s = support::shell_window(cx, &env, found);
