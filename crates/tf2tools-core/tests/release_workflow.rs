@@ -91,42 +91,47 @@ fn jobs(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn only_the_sign_job_may_write_and_it_asks_only_for_attestation_besides() {
+fn only_changes_and_sign_may_write_and_each_asks_only_for_what_it_needs() {
     let text = workflow();
     assert!(preamble(&text).contains("permissions:\n  contents: read"));
-    assert_eq!(text.matches("contents: write").count(), 1);
-    let sign = job(&text, "sign");
-    let granted: Vec<&str> = sign
-        .lines()
-        .skip_while(|l| l.trim() != "permissions:")
-        .skip(1)
-        .take_while(|l| l.starts_with("      "))
-        .map(|l| l.split('#').next().unwrap().trim())
-        .collect();
+    assert_eq!(text.matches("contents: write").count(), 2);
+    let granted = |name: &str| -> Vec<String> {
+        job(&text, name)
+            .lines()
+            .skip_while(|l| l.trim() != "permissions:")
+            .skip(1)
+            .take_while(|l| l.starts_with("      "))
+            .map(|l| l.split('#').next().unwrap().trim().to_owned())
+            .collect()
+    };
     assert_eq!(
-        granted,
+        granted("sign"),
         [
             "contents: write",
             "id-token: write",
             "attestations: write",
             "artifact-metadata: write"
-        ],
-        "{sign}"
+        ]
     );
-    for other in jobs(&text).iter().filter(|j| *j != "sign") {
+    assert_eq!(granted("changes"), ["contents: write"]);
+    for other in jobs(&text)
+        .iter()
+        .filter(|j| *j != "sign" && *j != "changes")
+    {
         assert!(!job(&text, other).contains("permissions:"), "{other}");
     }
 }
 
 #[test]
-fn the_jobs_run_gate_then_builds_then_manifest_then_a_tag_only_sign() {
+fn the_jobs_run_gate_then_builds_and_changes_then_manifest_then_a_tag_only_sign() {
     let text = workflow();
     assert_eq!(
         jobs(&text),
-        ["gate", "linux", "windows", "manifest", "sign"]
+        ["gate", "linux", "windows", "changes", "manifest", "sign"]
     );
     assert!(job(&text, "linux").contains("needs: gate"));
-    assert!(job(&text, "manifest").contains("needs: [linux, windows]"));
+    assert!(job(&text, "changes").contains("needs: gate"));
+    assert!(job(&text, "manifest").contains("needs: [linux, windows, changes]"));
     let sign = job(&text, "sign");
     assert!(
         sign.contains("needs: [gate, linux, windows, manifest]"),
@@ -136,6 +141,94 @@ fn the_jobs_run_gate_then_builds_then_manifest_then_a_tag_only_sign() {
         sign.contains("if: startsWith(github.ref, 'refs/tags/v')"),
         "{sign}"
     );
+}
+
+#[test]
+fn the_changes_job_only_asks_github_for_the_generated_notes() {
+    let changes = job(&workflow(), "changes");
+    for banned in [
+        "cargo",
+        "rust-toolchain",
+        "make ",
+        "scripts/",
+        "secrets.",
+        "environment:",
+        "fetch-depth",
+        "git describe",
+    ] {
+        assert!(
+            !changes.contains(banned),
+            "the changes job has {banned}:\n{changes}"
+        );
+    }
+    let uses: Vec<&str> = changes
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("- uses: "))
+        .map(|u| u.split('@').next().unwrap())
+        .collect();
+    assert_eq!(uses, ["actions/checkout", "actions/upload-artifact"]);
+    assert_eq!(changes.matches("GH_TOKEN:").count(), 1, "{changes}");
+    let generate = step(
+        &changes,
+        "Generate the notes since the last published release",
+    );
+    for needle in [
+        "GH_TOKEN: ${{ github.token }}",
+        "gh release list --exclude-drafts --exclude-pre-releases --limit 100",
+        "sort -V",
+        "-f target_commitish=\"$GITHUB_SHA\"",
+        "gh api \"repos/$GH_REPO/releases/generate-notes\"",
+    ] {
+        assert!(generate.contains(needle), "missing {needle}:\n{generate}");
+    }
+    assert!(changes.contains("name: generated-notes"), "{changes}");
+}
+
+#[test]
+fn the_manifest_job_builds_the_notes_and_hashes_them_into_the_manifest() {
+    let manifest = job(&workflow(), "manifest");
+    assert!(manifest.contains("fetch-depth: 0"), "{manifest}");
+    let fetch = step(&manifest, "Fetch the tag annotations");
+    assert!(fetch.contains("git fetch --force --tags"), "{fetch}");
+    assert!(manifest.contains("name: generated-notes"), "{manifest}");
+    let notes = step(&manifest, "Write the release page and notes");
+    for needle in [
+        "git cat-file -t",
+        "%(contents:body)",
+        "scripts/release-notes.sh \"$tag\" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md",
+        "cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version \"$VERSION\" --out dist/notes.json",
+    ] {
+        assert!(notes.contains(needle), "missing {needle}:\n{notes}");
+    }
+    assert!(!notes.contains("secrets."), "{notes}");
+    // Only the dump step holds the token, so no cargo compile ever sees it.
+    let dump = step(&manifest, "Dump the published releases");
+    for needle in [
+        "mkdir -p releases",
+        "gh release list --exclude-drafts --limit 100",
+        "--json tagName,body,publishedAt,isPrerelease,isDraft",
+    ] {
+        assert!(dump.contains(needle), "missing {needle}:\n{dump}");
+    }
+    assert!(!dump.contains("cargo"), "{dump}");
+    assert!(!notes.contains("GH_TOKEN"), "{notes}");
+    let write = step(&manifest, "Write the update manifest");
+    assert!(write.contains("make_manifest -- manifest"), "{write}");
+    assert!(write.contains("--notes-file dist/notes.json"), "{write}");
+    assert!(!write.contains("GH_TOKEN"), "{write}");
+    for needle in [
+        "name: update-notes",
+        "path: dist/notes.json",
+        "name: release-page",
+        "path: page/release-page.md",
+    ] {
+        assert!(manifest.contains(needle), "missing {needle}:\n{manifest}");
+    }
+    let at = |s: &str| manifest.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("Fetch the tag annotations") < at("Write the release page and notes"));
+    assert!(at("name: generated-notes") < at("Write the release page and notes"));
+    assert!(at("Dump the published releases") < at("Write the release page and notes"));
+    assert!(at("Write the release page and notes") < at("Write the update manifest"));
 }
 
 #[test]
@@ -291,13 +384,14 @@ fn only_the_packages_are_uploaded_and_released() {
     );
 }
 
-/// Every release file but SHA256SUMS, in upload order. The first four are what the updater and the
+/// Every release file but SHA256SUMS, in upload order. The first five are what the updater and the
 /// README depend on; the rest are the unversioned copies.
-const RELEASED: [&str; 7] = [
+const RELEASED: [&str; 8] = [
     "tf2tools_*",
     "TF2Tools.exe",
     "tf2tools-update.json",
     "tf2tools-update.json.minisig",
+    "notes.json",
     "tf2tools-windows-setup.exe",
     "tf2tools-linux-x86_64.AppImage",
     "tf2tools-linux-amd64.deb",
@@ -326,21 +420,42 @@ fn the_sign_job_adds_unversioned_copies_and_checksums_after_verifying() {
 }
 
 #[test]
-fn the_sign_job_writes_whats_changed_from_the_generated_notes() {
-    let draft = job(&workflow(), "sign");
-    // The previous tag comes from git history, so the checkout needs every tag.
-    assert!(draft.contains("fetch-depth: 0"), "{draft}");
-    let create = step(&draft, "Create the draft release");
+fn the_sign_job_publishes_the_page_the_manifest_job_wrote() {
+    let sign = job(&workflow(), "sign");
+    for gone in ["generate-notes", "fetch-depth", "scripts/release-notes.sh"] {
+        assert!(
+            !sign.contains(gone),
+            "the sign job still has {gone}:\n{sign}"
+        );
+    }
+    assert!(sign.contains("name: release-page"), "{sign}");
+    assert!(sign.contains("name: update-notes"), "{sign}");
+    let create = step(&sign, "Create the draft release");
     assert!(
-        create.contains("gh api \"repos/$GH_REPO/releases/generate-notes\""),
+        create.contains("--notes-file page/release-page.md"),
         "{create}"
     );
-    assert!(
-        create.contains(
-            "scripts/release-notes.sh \"$GITHUB_REF_NAME\" packaging/release-notes.md \"$RUNNER_TEMP/generated.md\" > \"$RUNNER_TEMP/notes.md\""
-        ),
-        "{create}"
-    );
+    let at = |s: &str| sign.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("name: update-notes") < at("Verify it against the compiled-in keys"));
+}
+
+#[test]
+fn the_sign_job_checks_the_notes_against_the_signed_manifest() {
+    let sign = job(&workflow(), "sign");
+    let verify = step(&sign, "Verify it against the compiled-in keys");
+    for needle in [
+        "jq -e '.notes_asset | type == \"object\"'",
+        "the signed manifest has no release notes",
+        "\"https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/notes.json\"",
+        "stat -c %s dist/notes.json",
+        "sha256sum < dist/notes.json",
+        "\"$(stat -c %s dist/notes.json)\" -gt 49152",
+        "notes.json is larger than 49152 bytes",
+        "notes: notes.json matches",
+    ] {
+        assert!(verify.contains(needle), "missing {needle}:\n{verify}");
+    }
+    assert!(verify.find("notes: notes.json matches") < verify.find("printf '%s\\n' \"$out\""));
 }
 
 #[test]
@@ -429,14 +544,17 @@ fn the_sign_job_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
         draft.contains("gh release create \"$GITHUB_REF_NAME\" --draft --verify-tag"),
         "{draft}"
     );
-    assert!(draft.contains("packaging/release-notes.md"), "{draft}");
+    assert!(
+        draft.contains("--notes-file page/release-page.md"),
+        "{draft}"
+    );
 }
 
 #[test]
 fn checkouts_never_keep_credentials() {
     let text = workflow();
     let checkouts = text.matches("actions/checkout@").count();
-    assert_eq!(checkouts, 5);
+    assert_eq!(checkouts, 6);
     assert_eq!(
         text.matches("persist-credentials: false").count(),
         checkouts
@@ -617,6 +735,9 @@ fn the_runbook_names_every_secret_and_gated_step() {
         "SHA256SUMS",
         "tf2tools-windows-setup.exe",
         "tf2tools-linux-x86_64.AppImage",
+        "notes.json",
+        "git tag -a",
+        "-F",
         "tf2tools-linux-amd64.deb",
     ] {
         assert!(runbook.contains(needle), "runbook lacks {needle:?}");

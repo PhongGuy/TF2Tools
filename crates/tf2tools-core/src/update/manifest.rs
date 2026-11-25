@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 use super::install::InstallTarget;
+use super::notes::{NotesStatus, ReleaseNotes};
 use crate::error::UpdateCheckError;
 
 /// A validated manifest. Asset URLs are normalised and sha256 digests lowercase.
@@ -16,6 +17,7 @@ pub(crate) struct Manifest {
     pub(crate) notes: String,
     pub(crate) pub_date: String,
     pub(crate) platforms: BTreeMap<String, ManifestAsset>,
+    pub(crate) notes_asset: Option<ManifestAsset>,
 }
 
 /// One platform's payload as the manifest names it.
@@ -35,6 +37,9 @@ struct RawManifest {
     pub_date: String,
     #[serde(deserialize_with = "unique_keys")]
     platforms: BTreeMap<String, RawAsset>,
+    // Kept as raw JSON so a bad notes asset of any shape drops the notes, not the manifest.
+    #[serde(default)]
+    notes_asset: Option<serde_json::Value>,
 }
 
 // serde's map impl lets a repeated key overwrite the earlier one; a manifest that names a
@@ -94,12 +99,30 @@ impl Manifest {
                 Ok((key, asset))
             })
             .collect::<Result<_, UpdateCheckError>>()?;
+        let notes_asset = raw
+            .notes_asset
+            .and_then(|value| notes_asset(value, &prefix));
         Ok(Manifest {
             version,
             notes: raw.notes,
             pub_date: raw.pub_date,
             platforms,
+            notes_asset,
         })
+    }
+}
+
+// The notes are optional extras: a notes asset that fails any check is logged and dropped.
+fn notes_asset(value: serde_json::Value, prefix: &str) -> Option<ManifestAsset> {
+    let checked = serde_json::from_value::<RawAsset>(value)
+        .map_err(|e| malformed(format!("notes_asset: {e}")))
+        .and_then(|raw| validate_asset("notes_asset", raw, prefix));
+    match checked {
+        Ok(asset) => Some(asset),
+        Err(e) => {
+            tracing::warn!("ignoring the manifest's notes: {e}");
+            None
+        }
     }
 }
 
@@ -165,6 +188,8 @@ pub struct UpdateOffer {
     pub_date: String,
     asset: Option<UpdateAsset>,
     release_page: String,
+    releases: Vec<ReleaseNotes>,
+    notes_status: NotesStatus,
 }
 
 impl UpdateOffer {
@@ -191,6 +216,22 @@ impl UpdateOffer {
     /// The GitHub release page for the offered version.
     pub fn release_page(&self) -> &str {
         &self.release_page
+    }
+
+    /// The signed notes for the releases after the installed version up to the offered
+    /// one, newest first; empty unless `notes_status` is Complete or Partial.
+    pub fn releases(&self) -> &[ReleaseNotes] {
+        &self.releases
+    }
+
+    /// How fully `releases` covers the versions between the installed and offered ones.
+    pub fn notes_status(&self) -> NotesStatus {
+        self.notes_status
+    }
+
+    pub(crate) fn set_notes(&mut self, releases: Vec<ReleaseNotes>, status: NotesStatus) {
+        self.releases = releases;
+        self.notes_status = status;
     }
 }
 
@@ -293,6 +334,8 @@ pub(crate) fn select(
         notes: manifest.notes.clone(),
         pub_date: manifest.pub_date.clone(),
         asset,
+        releases: Vec::new(),
+        notes_status: NotesStatus::Unavailable,
     }))
 }
 
@@ -533,6 +576,97 @@ mod tests {
             assert!(message.len() < 300, "{} bytes", message.len());
         }
     }
+
+    fn with_notes(notes_asset: &str) -> String {
+        let base = good();
+        format!(
+            "{},\"notes_asset\":{notes_asset}}}",
+            &base[..base.len() - 1]
+        )
+    }
+
+    #[test]
+    fn a_valid_notes_asset_is_kept() {
+        let body = with_notes(&format!(
+            r#"{{"url":"{}","sha256":"{}","size":900}}"#,
+            url("notes.json"),
+            "EF".repeat(32)
+        ));
+        let m = Manifest::parse(body.as_bytes(), GH).unwrap();
+        assert_eq!(
+            m.notes_asset,
+            Some(ManifestAsset {
+                url: url("notes.json"),
+                sha256: "ef".repeat(32),
+                size: 900
+            })
+        );
+    }
+
+    #[test]
+    fn a_manifest_without_notes_asset_has_none() {
+        assert_eq!(
+            Manifest::parse(good().as_bytes(), GH).unwrap().notes_asset,
+            None
+        );
+    }
+
+    #[test]
+    fn a_malformed_notes_asset_is_dropped_but_the_manifest_still_parses() {
+        for bad in [
+            format!(
+                r#"{{"url":"https://evil.example/notes.json","sha256":"{}","size":9}}"#,
+                "ab".repeat(32)
+            ),
+            format!(
+                r#"{{"url":"{}","sha256":"short","size":9}}"#,
+                url("notes.json")
+            ),
+            format!(
+                r#"{{"url":"{}","sha256":"{}","size":0}}"#,
+                url("notes.json"),
+                "ab".repeat(32)
+            ),
+            r#""not an object""#.to_owned(),
+            "null".to_owned(),
+            r#"{"url":7}"#.to_owned(),
+        ] {
+            let m = Manifest::parse(with_notes(&bad).as_bytes(), GH)
+                .unwrap_or_else(|e| panic!("{bad}: {e:?}"));
+            assert_eq!(m.notes_asset, None, "{bad}");
+            assert_eq!(m.platforms.len(), 1);
+        }
+    }
+
+    // RawManifest exactly as v6.2.0 shipped it (git show v6.2.0:crates/tf2tools-core/src/update/manifest.rs).
+    #[test]
+    fn a_6_2_0_client_reads_a_manifest_with_notes_asset() {
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct Raw620 {
+            version: String,
+            #[serde(default)]
+            notes: String,
+            #[serde(default)]
+            pub_date: String,
+            platforms: BTreeMap<String, Asset620>,
+        }
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct Asset620 {
+            url: String,
+            sha256: String,
+            size: u64,
+        }
+        let body = with_notes(&format!(
+            r#"{{"url":"{}","sha256":"{}","size":900}}"#,
+            url("notes.json"),
+            "ab".repeat(32)
+        ));
+        let old: Raw620 = serde_json::from_str(&body).unwrap();
+        assert_eq!(old.version, "6.0.1");
+        assert_eq!(old.platforms.len(), 1);
+    }
 }
 
 #[cfg(test)]
@@ -705,6 +839,21 @@ mod select_tests {
                 .unwrap()
                 .url()
                 .ends_with("/windows-x86_64-nsis.bin")
+        );
+    }
+
+    #[test]
+    fn a_fresh_offer_has_no_notes_yet() {
+        let offer = on_linux(
+            &manifest("6.0.1", &["linux-x86_64-appimage"]),
+            "6.0.0",
+            &appimage(),
+        )
+        .unwrap();
+        assert!(offer.releases().is_empty());
+        assert_eq!(
+            offer.notes_status(),
+            crate::update::NotesStatus::Unavailable
         );
     }
 

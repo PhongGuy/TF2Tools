@@ -88,5 +88,32 @@ if render v1.1.0 "$WORK/missing.md"; then fail "a missing generated file: exit 0
 if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" > /dev/null 2>&1; then fail "no generated notes argument: exit 0"; fi
 if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/nope.md" "$WORK/generated.md" > /dev/null 2>&1; then fail "no template: exit 0"; fi
 
+# A fourth argument puts the tag annotation's intro in place of the template's comment line.
+printf 'Players can read what an update brings.\nA & B \\ C.\n\n' > "$WORK/intro.md"
+"$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" "$WORK/generated.md" "$WORK/intro.md" > "$WORK/out" 2> "$WORK/err" \
+  || fail "an intro: exit 1 [$(cat "$WORK/err")]"
+[ "$(sed -n 1,2p "$WORK/out")" = "$(printf 'Players can read what an update brings.\nA & B \\ C.')" ] \
+  || fail "the intro is not first: [$(cat "$WORK/out")]"
+[ "$(sed -n 3p "$WORK/out")" = "" ] || fail "the intro is not followed by its blank line: [$(cat "$WORK/out")]"
+grep -qF '<!-- intro -->' "$WORK/out" && fail "the comment stayed beside the intro"
+[ "$(grep -c "^## What.s Changed" "$WORK/out")" -eq 1 ] || fail "an intro: the heading count changed"
+grep -qxF 'tf2tools_1.1.0_x86_64.AppImage and v1.1.0' "$WORK/out" || fail "an intro: the version is not filled in"
+
+# A blank intro keeps the template's comment.
+printf '\n   \n' > "$WORK/blank-intro.md"
+"$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" "$WORK/generated.md" "$WORK/blank-intro.md" > "$WORK/out" 2> "$WORK/err" \
+  || fail "a blank intro: exit 1 [$(cat "$WORK/err")]"
+grep -qxF '<!-- intro -->' "$WORK/out" || fail "a blank intro dropped the comment"
+
+# The real template's first line is the comment the intro replaces.
+"$ROOT/scripts/release-notes.sh" v1.1.0 "$ROOT/packaging/release-notes.md" "$WORK/generated.md" "$WORK/intro.md" > "$WORK/real" 2> "$WORK/err" \
+  || fail "the real template with an intro: exit 1 [$(cat "$WORK/err")]"
+[ "$(head -n 1 "$WORK/real")" = 'Players can read what an update brings.' ] || fail "the real template kept its comment: [$(head -n 2 "$WORK/real")]"
+
+if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" "$WORK/generated.md" "$WORK/no-intro.md" > /dev/null 2>&1; then fail "a missing intro file: exit 0"; fi
+rc=0
+"$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" "$WORK/generated.md" "$WORK/intro.md" extra > /dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] || fail "five arguments: not a usage error (exit $rc)"
+
 [ "$FAILS" -eq 0 ] || { echo "$FAILS release notes check(s) failed" >&2; exit 1; }
 echo "release notes OK"

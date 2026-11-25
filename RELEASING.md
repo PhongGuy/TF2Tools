@@ -10,8 +10,9 @@ Building and signing run in separate jobs, so no dependency's build script ever 
 | --- | --- | --- |
 | `gate` | `scripts/check-trailers.sh HEAD` and `make check` | none, read-only |
 | `linux`, `windows` | build the packages and upload them unsigned as the `linux-packages` and `windows-installer` artifacts | none, read-only |
-| `manifest` | checks the tag against `Cargo.toml` and runs `make_manifest manifest`, which writes `tf2tools-update.json` unsigned, uploaded as `update-manifest` | none, read-only |
-| `sign` (v* tags only) | downloads the three artifacts, signs the manifest with the prebuilt minisign 0.12 CLI (pinned by sha256; nothing is compiled), checks it against `UPDATE_PUBLIC_KEYS`, adds the copies and `SHA256SUMS`, attests every release file with `actions/attest` and creates the draft | the `release` environment's two signing secrets; `contents: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` |
+| `changes` | asks GitHub to generate the notes since the last published stable release and uploads them as `generated-notes`; it runs no repo code or scripts | no secrets; `contents: write`, which generate-notes needs and nothing else uses |
+| `manifest` | checks the tag against `Cargo.toml`, dumps the published releases with `gh` in a step of its own, the only step that holds the token, then renders the release page from the generated notes and the tag's intro and runs `make_manifest notes` over that dump to write `notes.json` with no token in reach, then runs `make_manifest manifest --notes-file`, which writes `tf2tools-update.json` unsigned; uploaded as `update-manifest`, `update-notes` and `release-page` | none, read-only |
+| `sign` (v* tags only) | downloads the build and manifest artifacts, signs the manifest with the prebuilt minisign 0.12 CLI (pinned by sha256; nothing is compiled), checks it against `UPDATE_PUBLIC_KEYS` and checks `notes.json` against it and against the 49152-byte cap, adds the copies and `SHA256SUMS`, attests every release file with `actions/attest` and creates the draft | the `release` environment's two signing secrets; `contents: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` |
 
 The `sign` job is the only one bound to `environment: release`, which is limited to `v*` tags and waits for the maintainer's approval before it starts.
 
@@ -59,17 +60,23 @@ The `release` environment allows only `v*` tags and names the maintainer as requ
 
 ### 4. Dry-run the real key locally (maintainer)
 
-This proves the key file, its password and the compiled-in slot agree before CI ever sees them, the same way the `sign` job does: `make_manifest` writes the manifest, the minisign CLI signs it, and `make_manifest` checks it.
+This proves the key file, its password and the compiled-in slot agree before CI ever sees them, the same way the `manifest` and `sign` jobs do: `make_manifest` writes the notes and the manifest, the minisign CLI signs it, and `make_manifest` checks both.
 
 ```sh
 make package
 packages=${CARGO_TARGET_DIR:-target}/packages
-cargo run -p tf2tools-core --example make_manifest -- manifest --dir "$packages" --version <version>
+mkdir -p <scratch>/releases
+gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | while read -r name; do
+  gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "<scratch>/releases/$name.json" < /dev/null
+done
+scripts/release-notes.sh v<version> packaging/release-notes.md - < /dev/null > <scratch>/release-page.md
+cargo run -p tf2tools-core --example make_manifest -- notes --releases <scratch>/releases --page <scratch>/release-page.md --version <version> --out "$packages/notes.json"
+cargo run -p tf2tools-core --example make_manifest -- manifest --dir "$packages" --version <version> --notes-file "$packages/notes.json"
 minisign -S -s tf2tools-update.key -m "$packages/tf2tools-update.json"   # prompts for the password
 cargo run -p tf2tools-core --example make_manifest -- verify --dir "$packages"
 ```
 
-`<version>` is the workspace version in `Cargo.toml` (`[workspace.package]`). Run `verify` without `--key`, so it checks against `UPDATE_PUBLIC_KEYS`; it must print `signature ok`. `make package` writes to `$CARGO_TARGET_DIR/packages` when `CARGO_TARGET_DIR` is set and to `target/packages` otherwise (Makefile `PACKAGES`), hence `$packages`. Delete the generated `tf2tools-update.json` and `.minisig` from it afterwards.
+`<version>` is the workspace version in `Cargo.toml` (`[workspace.package]`). Run `verify` without `--key`, so it checks against `UPDATE_PUBLIC_KEYS`; it must print `signature ok` and `notes: notes.json matches`. `make package` writes to `$CARGO_TARGET_DIR/packages` when `CARGO_TARGET_DIR` is set and to `target/packages` otherwise (Makefile `PACKAGES`), hence `$packages`. Delete the generated `tf2tools-update.json`, `.minisig` and `notes.json` from it afterwards, and the scratch dir.
 
 ### 5. Watch an old AppImage update itself (maintainer)
 
@@ -118,24 +125,24 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
 
    `scripts/test-deb-prerelease.sh` uses podman or docker when the host has no `dpkg-deb`. `scripts/check-trailers.sh` checks every commit since the previous tag for AI credit, using the same `.github/scripts/attribution-lib.sh` as the PR attribution check.
 3. **(maintainer)** Push the branch.
-4. **(maintainer)** Tag and push the tag:
+4. **(maintainer)** Write the tag message to a file: the first line `TF2Tools <version>`, a blank line, then one or two sentences for players on what is new. Tag with it and push the tag:
 
    ```sh
-   git tag -a v<version> -m "TF2Tools <version>"
+   git tag -a v<version> -F <file>
    git push origin v<version>
    ```
 
-   The tag must match the workspace version; the `manifest` job fails early when it does not.
-5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux` and `windows`, then `manifest`, then waits at `sign` for approval.
-6. **(maintainer)** Approve the `release` environment: on the run's page, click "Review deployments", tick `release` and approve. Only then does `sign` receive the signing key. It signs the manifest, adds the unversioned copies and `SHA256SUMS`, attests every release file, writes the notes with `scripts/release-notes.sh` and calls `gh release create --draft`.
+   The intro becomes the first paragraph of the release page and the intro of this release's entry in `notes.json`, which the app shows with the update. The tag must match the workspace version; the `manifest` job fails early when it does not.
+5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux`, `windows` and `changes` side by side, then `manifest`, then waits at `sign` for approval.
+6. **(maintainer)** Approve the `release` environment: on the run's page, click "Review deployments", tick `release` and approve. Only then does `sign` receive the signing key. It signs the manifest, checks that the manifest names this tag's exact `notes.json` URL and that `notes.json` matches the size and sha256 it gives and is at most 49152 bytes, adds the unversioned copies and `SHA256SUMS`, attests every release file and calls `gh release create --draft` with the release page the `manifest` job wrote.
 7. **(maintainer)** Review the draft:
-   - The assets are the AppImage, the deb, `TF2Tools.exe`, `tf2tools-update.json` and `tf2tools-update.json.minisig`, plus the unversioned copies `tf2tools-windows-setup.exe`, `tf2tools-linux-x86_64.AppImage` and `tf2tools-linux-amd64.deb`, and `SHA256SUMS`, which covers every other file. In a folder holding the downloads, `sha256sum -c --ignore-missing SHA256SUMS` must print `OK` for each.
+   - The assets are the AppImage, the deb, `TF2Tools.exe`, `tf2tools-update.json`, `tf2tools-update.json.minisig` and `notes.json`, plus the unversioned copies `tf2tools-windows-setup.exe`, `tf2tools-linux-x86_64.AppImage` and `tf2tools-linux-amd64.deb`, and `SHA256SUMS`, which covers every other file. In a folder holding the downloads, `sha256sum -c --ignore-missing SHA256SUMS` must print `OK` for each.
    - Download `TF2Tools.exe` on a Windows PC, install it and check it opens and finds TF2 before publishing.
    - Download the manifest and its signature and check them: `minisign -Vm tf2tools-update.json -p tf2tools-update.pub`.
    - Check the build attestation of a download: `gh attestation verify TF2Tools.exe --repo PhongGuy/TF2Tools`. The release notes tell players the same.
    - A prerelease deb's Version uses `~`, such as `6.0.0~alpha.1`, so it sorts before `6.0.0`: `dpkg-deb -f tf2tools_<version>_amd64.deb Version`.
    - A tag with `-` in it is marked as a prerelease.
-8. **(maintainer)** Replace the placeholder comment at the top of the draft body with one or two sentences on what is new in this release, and read through What's Changed: reword or drop any bullet a player would not understand.
+8. **(maintainer)** Read through the draft body. The intro at the top comes from the tag annotation. Reword or drop any What's Changed bullet a player would not understand. Editing the draft changes the release page only, since this release's `notes.json` is already signed; the edited body reaches the app with the next release's `notes.json`.
 9. **(maintainer)** Publish.
 
 ## Facts to keep in mind
@@ -183,7 +190,7 @@ If the old key is compromised, that wait is not possible: switch to the new key 
 
 ## Writing release notes
 
-The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. The `sign` job asks GitHub to generate the notes for the tag (`gh api repos/PhongGuy/TF2Tools/releases/generate-notes` with the previous `v*` tag as `previous_tag_name`), which lists every merged PR since that tag grouped by its label as `.github/release.yml` says: New features (`feature`), Fixes (`bug`), Usability and accessibility, Performance, then Other changes; PRs labelled `chore`, `ci` or `dependencies`, and Dependabot's, are left out. `scripts/release-notes.sh <tag> packaging/release-notes.md <generated>` then fills in the version and replaces the `{changes}` line with that generated body (a file, or `-` for stdin), minus GitHub's own What's Changed heading, so the list and the Full Changelog link sit inside the template. With no PR listed it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
+The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. The `changes` job asks GitHub to generate the notes for the tag (`gh api repos/PhongGuy/TF2Tools/releases/generate-notes` with the last published stable release as `previous_tag_name`), which lists every merged PR since that tag grouped by its label as `.github/release.yml` says: New features (`feature`), Fixes (`bug`), Usability and accessibility, Performance, then Other changes; PRs labelled `chore`, `ci` or `dependencies`, and Dependabot's, are left out. In the `manifest` job, `scripts/release-notes.sh <tag> packaging/release-notes.md <generated> [intro]` then fills in the version and replaces the `{changes}` line with that generated body (a file, or `-` for stdin), minus GitHub's own What's Changed heading, so the list and the Full Changelog link sit inside the template. With no PR listed it writes "Small fixes and improvements." The optional intro file replaces the template's leading comment; the job takes it from the tag annotation.
 
 To preview the notes before tagging, run the same two steps by hand with `-f tag_name=<new tag> -f target_commitish=master`.
 

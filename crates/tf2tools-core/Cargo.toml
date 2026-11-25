@@ -73,6 +73,7 @@ test = true
 
 [[example]]
 name = "make_manifest"
+path = "examples/make_manifest/main.rs"
 test = true
 
 [[example]]

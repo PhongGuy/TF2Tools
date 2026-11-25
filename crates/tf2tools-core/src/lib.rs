@@ -167,8 +167,8 @@ pub use texture::{
 };
 pub use tf2::{Tf2Install, tf2_running, tf2_running_in};
 pub use update::{
-    Applied, InstallTarget, StagedUpdate, UPDATE_PUBLIC_KEYS, UpdateAsset, UpdateClient,
-    UpdateOffer, apply,
+    Applied, InstallTarget, NotesGroup, NotesItem, NotesKind, NotesStatus, ReleaseNotes,
+    StagedUpdate, UPDATE_PUBLIC_KEYS, UpdateAsset, UpdateClient, UpdateOffer, apply,
 };
 pub use wav::{WavInfo, inspect_wav};
 pub use weapon_icons::weapon_inventory_images;
