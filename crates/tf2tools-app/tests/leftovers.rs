@@ -130,7 +130,8 @@ fn finding_tf2_removes_an_aged_download_part_from_custom(cx: &mut TestAppContext
     );
 }
 
-// The game sweep runs inside detection, so once TF2 reads Found a part younger than a day has had its chance to go.
+// The game sweep runs inside detection, so once TF2 reads Found a part
+// younger than a day has had its chance to go.
 #[gpui_kit::test]
 fn finding_tf2_keeps_a_download_part_younger_than_a_day(cx: &mut TestAppContext) {
     let env = support::env();
