@@ -6,14 +6,61 @@ use std::time::Duration;
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    Applied, InstallTarget, StagedUpdate, UpdateApplyError, UpdateCheckError, UpdateClient,
-    UpdateDownloadError, UpdateOffer, apply,
+    Applied, InstallTarget, NotesKind, NotesStatus, StagedUpdate, UpdateApplyError,
+    UpdateCheckError, UpdateClient, UpdateDownloadError, UpdateOffer, apply,
 };
 
 use super::{
-    AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, Offer, UpdateBackend,
+    AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, GroupKind, Notes, NotesGroup,
+    NotesItem, NotesRelease, NotesState, Offer, UpdateBackend,
 };
 use crate::i18n::{Phrase, tr};
+
+/// Copies core's verified notes into the app's model; kinds and states core adds later read
+/// as Other and Unavailable.
+fn notes_of(offer: &UpdateOffer) -> Notes {
+    let status = match offer.notes_status() {
+        NotesStatus::Complete => NotesState::Complete,
+        NotesStatus::Partial => NotesState::Partial,
+        NotesStatus::NotPublished => NotesState::NotPublished,
+        NotesStatus::Unavailable | _ => NotesState::Unavailable,
+    };
+    let kind = |kind: NotesKind| match kind {
+        NotesKind::Features => GroupKind::Features,
+        NotesKind::Fixes => GroupKind::Fixes,
+        NotesKind::Usability => GroupKind::Usability,
+        NotesKind::Performance => GroupKind::Performance,
+        NotesKind::Other | _ => GroupKind::Other,
+    };
+    let releases: Vec<NotesRelease> = offer
+        .releases()
+        .iter()
+        .map(|r| NotesRelease {
+            version: r.version().to_owned(),
+            date: r.date().to_owned(),
+            intro: r.intro().map(str::to_owned),
+            groups: r
+                .groups()
+                .iter()
+                .map(|g| NotesGroup {
+                    kind: g.kind().map(kind),
+                    title: g.title().to_owned(),
+                    items: g
+                        .items()
+                        .iter()
+                        .map(|i| NotesItem {
+                            text: i.text().to_owned(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect();
+    Notes {
+        status,
+        releases: Arc::from(releases),
+    }
+}
 
 /// The release page is the way to update when this build cannot update itself.
 pub(super) fn unavailable() -> SharedString {
@@ -142,10 +189,17 @@ pub fn core_backend(
                         }
                         Ok(Ok(found)) => found,
                     };
-                let shown = found.as_ref().map(|o| Offer {
-                    version: o.version().to_owned(),
-                    release_page: o.release_page().to_owned(),
-                    installable: o.asset().is_some(),
+                let shown = found.as_ref().map(|o| {
+                    let page = o.release_page();
+                    // The release list is the tag page's parent, for when no notes can be shown.
+                    let history = page.split_once("/tag/").map_or(page, |(list, _)| list);
+                    Offer {
+                        version: o.version().to_owned(),
+                        release_page: page.to_owned(),
+                        history_page: history.to_owned(),
+                        installable: o.asset().is_some(),
+                        notes: notes_of(o),
+                    }
                 });
                 *lock(&offer) = found;
                 Ok(shown)

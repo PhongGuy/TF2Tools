@@ -85,6 +85,7 @@ impl SignedFeed {
             &self.key,
             (Duration::ZERO, Duration::ZERO),
             "appimage",
+            None,
         );
     }
 
@@ -97,6 +98,7 @@ impl SignedFeed {
             &self.key,
             (Duration::ZERO, Duration::ZERO),
             "nsis",
+            None,
         );
     }
 
@@ -109,6 +111,7 @@ impl SignedFeed {
             &self.key,
             (Duration::ZERO, Duration::ZERO),
             "appimage",
+            None,
         );
     }
 
@@ -121,6 +124,7 @@ impl SignedFeed {
             signer,
             (Duration::ZERO, Duration::ZERO),
             "appimage",
+            None,
         );
     }
 
@@ -139,9 +143,31 @@ impl SignedFeed {
             &self.key,
             (manifest, payload_delay),
             "appimage",
+            None,
         );
     }
 
+    /// Like `publish`, but the manifest also names a notes.json hashing to `notes`, and the
+    /// feed serves `served` there (nothing when None, so the fetch fails).
+    pub fn publish_with_notes(
+        &self,
+        version: &str,
+        payload: &[u8],
+        notes: &[u8],
+        served: Option<&[u8]>,
+    ) {
+        self.mount(
+            version,
+            payload,
+            &sha256_hex(payload),
+            &self.key,
+            (Duration::ZERO, Duration::ZERO),
+            "appimage",
+            Some((notes, served)),
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn mount(
         &self,
         version: &str,
@@ -150,6 +176,7 @@ impl SignedFeed {
         signer: &minisign::KeyPair,
         (manifest_delay, payload_delay): (Duration, Duration),
         suffix: &str,
+        notes: Option<(&[u8], Option<&[u8]>)>,
     ) {
         let asset = format!(
             "/gh/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_x86_64.AppImage"
@@ -159,8 +186,17 @@ impl SignedFeed {
             std::env::consts::OS,
             std::env::consts::ARCH
         );
+        let notes_path = format!("/gh/PhongGuy/TF2Tools/releases/download/v{version}/notes.json");
+        let notes_field = notes.map_or(String::new(), |(notes, _)| {
+            format!(
+                r#","notes_asset":{{"url":"{}{notes_path}","sha256":"{}","size":{}}}"#,
+                self.server.uri(),
+                sha256_hex(notes),
+                notes.len()
+            )
+        });
         let manifest = format!(
-            r#"{{"version":"{version}","pub_date":"2026-11-01T12:00:00Z","notes":"Fixes.","platforms":{{"{platform}":{{"url":"{}{asset}","sha256":"{sha256}","size":{}}}}}}}"#,
+            r#"{{"version":"{version}","pub_date":"2026-11-01T12:00:00Z","notes":"Fixes.","platforms":{{"{platform}":{{"url":"{}{asset}","sha256":"{sha256}","size":{}}}}}{notes_field}}}"#,
             self.server.uri(),
             payload.len()
         );
@@ -190,6 +226,13 @@ impl SignedFeed {
                 )
                 .mount(&self.server)
                 .await;
+            if let Some((_, Some(served))) = notes {
+                Mock::given(method("GET"))
+                    .and(path(notes_path))
+                    .respond_with(ResponseTemplate::new(200).set_body_bytes(served.to_vec()))
+                    .mount(&self.server)
+                    .await;
+            }
         });
     }
 }

@@ -1,11 +1,15 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tf2tools_app::i18n::Phrase;
 #[cfg(unix)]
 use tf2tools_app::updater::AfterInstall;
 use tf2tools_app::updater::backend::{Deadlines, core_backend};
-use tf2tools_app::updater::{DownloadSink, Failure, Offer, UpdateBackend};
+use tf2tools_app::updater::{
+    DownloadSink, Failure, GroupKind, Notes, NotesGroup, NotesItem, NotesRelease, NotesState,
+    Offer, UpdateBackend,
+};
 use tf2tools_core::InstallTarget;
 
 use crate::support;
@@ -74,7 +78,9 @@ fn a_newer_release_is_offered_to_an_appimage_as_installable() {
         Ok(Some(Offer {
             version: "6.0.1".into(),
             release_page: feed.release_page("6.0.1"),
+            history_page: format!("{}/PhongGuy/TF2Tools/releases", feed.github()),
             installable: true,
+            notes: Notes::not_published(),
         }))
     );
 }
@@ -249,4 +255,81 @@ fn download_and_apply_out_of_order_fail_in_plain_words() {
         (backend.apply)(),
         Err(says("Download the update first.", false))
     );
+}
+
+const NOTES: &[u8] = br#"{"schema":1,"releases":[{"version":"6.0.1","previous":"6.0.0","date":"2026-11-01","intro":"Small fixes.","groups":[{"kind":"fixes","title":"Fixes","items":[{"text":"Fix A","pr":7}]},{"kind":"thanks","title":"Thanks","items":[{"text":"Everyone"}]},{"title":"Misc","items":[{"text":"Icon"}]}]},{"version":"6.0.2","previous":"6.0.1","date":"2026-11-10","groups":[{"kind":"features","title":"Features","items":[{"text":"Demos"}]}]}]}"#;
+
+#[test]
+fn published_notes_reach_the_offer_newest_first() {
+    let feed = SignedFeed::start();
+    feed.publish_with_notes("6.0.2", b"new AppImage", NOTES, Some(NOTES));
+    let dir = tempfile::tempdir().unwrap();
+    let backend = backend(
+        &feed,
+        InstallTarget::AppImage(appimage(dir.path())),
+        relaxed(),
+    );
+    let offer = check(&feed, &backend).unwrap().expect("an offer");
+    assert_eq!(
+        offer.history_page,
+        format!("{}/PhongGuy/TF2Tools/releases", feed.github())
+    );
+    let item = |t: &str| NotesItem { text: t.into() };
+    let expected = Notes {
+        status: NotesState::Complete,
+        releases: Arc::from(vec![
+            NotesRelease {
+                version: "6.0.2".into(),
+                date: "2026-11-10".into(),
+                intro: None,
+                groups: vec![NotesGroup {
+                    kind: Some(GroupKind::Features),
+                    title: "Features".into(),
+                    items: vec![item("Demos")],
+                }],
+            },
+            NotesRelease {
+                version: "6.0.1".into(),
+                date: "2026-11-01".into(),
+                intro: Some("Small fixes.".into()),
+                groups: vec![
+                    NotesGroup {
+                        kind: Some(GroupKind::Fixes),
+                        title: "Fixes".into(),
+                        items: vec![item("Fix A")],
+                    },
+                    NotesGroup {
+                        kind: Some(GroupKind::Other),
+                        title: "Thanks".into(),
+                        items: vec![item("Everyone")],
+                    },
+                    NotesGroup {
+                        kind: None,
+                        title: "Misc".into(),
+                        items: vec![item("Icon")],
+                    },
+                ],
+            },
+        ]),
+    };
+    assert_eq!(offer.notes, expected);
+}
+
+#[test]
+fn notes_that_fail_their_check_read_as_unavailable() {
+    let feed = SignedFeed::start();
+    feed.publish_with_notes("6.0.2", b"new AppImage", NOTES, Some(b"tampered"));
+    let backend = backend(&feed, InstallTarget::Unmanaged, relaxed());
+    let offer = check(&feed, &backend).unwrap().expect("an offer");
+    assert_eq!(offer.notes.status, NotesState::Unavailable);
+    assert!(offer.notes.releases.is_empty());
+}
+
+#[test]
+fn a_release_without_notes_reads_as_not_published() {
+    let feed = SignedFeed::start();
+    feed.publish("6.0.1", b"new AppImage");
+    let backend = backend(&feed, InstallTarget::Unmanaged, relaxed());
+    let offer = check(&feed, &backend).unwrap().expect("an offer");
+    assert_eq!(offer.notes, Notes::not_published());
 }
