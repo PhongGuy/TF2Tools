@@ -117,7 +117,11 @@ fn a_start_removes_v5_web_view_data_and_logs_one_row(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn finding_tf2_removes_an_aged_download_part_from_custom(cx: &mut TestAppContext) {
     let env = support::env();
-    let part = env.game.join("tf/custom/.tf2tools-AbC123.part");
+    let part = env
+        .game
+        .join("tf")
+        .join("custom")
+        .join(".tf2tools-AbC123.part");
     std::fs::write(&part, [0u8; 64]).unwrap();
     age(&part, MAX_PART_AGE * 2);
     let _win = started(cx, boot(&env, support::steam_finds(env.game.clone())));
@@ -135,7 +139,11 @@ fn finding_tf2_removes_an_aged_download_part_from_custom(cx: &mut TestAppContext
 #[gpui_kit::test]
 fn finding_tf2_keeps_a_download_part_younger_than_a_day(cx: &mut TestAppContext) {
     let env = support::env();
-    let part = env.game.join("tf/custom/.tf2tools-AbC123.part");
+    let part = env
+        .game
+        .join("tf")
+        .join("custom")
+        .join(".tf2tools-AbC123.part");
     std::fs::write(&part, [0u8; 64]).unwrap();
     age(&part, MAX_PART_AGE - Duration::from_secs(60 * 60));
     let _win = started(cx, boot(&env, support::steam_finds(env.game.clone())));
