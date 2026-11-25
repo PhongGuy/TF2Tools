@@ -263,6 +263,22 @@ fn an_aged_demo_part_goes_and_a_fresh_one_stays() {
     assert!(fresh.exists() && demo.exists());
 }
 
+// A clock that jumped back leaves a part dated ahead of now; it reads as fresh.
+#[test]
+fn a_part_modified_in_the_future_stays() {
+    let tmp = tempfile::tempdir().unwrap();
+    let part = tmp.path().join("demos/.9.dem.Qw3rTy.part");
+    write(&part, 15);
+    std::fs::File::options()
+        .write(true)
+        .open(&part)
+        .unwrap()
+        .set_modified(SystemTime::now() + HOUR)
+        .unwrap();
+    assert_eq!(sweep(&roots(tmp.path())), Freed::default());
+    assert!(part.exists());
+}
+
 #[test]
 fn aged_update_downloads_beside_the_appimage_and_in_temp_go() {
     let tmp = tempfile::tempdir().unwrap();
