@@ -61,6 +61,10 @@ settings:
     logs_tf: "logs.tf 缓存"
     store_data: "商店数据"
     image_cache: "图片缓存"
+    demo_cache: "录像缓存"
+    clear_demo_cache: "清除录像缓存"
+    demo_cache_cleared: "录像缓存已清除"
+    demo_cache_freed: "已释放 %{size}"
   logs_tf:
     title: "logs.tf"
     description: "打开的比赛日志中玩家名称的显示方式，以及完整日志的保留时长"
@@ -982,6 +986,10 @@ confirm:
     title: "移除旧版 TF2Tools"
     body: "TF2Tools 会在移除旧版本时关闭。完成后请重新打开。"
     ok: "移除并关闭"
+  clear_demo_cache:
+    title: "清除录像缓存"
+    body: "删除 %{size} 已下载的录像？仍在下载的录像会保留，任何录像都可以重新下载。"
+    ok: "清除"
   clear_logs:
     title: "清除所有日志"
     body: "确定要清除所有活动日志吗？此操作无法撤销。"
@@ -2765,6 +2773,8 @@ messages:
       closed: "声音播放已停止工作。请重启 TF2Tools 以重新播放声音。"
     log:
       database: "TF2Tools 无法打开活动日志。请重启 TF2Tools，然后重试。"
+    demo_cache:
+      clear: "部分已下载的录像无法删除。请关闭所有已打开的录像，然后重试。"
     logs_cache:
       database: "TF2Tools 无法读取或保存其 logs.tf 数据。请重启 TF2Tools，然后重试。"
     startup:
@@ -2956,6 +2966,7 @@ messages:
     add_to_profile: "无法添加到配置文件"
     make_hud_pictures: "无法生成 HUD 图片"
     load_more_logs: "加载更多日志失败"
+    clear_demo_cache: "清除录像缓存失败"
     clear_logs: "清除日志失败"
     load_logs: "加载日志失败"
     read_class_weapons: "读取兵种武器失败"

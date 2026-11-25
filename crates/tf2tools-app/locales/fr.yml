@@ -64,6 +64,10 @@ settings:
     logs_tf: "Cache logs.tf"
     store_data: "Données des magasins"
     image_cache: "Cache des images"
+    demo_cache: "Cache des démos"
+    clear_demo_cache: "Vider le cache des démos"
+    demo_cache_cleared: "Cache des démos vidé"
+    demo_cache_freed: "%{size} libérés"
   logs_tf:
     title: "logs.tf"
     description: "L'affichage du nom des joueurs dans les logs de match ouverts et la durée de conservation des logs complets"
@@ -985,6 +989,10 @@ confirm:
     title: "Désinstaller l'ancien TF2Tools"
     body: "TF2Tools se ferme pendant la désinstallation de l'ancienne version. Rouvrez-le une fois terminé."
     ok: "Désinstaller et fermer"
+  clear_demo_cache:
+    title: "Vider le cache des démos"
+    body: "Supprimer %{size} de démos téléchargées\u00A0? Les démos en cours de téléchargement sont conservées, et toute démo peut être téléchargée à nouveau."
+    ok: "Vider"
   clear_logs:
     title: "Effacer tout le journal"
     body: "Voulez-vous vraiment effacer tout le journal d'activité\u00A0? Cette action est irréversible."
@@ -2768,6 +2776,8 @@ messages:
       closed: "La lecture du son ne fonctionne plus. Redémarrez TF2Tools pour lire à nouveau des sons."
     log:
       database: "TF2Tools n'a pas pu ouvrir le journal d'activité. Redémarrez TF2Tools et réessayez."
+    demo_cache:
+      clear: "Certaines démos téléchargées n'ont pas pu être supprimées. Fermez toute démo ouverte et réessayez."
     logs_cache:
       database: "TF2Tools n'a pas pu lire ou enregistrer ses données logs.tf. Redémarrez TF2Tools et réessayez."
     startup:
@@ -2959,6 +2969,7 @@ messages:
     add_to_profile: "Impossible d'ajouter au profil"
     make_hud_pictures: "Impossible de créer les images du HUD"
     load_more_logs: "Impossible de charger plus de journaux"
+    clear_demo_cache: "Impossible de vider le cache des démos"
     clear_logs: "Impossible d'effacer les journaux"
     load_logs: "Impossible de charger les journaux"
     read_class_weapons: "Impossible de lire les armes des classes"

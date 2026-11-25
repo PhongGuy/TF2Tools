@@ -3705,6 +3705,7 @@ pub fn storage_slug(kind: StorageKind) -> &'static str {
         StorageKind::LogsTf => "logs-tf",
         StorageKind::StoreData => "store-data",
         StorageKind::ImageCache => "image-cache",
+        StorageKind::DemoCache => "demo-cache",
         _ => "other",
     }
 }
@@ -3712,6 +3713,11 @@ pub fn storage_slug(kind: StorageKind) -> &'static str {
 /// One Storage card row, labelled with its name and size.
 pub fn settings_storage(kind: StorageKind) -> ElementId {
     keyed("settings-storage", storage_slug(kind))
+}
+
+/// A Storage row's Clear button, for the kinds that can be cleared from the card.
+pub fn settings_storage_clear(kind: StorageKind) -> ElementId {
+    keyed("settings-storage-clear", storage_slug(kind))
 }
 
 /// Which ids a shared widget draws under: the page's own, or a host's prefix.

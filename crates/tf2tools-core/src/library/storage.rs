@@ -25,11 +25,13 @@ pub enum StorageKind {
     StoreData,
     /// Store images and game weapon icons.
     ImageCache,
+    /// Demos downloaded to watch from demos.tf and logs.tf.
+    DemoCache,
 }
 
 impl StorageKind {
     /// Every kind, in the order the Settings page lists them.
-    pub const ALL: [StorageKind; 7] = [
+    pub const ALL: [StorageKind; 8] = [
         StorageKind::Huds,
         StorageKind::Sounds,
         StorageKind::Crosshairs,
@@ -37,6 +39,7 @@ impl StorageKind {
         StorageKind::LogsTf,
         StorageKind::StoreData,
         StorageKind::ImageCache,
+        StorageKind::DemoCache,
     ];
 
     fn index(self) -> usize {
@@ -48,6 +51,7 @@ impl StorageKind {
             StorageKind::LogsTf => 4,
             StorageKind::StoreData => 5,
             StorageKind::ImageCache => 6,
+            StorageKind::DemoCache => 7,
         }
     }
 }
@@ -56,8 +60,8 @@ impl StorageKind {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StorageUse {
-    bytes: [u64; 7],
-    unpacked: [u64; 7],
+    bytes: [u64; 8],
+    unpacked: [u64; 8],
 }
 
 impl StorageUse {
@@ -84,7 +88,7 @@ impl StorageUse {
 }
 
 impl Library {
-    /// Measures every kind TF2Tools keeps. Blocking: it walks the library and image caches
+    /// Measures every kind TF2Tools keeps. Blocking: it walks the library, image and demo caches
     /// and reads the database sizes in one read transaction.
     ///
     /// # Errors
@@ -113,6 +117,11 @@ impl Library {
             })
             .map_err(io_error)?;
         }
+        // Partial downloads count too: they take disk space until they finish or are swept.
+        walk_files(&self.dir.demo_cache_dir(), false, |_, len, _| {
+            use_.add(StorageKind::DemoCache, len, len);
+        })
+        .map_err(io_error)?;
         // Read the file lengths inside the same transaction as the logs.tf pages, which narrows
         // how far a commit between the two can skew the store data share.
         let db_path = self.dir.db_path();

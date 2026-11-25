@@ -63,6 +63,10 @@ settings:
     logs_tf: "Cache do logs.tf"
     store_data: "Dados das lojas"
     image_cache: "Cache de imagens"
+    demo_cache: "Cache de demos"
+    clear_demo_cache: "Limpar cache"
+    demo_cache_cleared: "Cache de demos limpo"
+    demo_cache_freed: "%{size} liberados"
   logs_tf:
     title: "logs.tf"
     description: "Como os logs de partida abertos nomeiam os jogadores e por quanto tempo os logs completos ficam guardados"
@@ -984,6 +988,10 @@ confirm:
     title: "Remover o TF2Tools antigo"
     body: "O TF2Tools fecha enquanto a versão antiga é removida. Abra-o de novo quando terminar."
     ok: "Remover e fechar"
+  clear_demo_cache:
+    title: "Limpar cache de demos"
+    body: "Excluir %{size} de demos baixadas? As demos que ainda estão sendo baixadas são mantidas, e qualquer demo pode ser baixada de novo."
+    ok: "Limpar"
   clear_logs:
     title: "Limpar todos os registros"
     body: "Tem certeza de que deseja limpar todo o registro de atividades? Isso não pode ser desfeito."
@@ -2767,6 +2775,8 @@ messages:
       closed: "A reprodução de som parou de funcionar. Reinicie o TF2Tools para tocar sons de novo."
     log:
       database: "O TF2Tools não conseguiu abrir o Registro de atividades. Reinicie o TF2Tools e tente de novo."
+    demo_cache:
+      clear: "Não foi possível excluir algumas demos baixadas. Feche qualquer demo aberta e tente de novo."
     logs_cache:
       database: "O TF2Tools não conseguiu ler ou salvar seus dados do logs.tf. Reinicie o TF2Tools e tente de novo."
     startup:
@@ -2958,6 +2968,7 @@ messages:
     add_to_profile: "Não foi possível adicionar ao perfil"
     make_hud_pictures: "Não foi possível criar as imagens do HUD"
     load_more_logs: "Não foi possível carregar mais logs"
+    clear_demo_cache: "Não foi possível limpar o cache de demos"
     clear_logs: "Não foi possível limpar os logs"
     load_logs: "Não foi possível carregar os logs"
     read_class_weapons: "Não foi possível ler as armas da classe"

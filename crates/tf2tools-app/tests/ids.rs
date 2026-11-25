@@ -844,7 +844,14 @@ fn the_storage_card_ids_carry_the_kind_slug() {
             "settings-storage:logs-tf",
             "settings-storage:store-data",
             "settings-storage:image-cache",
+            "settings-storage:demo-cache",
         ]
+    );
+    assert_eq!(
+        name(ids::settings_storage_clear(
+            tf2tools_core::StorageKind::DemoCache
+        )),
+        "settings-storage-clear:demo-cache"
     );
 }
 

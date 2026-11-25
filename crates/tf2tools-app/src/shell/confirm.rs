@@ -156,6 +156,16 @@ impl Confirm {
         }
     }
 
+    /// The Storage card's prompt before deleting the downloaded demos, which take `size` on disk.
+    pub fn clear_demo_cache(size: &str) -> Self {
+        Self {
+            title: tr!("confirm.clear_demo_cache.title"),
+            description: tr!("confirm.clear_demo_cache.body", size = size),
+            confirm_label: tr!("confirm.clear_demo_cache.ok"),
+            cancel_label: tr!("confirm.cancel"),
+        }
+    }
+
     /// v5's confirm before removing an addon from the library, and from tf/custom if installed.
     pub fn delete_addon() -> Self {
         Self {

@@ -17,7 +17,7 @@ use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::switch::Switch;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, Font, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
@@ -26,8 +26,8 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    KeepFullLogs, LogLevel, LogsSpace, NewLogEntry, Settings, SettingsError, StorageKind,
-    StorageUse, StoreKind, StoreSyncStatus, Tf2Install,
+    DemoCache, KeepFullLogs, LogLevel, LogsSpace, NewLogEntry, Settings, SettingsError,
+    StorageKind, StorageUse, StoreKind, StoreSyncStatus, Tf2Install,
 };
 
 use crate::activity;
@@ -37,7 +37,8 @@ use crate::ids;
 use crate::library_pack::LibraryPack;
 use crate::links;
 use crate::local_messages::{
-    describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
+    describe_demo_clear, describe_detect, describe_settings, describe_store_status,
+    describe_tf2_folder,
 };
 use crate::log_nicknames::LogNicknames;
 use crate::logs_trim::{LogsTrim, LogsTrimEvent};
@@ -46,6 +47,7 @@ use crate::notices::{self, Notice};
 use crate::picker::PickKind;
 use crate::services::{Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
+use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
@@ -193,8 +195,8 @@ pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedSt
 }
 
 /// Each kind of stored data in `StorageKind::ALL` order: its name's catalogue key and its colour.
-/// The first five are v5's dark chart colours; sky and lime extend them.
-pub const STORAGE_ROWS: [(StorageKind, &str, u32); 7] = [
+/// The first five are v5's dark chart colours; sky, lime and pink extend them.
+pub const STORAGE_ROWS: [(StorageKind, &str, u32); 8] = [
     (StorageKind::Huds, "settings.storage.huds", 0x1447e6),
     (StorageKind::Sounds, "settings.storage.sounds", 0x00bc7d),
     (
@@ -213,6 +215,11 @@ pub const STORAGE_ROWS: [(StorageKind, &str, u32); 7] = [
         StorageKind::ImageCache,
         "settings.storage.image_cache",
         0xa3e635,
+    ),
+    (
+        StorageKind::DemoCache,
+        "settings.storage.demo_cache",
+        0xfb64b6,
     ),
 ];
 
@@ -273,6 +280,8 @@ pub struct SettingsPage {
     hidden: bool,
     loaded: bool,
     busy: Option<Busy>,
+    /// Whether a demo cache clear is running; the Storage card's Clear button stays off meanwhile.
+    clearing_demos: bool,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
     sync_status: Option<Vec<StoreSyncStatus>>,
     sync_loaded: bool,
@@ -461,6 +470,7 @@ impl SettingsPage {
             hidden: false,
             loaded: false,
             busy: None,
+            clearing_demos: false,
             sync_status: None,
             sync_loaded: false,
             sync_generation: 0,
@@ -735,6 +745,52 @@ impl SettingsPage {
                         .update(cx, |input, cx| input.set_value(path, window, cx));
                 }
                 page.busy = None;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    // Asks first, then deletes the finished demos off the UI thread, toasts what it freed or why
+    // it failed, and measures the Storage card again either way.
+    fn clear_demos(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let bytes = self
+            .pack
+            .read(cx)
+            .space()
+            .map_or(0, |s| s.bytes(StorageKind::DemoCache));
+        let answer = confirm(Confirm::clear_demo_cache(&size_text(bytes)), window, cx);
+        cx.spawn_in(window, async move |page, cx| {
+            if !answer.recv().await.unwrap_or(false) {
+                return;
+            }
+            let Ok(clearing) = page.update(cx, |page, cx| {
+                page.clearing_demos = true;
+                cx.notify();
+                run_blocking(cx, |s| {
+                    DemoCache::new(s.data.demo_cache_dir())
+                        .clear()
+                        .map_err(|e| {
+                            describe_demo_clear(&e).into_op(tr!("messages.action.clear_demo_cache"))
+                        })
+                })
+            }) else {
+                return;
+            };
+            let done = clearing.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                match done {
+                    Ok(freed) => toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        tr!("settings.storage.demo_cache_cleared"),
+                        tr!("settings.storage.demo_cache_freed", size = size_text(freed)),
+                    ),
+                    Err(err) => toast_error(window, cx, &err),
+                }
+                page.clearing_demos = false;
+                page.pack.update(cx, |pack, cx| pack.measure(cx));
                 cx.notify();
             });
         })
@@ -1238,7 +1294,11 @@ fn labelled(id: &'static str, text: impl Into<SharedString>) -> impl IntoElement
 
 // The Storage card: a donut of the kinds with the total in its middle, beside one row per kind.
 // Before the first measure lands, the list is one line saying it is measuring or that it failed.
-fn storage_content(pack: &LibraryPack, cx: &App) -> AnyElement {
+fn storage_content(
+    pack: &LibraryPack,
+    mut clear_demos: Option<AnyElement>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let muted = theme.muted_foreground;
     let space = pack.space();
@@ -1295,7 +1355,19 @@ fn storage_content(pack: &LibraryPack, cx: &App) -> AnyElement {
     let list = v_flex().flex_1().min_w_0().gap_2().text_sm();
     let list = match space {
         Some(s) => list.children(STORAGE_ROWS.iter().map(|(kind, _, colour)| {
-            storage_row(*kind, s.bytes(*kind), s.unpacked(*kind), *colour, muted)
+            let action = if *kind == StorageKind::DemoCache {
+                clear_demos.take()
+            } else {
+                None
+            };
+            storage_row(
+                *kind,
+                s.bytes(*kind),
+                s.unpacked(*kind),
+                *colour,
+                muted,
+                action,
+            )
         })),
         None => list.child(label.clone()),
     };
@@ -1311,13 +1383,14 @@ fn storage_content(pack: &LibraryPack, cx: &App) -> AnyElement {
 }
 
 // One Storage row: a dot in the kind's colour, its name left and size right, then any
-// unpacked size.
+// unpacked size and any action on lines of their own, so a long label wraps under the name.
 fn storage_row(
     kind: StorageKind,
     bytes: u64,
     unpacked: u64,
     colour: u32,
     muted: Hsla,
+    action: Option<AnyElement>,
 ) -> AnyElement {
     let name = storage_name(kind);
     h_flex()
@@ -1348,7 +1421,8 @@ fn storage_row(
                 .children(
                     unpacked_line(bytes, unpacked)
                         .map(|line| div().text_xs().text_color(muted).child(line)),
-                ),
+                )
+                .children(action.map(|button| h_flex().pt_1().child(button))),
         )
         .into_any_element()
 }
@@ -1388,7 +1462,20 @@ impl Render for SettingsPage {
             None if trim.failed() => tr!("settings.logs_tf.unmeasured"),
             None => tr!("settings.logs_tf.measuring"),
         };
-        let storage = storage_content(self.pack.read(cx), cx);
+        let demo_bytes = self
+            .pack
+            .read(cx)
+            .space()
+            .map_or(0, |s| s.bytes(StorageKind::DemoCache));
+        let clear_demos = Button::new(ids::settings_storage_clear(StorageKind::DemoCache))
+            .outline()
+            .small()
+            .label(tr!("settings.storage.clear_demo_cache"))
+            .loading(self.clearing_demos)
+            .disabled(demo_bytes == 0 || self.clearing_demos)
+            .on_click(cx.listener(|page, _, window, cx| page.clear_demos(window, cx)))
+            .into_any_element();
+        let storage = storage_content(self.pack.read(cx), Some(clear_demos), cx);
         let logs_tf = v_flex()
             .gap_3()
             .child(nicknames_switch(cx))

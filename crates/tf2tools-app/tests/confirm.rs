@@ -246,3 +246,15 @@ fn clear_profile_crosshairs_asks_before_removing_them_all() {
     assert_eq!(spec.confirm_label.as_ref(), "Clear all");
     assert_eq!(spec.cancel_label.as_ref(), "Cancel");
 }
+
+#[test]
+fn clearing_the_demo_cache_asks_with_the_size() {
+    let c = Confirm::clear_demo_cache("4.9 KB");
+    assert_eq!(c.title.as_ref(), "Clear demo cache");
+    assert_eq!(
+        c.description.as_ref(),
+        "Delete 4.9 KB of downloaded demos? Demos still downloading are kept, and any demo can be downloaded again."
+    );
+    assert_eq!(c.confirm_label.as_ref(), "Clear");
+    assert_eq!(c.cancel_label.as_ref(), "Cancel");
+}
