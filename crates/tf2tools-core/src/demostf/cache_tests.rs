@@ -144,6 +144,12 @@ async fn save_to_copies_a_cached_demo_without_asking() {
     assert_eq!(std::fs::read(&dest).unwrap(), b"cached demo");
     assert_eq!(names(&out), ["saved.dem"], "no part file is left");
     assert_eq!(std::fs::read(cache.path_for(7)).unwrap(), b"cached demo");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o644, "other tools and users can read the demo");
+    }
 }
 
 #[tokio::test]
