@@ -241,3 +241,232 @@ fn a_missing_game_folder_frees_nothing() {
         Freed::default()
     );
 }
+
+const HOUR: Duration = Duration::from_secs(60 * 60);
+
+#[test]
+fn an_aged_demo_part_goes_and_a_fresh_one_stays() {
+    let tmp = tempfile::tempdir().unwrap();
+    let demos = tmp.path().join("demos");
+    let aged = demos.join(".7.dem.AbC123.part");
+    let fresh = demos.join(".8.dem.Zz9yX0.part");
+    let demo = demos.join("7.dem");
+    write(&aged, 30);
+    age(&aged, DAY + HOUR);
+    write(&fresh, 20);
+    age(&fresh, HOUR);
+    write(&demo, 10);
+    age(&demo, 3 * DAY);
+    let freed = sweep(&roots(tmp.path()));
+    assert_eq!(freed.paths(), std::slice::from_ref(&aged));
+    assert_eq!(freed.bytes(), 30);
+    assert!(fresh.exists() && demo.exists());
+}
+
+#[test]
+fn aged_update_downloads_beside_the_appimage_and_in_temp_go() {
+    let tmp = tempfile::tempdir().unwrap();
+    let apps = tmp.path().join("apps");
+    let temp = tmp.path().join("temp");
+    let appimage = apps.join("TF2Tools.AppImage");
+    write(&appimage, 8);
+    let aged = [
+        apps.join(".tf2tools-update-6.0.3"),
+        apps.join(".tf2tools-update-6.0.3.part"),
+        apps.join(".tf2tools-update-6.1.0-rc.1+ci.7"),
+        temp.join("tf2tools-update-6.0.3-setup.exe"),
+        temp.join("tf2tools-update-6.0.3-setup.exe.part"),
+    ];
+    for path in &aged {
+        write(path, 10);
+        age(path, 2 * DAY);
+    }
+    let fresh = apps.join(".tf2tools-update-6.0.4");
+    write(&fresh, 10);
+    age(&fresh, HOUR);
+    let odd = [
+        apps.join(".tf2tools-update-latest"),
+        apps.join(".tf2tools-update-6.0.3.bak"),
+        temp.join("tf2tools-update-6.0-setup.exe"),
+    ];
+    for path in &odd {
+        write(path, 10);
+        age(path, 2 * DAY);
+    }
+    let freed = sweep(&roots(tmp.path()).with_appimage(appimage.clone()));
+    let mut want = aged.to_vec();
+    want.sort();
+    assert_eq!(sorted(&freed), want);
+    assert_eq!(freed.bytes(), 50);
+    assert!(fresh.exists() && appimage.exists());
+    for path in &odd {
+        assert!(path.exists(), "{}", path.display());
+    }
+}
+
+#[test]
+fn update_files_beside_an_unknown_appimage_stay() {
+    let tmp = tempfile::tempdir().unwrap();
+    let staged = tmp.path().join("apps/.tf2tools-update-6.0.3");
+    write(&staged, 10);
+    age(&staged, 2 * DAY);
+    assert_eq!(sweep(&roots(tmp.path())), Freed::default());
+    assert!(staged.exists());
+}
+
+#[test]
+fn the_previous_appimage_backup_goes_once_the_new_build_runs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let appimage = tmp.path().join("apps/TF2Tools.AppImage");
+    let bak = tmp.path().join("apps/TF2Tools.AppImage.bak");
+    write(&appimage, 8);
+    write(&bak, 8);
+    let freed = sweep(&roots(tmp.path()).with_appimage(appimage.clone()));
+    assert_eq!(freed.paths(), std::slice::from_ref(&bak));
+    assert_eq!(freed.bytes(), 8);
+    assert!(gone(&bak) && appimage.exists());
+}
+
+#[test]
+fn a_folder_named_like_a_file_leftover_stays() {
+    let tmp = tempfile::tempdir().unwrap();
+    let t = tmp.path();
+    let appimage = t.join("apps/TF2Tools.AppImage");
+    write(&appimage, 8);
+    let folders = [
+        t.join("apps/TF2Tools.AppImage.bak"),
+        t.join("apps/.tf2tools-update-6.0.3"),
+        t.join("demos/.7.dem.AbC123.part"),
+        t.join("temp/tf2tools-update-6.0.3-setup.exe"),
+        t.join("data/library/huds/a/.tf2tools/thumbnail.webp"),
+        t.join("tf/custom/.tf2tools-AbC123.part"),
+    ];
+    for folder in &folders {
+        write(&folder.join("inner"), 5);
+    }
+    write(&t.join("data/library/huds/a/.tf2tools/thumbnail.jpg"), 3);
+    // Two days ahead makes every entry old enough, so only the kind check can keep it.
+    let later = SystemTime::now() + 2 * DAY;
+    let roots = roots(t).with_appimage(appimage);
+    assert_eq!(sweep_leftovers(&roots, later, DAY), Freed::default());
+    assert_eq!(
+        sweep_game_leftovers(&t.join("tf"), later, DAY),
+        Freed::default()
+    );
+    for folder in &folders {
+        assert!(folder.join("inner").exists(), "{}", folder.display());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_backup_that_is_a_link_stays_and_so_does_its_target() {
+    let tmp = tempfile::tempdir().unwrap();
+    let appimage = tmp.path().join("apps/TF2Tools.AppImage");
+    let bak = tmp.path().join("apps/TF2Tools.AppImage.bak");
+    let target = tmp.path().join("elsewhere");
+    write(&appimage, 8);
+    write(&target, 4);
+    std::os::unix::fs::symlink(&target, &bak).unwrap();
+    let freed = sweep(&roots(tmp.path()).with_appimage(appimage));
+    assert_eq!(freed, Freed::default());
+    assert!(!gone(&bak) && target.exists());
+}
+
+#[test]
+fn a_v5_webp_thumbnail_goes_only_beside_a_v6_jpg() {
+    let tmp = tempfile::tempdir().unwrap();
+    let huds = tmp.path().join("data/library/huds");
+    let paired = huds.join("a/.tf2tools/thumbnail.webp");
+    write(&paired, 11);
+    write(&huds.join("a/.tf2tools/thumbnail.jpg"), 3);
+    write(&huds.join("b/.tf2tools/thumbnail.webp"), 11);
+    write(&huds.join("c/thumbnail.webp"), 11);
+    write(&huds.join("c/thumbnail.jpg"), 3);
+    let freed = sweep(&roots(tmp.path()));
+    assert_eq!(freed.paths(), std::slice::from_ref(&paired));
+    assert_eq!(freed.bytes(), 11);
+    assert!(huds.join("a/.tf2tools/thumbnail.jpg").exists());
+    assert!(huds.join("b/.tf2tools/thumbnail.webp").exists());
+    assert!(huds.join("c/thumbnail.webp").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_linked_hud_folder_is_not_followed_for_its_thumbnail() {
+    let tmp = tempfile::tempdir().unwrap();
+    let outside = tmp.path().join("outside");
+    write(&outside.join(".tf2tools/thumbnail.webp"), 11);
+    write(&outside.join(".tf2tools/thumbnail.jpg"), 3);
+    let huds = tmp.path().join("data/library/huds");
+    std::fs::create_dir_all(&huds).unwrap();
+    std::os::unix::fs::symlink(&outside, huds.join("linked")).unwrap();
+    assert_eq!(sweep(&roots(tmp.path())), Freed::default());
+    assert!(outside.join(".tf2tools/thumbnail.webp").exists());
+}
+
+#[test]
+fn aged_download_parts_in_custom_and_maps_go() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tf = tmp.path().join("tf");
+    let aged = [
+        tf.join("custom/.tf2tools-AbC123.part"),
+        tf.join("maps/.tf2tools-Zz9yX0.part"),
+    ];
+    for path in &aged {
+        write(path, 10);
+        age(path, 2 * DAY);
+    }
+    let fresh = tf.join("custom/.tf2tools-QqQqQq.part");
+    write(&fresh, 10);
+    age(&fresh, HOUR);
+    let keep = [
+        tf.join("custom/.tf2tools-AbC123.part.bak"),
+        tf.join("custom/.tf2tools-AbC12.part"),
+        tf.join("custom/tf2tools-AbC123.part"),
+        tf.join("custom/budhud.vpk"),
+        tf.join("maps/cp_x.bsp"),
+        // The game's own download folder; TF2Tools never writes parts there.
+        tf.join("download/maps/.tf2tools-AbC123.part"),
+    ];
+    for path in &keep {
+        write(path, 3);
+        age(path, 2 * DAY);
+    }
+    let freed = sweep_game_leftovers(&tf, SystemTime::now(), DAY);
+    let mut want = aged.to_vec();
+    want.sort();
+    assert_eq!(sorted(&freed), want);
+    assert_eq!(freed.bytes(), 20);
+    assert!(fresh.exists());
+    for path in &keep {
+        assert!(path.exists(), "{}", path.display());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_local_folder_that_links_to_an_empty_folder_is_not_followed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    std::fs::create_dir_all(&target).unwrap();
+    std::os::unix::fs::symlink(&target, tmp.path().join("local")).unwrap();
+    assert_eq!(sweep(&roots(tmp.path())), Freed::default());
+    assert!(target.is_dir() && !gone(&tmp.path().join("local")));
+}
+
+#[test]
+fn an_empty_local_folder_that_is_a_parent_of_the_data_folder_stays() {
+    let tmp = tempfile::tempdir().unwrap();
+    let local = tmp.path().join("local");
+    std::fs::create_dir_all(&local).unwrap();
+    // The data folder is not created, so only the prefix check keeps the empty parent.
+    let nested = CleanupRoots::new(
+        local.join("data"),
+        local.clone(),
+        tmp.path().join("demos"),
+        tmp.path().join("temp"),
+    );
+    assert_eq!(sweep(&nested), Freed::default());
+    assert!(local.is_dir());
+}
