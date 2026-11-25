@@ -1,6 +1,7 @@
 //! The Demos.tf page: a list of demos that opens the chosen one in the 3D viewer.
 
 mod crumb;
+pub mod text;
 
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};

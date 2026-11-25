@@ -6,7 +6,7 @@ mod demo;
 mod detail;
 mod grid;
 mod head;
-mod list;
+pub(crate) mod list;
 pub mod sort;
 pub mod tables;
 pub mod text;

@@ -139,6 +139,17 @@ demos_tf:
   open: "Открыть демо"
   back: "Назад к списку демо"
   coming: "Список demos.tf скоро появится. А пока откройте демо со своего компьютера."
+  format:
+    hl: "Highlander"
+    prolander: "Prolander"
+    sixes: "6v6"
+    fours: "4v4"
+    threes: "3v3"
+    twos: "2v2"
+    ones: "1v1"
+    ultiduo: "Ultiduo"
+    bball: "BBall"
+    misc: "Другое"
 demo_viewer:
   preview: "Предпросмотр"
   open: "Открыть демо"

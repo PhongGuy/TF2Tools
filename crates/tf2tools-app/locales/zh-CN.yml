@@ -163,6 +163,17 @@ demos_tf:
   open: "打开录像"
   back: "返回录像列表"
   coming: "demos.tf 列表即将推出。目前请从你的电脑打开录像。"
+  format:
+    hl: "Highlander"
+    prolander: "Prolander"
+    sixes: "6v6"
+    fours: "4v4"
+    threes: "3v3"
+    twos: "2v2"
+    ones: "1v1"
+    ultiduo: "Ultiduo"
+    bball: "BBall"
+    misc: "其他"
 demo_viewer:
   preview: "预览"
   open: "打开录像"
