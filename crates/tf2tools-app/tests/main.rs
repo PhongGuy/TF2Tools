@@ -58,6 +58,7 @@ mod demo_viewport;
 mod demos_tf;
 mod demos_tf_list;
 mod demos_tf_text;
+mod demos_tf_watch;
 mod diagnostics;
 mod dialog_frame;
 mod external_huds;

@@ -165,6 +165,9 @@ demos_tf:
   back: "Volver a la lista de demos"
   loading: "Cargando demos..."
   empty: "No hay demos en este periodo"
+  watch: "Ver"
+  private: "Privada"
+  downloading: "Descargando..."
   column:
     date: "Fecha"
     title: "Título"

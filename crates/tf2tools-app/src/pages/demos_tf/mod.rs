@@ -3,8 +3,10 @@
 mod crumb;
 mod list;
 pub mod text;
+mod watch;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use gpui_kit::component::v_flex;
 use gpui_kit::{
@@ -65,6 +67,8 @@ pub struct DemosTfPage {
     // The cursor a failed page asked with, so Retry asks for that page again.
     resume: Option<DemoCursor>,
     error: Option<SharedString>,
+    // Watch downloads in flight by demo id, with their whole percent once known.
+    downloads: HashMap<u64, Option<u8>>,
     _release: Subscription,
 }
 
@@ -83,6 +87,7 @@ impl DemosTfPage {
             query: DemoListQuery::new(DemosRange::default(), 0),
             resume: None,
             error: None,
+            downloads: HashMap::new(),
             _release: release,
         };
         page.restart(cx);
@@ -255,19 +260,22 @@ impl DemosTfPage {
         cx.spawn_in(window, async move |page, cx| {
             let Some(path) = picking.await else { return };
             let _ = page.update_in(cx, |page, window, cx| {
-                if page.hidden {
-                    return;
+                if !page.hidden {
+                    page.show_viewer(path, window, cx);
                 }
-                let viewer = cx.new(|cx| DemoViewerPage::open_path(path, window, cx));
-                let this = cx.entity().downgrade();
-                let crumb = cx.new(|cx| DemosTfCrumb::new(this, &viewer, cx));
-                HeaderSlot::global(cx)
-                    .update(cx, |slot, cx| slot.set(Page::DemosTf, crumb.into(), cx));
-                page.mode = Mode::Viewer(viewer);
-                cx.notify();
             });
         })
         .detach();
+    }
+
+    // Swaps the list for a viewer on `path` and puts its crumb in the header.
+    fn show_viewer(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        let viewer = cx.new(|cx| DemoViewerPage::open_path(path, window, cx));
+        let this = cx.entity().downgrade();
+        let crumb = cx.new(|cx| DemosTfCrumb::new(this, &viewer, cx));
+        HeaderSlot::global(cx).update(cx, |slot, cx| slot.set(Page::DemosTf, crumb.into(), cx));
+        self.mode = Mode::Viewer(viewer);
+        cx.notify();
     }
 
     fn list(&self, cx: &mut Context<Self>) -> impl IntoElement {

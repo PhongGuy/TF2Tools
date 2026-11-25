@@ -3538,6 +3538,11 @@ pub fn demos_tf_row_map(id: u64) -> ElementId {
 pub fn demos_tf_row_duration(id: u64) -> ElementId {
     keyed("demos-tf-row-duration", &id.to_string())
 }
+
+/// A Demos.tf row's Watch button, labelled Watch, Private or the download's progress.
+pub fn demos_tf_watch(id: u64) -> ElementId {
+    keyed("demos-tf-watch", &id.to_string())
+}
 /// The Demos.tf header crumb's "Demos.tf" link, which closes the viewer back to the list.
 pub const DEMOS_TF_CRUMB: &str = "demos-tf-crumb";
 /// The Demos.tf header crumb's name of the open demo: its map, or its file until the map is known.

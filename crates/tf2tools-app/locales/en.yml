@@ -142,6 +142,9 @@ demos_tf:
   back: "Back to the demo list"
   loading: "Loading demos..."
   empty: "No demos in this range"
+  watch: "Watch"
+  private: "Private"
+  downloading: "Downloading..."
   column:
     date: "Date"
     title: "Title"

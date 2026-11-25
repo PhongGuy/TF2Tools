@@ -164,6 +164,9 @@ demos_tf:
   back: "返回录像列表"
   loading: "正在加载录像…"
   empty: "此时间范围内没有录像"
+  watch: "观看"
+  private: "私密"
+  downloading: "正在下载…"
   column:
     date: "日期"
     title: "标题"

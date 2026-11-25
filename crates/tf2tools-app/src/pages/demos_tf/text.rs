@@ -3,7 +3,7 @@
 use gpui_kit::SharedString;
 use tf2tools_core::{DemoFormat, DemosError};
 
-use crate::i18n::tr;
+use crate::i18n::{format, tr};
 
 /// A demo's row title: its server and both teams, or the server alone when a team is unnamed.
 pub fn demo_title(server: &str, red: &str, blue: &str) -> String {
@@ -45,5 +45,16 @@ pub fn list_error(error: &DemosError) -> SharedString {
         | DemosError::ForeignUrl { .. }
         | DemosError::Write { .. }
         | _ => tr!("logs_tf.demo.down"),
+    }
+}
+
+/// A row's Watch button: Private for a demo without a file, the download's progress while
+/// one runs (a whole percent once its size is known), Watch otherwise.
+pub fn watch_label(public: bool, downloading: Option<Option<u8>>) -> SharedString {
+    match (public, downloading) {
+        (false, _) => tr!("demos_tf.private"),
+        (true, None) => tr!("demos_tf.watch"),
+        (true, Some(None)) => tr!("demos_tf.downloading"),
+        (true, Some(Some(done))) => format::percent(u64::from(done)),
     }
 }

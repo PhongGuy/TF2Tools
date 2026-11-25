@@ -3,14 +3,14 @@
 //! the page failed.
 
 use gpui_kit::component::button::Button;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, Div, FontWeight, IntoElement, ListState, ParentElement as _, Pixels,
     SharedString, Styled as _, WeakEntity, Window, div, list, px,
 };
 
-use super::text::{demo_title, format_label};
+use super::text::{demo_title, format_label, watch_label};
 use super::{DemoRow, DemosTfPage};
 use crate::i18n::tr;
 use crate::ids;
@@ -66,7 +66,10 @@ pub(super) fn page_list(page: &DemosTfPage, cx: &mut Context<DemosTfPage>) -> Di
             } else {
                 let page = page.read(cx);
                 match page.feed.items().get(ix - 1) {
-                    Some(row) => demo_row(row, fit, cx),
+                    Some(row) => {
+                        let downloading = page.download_progress(row.feed_id());
+                        demo_row(row, downloading, fit, this.clone(), cx)
+                    }
                     None => {
                         // Building the footer means it is near the view, so ask for the next
                         // page after this layout; a notify during layout would be dropped.
@@ -132,14 +135,29 @@ fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .child(div().w(WATCH).flex_none())
 }
 
-// One demo: date, title, format, map and length, with whatever no longer fits beside the
-// title moved under it as one muted line.
-fn demo_row(row: &DemoRow, fit: Fit, cx: &App) -> AnyElement {
+// One demo: date, title, format, map, length and Watch, with whatever no longer fits beside
+// the title moved under it as one muted line.
+fn demo_row(
+    row: &DemoRow,
+    downloading: Option<Option<u8>>,
+    fit: Fit,
+    this: WeakEntity<DemosTfPage>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let demo = &row.demo;
     let id = row.feed_id();
     let title = demo_title(demo.server(), demo.red(), demo.blue());
     let format = format_label(demo.format());
+    let public = !demo.url().is_empty();
+    let watch = Button::new(ids::demos_tf_watch(id))
+        .outline()
+        .small()
+        .label(watch_label(public, downloading))
+        .disabled(!public || downloading.is_some())
+        .on_click(move |_, window, cx| {
+            let _ = this.update(cx, |page, cx| page.watch(id, window, cx));
+        });
     let under = (!fit.side_columns).then(|| {
         h_flex()
             .gap_2()
@@ -203,7 +221,7 @@ fn demo_row(row: &DemoRow, fit: Fit, cx: &App) -> AnyElement {
             ids::demos_tf_row_duration(id),
             duration_text(demo.duration()),
         ))
-        .child(div().w(WATCH).flex_none())
+        .child(div().w(WATCH).flex_none().flex().justify_end().child(watch))
         .into_any_element()
 }
 

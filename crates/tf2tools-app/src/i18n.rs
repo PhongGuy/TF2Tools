@@ -1629,6 +1629,7 @@ mod tests {
         "pages/demos_tf/mod.rs",
         "pages/demos_tf/crumb.rs",
         "pages/demos_tf/list.rs",
+        "pages/demos_tf/watch.rs",
         "audio/player.rs",
         "widgets/profile_menu.rs",
         "pages/crosshairs.rs",

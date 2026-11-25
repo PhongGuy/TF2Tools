@@ -140,6 +140,9 @@ demos_tf:
   back: "Назад к списку демо"
   loading: "Загрузка демо..."
   empty: "Нет демо за этот период"
+  watch: "Смотреть"
+  private: "Закрыто"
+  downloading: "Загрузка..."
   column:
     date: "Дата"
     title: "Название"
