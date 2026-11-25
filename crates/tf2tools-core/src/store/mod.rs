@@ -127,6 +127,7 @@ pub struct Endpoints {
     serveme: String,
     map_downloads: String,
     mastercomfig_data: String,
+    demos: crate::demostf::DemosEndpoints,
 }
 
 impl Default for Endpoints {
@@ -150,6 +151,7 @@ impl Default for Endpoints {
             map_downloads: "https://fastdl.serveme.tf/maps".to_owned(),
             mastercomfig_data: "https://raw.githubusercontent.com/mastercomfig/mastercomfig"
                 .to_owned(),
+            demos: crate::demostf::DemosEndpoints::default(),
         }
     }
 }
@@ -159,7 +161,7 @@ impl Endpoints {
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
     /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, serveme.tf
     /// `{base}/serveme`, map files `{base}/fastdl/maps` and
-    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`.
+    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`, demos.tf `{base}/demostf`.
     pub fn loopback(base: &str) -> Self {
         Self {
             gamebanana: format!("{base}/apiv11"),
@@ -171,6 +173,7 @@ impl Endpoints {
             serveme: format!("{base}/serveme"),
             map_downloads: format!("{base}/fastdl/maps"),
             mastercomfig_data: format!("{base}/gh-raw/mastercomfig"),
+            demos: crate::demostf::DemosEndpoints::loopback(&format!("{base}/demostf")),
         }
     }
 
@@ -219,6 +222,17 @@ impl Endpoints {
     /// `{base}/{tag}/{path}`.
     pub fn mastercomfig_data(&self) -> &str {
         &self.mastercomfig_data
+    }
+
+    /// The demos.tf API and demo file endpoints.
+    pub fn demos(&self) -> &crate::demostf::DemosEndpoints {
+        &self.demos
+    }
+
+    /// These endpoints with other demos.tf endpoints.
+    pub fn with_demos(mut self, demos: crate::demostf::DemosEndpoints) -> Self {
+        self.demos = demos;
+        self
     }
 
     /// These endpoints with another mastercomfig repository file base.
