@@ -557,3 +557,34 @@ fn the_maps_section_mentions_the_demos_tf_page() {
     assert!(maps.contains("preview"), "Maps section: {maps}");
     assert!(maps.contains("RED and BLU boxes"), "Maps section: {maps}");
 }
+
+#[test]
+fn the_readme_describes_the_demos_tf_list() {
+    let readme = repo_file("README.md");
+    let (_, maps) = readme.split_once("### Maps").expect("a Maps section");
+    let (maps, _) = maps.split_once("\n### ").expect("a section after it");
+    for needle in [
+        "Demos.tf page lists",
+        "**Watch**",
+        "tracked player",
+        "format",
+        "scroll",
+    ] {
+        assert!(
+            maps.contains(needle),
+            "Maps section lacks {needle:?}: {maps}"
+        );
+    }
+    let (_, privacy) = readme
+        .split_once("No accounts, no ads, no tracking.")
+        .expect("the privacy line");
+    let privacy = privacy.split_once('\n').map_or(privacy, |(line, _)| line);
+    assert!(
+        privacy.contains("the Demos.tf page (demos.tf)"),
+        "{privacy}"
+    );
+    assert!(
+        readme.contains("the logs.tf and Demos.tf pages"),
+        "the demos.tf credit"
+    );
+}
