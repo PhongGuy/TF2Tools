@@ -32,6 +32,7 @@ use std::time::Duration;
 use rusqlite::OptionalExtension;
 
 use crate::db::Database;
+use crate::demostf::DemosEndpoints;
 use crate::error::{BrowseError, FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 pub use addon_catalog::{
@@ -127,6 +128,7 @@ pub struct Endpoints {
     serveme: String,
     map_downloads: String,
     mastercomfig_data: String,
+    demos: DemosEndpoints,
 }
 
 impl Default for Endpoints {
@@ -150,6 +152,7 @@ impl Default for Endpoints {
             map_downloads: "https://fastdl.serveme.tf/maps".to_owned(),
             mastercomfig_data: "https://raw.githubusercontent.com/mastercomfig/mastercomfig"
                 .to_owned(),
+            demos: DemosEndpoints::default(),
         }
     }
 }
@@ -158,8 +161,8 @@ impl Endpoints {
     /// Every base under `base` (no trailing slash): GameBanana `{base}/apiv11`, GitHub API
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
     /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, serveme.tf
-    /// `{base}/serveme`, map files `{base}/fastdl/maps` and
-    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`.
+    /// `{base}/serveme`, map files `{base}/fastdl/maps`,
+    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig` and demos.tf `{base}/demostf`.
     pub fn loopback(base: &str) -> Self {
         Self {
             gamebanana: format!("{base}/apiv11"),
@@ -171,6 +174,7 @@ impl Endpoints {
             serveme: format!("{base}/serveme"),
             map_downloads: format!("{base}/fastdl/maps"),
             mastercomfig_data: format!("{base}/gh-raw/mastercomfig"),
+            demos: DemosEndpoints::loopback(&format!("{base}/demostf")),
         }
     }
 
@@ -219,6 +223,17 @@ impl Endpoints {
     /// `{base}/{tag}/{path}`.
     pub fn mastercomfig_data(&self) -> &str {
         &self.mastercomfig_data
+    }
+
+    /// The demos.tf API and demo file endpoints.
+    pub fn demos(&self) -> &DemosEndpoints {
+        &self.demos
+    }
+
+    /// These endpoints with other demos.tf endpoints.
+    pub fn with_demos(mut self, demos: DemosEndpoints) -> Self {
+        self.demos = demos;
+        self
     }
 
     /// These endpoints with another mastercomfig repository file base.

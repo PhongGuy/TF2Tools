@@ -8,9 +8,9 @@ use std::sync::Arc;
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Entity, Global, SharedString, Task};
 use tf2tools_core::{
-    ActivityLog, BuiltinCrosshairs, DataDir, Database, DemosClient, DemosEndpoints, DetectError,
-    Endpoints, FontHost, Library, LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient,
-    StoreConfig, Tf2Install,
+    ActivityLog, BuiltinCrosshairs, DataDir, Database, DemosClient, DetectError, Endpoints,
+    FontHost, Library, LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient, StoreConfig,
+    Tf2Install,
 };
 
 use crate::assets::{AssetRoot, AssetRootError};
@@ -92,6 +92,7 @@ impl Services {
         if let Err(error) = library.retire_override_addons() {
             tracing::warn!(%error, "could not retire mastercomfig's override addons");
         }
+        let demos_endpoints = endpoints.demos().clone();
         // Offline narrows the client to loopback; online keeps the default config `new` built.
         let mut store = StoreClient::new(db.clone(), data.clone(), endpoints);
         if offline {
@@ -102,7 +103,8 @@ impl Services {
         if offline {
             logs = logs.with_config(LogsClient::default_config().with_loopback_only(true));
         }
-        let mut demos = DemosClient::new(DemosEndpoints::default());
+        // The demos client follows the boot's endpoints, so a loopback boot never leaves loopback.
+        let mut demos = DemosClient::new(demos_endpoints);
         if offline {
             demos = demos.with_config(DemosClient::default_config().with_loopback_only(true));
         }

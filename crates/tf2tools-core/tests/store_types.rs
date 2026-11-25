@@ -12,9 +12,9 @@ use tf2tools_core::{
 };
 use tf2tools_core::{CommunityMap, MapDownloadError, MapEntry, MapRemoveError, MapState};
 use tf2tools_core::{
-    Database, DownloadError, DownloadPhase, DownloadProgress, Endpoints, FilesError, ImageError,
-    PreviewError, QueryError, StoreClient, StoreConfig, StoreFile, StoreItem, StoreItemId,
-    StoreKind, StoreSyncStatus, SyncError, SyncOutcome, SyncProgress,
+    Database, DemosEndpoints, DownloadError, DownloadPhase, DownloadProgress, Endpoints,
+    FilesError, ImageError, PreviewError, QueryError, StoreClient, StoreConfig, StoreFile,
+    StoreItem, StoreItemId, StoreKind, StoreSyncStatus, SyncError, SyncOutcome, SyncProgress,
 };
 
 fn assert_send_sync<T: Send + Sync + std::fmt::Debug + 'static>() {}
@@ -234,4 +234,23 @@ fn no_endpoint_reaches_the_tf2_wiki() {
     for prefix in Endpoints::default().image_prefixes() {
         assert!(!prefix.contains("wiki.teamfortress.com"), "{prefix}");
     }
+}
+
+#[test]
+fn demos_endpoints_follow_the_store_base() {
+    let prod = Endpoints::default();
+    assert_eq!(prod.demos(), &DemosEndpoints::default());
+    assert_eq!(prod.demos().api(), "https://api.demos.tf");
+
+    let local = Endpoints::loopback("http://x");
+    assert_eq!(local.demos(), &DemosEndpoints::loopback("http://x/demostf"));
+    assert_eq!(local.demos().api(), "http://x/demostf");
+    assert_eq!(
+        local.demos().files(),
+        ["http://x/demostf/files", "http://x/demostf/freezer"]
+    );
+
+    let moved = local.with_demos(DemosEndpoints::loopback("http://y"));
+    assert_eq!(moved.demos().api(), "http://y");
+    assert_eq!(moved.gamebanana(), "http://x/apiv11");
 }
