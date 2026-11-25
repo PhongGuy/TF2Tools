@@ -152,15 +152,53 @@ jobs:
           compression-level: 0
 
 
+  # Asks GitHub for the merged PRs since the last published release. generate-notes is a write
+  # endpoint even though it saves nothing, so this job runs no repo code and holds no secret.
+  changes:
+    needs: gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # generate-notes needs it
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Generate the notes since the last published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(awk -F'"' '/^\[workspace\.package\]/ { s = 1; next } /^\[/ { s = 0 } s && /^version *=/ { print $2; exit }' Cargo.toml)
+          tag="v$version"
+          # The newest published stable release below this tag: the same one notes.json names as previous.
+          prev=$(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq '.[].tagName' \
+            | { cat; printf '%s\n' "$tag"; } | sort -V | awk -v tag="$tag" '$0 == tag && !done { print last; done = 1 } { last = $0 }')
+          args=(-f tag_name="$tag" -f target_commitish="$GITHUB_SHA")
+          if [ -n "$prev" ]; then args+=(-f previous_tag_name="$prev"); fi
+          mkdir -p changes
+          gh api "repos/$GH_REPO/releases/generate-notes" "${args[@]}" --jq .body > changes/generated.md
+          cat changes/generated.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: generated-notes
+          path: changes/generated.md
+          if-no-files-found: error
+
   # Builds the update manifest from the downloaded packages, still unsigned, so no compiling job sees the key.
   manifest:
-    needs: [linux, windows]
+    needs: [linux, windows, changes]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The intro is read from the tag annotation.
+          fetch-depth: 0
+      # Checkout leaves a pushed tag lightweight (actions/checkout#290), so fetch the annotated objects.
+      - name: Fetch the tag annotations
+        run: git fetch --force --tags
       # A tag that disagrees with Cargo.toml would otherwise surface later as a missing AppImage.
       - name: The tag matches the workspace version
         id: version
@@ -186,6 +224,10 @@ jobs:
         with:
           name: windows-installer
           path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: generated-notes
+          path: changes
       # make_manifest skips a missing installer, so a lost artifact would write a Linux-only manifest.
       - name: Both platforms are present
         run: |
@@ -196,16 +238,44 @@ jobs:
             ls -l dist >&2
             exit 1
           fi
+      - name: Write the release page and notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          mkdir -p page releases
+          # Only an annotated tag carries a player intro; a lightweight one would give the commit message.
+          : > page/intro.md
+          if [ "$(git cat-file -t "refs/tags/$tag" 2> /dev/null)" = tag ]; then
+            git for-each-ref "refs/tags/$tag" --format='%(contents:body)' > page/intro.md
+          fi
+          scripts/release-notes.sh "$tag" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md
+          gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | while read -r name; do
+            gh release view "$name" --json tagName,body,publishedAt,isPrerelease,isDraft > "releases/$name.json"
+          done
+          cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version "$VERSION" --out dist/notes.json
       - name: Write the update manifest
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          cargo run --locked -p tf2tools-core --example make_manifest -- manifest --dir dist --version "$VERSION"
+          cargo run --locked -p tf2tools-core --example make_manifest -- manifest --dir dist --version "$VERSION" --notes-file dist/notes.json
           cat dist/tf2tools-update.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: update-manifest
           path: dist/tf2tools-update.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update-notes
+          path: dist/notes.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-page
+          path: page/release-page.md
           if-no-files-found: error
 
   # The only job that sees the signing key, so it compiles nothing: it signs the manifest with the minisign CLI, checks

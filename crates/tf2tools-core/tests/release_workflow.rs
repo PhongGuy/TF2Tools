@@ -91,42 +91,47 @@ fn jobs(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn only_the_sign_job_may_write_and_it_asks_only_for_attestation_besides() {
+fn only_changes_and_sign_may_write_and_each_asks_only_for_what_it_needs() {
     let text = workflow();
     assert!(preamble(&text).contains("permissions:\n  contents: read"));
-    assert_eq!(text.matches("contents: write").count(), 1);
-    let sign = job(&text, "sign");
-    let granted: Vec<&str> = sign
-        .lines()
-        .skip_while(|l| l.trim() != "permissions:")
-        .skip(1)
-        .take_while(|l| l.starts_with("      "))
-        .map(|l| l.split('#').next().unwrap().trim())
-        .collect();
+    assert_eq!(text.matches("contents: write").count(), 2);
+    let granted = |name: &str| -> Vec<String> {
+        job(&text, name)
+            .lines()
+            .skip_while(|l| l.trim() != "permissions:")
+            .skip(1)
+            .take_while(|l| l.starts_with("      "))
+            .map(|l| l.split('#').next().unwrap().trim().to_owned())
+            .collect()
+    };
     assert_eq!(
-        granted,
+        granted("sign"),
         [
             "contents: write",
             "id-token: write",
             "attestations: write",
             "artifact-metadata: write"
-        ],
-        "{sign}"
+        ]
     );
-    for other in jobs(&text).iter().filter(|j| *j != "sign") {
+    assert_eq!(granted("changes"), ["contents: write"]);
+    for other in jobs(&text)
+        .iter()
+        .filter(|j| *j != "sign" && *j != "changes")
+    {
         assert!(!job(&text, other).contains("permissions:"), "{other}");
     }
 }
 
 #[test]
-fn the_jobs_run_gate_then_builds_then_manifest_then_a_tag_only_sign() {
+fn the_jobs_run_gate_then_builds_and_changes_then_manifest_then_a_tag_only_sign() {
     let text = workflow();
     assert_eq!(
         jobs(&text),
-        ["gate", "linux", "windows", "manifest", "sign"]
+        ["gate", "linux", "windows", "changes", "manifest", "sign"]
     );
     assert!(job(&text, "linux").contains("needs: gate"));
-    assert!(job(&text, "manifest").contains("needs: [linux, windows]"));
+    assert!(job(&text, "changes").contains("needs: gate"));
+    assert!(job(&text, "manifest").contains("needs: [linux, windows, changes]"));
     let sign = job(&text, "sign");
     assert!(
         sign.contains("needs: [gate, linux, windows, manifest]"),
@@ -136,6 +141,82 @@ fn the_jobs_run_gate_then_builds_then_manifest_then_a_tag_only_sign() {
         sign.contains("if: startsWith(github.ref, 'refs/tags/v')"),
         "{sign}"
     );
+}
+
+#[test]
+fn the_changes_job_only_asks_github_for_the_generated_notes() {
+    let changes = job(&workflow(), "changes");
+    for banned in [
+        "cargo",
+        "rust-toolchain",
+        "make ",
+        "scripts/",
+        "secrets.",
+        "environment:",
+        "fetch-depth",
+        "git describe",
+    ] {
+        assert!(
+            !changes.contains(banned),
+            "the changes job has {banned}:\n{changes}"
+        );
+    }
+    let uses: Vec<&str> = changes
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("- uses: "))
+        .map(|u| u.split('@').next().unwrap())
+        .collect();
+    assert_eq!(uses, ["actions/checkout", "actions/upload-artifact"]);
+    assert_eq!(changes.matches("GH_TOKEN:").count(), 1, "{changes}");
+    let generate = step(
+        &changes,
+        "Generate the notes since the last published release",
+    );
+    for needle in [
+        "GH_TOKEN: ${{ github.token }}",
+        "gh release list --exclude-drafts --exclude-pre-releases --limit 100",
+        "sort -V",
+        "-f target_commitish=\"$GITHUB_SHA\"",
+        "gh api \"repos/$GH_REPO/releases/generate-notes\"",
+    ] {
+        assert!(generate.contains(needle), "missing {needle}:\n{generate}");
+    }
+    assert!(changes.contains("name: generated-notes"), "{changes}");
+}
+
+#[test]
+fn the_manifest_job_builds_the_notes_and_hashes_them_into_the_manifest() {
+    let manifest = job(&workflow(), "manifest");
+    assert!(manifest.contains("fetch-depth: 0"), "{manifest}");
+    let fetch = step(&manifest, "Fetch the tag annotations");
+    assert!(fetch.contains("git fetch --force --tags"), "{fetch}");
+    assert!(manifest.contains("name: generated-notes"), "{manifest}");
+    let notes = step(&manifest, "Write the release page and notes");
+    for needle in [
+        "git cat-file -t",
+        "%(contents:body)",
+        "scripts/release-notes.sh \"$tag\" packaging/release-notes.md changes/generated.md page/intro.md > page/release-page.md",
+        "gh release list --exclude-drafts --limit 100",
+        "--json tagName,body,publishedAt,isPrerelease,isDraft",
+        "cargo run --locked -p tf2tools-core --example make_manifest -- notes --releases releases --page page/release-page.md --version \"$VERSION\" --out dist/notes.json",
+    ] {
+        assert!(notes.contains(needle), "missing {needle}:\n{notes}");
+    }
+    assert!(!notes.contains("secrets."), "{notes}");
+    let write = step(&manifest, "Write the update manifest");
+    assert!(write.contains("--notes-file dist/notes.json"), "{write}");
+    for needle in [
+        "name: update-notes",
+        "path: dist/notes.json",
+        "name: release-page",
+        "path: page/release-page.md",
+    ] {
+        assert!(manifest.contains(needle), "missing {needle}:\n{manifest}");
+    }
+    let at = |s: &str| manifest.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("Fetch the tag annotations") < at("Write the release page and notes"));
+    assert!(at("name: generated-notes") < at("Write the release page and notes"));
+    assert!(at("Write the release page and notes") < at("Write the update manifest"));
 }
 
 #[test]
@@ -436,7 +517,7 @@ fn the_sign_job_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
 fn checkouts_never_keep_credentials() {
     let text = workflow();
     let checkouts = text.matches("actions/checkout@").count();
-    assert_eq!(checkouts, 5);
+    assert_eq!(checkouts, 6);
     assert_eq!(
         text.matches("persist-credentials: false").count(),
         checkouts
