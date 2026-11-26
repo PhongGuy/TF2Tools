@@ -198,7 +198,7 @@ impl EyePose {
         Self {
             eye: [s.feet[0], s.feet[1], s.feet[2] + f32::from(s.eye_z)],
             yaw: if yaw >= 360. { 0. } else { yaw },
-            pitch: f32::from(s.pitch) / 100.,
+            pitch: (f32::from(s.pitch) / 100.).clamp(-89., 89.),
             ducked: s.flags & DUCKED != 0,
             team: run.team,
             class: run.class,
@@ -358,8 +358,10 @@ impl DemoTracks {
         let next = track.runs.get(found + 1).and_then(|r| r.samples.first());
         match next {
             Some(n)
-                if f64::from(n.tick - last.tick) * f64::from(self.seconds_per_tick)
-                    < f64::from(GAP_HOLD) =>
+                if self.seconds_per_tick.is_finite()
+                    && self.seconds_per_tick > 0.
+                    && f64::from(n.tick - last.tick) * f64::from(self.seconds_per_tick)
+                        < f64::from(GAP_HOLD) =>
             {
                 FollowPose::Alive(pose)
             }
@@ -547,6 +549,29 @@ pub(crate) fn seconds_per_tick(server: f32, header_duration: f32, header_ticks: 
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_bad_tick_length_never_holds_a_gap_alive() {
+        let frames = (0..=10u32)
+            .map(|t| (t, vec![test_support::row(1, [100., 0., 64.], 0.)]))
+            .chain((11..100u32).map(|t| (t, vec![])))
+            .chain((100..=110u32).map(|t| (t, vec![test_support::row(1, [500., 0., 64.], 0.)])))
+            .collect();
+        let mut t = test_support::tracks(frames);
+        t.seconds_per_tick = 0.;
+        assert!(matches!(t.eye_at(PlayerId(1), 50.), FollowPose::Dead(_)));
+    }
+
+    #[test]
+    fn a_held_pose_keeps_pitch_in_range() {
+        let mut r = test_support::row(1, [100., 0., 64.], 0.);
+        r.pitch = 95.;
+        let t = test_support::tracks(vec![(0, vec![r])]);
+        match t.eye_at(PlayerId(1), 50.) {
+            FollowPose::Dead(e) => assert_eq!(e.pitch(), 89.),
+            other @ (FollowPose::Alive(_) | FollowPose::Absent) => panic!("{other:?}"),
+        }
+    }
     use super::build::TrackBuilder;
     use super::*;
     use crate::demo_view::snapshot::{TickFrame, TickRow};
