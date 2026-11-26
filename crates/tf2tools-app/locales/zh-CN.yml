@@ -62,6 +62,7 @@ settings:
     store_data: "商店数据"
     image_cache: "图片缓存"
     demo_cache: "录像缓存"
+    temporary: "临时文件"
     clear_demo_cache: "清除录像缓存"
     demo_cache_cleared: "录像缓存已清除"
     demo_cache_freed: "已释放 %{size}"

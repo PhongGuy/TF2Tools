@@ -40,6 +40,7 @@ settings:
     store_data: "Store data"
     image_cache: "Image cache"
     demo_cache: "Demo cache"
+    temporary: "Temporary files"
     clear_demo_cache: "Clear demo cache"
     demo_cache_cleared: "Demo cache cleared"
     demo_cache_freed: "%{size} freed"

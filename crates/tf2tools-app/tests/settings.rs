@@ -861,7 +861,8 @@ fn the_storage_rows_read_their_size_and_any_unpacked_size() {
             "logs.tf cache",
             "Store data",
             "Image cache",
-            "Demo cache"
+            "Demo cache",
+            "Temporary files"
         ]
     );
     assert_eq!(
@@ -883,7 +884,7 @@ fn every_storage_kind_has_its_own_colour() {
     let mut colours: Vec<u32> = STORAGE_ROWS.iter().map(|r| r.2).collect();
     colours.sort_unstable();
     colours.dedup();
-    assert_eq!(colours.len(), 8, "{colours:x?}");
+    assert_eq!(colours.len(), 9, "{colours:x?}");
 }
 
 #[test]
