@@ -11,7 +11,8 @@ use tf2tools_app::viewer::{DrawRequest, RenderEvent, Renderer, SceneRenderer, ma
 use tf2tools_core::Team;
 use tf2tools_core::load_map_mesh;
 
-// Concurrent device teardown deadlocks some Vulkan drivers, so the GPU tests take turns.
+// The GPU tests take turns: the NVIDIA Vulkan/EGL driver deadlocks when one device is torn
+// down while another comes up, and a quit join stops every live worker in the process.
 static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn one_at_a_time() -> std::sync::MutexGuard<'static, ()> {
@@ -230,6 +231,57 @@ fn the_box_buffer_grows_shrinks_and_clears_between_draws() {
         "no boxes left a box: {:?}",
         (r, g, b)
     );
+    drop(renderer);
+    wait_closed(&events);
+}
+
+#[test]
+fn quit_stops_a_live_renderer_and_joins_it_quickly() {
+    let _turn = one_at_a_time();
+    let (renderer, events) = ready_renderer();
+    let started = Instant::now();
+    assert!(
+        join_render_workers(Duration::from_secs(2)),
+        "a worker outlived the quit join"
+    );
+    let took = started.elapsed();
+    assert!(
+        took < Duration::from_millis(500),
+        "the quit join took {took:?}"
+    );
+    assert!(events.is_closed(), "the worker's events are still open");
+    // A renderer whose worker stopped takes draws without panicking.
+    renderer.draw(DrawRequest {
+        width: 8,
+        height: 8,
+        view_proj: above(1.),
+        seq: 1,
+        players: Arc::from([]),
+    });
+    drop(renderer);
+}
+
+#[test]
+fn a_renderer_opened_after_one_closes_waits_for_its_teardown() {
+    let _turn = one_at_a_time();
+    for _ in 0..3 {
+        let (first, first_events) = ready_renderer();
+        drop(first);
+        // The second device must not come up while the first is still being destroyed.
+        let (second, events) = ready_renderer();
+        assert!(
+            first_events.is_closed(),
+            "the new device came up before the old one was torn down"
+        );
+        drop(second);
+        wait_closed(&events);
+    }
+}
+
+#[test]
+fn a_dropped_renderer_ends_its_worker_without_any_join() {
+    let _turn = one_at_a_time();
+    let (renderer, events) = ready_renderer();
     drop(renderer);
     wait_closed(&events);
 }

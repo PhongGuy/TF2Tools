@@ -89,8 +89,8 @@ pub struct DemoViewport {
 }
 
 impl DemoViewport {
-    /// Loads `mesh` into `renderer`, keeps the snapshot's boxes for every draw, starts the camera at
-    /// `start_camera` and listens for frames.
+    /// Loads `mesh` into `renderer`, keeps the snapshot's boxes for every draw, starts the camera
+    /// at `start_camera` and listens for frames.
     #[expect(
         clippy::too_many_arguments,
         reason = "each seam a test swaps plus GPUI's window and context"

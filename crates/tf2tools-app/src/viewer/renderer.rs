@@ -2,6 +2,7 @@
 //! and reading each frame back into a `RenderImage`.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
 use std::sync::{Mutex, PoisonError};
 use std::thread::JoinHandle;
@@ -80,18 +81,31 @@ fn fs(in: Out) -> @location(0) vec4<f32> {
 }
 ";
 
-// Every worker spawned and not yet joined, so app quit can wait for their device teardown.
-static WORKERS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
+// Every worker spawned and not yet joined, so app quit can stop them and wait for their device
+// teardown, and a new worker can wait for older ones that are closing.
+static WORKERS: Mutex<Vec<Worker>> = Mutex::new(Vec::new());
+static NEXT_WORKER: AtomicU64 = AtomicU64::new(0);
+/// How long a new worker waits for closing ones before it creates its device anyway.
+const TEARDOWN_WAIT: Duration = Duration::from_secs(2);
+
+struct Worker {
+    id: u64,
+    handle: JoinHandle<()>,
+    commands: mpsc::Sender<Command>,
+    closing: Arc<AtomicBool>,
+}
 
 enum Command {
     LoadScene(Arc<MapMesh>),
     Draw(DrawRequest),
+    Stop,
 }
 
-/// The real renderer. Dropping it ends the worker without waiting for it.
+/// The real renderer. Dropping it stops the worker without waiting for it.
 pub struct Renderer {
     commands: mpsc::Sender<Command>,
     events: async_channel::Receiver<RenderEvent>,
+    closing: Arc<AtomicBool>,
 }
 
 impl Renderer {
@@ -100,9 +114,12 @@ impl Renderer {
         let (commands, inbox) = mpsc::channel();
         let (sender, events) = async_channel::unbounded();
         let worker_sender = sender.clone();
+        let id = NEXT_WORKER.fetch_add(1, Ordering::Relaxed);
+        let closing = Arc::new(AtomicBool::new(false));
         let spawned = std::thread::Builder::new()
             .name("viewer-render".into())
             .spawn(move || {
+                wait_for_closing_workers(id);
                 // A panic (wgpu reports validation errors that way) ends the worker as a failure.
                 if let Err(payload) = crate::crash::catching(|| run(&inbox, &worker_sender)) {
                     let error = RendererError::Device(crate::crash::panic_text(payload.as_ref()));
@@ -115,15 +132,55 @@ impl Renderer {
             Ok(handle) => {
                 // Finished workers have nothing left to join, so page visits don't pile them up.
                 let mut workers = WORKERS.lock().unwrap_or_else(PoisonError::into_inner);
-                workers.retain(|worker| !worker.is_finished());
-                workers.push(handle);
+                workers.retain(|worker| !worker.handle.is_finished());
+                workers.push(Worker {
+                    id,
+                    handle,
+                    commands: commands.clone(),
+                    closing: Arc::clone(&closing),
+                });
             }
             Err(e) => {
                 let error = RendererError::Device(e.to_string());
                 let _ = sender.try_send(RenderEvent::Failed(error));
             }
         }
-        Self { commands, events }
+        Self {
+            commands,
+            events,
+            closing,
+        }
+    }
+}
+
+// The registry holds a sender clone, so dropping ours alone would not end the worker.
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        self.closing.store(true, Ordering::Relaxed);
+        let _ = self.commands.send(Command::Stop);
+    }
+}
+
+// Some drivers deadlock when one device is created while another is destroyed, so a new worker
+// waits until every older worker that is closing has finished, for at most `TEARDOWN_WAIT`.
+fn wait_for_closing_workers(id: u64) {
+    let deadline = Instant::now() + TEARDOWN_WAIT;
+    loop {
+        let waiting = WORKERS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .any(|w| w.id < id && w.closing.load(Ordering::Relaxed) && !w.handle.is_finished());
+        if !waiting {
+            return;
+        }
+        if Instant::now() >= deadline {
+            tracing::warn!(
+                "an older demo viewer is still tearing down; opening the new one anyway"
+            );
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -141,19 +198,27 @@ impl SceneRenderer for Renderer {
     }
 }
 
-/// Joins every finished render worker, waiting up to `timeout` for the rest; true when none
-/// is left. For app quit, so no worker is still destroying its device while the process exits.
+/// Stops every render worker and joins them, waiting up to `timeout`; true when none is left.
+/// For app quit, so no worker is still destroying its device while the process exits.
 pub fn join_render_workers(timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
+    for worker in WORKERS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+    {
+        worker.closing.store(true, Ordering::Relaxed);
+        let _ = worker.commands.send(Command::Stop);
+    }
     loop {
         let finished: Vec<_> = {
             let mut workers = WORKERS.lock().unwrap_or_else(PoisonError::into_inner);
-            let (done, running) = workers.drain(..).partition(JoinHandle::is_finished);
+            let (done, running) = workers.drain(..).partition(|w| w.handle.is_finished());
             *workers = running;
             done
         };
-        for handle in finished {
-            let _ = handle.join();
+        for worker in finished {
+            let _ = worker.handle.join();
         }
         let left = WORKERS.lock().unwrap_or_else(PoisonError::into_inner).len();
         if left == 0 {
@@ -187,7 +252,8 @@ fn run(inbox: &mpsc::Receiver<Command>, events: &async_channel::Sender<RenderEve
     gpu.shutdown();
 }
 
-// Handles commands until the inbox disconnects, the UI drops its receiver, or the GPU fails.
+// Handles commands until a Stop, the inbox disconnects, the UI drops its receiver, or the GPU
+// fails.
 fn serve(
     gpu: &mut Gpu,
     inbox: &mpsc::Receiver<Command>,
@@ -226,7 +292,7 @@ fn serve(
 }
 
 // One batch of commands: scenes load in order, only the newest draw renders. Ok(true) means
-// the inbox disconnected; Err(None) means the UI dropped its events receiver.
+// a Stop or a disconnected inbox; Err(None) means the UI dropped its events receiver.
 fn step(
     gpu: &mut Gpu,
     first: Command,
@@ -241,6 +307,7 @@ fn step(
         match command {
             Command::LoadScene(mesh) => gpu.load_scene(&mesh),
             Command::Draw(request) => draw = Some(request),
+            Command::Stop => return Ok(true),
         }
         next = match inbox.try_recv() {
             Ok(command) => Some(command),
@@ -518,7 +585,8 @@ impl Gpu {
         if let Some(buffer) = self.players.buffer.as_ref().filter(|_| needed > 0) {
             self.queue.write_buffer(buffer, 0, &bytes);
         }
-        self.players.count = u32::try_from(boxes.len() * 36).unwrap_or(u32::MAX);
+        // Counted from the bytes written, so a draw never reads past them.
+        self.players.count = u32::try_from(needed / VERTEX_STRIDE).unwrap_or(0);
         self.players.written = Some(Arc::clone(boxes));
     }
 
