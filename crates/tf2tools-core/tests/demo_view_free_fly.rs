@@ -103,3 +103,18 @@ fn moving_means_at_least_one_unit_a_second() {
     camera.advance(1.0 / 60.0, forward());
     assert!(camera.is_moving());
 }
+
+#[test]
+fn a_negative_frame_does_not_drain_the_step_accumulator() {
+    let mut camera = FreeFly::new([0.; 3], 0., 0.);
+    camera.advance(-1.0, forward());
+    camera.advance(1.0 / 240.0 + 1e-5, forward());
+    assert!(camera.origin()[0] > 0.0, "{:?}", camera.origin());
+}
+
+#[test]
+fn a_nan_frame_does_not_move_the_camera() {
+    let mut camera = FreeFly::new([0.; 3], 0., 0.);
+    camera.advance(f32::NAN, forward());
+    assert_eq!(camera.origin(), [0.; 3]);
+}

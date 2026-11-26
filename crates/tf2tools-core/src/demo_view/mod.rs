@@ -1,12 +1,15 @@
 //! The demo viewer's UI-free pieces: the map mesh drawn behind a demo, the free-fly camera,
-//! the demo header, the players at one tick and their tracks over the whole demo.
+//! the demo header, the players at one tick, their tracks over the whole demo and the
+//! playback clock.
 
+mod clock;
 mod free_fly;
 mod header;
 mod mesh;
 mod snapshot;
 mod tracks;
 
+pub use clock::PlaybackClock;
 pub use free_fly::{FlyInput, FreeFly};
 pub use header::{DemoHeader, read_demo_header};
 pub use mesh::{

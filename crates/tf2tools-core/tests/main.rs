@@ -24,6 +24,7 @@ mod curated_images;
 mod data_dir;
 mod db_open;
 mod db_upgrade;
+mod demo_view_clock;
 mod demo_view_free_fly;
 mod demo_view_header;
 mod demo_view_map_lookup;
