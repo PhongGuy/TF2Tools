@@ -9,8 +9,8 @@ use anyhow::Context as _;
 use chrono::{SecondsFormat, TimeDelta, Utc};
 use image::{Rgba, RgbaImage};
 use tf2tools_core::{
-    AddonName, BuiltinCrosshairs, CrosshairRef, DataDir, Database, DraftItem, Library,
-    ProfileDraft, Provenance, SlotMode, SoundKind, Tf2Install,
+    AddonName, BuiltinCrosshairs, CrosshairRef, DataDir, Database, DraftItem, Library, LogsCache,
+    ProfileDraft, Provenance, SlotMode, SoundKind, SteamId, Tf2Install, TrackedPlayer,
 };
 
 const HUDS: [&str; 3] = ["budhud", "flawhud", "rayshud"];
@@ -192,6 +192,12 @@ fn fill(
     )?;
 
     db.set_tf2_path(Some(tf2.game_dir()))?;
+    // Track the logs.tf fake's first player so the Logs page opens populated.
+    let (steam3, name) = crate::logs_fake::PLAYERS[0];
+    let logs = LogsCache::new(db.clone());
+    let pilot = SteamId::from_steam3(steam3).context("fake logs player id")?;
+    logs.add_player(&TrackedPlayer::new(pilot, name))?;
+    logs.set_active_player(pilot)?;
     drop(db);
     seed_logs(dir)?;
     seed_store(dir, empty_store)

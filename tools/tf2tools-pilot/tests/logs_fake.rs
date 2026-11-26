@@ -4,6 +4,8 @@ use std::io::{Read as _, Write as _};
 use std::net::TcpStream;
 use std::time::Duration;
 
+use tf2tools_app::app::CLOSED_BASE;
+use tf2tools_core::Endpoints;
 use tf2tools_core::{
     DataDir, Database, DemoQuery, DemosClient, DemosEndpoints, LogsCache, LogsCancel, LogsClient,
     LogsEndpoints, LogsRange, PlayerInput, SteamId, TrackedPlayer,
@@ -136,4 +138,21 @@ fn the_newest_log_finds_its_demo_and_the_unmatched_one_does_not() {
     let old = rt.block_on(client.fetch_log(7001)).unwrap();
     let query = DemoQuery::from_log(&old).unwrap();
     assert_eq!(rt.block_on(demos.find_demo(&query)).unwrap(), None);
+}
+
+#[test]
+fn the_seeded_boot_points_logs_tf_at_the_fake() {
+    let tmp = tempfile::tempdir().unwrap();
+    let boot = tf2tools_pilot::seeded_boot(&tmp.path().join("com.tf2tools.app")).unwrap();
+    assert!(boot.offline);
+    let fake = LogsFake::start().unwrap();
+    assert_eq!(boot.endpoints.logs(), &LogsEndpoints::loopback(fake.base()));
+    assert_ne!(
+        boot.endpoints.logs(),
+        Endpoints::loopback(CLOSED_BASE).logs()
+    );
+    assert_eq!(
+        boot.endpoints.gamebanana(),
+        Endpoints::loopback(CLOSED_BASE).gamebanana()
+    );
 }
