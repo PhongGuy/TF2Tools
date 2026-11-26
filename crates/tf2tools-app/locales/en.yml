@@ -2794,6 +2794,7 @@ messages:
       unusable: "This download has nothing TF2Tools can use. Pick another file."
       locked: "This download is locked with a password, so TF2Tools can't open it."
       unpack: "The download couldn't be unpacked. Try again, or pick another file."
+      unpack_too_large: "This download unpacks to more than TF2Tools allows, so it wasn't installed."
       unknown: "Something went wrong with the download. Try again later."
     files:
       not_in_store: "This item is no longer in the store."

@@ -44,6 +44,11 @@ fn gb_too_large() -> SharedString {
     tr!("messages.store.gb_fetch.too_large")
 }
 
+// An archive that would unpack past the shared size or entry cap.
+fn unpack_too_large() -> SharedString {
+    tr!("messages.store.download.unpack_too_large")
+}
+
 /// The toast title when a detail cannot read its cached store row.
 pub fn details_failed_title() -> SharedString {
     tr!("messages.store.details_failed_title")
@@ -128,6 +133,7 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> SharedString {
 fn archive_message(err: &ArchiveError) -> SharedString {
     match err {
         ArchiveError::Encrypted { .. } => download_locked(),
+        ArchiveError::TooLarge { .. } | ArchiveError::TooManyEntries { .. } => unpack_too_large(),
         ArchiveError::Io { .. }
         | ArchiveError::Malformed { .. }
         | ArchiveError::UnsafePath { .. }
@@ -236,7 +242,9 @@ pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
             tr!("messages.shared.source_unreadable", source = GAMEBANANA)
         }
         GbAddonFetchError::Interrupted { .. } => download_stopped_text(),
-        GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => gb_too_large(),
+        GbAddonFetchError::Archive(
+            ArchiveError::TooLarge { .. } | ArchiveError::TooManyEntries { .. },
+        ) => unpack_too_large(),
         GbAddonFetchError::Archive(_) | _ => download_unknown(),
     };
     StoreFailure::new(message, err.to_string())
