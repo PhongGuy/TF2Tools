@@ -3,9 +3,7 @@
 use std::collections::BTreeMap;
 
 use super::{DUCKED, DemoTracks, PlayerTrack, TrackCut, TrackRun, TrackSample};
-use crate::demo_view::snapshot::{
-    SENTINEL_TICK, Step, TickFrame, TickRow, class_eye_height, drawable,
-};
+use crate::demo_view::snapshot::{SENTINEL_TICK, Step, TickFrame, TickRow, drawable, eye_height};
 use crate::weapons::TfClass;
 
 /// A move faster than this (`sv_maxvelocity` 3500 times the square root of 3) is a teleport.
@@ -174,16 +172,12 @@ impl TrackBuilder {
 // the sent eye height trusted only when plausible.
 fn sample(row: &TickRow, class: TfClass, tick: u32) -> TrackSample {
     let yaw = (row.yaw + 180.).rem_euclid(360.) - 180.;
-    let eye = row
-        .view_offset_z
-        .filter(|z| (1.0..=100.0).contains(z))
-        .unwrap_or_else(|| class_eye_height(class, row.ducked));
     TrackSample {
         tick,
         feet: row.feet,
         yaw: (yaw * 100.).round() as i16,
         pitch: (row.pitch * 100.).round() as i16,
-        eye_z: eye.round() as u8,
+        eye_z: eye_height(row, class).round() as u8,
         flags: if row.ducked { DUCKED } else { 0 },
     }
 }

@@ -1,6 +1,6 @@
 //! Picks the snapshot tick from a stream of per-tick player rows.
 
-use super::{DemoSnapshot, SnapshotPlayer, class_eye_height};
+use super::{DemoSnapshot, SnapshotPlayer, eye_height};
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
@@ -174,11 +174,7 @@ pub(crate) fn into_snapshot(tick: u32, rows: Vec<TickRow>) -> DemoSnapshot {
         .into_iter()
         .filter_map(|row| {
             let (team, class) = (row.team?, row.class?);
-            // The range check also rejects NaN and the infinities.
-            let eye = row
-                .view_offset_z
-                .filter(|z| (1.0..=100.0).contains(z))
-                .unwrap_or_else(|| class_eye_height(class, row.ducked));
+            let eye = eye_height(&row, class);
             Some(SnapshotPlayer::new(
                 team, class, row.feet, row.yaw, row.pitch, eye, row.ducked,
             ))

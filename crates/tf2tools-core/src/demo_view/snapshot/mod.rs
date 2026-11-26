@@ -6,8 +6,8 @@ use crate::weapons::TfClass;
 mod parse;
 mod pick;
 
+pub use parse::read_demo_snapshot;
 pub(crate) use parse::{Clocking, drive, read_prefix};
-pub use parse::{read_demo_snapshot, read_demo_tracks};
 pub(crate) use pick::{
     SENTINEL_TICK, SnapshotPicker, Step, TickFrame, TickRow, drawable, into_snapshot,
 };
@@ -121,6 +121,14 @@ pub(crate) fn class_eye_height(class: TfClass, ducked: bool) -> f32 {
         TfClass::Soldier | TfClass::Pyro | TfClass::Demoman | TfClass::Engineer => 68.,
         TfClass::Sniper | TfClass::Medic | TfClass::Heavy | TfClass::Spy => 75.,
     }
+}
+
+/// The eye height above the feet: the sent view offset when it is plausible, else the class's.
+pub(crate) fn eye_height(row: &TickRow, class: TfClass) -> f32 {
+    // The range check also rejects NaN and the infinities.
+    row.view_offset_z
+        .filter(|z| (1.0..=100.0).contains(z))
+        .unwrap_or_else(|| class_eye_height(class, row.ducked))
 }
 
 #[cfg(test)]

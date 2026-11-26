@@ -61,36 +61,47 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-// Times the playback read's snapshot and tracks and prints its event order compressed to
-// S, the count of Progress events, then T or F.
+// Times the playback read's snapshot and tracks and prints its true event order, each run of
+// Progress counted where it occurs: `S,P100,T` or `P3,S,P97,T`.
 fn playback_line(path: &std::path::Path) {
     let started = Instant::now();
     let (mut snapshot_at, mut snapshot_tick, mut tracks_at) = (0., None, 0.);
-    let (mut progress, mut order) = (0, String::new());
+    let (mut progress, mut run) = (0, 0);
+    let mut order: Vec<String> = Vec::new();
     read_demo_playback(path, &AtomicBool::new(false), |event| {
         let now = started.elapsed().as_secs_f64();
+        if matches!(event, PlaybackEvent::Progress(_)) {
+            progress += 1;
+            run += 1;
+            return ControlFlow::Continue(());
+        }
+        if run > 0 {
+            order.push(format!("P{run}"));
+            run = 0;
+        }
         match event {
             PlaybackEvent::Snapshot(snapshot) => {
                 snapshot_at = now;
                 snapshot_tick = snapshot.ok().map(|s| s.tick());
-                order.push('S');
+                order.push("S".into());
             }
-            PlaybackEvent::Progress(_) => progress += 1,
-            PlaybackEvent::Tracks(_) | PlaybackEvent::TracksFailed(_) => {
+            PlaybackEvent::Tracks(_) => {
                 tracks_at = now;
-                if progress > 0 {
-                    order.push_str(&format!(",P{progress}"));
-                }
-                order.push_str(if matches!(event, PlaybackEvent::Tracks(_)) {
-                    ",T"
-                } else {
-                    ",F"
-                });
+                order.push("T".into());
             }
-            _ => order.push('?'),
+            PlaybackEvent::TracksFailed(_) => {
+                tracks_at = now;
+                order.push("F".into());
+            }
+            PlaybackEvent::Progress(_) => {}
+            _ => order.push("?".into()),
         }
         ControlFlow::Continue(())
     });
+    if run > 0 {
+        order.push(format!("P{run}"));
+    }
+    let order = order.join(",");
     let snapshot_tick = snapshot_tick.map_or("none".to_owned(), |t| t.to_string());
     println!(
         "snapshot_at={snapshot_at:.3}s snapshot_tick={snapshot_tick} tracks_at={tracks_at:.3}s \

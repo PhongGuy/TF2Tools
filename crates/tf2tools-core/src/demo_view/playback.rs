@@ -8,7 +8,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use super::snapshot::{
     Clocking, DemoSnapshot, SnapshotPicker, Step, TickFrame, drive, into_snapshot, read_prefix,
 };
-use super::tracks::{DemoTracks, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, TrackBuilder};
+use super::tracks::{
+    DemoTracks, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, TrackBuilder, seconds_per_tick,
+};
 use crate::error::{DemoSnapshotError, DemoTracksError};
 use crate::panic_mark::catching;
 
@@ -53,9 +55,10 @@ impl<'a, E: FnMut(PlaybackEvent) -> ControlFlow<()>> PlaybackRun<'a, E> {
         }
     }
 
-    // Sends one event and remembers a Break, after which nothing more goes out.
+    // Sends one event unless a cancel or an earlier Break has halted the run, and remembers a
+    // Break, so nothing goes out after either even partway through a frame.
     fn send(&mut self, event: PlaybackEvent) {
-        if !self.stopped && (self.emit)(event).is_break() {
+        if !self.halted() && (self.emit)(event).is_break() {
             self.stopped = true;
         }
     }
@@ -80,10 +83,10 @@ impl<'a, E: FnMut(PlaybackEvent) -> ControlFlow<()>> PlaybackRun<'a, E> {
         {
             self.send(PlaybackEvent::Snapshot(snapshot(picker)));
         }
-        // Whole percents only, so the UI sees at most a hundred updates; a tick past the header's
-        // count (the opening server-tick frame) says nothing.
+        // Progress follows the picture, in whole percents only, so the UI sees at most a hundred
+        // updates; a tick past the header's count (the opening server-tick frame) says nothing.
         let total = u64::from(clocking.header_ticks);
-        if total > 0 && tick <= clocking.header_ticks {
+        if self.picker.is_none() && total > 0 && tick <= clocking.header_ticks {
             let percent = u64::from(tick) * 100 / total;
             if percent > self.percent {
                 self.percent = percent;
@@ -131,6 +134,17 @@ impl<'a, E: FnMut(PlaybackEvent) -> ControlFlow<()>> PlaybackRun<'a, E> {
     }
 }
 
+impl Clocking {
+    /// The tick length the tracks and the clock use.
+    pub fn seconds_per_tick(&self) -> f32 {
+        seconds_per_tick(
+            self.server_interval,
+            self.header_duration,
+            self.header_ticks,
+        )
+    }
+}
+
 fn snapshot(picker: SnapshotPicker) -> Result<DemoSnapshot, DemoSnapshotError> {
     picker
         .finish()
@@ -172,6 +186,23 @@ pub fn read_demo_playback(
         return;
     }
     playback_from_bytes(bytes, file_capped, cancel, || {}, emit);
+}
+
+/// Reads at most MAX_DEMO_BYTES of `dem` and builds every player's tracks over it, through the
+/// playback read. `cancel` is checked before and after the read and at every frame.
+pub fn read_demo_tracks(dem: &Path, cancel: &AtomicBool) -> Result<DemoTracks, DemoTracksError> {
+    let mut outcome = Err(DemoTracksError::Cancelled);
+    read_demo_playback(dem, cancel, |event| {
+        match event {
+            PlaybackEvent::Tracks(tracks) => {
+                outcome = Ok(Arc::try_unwrap(tracks).unwrap_or_else(|shared| (*shared).clone()))
+            }
+            PlaybackEvent::TracksFailed(error) => outcome = Err(error),
+            PlaybackEvent::Snapshot(_) | PlaybackEvent::Progress(_) => {}
+        }
+        ControlFlow::Continue(())
+    });
+    outcome
 }
 
 // Runs the parse under the panic guard with the run borrowed by the frame callback, so a
@@ -287,10 +318,10 @@ mod tests {
         assert_eq!(k.matches('S').count(), 1, "{k}");
         assert!(k.ends_with('T'), "{k}");
         assert_eq!(k.matches('T').count(), 1, "{k}");
-        let at = k.find('S').expect("snapshot");
-        // The pick settles at tick 2049 of 2100, so 97 whole percents come before it.
-        assert_eq!(at, 97, "{k}");
-        match &events[at] {
+        // Progress waits for the picture; the pick settles at tick 2049 of 2100, so the
+        // first Progress is 97 percent, then 98, 99 and 100.
+        assert_eq!(k.find('S'), Some(0), "{k}");
+        match &events[0] {
             PlaybackEvent::Snapshot(Ok(snap)) => assert_eq!(snap.tick(), 1050),
             other => panic!("{other:?}"),
         }
@@ -301,7 +332,15 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(progress.len(), 100);
+        assert_eq!(progress.len(), 4, "{k}");
+        assert_eq!(
+            progress
+                .iter()
+                .map(|p| (p * 2100.).round() as u32 * 100 / 2100)
+                .collect::<Vec<_>>(),
+            [97, 98, 99, 100],
+            "{progress:?}"
+        );
         assert!(progress.windows(2).all(|w| w[1] > w[0]), "{progress:?}");
         assert!(
             progress.iter().all(|p| (0. ..=1.).contains(p)),
@@ -434,6 +473,28 @@ mod tests {
             playback.end(Ok(clocking(0)), false);
         }
         assert!(events.is_empty(), "{events:?}");
+    }
+
+    #[test]
+    fn a_cancel_set_while_sending_the_snapshot_lets_nothing_more_out() {
+        let cancel = AtomicBool::new(false);
+        let mut events = Vec::new();
+        {
+            let mut playback = PlaybackRun::new(&cancel, MAX_TRACK_SAMPLES, |e| {
+                if matches!(e, PlaybackEvent::Snapshot(_)) {
+                    cancel.store(true, Ordering::SeqCst);
+                }
+                events.push(e);
+                ControlFlow::Continue(())
+            });
+            for t in 0..=2100 {
+                if playback.frame(settling(t), &clocking(2100)).is_break() {
+                    break;
+                }
+            }
+            playback.end(Ok(clocking(2100)), false);
+        }
+        assert_eq!(kinds(&events), "S");
     }
 
     #[test]
