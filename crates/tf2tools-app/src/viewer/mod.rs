@@ -1,12 +1,14 @@
 //! The demo viewer's 3D view: camera math and a renderer worker that draws a map offscreen and
 //! hands each frame back as a GPUI image.
 
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 use gpui_kit::RenderImage;
-use tf2tools_core::{DemoSnapshot, DemoSnapshotError, MapMesh, Team};
+use tf2tools_core::{MapMesh, PlaybackEvent, Team};
 
 pub mod load;
 pub mod math;
@@ -17,13 +19,15 @@ pub mod viewport;
 
 pub use renderer::{Renderer, join_render_workers, wgpu_renderers};
 
-/// One frame to draw: its pixel size, the camera, and a sequence number the frame echoes back.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// One frame to draw: its pixel size, the camera, a sequence number the frame echoes back,
+/// and the player boxes to draw in it.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DrawRequest {
     pub width: u32,
     pub height: u32,
     pub view_proj: [[f32; 4]; 4],
     pub seq: u64,
+    pub players: Arc<[PlayerBox]>,
 }
 
 /// Where one frame's time went on the worker.
@@ -77,19 +81,17 @@ pub trait SceneRenderer {
     fn draw(&self, request: DrawRequest);
     /// The renderer's events; closed once the renderer has stopped.
     fn events(&self) -> async_channel::Receiver<RenderEvent>;
-    /// Replaces the player boxes drawn by later draws; an empty slice clears them.
-    fn set_players(&self, boxes: Arc<[PlayerBox]>);
 }
 
 /// Makes a renderer for a page; tests swap the wgpu one for a stub.
 pub type RendererFactory = Arc<dyn Fn() -> Box<dyn SceneRenderer> + Send + Sync>;
 
-/// Reads a demo's players; tests swap the core reader for a fixed answer.
-pub type SnapshotReader =
-    Arc<dyn Fn(&Path) -> Result<DemoSnapshot, DemoSnapshotError> + Send + Sync>;
+/// Reads a demo's still picture and playback tracks, sending each event as it becomes known
+/// until the cancel flag is set or the sink answers `Break`; tests swap in scripted events.
+pub type PlaybackReader =
+    Arc<dyn Fn(&Path, &AtomicBool, &mut dyn FnMut(PlaybackEvent) -> ControlFlow<()>) + Send + Sync>;
 
-/// The reader `Services` holds in the real app: `tf2tools_core::read_demo_snapshot`.
-pub fn core_snapshots() -> SnapshotReader {
-    // A closure, because a fn item does not coerce to the higher-ranked `dyn Fn(&Path)` here.
-    Arc::new(|dem: &Path| tf2tools_core::read_demo_snapshot(dem))
+/// The reader `Services` holds in the real app: `tf2tools_core::read_demo_playback`.
+pub fn core_playback() -> PlaybackReader {
+    Arc::new(|dem, cancel, emit| tf2tools_core::read_demo_playback(dem, cancel, emit))
 }

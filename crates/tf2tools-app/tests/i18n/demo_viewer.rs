@@ -7,22 +7,14 @@ use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
 use crate::support;
-use support::demo_view_fixtures::demo_header;
-use support::demo_viewer::{StubAnswer, demo_file, demo_viewer_shell, inside, install_map};
-use support::graphics::found;
+use support::demo_viewer::{inside, open_with_tracks};
 
 const ENGLISH_HINT: &str = "Drag to look, WASD to move, Shift to slow down.";
 
 fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch(lang);
     let env = support::env();
-    install_map(&env, "cp_synthetic");
-    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
-    let w = demo_viewer_shell(cx, &env, found(&env), vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
-    support::wait_real(cx, "the viewport", |cx| {
-        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
-    });
+    let w = open_with_tracks(cx, &env, None);
     cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
     support::settle(cx, w.s.win);
     // The hint must be the translated one, or the widths below prove nothing about it.
@@ -36,9 +28,14 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
     assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
     for id in [
         ids::DEMO_VIEWER_HINT,
-        ids::DEMO_VIEWER_PLAYERS_NOTE,
         ids::DEMO_VIEWER_OPEN,
         ids::DEMO_VIEWER_BAR_COLLAPSE,
+        ids::DEMO_VIEWER_PLAY,
+        ids::DEMO_VIEWER_STEP_BACK,
+        ids::DEMO_VIEWER_STEP_FORWARD,
+        ids::DEMO_VIEWER_TIMELINE,
+        ids::DEMO_VIEWER_TIME,
+        ids::DEMO_VIEWER_SPEED,
     ] {
         let part = support::bounds_of(cx, w.s.win, id).unwrap();
         assert!(
@@ -56,6 +53,11 @@ fn the_loaded_bar_fits_the_narrowest_page_in_german(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_narrowest_page_in_russian(cx: &mut TestAppContext) {
     bar_fits("ru", 800., 600., cx);
+}
+
+#[gpui_kit::test]
+fn the_loaded_bar_fits_the_narrowest_page_in_brazilian_portuguese(cx: &mut TestAppContext) {
+    bar_fits("pt-BR", 800., 600., cx);
 }
 
 #[gpui_kit::test]
@@ -102,5 +104,42 @@ fn the_gamebanana_fallback_speaks_every_language() {
             None,
             "{lang} keeps not_on_serveme"
         );
+    }
+}
+
+// The playback words exist in every language, keep their placeholders, and are translated.
+#[test]
+fn the_playback_words_speak_every_language() {
+    let text = |lang: &str, key: &str| {
+        tf2tools_app::_rust_i18n_try_translate(lang, key).map(|t| t.into_owned())
+    };
+    let langs = ["en", "de", "es", "fr", "pt-BR", "ru", "zh-CN"];
+    let keys = [
+        ("play", None),
+        ("pause", None),
+        ("step_back", None),
+        ("step_forward", None),
+        ("speed", None),
+        ("timeline", None),
+        ("round", Some("%{n}")),
+        ("reading", Some("%{percent}")),
+        ("reading_no_percent", None),
+        ("cut_file", Some("%{time}")),
+        ("cut_samples", Some("%{time}")),
+        ("cut_ended", Some("%{time}")),
+        ("tracks_failed", None),
+    ];
+    for (key, placeholder) in keys {
+        let key = format!("demo_viewer.playback.{key}");
+        let en = text("en", &key).unwrap_or_else(|| panic!("en lacks {key}"));
+        for lang in langs {
+            let theirs = text(lang, &key).unwrap_or_else(|| panic!("{lang} lacks {key}"));
+            if let Some(p) = placeholder {
+                assert!(theirs.contains(p), "{lang} {key}: {theirs}");
+            }
+            if lang != "en" {
+                assert_ne!(theirs, en, "{lang} {key} is untranslated");
+            }
+        }
     }
 }

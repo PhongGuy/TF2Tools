@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::{DUCKED, DemoTracks, PlayerTrack, TrackCut, TrackRun, TrackSample};
+use super::{DemoTracks, PlayerTrack, TrackCut, TrackRun, TrackSample, pack_sample};
 use crate::demo_view::snapshot::{SENTINEL_TICK, Step, TickFrame, TickRow, drawable, eye_height};
 use crate::weapons::TfClass;
 
@@ -168,18 +168,10 @@ impl TrackBuilder {
     }
 }
 
-// The row packed into a sample: yaw wrapped to -180..180 so its centidegrees fit an i16, and
-// the sent eye height trusted only when plausible.
+// The row packed into a sample, with the sent eye height trusted only when plausible.
 fn sample(row: &TickRow, class: TfClass, tick: u32) -> TrackSample {
-    let yaw = (row.yaw + 180.).rem_euclid(360.) - 180.;
-    TrackSample {
-        tick,
-        feet: row.feet,
-        yaw: (yaw * 100.).round() as i16,
-        pitch: (row.pitch * 100.).round() as i16,
-        eye_z: eye_height(row, class).round() as u8,
-        flags: if row.ducked { DUCKED } else { 0 },
-    }
+    let eye = eye_height(row, class);
+    pack_sample(tick, row.feet, row.yaw, row.pitch, eye, row.ducked)
 }
 
 fn too_fast(prev: &TrackSample, next: &TrackSample, seconds_per_tick: f32) -> bool {

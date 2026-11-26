@@ -18,7 +18,7 @@ use crate::i18n::tr;
 use crate::local_messages;
 use crate::picker::PathPicker;
 use crate::viewer::pointer::{PointerLockFactory, platform_pointer_locks};
-use crate::viewer::{RendererFactory, SnapshotReader, core_snapshots, wgpu_renderers};
+use crate::viewer::{PlaybackReader, RendererFactory, core_playback, wgpu_renderers};
 
 /// Finds a TF2 install; injected so tests and the pilot never touch the real Steam library.
 pub type Tf2Detector = Arc<dyn Fn() -> Result<Vec<Tf2Install>, DetectError> + Send + Sync>;
@@ -51,8 +51,8 @@ pub struct Services {
     pub renderers: RendererFactory,
     /// Makes the Demo Viewer's pointer locks; tests swap in a fake.
     pub pointer_lock: PointerLockFactory,
-    /// Reads a demo's players for the Demo Viewer; tests swap in a fixed answer.
-    pub demo_snapshots: SnapshotReader,
+    /// Reads a demo's picture and playback for the Demo Viewer; tests swap in scripted events.
+    pub demo_playback: PlaybackReader,
 }
 
 impl Global for Services {}
@@ -124,7 +124,7 @@ impl Services {
             demos,
             renderers: wgpu_renderers(),
             pointer_lock: platform_pointer_locks(),
-            demo_snapshots: core_snapshots(),
+            demo_playback: core_playback(),
         })
     }
 
@@ -160,10 +160,10 @@ impl Services {
         }
     }
 
-    /// The same services with `demo_snapshots` reading the Demo Viewer's players.
-    pub fn with_demo_snapshots(self, demo_snapshots: SnapshotReader) -> Self {
+    /// The same services with `demo_playback` reading the Demo Viewer's picture and playback.
+    pub fn with_demo_playback(self, demo_playback: PlaybackReader) -> Self {
         Self {
-            demo_snapshots,
+            demo_playback,
             ..self
         }
     }

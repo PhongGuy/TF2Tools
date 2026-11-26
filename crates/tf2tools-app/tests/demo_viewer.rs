@@ -355,12 +355,12 @@ fn three_players() -> DemoSnapshot {
     )
 }
 
-// Opens `header` with `reader` as the snapshot reader; waits for the viewport.
+// Opens `header` with `reader` as the playback reader; waits for the viewport.
 fn open_with_players(
     cx: &mut TestAppContext,
     env: &support::Env,
     header: Vec<u8>,
-    reader: tf2tools_app::viewer::SnapshotReader,
+    reader: tf2tools_app::viewer::PlaybackReader,
 ) -> crate::support::demo_viewer::DemoViewerShell {
     install_map(env, "cp_synthetic");
     let demo = demo_file(env, "match.dem", &header);

@@ -1,6 +1,9 @@
 //! The demo viewport: device-pixel draws, frame swaps, drag look, WASD flight with Shift, focus,
 //! resize and renderer failures, against a stub renderer.
 
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use gpui_kit::test::TestEventExt as _;
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Entity, Modifiers, MouseButton, Pixels, Point,
@@ -8,7 +11,9 @@ use gpui_kit::{
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::DemoViewport;
+use tf2tools_app::viewer::viewport::{PlaybackMoved, PlaybackState};
 use tf2tools_app::viewer::{RenderEvent, RendererError};
+use tf2tools_core::DemoTracks;
 use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass};
 
 use crate::support;
@@ -306,6 +311,56 @@ fn a_viewport_with_players_sends_their_boxes_and_starts_at_the_red_eye(cx: &mut 
     assert_eq!((origin, yaw, pitch), ([100., 200., 139.], 270., 12.));
 }
 
+#[gpui_kit::test]
+fn every_draw_carries_the_snapshot_boxes(cx: &mut TestAppContext) {
+    let snapshot = DemoSnapshot::new(
+        1668,
+        vec![
+            SnapshotPlayer::new(
+                Team::Blue,
+                TfClass::Scout,
+                [0., 0., 64.],
+                90.,
+                0.,
+                65.,
+                false,
+            ),
+            SnapshotPlayer::new(
+                Team::Red,
+                TfClass::Medic,
+                [100., 200., 64.],
+                270.,
+                12.,
+                75.,
+                false,
+            ),
+        ],
+    );
+    let (win, _viewport, stub) = viewport_window_with(
+        cx,
+        StubAnswer::Frames,
+        Some(snapshot),
+        fake_lock(LockMode::Grabbed).0,
+    );
+    let at = centre(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_down(at, MouseButton::Left, cx);
+        w.pointer_move(at + point(px(30.), px(0.)), Some(MouseButton::Left), cx);
+        w.pointer_move(at + point(px(60.), px(0.)), Some(MouseButton::Left), cx);
+        w.pointer_up(at + point(px(60.), px(0.)), MouseButton::Left, cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let draws = stub.draws();
+    assert!(draws.len() >= 2, "{draws:?}");
+    for draw in &draws {
+        let teams: Vec<Team> = draw.players.iter().map(|b| b.team).collect();
+        assert_eq!(teams, [Team::Blue, Team::Red], "draw {}", draw.seq);
+    }
+    // One set of boxes, shared by every draw rather than rebuilt for each.
+    assert_eq!(stub.players().len(), 1);
+}
+
 fn yaw_pitch(cx: &mut TestAppContext, viewport: &Entity<DemoViewport>) -> (f32, f32) {
     cx.update(|cx| {
         let camera = viewport.read(cx).camera();
@@ -568,4 +623,228 @@ fn a_grabbed_drag_outside_the_viewport_still_turns(cx: &mut TestAppContext) {
     support::settle(cx, win);
     let (yaw2, _) = yaw_pitch(cx, &viewport);
     assert!((yaw2 - (yaw - 22.)).abs() < 1e-3, "{yaw} -> {yaw2}");
+}
+
+// BLU walks +x from 0 to 200 over ticks 1000..=1200; RED stands at x 500. A round starts at 1100.
+fn walking_tracks() -> Arc<DemoTracks> {
+    let at = |tick, x| {
+        DemoSnapshot::new(
+            tick,
+            vec![
+                SnapshotPlayer::new(Team::Blue, TfClass::Scout, [x, 0., 64.], 0., 0., 65., false),
+                SnapshotPlayer::new(
+                    Team::Red,
+                    TfClass::Medic,
+                    [500., 0., 64.],
+                    0.,
+                    0.,
+                    75.,
+                    false,
+                ),
+            ],
+        )
+    };
+    Arc::new(
+        DemoTracks::from_keyframes(1. / 66., &[at(1000, 0.), at(1200, 200.)], vec![1100], None)
+            .unwrap(),
+    )
+}
+
+fn playback(cx: &mut TestAppContext, viewport: &Entity<DemoViewport>) -> PlaybackState {
+    cx.update(|cx| viewport.read(cx).playback())
+        .expect("tracks")
+}
+
+fn on(
+    cx: &mut TestAppContext,
+    viewport: &Entity<DemoViewport>,
+    f: impl FnOnce(&mut DemoViewport, &mut gpui_kit::Context<DemoViewport>),
+) {
+    cx.update(|cx| viewport.update(cx, |v, cx| f(v, cx)));
+}
+
+// The frame loop a real window has, with no forced re-render.
+fn next_frames(cx: &mut TestAppContext, win: AnyWindowHandle, n: usize) {
+    for _ in 0..n {
+        cx.update_window(win, |_, w, cx| w.simulate_next_frame(cx))
+            .unwrap();
+        cx.run_until_parked();
+    }
+}
+
+#[gpui_kit::test]
+fn tracks_start_paused_at_the_first_tick_and_draw_its_boxes(cx: &mut TestAppContext) {
+    let (win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    on(cx, &viewport, |v, cx| v.set_tracks(walking_tracks(), cx));
+    support::settle(cx, win);
+    let state = playback(cx, &viewport);
+    assert_eq!(state.tick, 1000.);
+    assert!(!state.playing);
+    assert_eq!(state.speed, 1.);
+    assert!((state.total_seconds - 200. / 66.).abs() < 1e-6);
+    let last = stub.draws().last().cloned().expect("a draw");
+    assert_eq!(last.players.len(), 2);
+    assert_eq!(last.players[0].feet[0], 0.);
+}
+
+#[gpui_kit::test]
+fn tracks_start_at_the_shown_snapshot_tick(cx: &mut TestAppContext) {
+    let still = DemoSnapshot::new(
+        1100,
+        vec![SnapshotPlayer::new(
+            Team::Blue,
+            TfClass::Scout,
+            [100., 0., 64.],
+            0.,
+            0.,
+            65.,
+            false,
+        )],
+    );
+    let (win, viewport, stub) = viewport_window_with(
+        cx,
+        StubAnswer::Frames,
+        Some(still),
+        fake_lock(LockMode::Grabbed).0,
+    );
+    on(cx, &viewport, |v, cx| v.set_tracks(walking_tracks(), cx));
+    support::settle(cx, win);
+    assert_eq!(playback(cx, &viewport).tick, 1100.);
+    let x = stub.draws().last().unwrap().players[0].feet[0];
+    assert!((x - 100.).abs() < 0.5, "{x}");
+}
+
+#[gpui_kit::test]
+fn play_advances_the_tick_and_moves_the_boxes_on_each_frame(cx: &mut TestAppContext) {
+    let (win, viewport, stub) =
+        viewport_window_unsettled(cx, StubAnswer::Frames, None, fake_lock(LockMode::Grabbed).0);
+    cx.run_until_parked();
+    next_frames(cx, win, 2);
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.toggle_play(cx);
+    });
+    next_frames(cx, win, 10);
+    let state = playback(cx, &viewport);
+    assert!(state.playing);
+    assert!(state.tick > 1000. && state.tick < 1200., "{state:?}");
+    let xs: Vec<f32> = stub
+        .draws()
+        .iter()
+        .filter(|d| !d.players.is_empty())
+        .map(|d| d.players[0].feet[0])
+        .collect();
+    assert!(xs.len() >= 5, "{xs:?}");
+    assert!(xs.windows(2).all(|w| w[0] <= w[1]), "{xs:?}");
+    assert!(xs.last() > xs.first(), "{xs:?}");
+}
+
+#[gpui_kit::test]
+fn playing_to_the_end_pauses_on_the_last_tick(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) =
+        viewport_window_unsettled(cx, StubAnswer::Frames, None, fake_lock(LockMode::Grabbed).0);
+    cx.run_until_parked();
+    next_frames(cx, win, 2);
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.set_speed(4., cx);
+        v.seek(1190., cx);
+        v.toggle_play(cx);
+    });
+    next_frames(cx, win, 30);
+    let state = playback(cx, &viewport);
+    assert!(!state.playing, "{state:?}");
+    assert_eq!(state.tick, 1200.);
+}
+
+#[gpui_kit::test]
+fn a_paused_seek_draws_once_at_the_new_tick(cx: &mut TestAppContext) {
+    let (win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    on(cx, &viewport, |v, cx| v.set_tracks(walking_tracks(), cx));
+    support::settle(cx, win);
+    let before = stub.draws().len();
+    on(cx, &viewport, |v, cx| v.seek(1150., cx));
+    next_frames(cx, win, 4);
+    let draws = stub.draws();
+    assert_eq!(draws.len(), before + 1, "{:?}", &draws[before..]);
+    let x = draws.last().unwrap().players[0].feet[0];
+    assert!((x - 150.).abs() < 0.5, "{x}");
+    let state = playback(cx, &viewport);
+    assert_eq!(state.tick, 1150.);
+    assert!(!state.playing);
+}
+
+#[gpui_kit::test]
+fn a_step_pauses_on_a_whole_tick(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = viewport_window(cx, StubAnswer::Frames);
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.seek(1150.5, cx);
+        v.toggle_play(cx);
+        v.step(1, cx);
+    });
+    support::settle(cx, win);
+    let state = playback(cx, &viewport);
+    assert!(!state.playing);
+    assert_eq!(state.tick, 1151.);
+}
+
+#[gpui_kit::test]
+fn controls_report_each_change_and_do_nothing_without_tracks(cx: &mut TestAppContext) {
+    let (win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    let seen: Arc<Mutex<Vec<PlaybackState>>> = Arc::default();
+    let record = Arc::clone(&seen);
+    cx.update(|cx| {
+        cx.subscribe(&viewport, move |_, ev: &PlaybackMoved, _| {
+            record.lock().unwrap().push(ev.0)
+        })
+        .detach();
+    });
+    let before = stub.draws().len();
+    on(cx, &viewport, |v, cx| {
+        v.toggle_play(cx);
+        v.seek(5., cx);
+        v.step(1, cx);
+        v.set_speed(2., cx);
+    });
+    support::settle(cx, win);
+    assert!(cx.update(|cx| viewport.read(cx).playback()).is_none());
+    assert!(seen.lock().unwrap().is_empty());
+    assert_eq!(stub.draws().len(), before);
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.set_speed(2., cx);
+        v.seek(1100., cx);
+    });
+    support::settle(cx, win);
+    let seen = seen.lock().unwrap();
+    assert!(seen.iter().any(|s| s.speed == 2.), "{seen:?}");
+    assert_eq!(seen.last().unwrap().tick, 1100.);
+}
+
+#[gpui_kit::test]
+fn a_seek_to_the_last_tick_while_playing_reports_and_draws_the_pause(cx: &mut TestAppContext) {
+    let (win, viewport, stub) =
+        viewport_window_unsettled(cx, StubAnswer::Frames, None, fake_lock(LockMode::Grabbed).0);
+    cx.run_until_parked();
+    next_frames(cx, win, 2);
+    let seen: Arc<Mutex<Vec<PlaybackState>>> = Arc::default();
+    let record = Arc::clone(&seen);
+    cx.update(|cx| {
+        cx.subscribe(&viewport, move |_, ev: &PlaybackMoved, _| {
+            record.lock().unwrap().push(ev.0)
+        })
+        .detach();
+    });
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.toggle_play(cx);
+        v.seek(1200., cx);
+    });
+    next_frames(cx, win, 4);
+    let last = *seen.lock().unwrap().last().expect("an event");
+    assert!(!last.playing, "{last:?}");
+    assert_eq!(last.tick, 1200.);
+    let x = stub.draws().last().expect("a draw").players[0].feet[0];
+    assert!((x - 200.).abs() < 1e-3, "{x}");
 }

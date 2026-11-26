@@ -83,6 +83,7 @@ fn bench_size(mesh: &Arc<MapMesh>, width: u32, height: u32, frames: u64) -> Resu
             height,
             view_proj: view_proj(eye, yaw, 20.0, width as f32 / height as f32),
             seq,
+            players: Arc::from([]),
         });
     };
     let mut sent = 0;

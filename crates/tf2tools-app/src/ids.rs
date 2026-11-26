@@ -3671,6 +3671,27 @@ pub const DEMO_VIEWER_LOOK_SLIDER: &str = "demo-viewer-look-slider";
 pub const DEMO_VIEWER_LOOK_VALUE: &str = "demo-viewer-look-value";
 /// The button that puts the look sensitivity back to 100%.
 pub const DEMO_VIEWER_LOOK_RESET: &str = "demo-viewer-look-reset";
+/// The bar's play button, which says Pause while the demo plays.
+pub const DEMO_VIEWER_PLAY: &str = "demo-viewer-play";
+/// The bar's button that steps playback back one tick.
+pub const DEMO_VIEWER_STEP_BACK: &str = "demo-viewer-step-back";
+/// The bar's button that steps playback forward one tick.
+pub const DEMO_VIEWER_STEP_FORWARD: &str = "demo-viewer-step-forward";
+/// The box around the bar's timeline slider.
+pub const DEMO_VIEWER_TIMELINE: &str = "demo-viewer-timeline";
+/// The playback time beside the timeline, "m:ss / m:ss".
+pub const DEMO_VIEWER_TIME: &str = "demo-viewer-time";
+/// The bar's playback speed button, showing "1×" and named "Playback speed 1×" and so on.
+pub const DEMO_VIEWER_SPEED: &str = "demo-viewer-speed";
+/// The muted note in the bar while the demo's playback is still being read.
+pub const DEMO_VIEWER_READING: &str = "demo-viewer-reading";
+/// The muted note in the bar when playback is cut short or cannot move the players.
+pub const DEMO_VIEWER_PLAYBACK_NOTE: &str = "demo-viewer-playback-note";
+
+/// A round's marker above the timeline, by its place from 0: "demo-viewer-round-marker-<n>".
+pub fn demo_viewer_round_marker(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-round-marker-{n}").into())
+}
 
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";

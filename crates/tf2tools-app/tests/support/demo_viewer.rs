@@ -11,20 +11,24 @@ use gpui_kit::{
     AnyWindowHandle, Bounds, Context, Entity, Pixels, Point, RenderImage, TestAppContext, Window,
     div, px, relative,
 };
+use tf2tools_app::ids;
+use tf2tools_app::pages::demo_viewer::ReadState;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::pointer::{FallbackLock, LockMode, PointerLock, PointerLockFactory};
-use tf2tools_app::viewer::viewport::{Clock, DemoViewport};
+use tf2tools_app::viewer::viewport::{Clock, DemoViewport, PlaybackState};
 use tf2tools_app::viewer::{
-    DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
-    SnapshotReader,
+    DrawRequest, FrameStats, PlaybackReader, PlayerBox, RenderEvent, RendererError,
+    RendererFactory, SceneRenderer,
 };
 use tf2tools_core::{
-    DemoSnapshot, DemoSnapshotError, Endpoints, LookSensitivity, MapMesh, Tf2Install, load_map_mesh,
+    DemoSnapshot, DemoSnapshotError, DemoTracks, DemoTracksError, Endpoints, LookSensitivity,
+    MapMesh, PlaybackEvent, SnapshotPlayer, Team, Tf2Install, TfClass, TrackCut, load_map_mesh,
 };
 
-use super::demo_view_fixtures::{BspOptions, bsp};
+use super::demo_view_fixtures::{BspOptions, bsp, demo_header};
+use super::graphics::found;
 
 /// How a stub answers once made.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,7 +46,6 @@ pub enum StubAnswer {
 pub struct StubHandle {
     pub draws: Arc<Mutex<Vec<DrawRequest>>>,
     pub scenes: Arc<Mutex<usize>>,
-    pub players: Arc<Mutex<Vec<Arc<[PlayerBox]>>>>,
     pub alive: Arc<AtomicBool>,
     pub events: async_channel::Sender<RenderEvent>,
 }
@@ -54,8 +57,18 @@ impl StubHandle {
     pub fn scenes(&self) -> usize {
         *self.scenes.lock().unwrap()
     }
+    /// The boxes of each recorded draw, with consecutive draws sharing one `Arc` as one entry.
     pub fn players(&self) -> Vec<Arc<[PlayerBox]>> {
-        self.players.lock().unwrap().clone()
+        let mut sent: Vec<Arc<[PlayerBox]>> = Vec::new();
+        for draw in self.draws.lock().unwrap().iter() {
+            if !sent
+                .last()
+                .is_some_and(|last| Arc::ptr_eq(last, &draw.players))
+            {
+                sent.push(Arc::clone(&draw.players));
+            }
+        }
+        sent
     }
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::SeqCst)
@@ -79,11 +92,12 @@ impl SceneRenderer for StubRenderer {
         *self.handle.scenes.lock().unwrap() += 1;
     }
     fn draw(&self, request: DrawRequest) {
+        let seq = request.seq;
         self.handle.draws.lock().unwrap().push(request);
         if self.answer == StubAnswer::Frames {
             let frame = RenderEvent::Frame {
                 image: one_pixel(),
-                seq: request.seq,
+                seq,
                 stats: FrameStats::default(),
             };
             let _ = self.handle.events.try_send(frame);
@@ -91,9 +105,6 @@ impl SceneRenderer for StubRenderer {
     }
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.receiver.clone()
-    }
-    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
-        self.handle.players.lock().unwrap().push(boxes);
     }
 }
 
@@ -119,7 +130,6 @@ pub fn stub(answer: StubAnswer) -> (Box<dyn SceneRenderer>, StubHandle) {
     let handle = StubHandle {
         draws: Arc::default(),
         scenes: Arc::default(),
-        players: Arc::default(),
         alive: Arc::new(AtomicBool::new(true)),
         events,
     };
@@ -317,16 +327,16 @@ pub fn demo_viewer_shell(
     demo_viewer_shell_with(cx, env, state, picks, answer, None)
 }
 
-/// `demo_viewer_shell`, with `snapshots` as the reader when given (the core reader otherwise).
+/// `demo_viewer_shell`, with `playback` as the reader when given (the core reader otherwise).
 pub fn demo_viewer_shell_with(
     cx: &mut TestAppContext,
     env: &super::Env,
     state: Tf2State,
     picks: Vec<PathBuf>,
     answer: StubAnswer,
-    snapshots: Option<SnapshotReader>,
+    playback: Option<PlaybackReader>,
 ) -> DemoViewerShell {
-    demo_viewer_shell_in(cx, env, state, picks, answer, snapshots, None, None, None)
+    demo_viewer_shell_in(cx, env, state, picks, answer, playback, None, None, None)
 }
 
 /// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
@@ -401,7 +411,7 @@ fn demo_viewer_shell_in(
     state: Tf2State,
     picks: Vec<PathBuf>,
     answer: StubAnswer,
-    snapshots: Option<SnapshotReader>,
+    playback: Option<PlaybackReader>,
     endpoints: Option<Endpoints>,
     locks: Option<PointerLockFactory>,
     stored: Option<LookSensitivity>,
@@ -422,8 +432,8 @@ fn demo_viewer_shell_in(
             // Shell tests never reach a real OS lock.
             let fallback: PointerLockFactory = Arc::new(|| Box::new(FallbackLock));
             services.pointer_lock = locks.unwrap_or(fallback);
-            if let Some(snapshots) = snapshots {
-                services.demo_snapshots = snapshots;
+            if let Some(playback) = playback {
+                services.demo_playback = playback;
             }
             if let Some(endpoints) = endpoints {
                 *services = services.clone().with_endpoints(endpoints);
@@ -454,17 +464,165 @@ pub fn open_not_a_demo(cx: &mut TestAppContext, win: AnyWindowHandle) {
     });
 }
 
-/// A reader answering `answer()` every time, and how many times it was asked.
+/// A reader that sends `Snapshot(answer())` then `TracksFailed(NoPlayers)` every time, and how
+/// many times it was asked.
 pub fn counting_snapshots(
     answer: impl Fn() -> Result<DemoSnapshot, DemoSnapshotError> + Send + Sync + 'static,
-) -> (SnapshotReader, Arc<AtomicUsize>) {
+) -> (PlaybackReader, Arc<AtomicUsize>) {
     let asked = Arc::new(AtomicUsize::new(0));
     let count = Arc::clone(&asked);
-    let reader: SnapshotReader = Arc::new(move |_| {
+    let reader: PlaybackReader = Arc::new(move |_, _, emit| {
         count.fetch_add(1, Ordering::SeqCst);
-        answer()
+        if emit(PlaybackEvent::Snapshot(answer())).is_continue() {
+            let _ = emit(PlaybackEvent::TracksFailed(DemoTracksError::NoPlayers));
+        }
     });
     (reader, asked)
+}
+
+/// What a gated reader saw: whether it found its cancel flag set, and whether its send after
+/// that was refused.
+#[derive(Clone, Default)]
+pub struct GateHandle {
+    open: Arc<AtomicBool>,
+    pub cancelled: Arc<AtomicBool>,
+    pub broke: Arc<AtomicBool>,
+}
+
+impl GateHandle {
+    /// Lets the reader send its `after` events.
+    pub fn open(&self) {
+        self.open.store(true, Ordering::SeqCst);
+    }
+}
+
+/// A reader that sends `before()`, waits up to 10 s for `open()` or its cancel flag, then
+/// sends `after()`. On a cancel it records it, sends one more `Progress` and records whether
+/// that send was refused.
+pub fn gated_playback(
+    before: impl Fn() -> Vec<PlaybackEvent> + Send + Sync + 'static,
+    after: impl Fn() -> Vec<PlaybackEvent> + Send + Sync + 'static,
+) -> (PlaybackReader, GateHandle) {
+    let handle = GateHandle::default();
+    let seen = handle.clone();
+    let reader: PlaybackReader = Arc::new(move |_, cancel, emit| {
+        for event in before() {
+            if emit(event).is_break() {
+                return;
+            }
+        }
+        for _ in 0..2000 {
+            if seen.open.load(Ordering::SeqCst) || cancel.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        if cancel.load(Ordering::SeqCst) {
+            seen.cancelled.store(true, Ordering::SeqCst);
+            // The page dropped its receiver with its task, so this send must be refused.
+            for _ in 0..200 {
+                if emit(PlaybackEvent::Progress(0.5)).is_break() {
+                    seen.broke.store(true, Ordering::SeqCst);
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            return;
+        }
+        for event in after() {
+            if emit(event).is_break() {
+                return;
+            }
+        }
+    });
+    (reader, handle)
+}
+
+/// Three soldiers; the first walks +x with `x`.
+pub fn walking(tick: u32, x: f32) -> DemoSnapshot {
+    let at =
+        |team, x| SnapshotPlayer::new(team, TfClass::Soldier, [x, 32., 0.], 0., 0., 68., false);
+    DemoSnapshot::new(
+        tick,
+        vec![at(Team::Blue, x), at(Team::Red, 20.), at(Team::Red, 40.)],
+    )
+}
+
+/// Ticks 4000..=4200 at the fixture header's 60 s over 3960 ticks, rounds at 4050 and 4150.
+pub fn walking_tracks(cut: Option<TrackCut>) -> Arc<DemoTracks> {
+    Arc::new(
+        DemoTracks::from_keyframes(
+            60. / 3960.,
+            &[walking(4000, 0.), walking(4200, 200.)],
+            vec![4050, 4150],
+            cut,
+        )
+        .unwrap(),
+    )
+}
+
+/// Opens the fixture demo with `reader` and waits for the viewport.
+pub fn open_scripted(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    reader: PlaybackReader,
+) -> DemoViewerShell {
+    install_map(env, "cp_synthetic");
+    let demo = demo_file(env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell_with(
+        cx,
+        env,
+        found(env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+    );
+    super::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    super::wait_real(cx, "the viewport", |cx| {
+        super::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    w
+}
+
+/// The open viewer's read state, if the viewer shows.
+pub fn read_state(cx: &mut TestAppContext, w: &DemoViewerShell) -> Option<ReadState> {
+    cx.update(|cx| {
+        let page = w.s.shell.read(cx).demo_viewer_page(cx)?;
+        Some(page.read(cx).read_state())
+    })
+}
+
+/// The open viewport's playback, once it has tracks.
+pub fn playback(cx: &mut TestAppContext, w: &DemoViewerShell) -> Option<PlaybackState> {
+    cx.update(|cx| {
+        let page = w.s.shell.read(cx).demo_viewer_page(cx)?;
+        let viewport = page.read(cx).viewport()?.clone();
+        viewport.read(cx).playback()
+    })
+}
+
+/// A gated reader whose `before` is the still picture of `walking(4100, 100.)`.
+pub fn still_then(
+    after: impl Fn() -> Vec<PlaybackEvent> + Send + Sync + 'static,
+) -> (PlaybackReader, GateHandle) {
+    gated_playback(
+        || vec![PlaybackEvent::Snapshot(Ok(walking(4100, 100.)))],
+        after,
+    )
+}
+
+/// Opens the fixture demo with `walking_tracks(cut)` already read, and waits for the tracks.
+pub fn open_with_tracks(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    cut: Option<TrackCut>,
+) -> DemoViewerShell {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(walking_tracks(cut))]);
+    gate.open();
+    let w = open_scripted(cx, env, reader);
+    super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    super::settle(cx, w.s.win);
+    w
 }
 
 /// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.
