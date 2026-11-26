@@ -248,6 +248,7 @@ impl DemoViewport {
             p.clock.play();
             // A restart from the last tick jumps, so the boxes follow before the loop runs.
             self.reread_boxes();
+            self.draw();
             self.emit_playback(cx);
             cx.notify();
         }
@@ -265,12 +266,15 @@ impl DemoViewport {
         let Some(p) = self.playback.as_mut() else {
             return;
         };
+        let before = p.clock.speed();
         p.clock.set_speed(speed);
-        self.emit_playback(cx);
+        if p.clock.speed() != before {
+            self.emit_playback(cx);
+        }
     }
 
-    /// Moves the clock outside the frame loop: a playing clock lets the next frame draw, a
-    /// paused one draws the new tick at once.
+    /// Moves the clock outside the frame loop and draws the new tick at once; a playing clock
+    /// keeps the frame loop it already has.
     fn with_clock(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut PlaybackClock)) {
         let Some(p) = self.playback.as_mut() else {
             return;
@@ -278,6 +282,7 @@ impl DemoViewport {
         f(&mut p.clock);
         if p.clock.is_playing() {
             self.reread_boxes();
+            self.draw();
             self.emit_playback(cx);
         } else {
             self.moved_while_paused(cx);
@@ -417,7 +422,8 @@ impl Render for DemoViewport {
             // Flight and playback step once per display frame. A render between ticks, such as
             // one for an arriving frame, must not step, or each frame would draw the next at once.
             if !self.tick_pending {
-                // The first moving frame steps by nothing, so time spent at rest is not played.
+                // The first moving frame steps by nothing, so time spent at rest is not flown
+                // or played.
                 let dt = self.last_tick.map_or(0.0, |t| (now - t).as_secs_f32());
                 self.last_tick = Some(now);
                 if flying {
@@ -426,7 +432,11 @@ impl Render for DemoViewport {
                     self.camera
                         .advance(dt, FlyInput::new(axis(k.w, k.s), axis(k.d, k.a), shift));
                 }
-                let ticked = self.playback.as_mut().is_some_and(|p| p.clock.advance(dt));
+                // A clock already on its last tick pauses without moving; that pause still counts.
+                let ticked = self.playback.as_mut().is_some_and(|p| {
+                    let was_playing = p.clock.is_playing();
+                    p.clock.advance(dt) || (was_playing && !p.clock.is_playing())
+                });
                 if ticked {
                     self.reread_boxes();
                     self.emit_playback(cx);

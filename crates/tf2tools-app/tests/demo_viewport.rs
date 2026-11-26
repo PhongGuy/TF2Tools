@@ -821,3 +821,30 @@ fn controls_report_each_change_and_do_nothing_without_tracks(cx: &mut TestAppCon
     assert!(seen.iter().any(|s| s.speed == 2.), "{seen:?}");
     assert_eq!(seen.last().unwrap().tick, 1100.);
 }
+
+#[gpui_kit::test]
+fn a_seek_to_the_last_tick_while_playing_reports_and_draws_the_pause(cx: &mut TestAppContext) {
+    let (win, viewport, stub) =
+        viewport_window_unsettled(cx, StubAnswer::Frames, None, fake_lock(LockMode::Grabbed).0);
+    cx.run_until_parked();
+    next_frames(cx, win, 2);
+    let seen: Arc<Mutex<Vec<PlaybackState>>> = Arc::default();
+    let record = Arc::clone(&seen);
+    cx.update(|cx| {
+        cx.subscribe(&viewport, move |_, ev: &PlaybackMoved, _| {
+            record.lock().unwrap().push(ev.0)
+        })
+        .detach();
+    });
+    on(cx, &viewport, |v, cx| {
+        v.set_tracks(walking_tracks(), cx);
+        v.toggle_play(cx);
+        v.seek(1200., cx);
+    });
+    next_frames(cx, win, 4);
+    let last = *seen.lock().unwrap().last().expect("an event");
+    assert!(!last.playing, "{last:?}");
+    assert_eq!(last.tick, 1200.);
+    let x = stub.draws().last().expect("a draw").players[0].feet[0];
+    assert!((x - 200.).abs() < 1e-3, "{x}");
+}
