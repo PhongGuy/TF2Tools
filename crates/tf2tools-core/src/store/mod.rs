@@ -34,6 +34,7 @@ use rusqlite::OptionalExtension;
 use crate::db::Database;
 use crate::demostf::DemosEndpoints;
 use crate::error::{BrowseError, FilesError, QueryError, SyncError};
+use crate::logstf::LogsEndpoints;
 use crate::paths::DataDir;
 pub use addon_catalog::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
@@ -129,6 +130,7 @@ pub struct Endpoints {
     map_downloads: String,
     mastercomfig_data: String,
     demos: DemosEndpoints,
+    logs: LogsEndpoints,
 }
 
 impl Default for Endpoints {
@@ -153,6 +155,7 @@ impl Default for Endpoints {
             mastercomfig_data: "https://raw.githubusercontent.com/mastercomfig/mastercomfig"
                 .to_owned(),
             demos: DemosEndpoints::default(),
+            logs: LogsEndpoints::default(),
         }
     }
 }
@@ -162,7 +165,8 @@ impl Endpoints {
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
     /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, serveme.tf
     /// `{base}/serveme`, map files `{base}/fastdl/maps`,
-    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig` and demos.tf `{base}/demostf`.
+    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`, demos.tf `{base}/demostf`
+    /// and logs.tf `{base}/logstf`.
     pub fn loopback(base: &str) -> Self {
         Self {
             gamebanana: format!("{base}/apiv11"),
@@ -175,6 +179,7 @@ impl Endpoints {
             map_downloads: format!("{base}/fastdl/maps"),
             mastercomfig_data: format!("{base}/gh-raw/mastercomfig"),
             demos: DemosEndpoints::loopback(&format!("{base}/demostf")),
+            logs: LogsEndpoints::loopback(&format!("{base}/logstf")),
         }
     }
 
@@ -233,6 +238,17 @@ impl Endpoints {
     /// These endpoints with other demos.tf endpoints.
     pub fn with_demos(mut self, demos: DemosEndpoints) -> Self {
         self.demos = demos;
+        self
+    }
+
+    /// The logs.tf and Steam Community endpoints.
+    pub fn logs(&self) -> &LogsEndpoints {
+        &self.logs
+    }
+
+    /// These endpoints with other logs.tf endpoints.
+    pub fn with_logs(mut self, logs: LogsEndpoints) -> Self {
+        self.logs = logs;
         self
     }
 

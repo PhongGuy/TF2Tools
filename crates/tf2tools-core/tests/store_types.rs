@@ -13,8 +13,9 @@ use tf2tools_core::{
 use tf2tools_core::{CommunityMap, MapDownloadError, MapEntry, MapRemoveError, MapState};
 use tf2tools_core::{
     Database, DemosEndpoints, DownloadError, DownloadPhase, DownloadProgress, Endpoints,
-    FilesError, ImageError, PreviewError, QueryError, StoreClient, StoreConfig, StoreFile,
-    StoreItem, StoreItemId, StoreKind, StoreSyncStatus, SyncError, SyncOutcome, SyncProgress,
+    FilesError, ImageError, LogsEndpoints, PreviewError, QueryError, StoreClient, StoreConfig,
+    StoreFile, StoreItem, StoreItemId, StoreKind, StoreSyncStatus, SyncError, SyncOutcome,
+    SyncProgress,
 };
 
 fn assert_send_sync<T: Send + Sync + std::fmt::Debug + 'static>() {}
@@ -253,4 +254,22 @@ fn demos_endpoints_follow_the_store_base() {
     let moved = local.with_demos(DemosEndpoints::loopback("http://y"));
     assert_eq!(moved.demos().api(), "http://y");
     assert_eq!(moved.gamebanana(), "http://x/apiv11");
+}
+
+#[test]
+fn logs_endpoints_follow_the_store_base() {
+    let prod = Endpoints::default();
+    assert_eq!(prod.logs(), &LogsEndpoints::default());
+    assert_eq!(prod.logs().logs_tf(), "https://logs.tf");
+    assert_eq!(prod.logs().steam_community(), "https://steamcommunity.com");
+
+    let local = Endpoints::loopback("x");
+    assert_eq!(local.logs().logs_tf(), "x/logstf");
+    assert_eq!(local.logs(), &LogsEndpoints::loopback("x/logstf"));
+    assert_eq!(local.logs().steam_community(), "x/logstf/steam");
+
+    let moved = local.with_logs(LogsEndpoints::loopback("http://y"));
+    assert_eq!(moved.logs().logs_tf(), "http://y");
+    assert_eq!(moved.demos().api(), "x/demostf");
+    assert_eq!(moved.gamebanana(), "x/apiv11");
 }
