@@ -275,17 +275,35 @@ fn player_at(track: &PlayerTrack, tick: f64) -> Option<SnapshotPlayer> {
     ))
 }
 
-// A drawn player packed the way the builder packs a row: yaw wrapped to -180..180 in
-// centidegrees, the eye rounded into 1..=100.
 fn keyframe_sample(p: &SnapshotPlayer, tick: u32) -> TrackSample {
-    let yaw = (p.yaw() + 180.).rem_euclid(360.) - 180.;
+    pack_sample(
+        tick,
+        p.feet(),
+        p.yaw(),
+        p.pitch(),
+        p.eye_height(),
+        p.ducked(),
+    )
+}
+
+/// One player packed into a sample: yaw wrapped to -180..180 so its centidegrees fit an i16,
+/// pitch in centidegrees, and the eye rounded into 1..=100.
+pub(crate) fn pack_sample(
+    tick: u32,
+    feet: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+    eye: f32,
+    ducked: bool,
+) -> TrackSample {
+    let yaw = (yaw + 180.).rem_euclid(360.) - 180.;
     TrackSample {
         tick,
-        feet: p.feet(),
+        feet,
         yaw: (yaw * 100.).round() as i16,
-        pitch: (p.pitch() * 100.).round() as i16,
-        eye_z: p.eye_height().round().clamp(1., 100.) as u8,
-        flags: if p.ducked() { DUCKED } else { 0 },
+        pitch: (pitch * 100.).round() as i16,
+        eye_z: eye.round().clamp(1., 100.) as u8,
+        flags: if ducked { DUCKED } else { 0 },
     }
 }
 
