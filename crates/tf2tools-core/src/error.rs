@@ -166,12 +166,20 @@ pub enum ArchiveError {
         /// The offending entry name.
         entry: String,
     },
-    /// Compressed maps decompress to more than the map size cap.
-    #[error("{path} is too large: the maps come to more than {limit} bytes")]
+    /// The archive (or the compressed maps of a download) unpacks to more than the cap allows.
+    #[error("{path} unpacks to more than {limit} bytes")]
     TooLarge {
-        /// The compressed map that went past the cap.
+        /// The archive or compressed map that went past the cap.
         path: PathBuf,
-        /// The cap in bytes, shared by every compressed map of the download.
+        /// The cap in bytes, shared by every archive or compressed map of one unpack.
+        limit: u64,
+    },
+    /// The archive holds more entries than an unpack allows; nothing past the cap was written.
+    #[error("{path} holds more than {limit} entries")]
+    TooManyEntries {
+        /// The archive that went past the cap.
+        path: PathBuf,
+        /// The cap in entries, shared by every archive of one unpack.
         limit: u64,
     },
 }
