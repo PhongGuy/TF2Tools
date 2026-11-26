@@ -3706,6 +3706,7 @@ pub fn storage_slug(kind: StorageKind) -> &'static str {
         StorageKind::StoreData => "store-data",
         StorageKind::ImageCache => "image-cache",
         StorageKind::DemoCache => "demo-cache",
+        StorageKind::Temporary => "temp",
         _ => "other",
     }
 }

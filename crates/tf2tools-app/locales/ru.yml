@@ -38,6 +38,7 @@ settings:
     store_data: "Данные магазинов"
     image_cache: "Кэш изображений"
     demo_cache: "Кэш демо"
+    temporary: "Временные файлы"
     clear_demo_cache: "Очистить кэш"
     demo_cache_cleared: "Кэш демо очищен"
     demo_cache_freed: "Освобождено %{size}"

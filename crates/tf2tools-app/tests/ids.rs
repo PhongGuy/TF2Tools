@@ -845,6 +845,7 @@ fn the_storage_card_ids_carry_the_kind_slug() {
             "settings-storage:store-data",
             "settings-storage:image-cache",
             "settings-storage:demo-cache",
+            "settings-storage:temp",
         ]
     );
     assert_eq!(

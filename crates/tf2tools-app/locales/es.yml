@@ -63,6 +63,7 @@ settings:
     store_data: "Datos de las tiendas"
     image_cache: "Caché de imágenes"
     demo_cache: "Caché de demos"
+    temporary: "Archivos temporales"
     clear_demo_cache: "Vaciar caché de demos"
     demo_cache_cleared: "Caché de demos vaciada"
     demo_cache_freed: "%{size} liberados"

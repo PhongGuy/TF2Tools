@@ -63,6 +63,7 @@ settings:
     store_data: "Shop-Daten"
     image_cache: "Bilder-Cache"
     demo_cache: "Demo-Cache"
+    temporary: "Temporäre Dateien"
     clear_demo_cache: "Cache leeren"
     demo_cache_cleared: "Demo-Cache geleert"
     demo_cache_freed: "%{size} freigegeben"
