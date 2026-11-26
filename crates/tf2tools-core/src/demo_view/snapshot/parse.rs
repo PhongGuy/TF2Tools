@@ -362,7 +362,7 @@ fn tracks_from_bytes(
 }
 
 // The first `cap` bytes of the file, or all of it when shorter.
-fn read_prefix(dem: &Path, cap: u64) -> std::io::Result<Vec<u8>> {
+pub(crate) fn read_prefix(dem: &Path, cap: u64) -> std::io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     std::fs::File::open(dem)?
         .take(cap)

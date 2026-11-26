@@ -1,14 +1,16 @@
 //! Prints what playback would hold for a demo: its players, runs and samples, the heap they
-//! take, the share of repeated samples, the tick length, the round starts and any cut.
+//! take, the share of repeated samples, the tick length, the round starts and any cut, then
+//! when the one-parse playback read sends its snapshot and tracks, and in what order.
 //! Usage: cargo run --release -p tf2tools-core --example demo_tracks_probe -- <file.dem>
 
 use std::io::Read as _;
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
-use tf2tools_core::{read_demo_header, read_demo_tracks};
+use tf2tools_core::{PlaybackEvent, read_demo_header, read_demo_playback, read_demo_tracks};
 
 fn main() -> ExitCode {
     let Some(path) = std::env::args_os().nth(1).map(PathBuf::from) else {
@@ -55,5 +57,43 @@ fn main() -> ExitCode {
         tracks.round_starts(),
         tracks.cut()
     );
+    playback_line(&path);
     ExitCode::SUCCESS
+}
+
+// Times the playback read's snapshot and tracks and prints its event order compressed to
+// S, the count of Progress events, then T or F.
+fn playback_line(path: &std::path::Path) {
+    let started = Instant::now();
+    let (mut snapshot_at, mut snapshot_tick, mut tracks_at) = (0., None, 0.);
+    let (mut progress, mut order) = (0, String::new());
+    read_demo_playback(path, &AtomicBool::new(false), |event| {
+        let now = started.elapsed().as_secs_f64();
+        match event {
+            PlaybackEvent::Snapshot(snapshot) => {
+                snapshot_at = now;
+                snapshot_tick = snapshot.ok().map(|s| s.tick());
+                order.push('S');
+            }
+            PlaybackEvent::Progress(_) => progress += 1,
+            PlaybackEvent::Tracks(_) | PlaybackEvent::TracksFailed(_) => {
+                tracks_at = now;
+                if progress > 0 {
+                    order.push_str(&format!(",P{progress}"));
+                }
+                order.push_str(if matches!(event, PlaybackEvent::Tracks(_)) {
+                    ",T"
+                } else {
+                    ",F"
+                });
+            }
+            _ => order.push('?'),
+        }
+        ControlFlow::Continue(())
+    });
+    let snapshot_tick = snapshot_tick.map_or("none".to_owned(), |t| t.to_string());
+    println!(
+        "snapshot_at={snapshot_at:.3}s snapshot_tick={snapshot_tick} tracks_at={tracks_at:.3}s \
+         progress_events={progress} order={order}"
+    );
 }

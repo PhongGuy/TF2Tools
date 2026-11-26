@@ -6,6 +6,7 @@ mod clock;
 mod free_fly;
 mod header;
 mod mesh;
+mod playback;
 mod snapshot;
 mod tracks;
 
@@ -15,6 +16,7 @@ pub use header::{DemoHeader, read_demo_header};
 pub use mesh::{
     MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MapMesh, load_map_file, load_map_file_capped, load_map_mesh,
 };
+pub use playback::{PlaybackEvent, read_demo_playback};
 pub use snapshot::{
     DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer, read_demo_snapshot, read_demo_tracks,
 };

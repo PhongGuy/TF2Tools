@@ -52,8 +52,8 @@ pub use db::Database;
 pub use demo_view::{
     DemoHeader, DemoSnapshot, DemoTracks, FlyInput, FreeFly, MAX_DEMO_BYTES, MAX_MAP_BYTES,
     MAX_MAP_TRIANGLES, MAX_SNAPSHOT_BYTES, MAX_TRACK_SAMPLES, MapMesh, PlaybackClock,
-    SnapshotPlayer, TrackCut, load_map_file, load_map_file_capped, load_map_mesh, read_demo_header,
-    read_demo_snapshot, read_demo_tracks,
+    PlaybackEvent, SnapshotPlayer, TrackCut, load_map_file, load_map_file_capped, load_map_mesh,
+    read_demo_header, read_demo_playback, read_demo_snapshot, read_demo_tracks,
 };
 pub use demostf::{
     DEMO_CACHE_HIGH, DEMO_CACHE_LOW, DEMO_LIMIT, DemoCache, DemoCursor, DemoDetail, DemoFormat,
