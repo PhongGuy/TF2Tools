@@ -226,6 +226,7 @@ demo_viewer:
   searching_candidate: "GameBanana wird nach %{map} durchsucht (%{n} von %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} Spieler bei %{time}"
+  caption_players_playing: "%{map}, %{count} Spieler"
   players_note: "Die Spieler konnten aus dieser Demo nicht gelesen werden."
   hint: "Ziehen zum Umsehen, WASD zum Bewegen, Shift zum Verlangsamen."
   bar_collapse: "Steuerung minimieren"

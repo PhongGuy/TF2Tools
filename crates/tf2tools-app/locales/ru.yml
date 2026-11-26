@@ -201,6 +201,7 @@ demo_viewer:
   searching_candidate: "Поиск %{map} на GameBanana (%{n} из %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, игроков: %{count}, момент %{time}"
+  caption_players_playing: "%{map}, игроков: %{count}"
   players_note: "Не удалось прочитать игроков из этого демо."
   hint: "Перетаскивайте, чтобы осмотреться, WASD для движения, Shift для замедления."
   bar_collapse: "Свернуть управление"
