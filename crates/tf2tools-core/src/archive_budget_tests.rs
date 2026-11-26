@@ -1,7 +1,9 @@
 use std::io::Read;
 
 use super::*;
-use crate::test_archives::{bytes_under, rar_bytes, write_7z, zip_bytes, zip_with_listed_size};
+use crate::test_archives::{
+    bytes_under, rar_bytes, vpk_shared, write_7z, zip_bytes, zip_with_listed_size,
+};
 
 const KIB: u64 = 1024;
 
@@ -282,4 +284,34 @@ fn a_rar_output_file_stops_at_the_shared_cap_and_records_too_large() {
         "{recorded:?}"
     );
     assert_eq!(fs::metadata(&target).unwrap().len(), 4 * KIB);
+}
+
+#[test]
+fn a_vpk_whose_entries_share_bytes_is_refused_on_its_listed_total() {
+    let tmp = tempfile::tempdir().unwrap();
+    let vpk = tmp.path().join("shared.vpk");
+    fs::write(&vpk, vpk_shared(1000, &[1u8; 1024])).unwrap();
+    assert!(fs::metadata(&vpk).unwrap().len() < 64 * KIB);
+    let dest = tmp.path().join("out");
+    let err = extract_archive_within(&vpk, &dest, &mut Budget::new(256 * KIB, 2000)).unwrap_err();
+    assert!(
+        matches!(err, ArchiveError::TooLarge { limit, .. } if limit == 256 * KIB),
+        "{err:?}"
+    );
+    assert!(!dest.exists());
+    extract_archive_within(&vpk, &dest, &mut Budget::new(1000 * KIB, 2000)).unwrap();
+}
+
+#[test]
+fn a_vpk_with_more_entries_than_the_budget_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let vpk = tmp.path().join("many.vpk");
+    fs::write(&vpk, vpk_shared(4, b"x")).unwrap();
+    let dest = tmp.path().join("out");
+    let err = extract_archive_within(&vpk, &dest, &mut Budget::new(64 * KIB, 3)).unwrap_err();
+    assert!(
+        matches!(err, ArchiveError::TooManyEntries { limit: 3, .. }),
+        "{err:?}"
+    );
+    assert!(!dest.exists());
 }

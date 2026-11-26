@@ -8,8 +8,8 @@ use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 
 use super::download::io_at;
-use crate::archive::{VPK_MAGIC, extract_archive};
-use crate::error::DownloadError;
+use crate::archive::{Budget, VPK_MAGIC, extract_archive, extract_archive_within};
+use crate::error::{ArchiveError, DownloadError};
 use crate::wav::inspect_wav;
 
 /// How many WAV refusals a NoUsableFiles reason lists before "and N more".
@@ -72,9 +72,11 @@ pub(super) fn sound_files(saved: &Path, work: &Path) -> Result<Vec<PathBuf>, Dow
 /// The files a crosshair download imports, in path order: the VTFs outside any `scripts`
 /// directory (VPKs inside opened first), else the PNGs. `work` is an empty scratch directory.
 pub(super) fn crosshair_files(saved: &Path, work: &Path) -> Result<Vec<PathBuf>, DownloadError> {
-    let root = extract_archive(saved, work)?;
+    // The outer archive and every VPK inside it draw on one unpack budget.
+    let mut budget = Budget::default();
+    let root = extract_archive_within(saved, work, &mut budget)?;
     if root.is_dir() {
-        open_inner_vpks(&root)?;
+        open_inner_vpks(&root, &mut budget)?;
     }
     let files = files_under(&root)?;
 
@@ -118,18 +120,26 @@ pub(super) fn entry_name(file: &Path, store_name: Option<&str>, several: bool) -
     }
 }
 
-/// Extracts every VPK under `root` into a sibling `<stem>-vpk/` directory. A VPK that does
-/// not open is skipped with a warning, as v5 skipped it, and its partial output removed.
-fn open_inner_vpks(root: &Path) -> Result<(), DownloadError> {
+/// Extracts every VPK under `root` into a sibling `<stem>-vpk/` directory, charging `budget`.
+/// A VPK past the budget fails the download; one that does not open is skipped with a
+/// warning, as v5 skipped it. Either way its partial output is removed.
+fn open_inner_vpks(root: &Path, budget: &mut Budget) -> Result<(), DownloadError> {
     for vpk in files_under(root)?
         .into_iter()
         .filter(|f| has_extension(f, "vpk"))
     {
         let stem = vpk.file_stem().unwrap_or_default().to_string_lossy();
         let dest = vpk.with_file_name(format!("{stem}-vpk"));
-        if let Err(e) = extract_archive(&vpk, &dest) {
-            tracing::warn!(vpk = %vpk.display(), error = %e, "skipping a VPK that does not open");
-            let _ = std::fs::remove_dir_all(&dest);
+        match extract_archive_within(&vpk, &dest, budget) {
+            Ok(_) => {}
+            Err(e @ (ArchiveError::TooLarge { .. } | ArchiveError::TooManyEntries { .. })) => {
+                let _ = std::fs::remove_dir_all(&dest);
+                return Err(DownloadError::Archive(e));
+            }
+            Err(e) => {
+                tracing::warn!(vpk = %vpk.display(), error = %e, "skipping a VPK that does not open");
+                let _ = std::fs::remove_dir_all(&dest);
+            }
         }
     }
     Ok(())
@@ -167,4 +177,26 @@ fn display_name(path: &Path) -> String {
     path.file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_archives::vpk_shared;
+
+    #[test]
+    fn inner_vpks_share_one_budget_and_a_refused_one_leaves_no_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::write(root.join("a.vpk"), vpk_shared(1, &[3u8; 40 * 1024])).unwrap();
+        std::fs::write(root.join("b.vpk"), vpk_shared(1, &[4u8; 40 * 1024])).unwrap();
+        let mut budget = Budget::new(64 * 1024, 100);
+        let err = open_inner_vpks(root, &mut budget).unwrap_err();
+        assert!(
+            matches!(err, DownloadError::Archive(ArchiveError::TooLarge { .. })),
+            "{err:?}"
+        );
+        assert!(root.join("a-vpk").join("d").join("f0.txt").exists());
+        assert!(!root.join("b-vpk").exists());
+    }
 }

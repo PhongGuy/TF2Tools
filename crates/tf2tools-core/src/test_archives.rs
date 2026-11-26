@@ -74,3 +74,29 @@ pub(crate) fn rar_bytes(version: rars::ArchiveVersion, entries: &[(&str, &[u8])]
         .unwrap();
     out
 }
+
+/// A single-file VPK whose `count` entries (`d/f<i>.txt`) all point at the same `body`.
+pub(crate) fn vpk_shared(count: usize, body: &[u8]) -> Vec<u8> {
+    let mut tree = Vec::new();
+    for i in 0..count {
+        for part in ["txt", "d", &format!("f{i}")] {
+            tree.extend_from_slice(part.as_bytes());
+            tree.push(0);
+        }
+        tree.extend_from_slice(&0u32.to_le_bytes()); // crc, not checked by readers
+        tree.extend_from_slice(&0u16.to_le_bytes()); // preload length
+        tree.extend_from_slice(&0x7fffu16.to_le_bytes()); // data follows the tree
+        tree.extend_from_slice(&0u32.to_le_bytes()); // every entry at offset 0
+        tree.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        tree.extend_from_slice(&0xffffu16.to_le_bytes());
+        tree.extend_from_slice(&[0, 0]); // end of names, end of paths
+    }
+    tree.push(0);
+    let mut out = Vec::new();
+    out.extend_from_slice(&0x55aa_1234u32.to_le_bytes());
+    out.extend_from_slice(&1u32.to_le_bytes());
+    out.extend_from_slice(&(tree.len() as u32).to_le_bytes());
+    out.extend(tree);
+    out.extend_from_slice(body);
+    out
+}

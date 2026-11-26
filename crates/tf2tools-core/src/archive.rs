@@ -234,7 +234,7 @@ fn write_7z_entry(
     }
 }
 
-fn extract_vpk(archive: &Path, dest: &Path, _budget: &mut Budget) -> Result<(), ArchiveError> {
+fn extract_vpk(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), ArchiveError> {
     let from_vpk = |e: VpkError| match e {
         VpkError::Io { path, source } => ArchiveError::Io { path, source },
         other @ VpkError::Malformed { .. } | other @ VpkError::NoWav { .. } => {
@@ -242,13 +242,21 @@ fn extract_vpk(archive: &Path, dest: &Path, _budget: &mut Budget) -> Result<(), 
         }
     };
     let vpk = pak::open_vpk(archive).map_err(from_vpk)?;
-    for name in vpk.tree.keys() {
+    // Entries may all point at the same bytes, so the listed lengths are what is weighed.
+    let (mut listed, mut entries) = (0u64, 0u64);
+    for (name, entry) in &vpk.tree {
         check_entry_name(archive, name)?;
+        let length =
+            u64::from(entry.dir_entry.preload_length) + u64::from(entry.dir_entry.file_length);
+        listed = listed.saturating_add(length);
+        entries += 1;
     }
+    budget.admit(archive, listed, entries)?;
 
     create_dir(dest)?;
     for (name, entry) in &vpk.tree {
         let bytes = pak::read_entry(archive, name, entry).map_err(from_vpk)?;
+        budget.charge(archive, bytes.len() as u64)?;
         write_file(&dest.join(name.replace('\\', "/")), &bytes)?;
     }
     Ok(())

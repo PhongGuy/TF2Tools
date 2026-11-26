@@ -1131,3 +1131,25 @@ pub fn low_choices() -> Choices {
     choices.set(&catalog, "motion_blur", ModuleChoice::Value("high".into()));
     choices
 }
+
+/// A one-file zip whose local and central headers claim `listed` unpacked bytes, whatever
+/// `body` really holds. `deflate` picks the method; stored otherwise.
+pub fn zip_with_listed_size(name: &str, body: &[u8], listed: u32, deflate: bool) -> Vec<u8> {
+    use std::io::Write;
+    let method = if deflate {
+        zip::CompressionMethod::Deflated
+    } else {
+        zip::CompressionMethod::Stored
+    };
+    let options = zip::write::SimpleFileOptions::default().compression_method(method);
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    zip.start_file(name, options).unwrap();
+    zip.write_all(body).unwrap();
+    let mut bytes = zip.finish().unwrap().into_inner();
+    // Uncompressed size sits 22 bytes into a local header and 24 into a central one.
+    for (signature, offset) in [(b"PK\x03\x04", 22), (b"PK\x01\x02", 24)] {
+        let at = bytes.windows(4).position(|w| w == signature).unwrap();
+        bytes[at + offset..at + offset + 4].copy_from_slice(&listed.to_le_bytes());
+    }
+    bytes
+}
