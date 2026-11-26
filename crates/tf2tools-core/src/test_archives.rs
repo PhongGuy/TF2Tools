@@ -48,3 +48,29 @@ pub(crate) fn bytes_under(dir: &Path) -> u64 {
         .map(|e| e.metadata().unwrap().len())
         .sum()
 }
+
+/// A 7z at `path` holding `entries` as files.
+pub(crate) fn write_7z(path: &Path, entries: &[(&str, &[u8])]) {
+    let mut writer = sevenz_rust2::ArchiveWriter::create(path).unwrap();
+    for &(name, bytes) in entries {
+        writer
+            .push_archive_entry(sevenz_rust2::ArchiveEntry::new_file(name), Some(bytes))
+            .unwrap();
+    }
+    writer.finish().unwrap();
+}
+
+/// A RAR of `version` holding `entries` as files.
+pub(crate) fn rar_bytes(version: rars::ArchiveVersion, entries: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut builder = rars::Builder::new(version);
+    for &(name, bytes) in entries {
+        builder
+            .add_bytes(name.as_bytes().to_vec(), bytes.to_vec(), None, None)
+            .unwrap();
+    }
+    let mut out = Vec::new();
+    builder
+        .write_to(&mut out, &rars::WriterResources::default(), None)
+        .unwrap();
+    out
+}
