@@ -569,6 +569,7 @@ fn the_readme_describes_the_demos_tf_list() {
         "tracked player",
         "format",
         "scroll",
+        "exactly that map in its GameBanana map list",
     ] {
         assert!(
             maps.contains(needle),
@@ -580,7 +581,9 @@ fn the_readme_describes_the_demos_tf_list() {
         .expect("the privacy line");
     let privacy = privacy.split_once('\n').map_or(privacy, |(line, _)| line);
     assert!(
-        privacy.contains("the Demos.tf page (demos.tf)"),
+        privacy.contains(
+            "the Demos.tf page (demos.tf, and serveme.tf or GameBanana for a demo's missing map)"
+        ),
         "{privacy}"
     );
     assert!(

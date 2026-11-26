@@ -220,6 +220,8 @@ demo_viewer:
   loading: "正在加载地图…"
   downloading: "正在从 serveme.tf 下载 %{map}…"
   received: "%{done} / %{total}"
+  searching: "正在 GameBanana 上搜索 %{map}…"
+  searching_candidate: "正在 GameBanana 上搜索 %{map}（第 %{n} 个，共 %{of} 个）…"
   caption: "%{map}"
   caption_players: "%{map}，%{time} 时的 %{count} 名玩家"
   players_note: "无法从此录像中读取玩家。"
@@ -237,7 +239,8 @@ demo_viewer:
     no_tf2: "未找到 TF2，因此无法加载其地图。"
     map_missing: "地图 %{map} 未安装。请在 TF2 中玩一次，或在“地图”页面获取自定义地图。"
     map_unreadable: "无法显示此地图。"
-    not_on_serveme: "serveme.tf 上没有 %{map}。请在“地图”页面的 GameBanana 标签页中查找。"
+    not_on_gamebanana: "在 serveme.tf 和 TF2Tools 的 GameBanana 地图列表中都没有找到与 %{map} 完全匹配的地图。请在“地图”页面的 GameBanana 标签页中查找。"
+    gb_not_synced: "serveme.tf 上没有 %{map}，而 TF2Tools 尚未加载 GameBanana 的地图列表。请打开“地图”页面的 GameBanana 标签页，然后重新打开该录像。"
     download_failed: "无法下载 %{map}。"
     unsupported: "当前图形配置不支持 3D 视图。"
 

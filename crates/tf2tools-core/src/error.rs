@@ -1313,6 +1313,57 @@ pub enum GbMapInstallError {
     },
 }
 
+/// Why a demo's missing map could not be found on GameBanana.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbMapSearchError {
+    /// The name is not a safe map file name, so nothing was searched.
+    #[error("{name:?} is not a map name")]
+    BadName {
+        /// The name as asked for.
+        name: String,
+    },
+    /// The GameBanana map catalogue has never been synced.
+    #[error("the GameBanana map catalogue is empty; sync it from the Maps page")]
+    NotSynced,
+    /// No candidate held exactly the map.
+    #[error("no GameBanana item holds {name} ({tried} downloads tried)")]
+    NoMatch {
+        /// The map name searched for.
+        name: String,
+        /// How many archives were downloaded and checked.
+        tried: u8,
+    },
+    /// GameBanana kept answering HTTP 429 or the pacer is throttled.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// GameBanana could not be reached or failed on its side.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The search stopped part way, as when the catalogue read or a worker failed.
+    #[error("the map search was interrupted: {message}")]
+    Interrupted {
+        /// What stopped it.
+        message: String,
+    },
+}
+
 /// Why a GameBanana map item could not be removed.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

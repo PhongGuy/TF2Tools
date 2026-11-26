@@ -1,12 +1,13 @@
 //! Map list and map download failures in player words. The messages never carry URLs,
 //! paths or codes; the raw error rides along as `detail` for the developer log.
 
-use tf2tools_core::{MapDownloadError, MapRemoveError, SyncError};
+use tf2tools_core::{GbMapSearchError, MapDownloadError, MapRemoveError, SyncError};
 
 use gpui_kit::SharedString;
 
 use crate::i18n::{Phrase, tr};
 use crate::store_messages::StoreFailure;
+use crate::sync_messages::GAMEBANANA;
 
 // The site the map list and the maps come from, as players know it.
 const SERVEME: &str = "serveme.tf";
@@ -68,6 +69,25 @@ pub fn describe_map_download(err: &MapDownloadError) -> StoreFailure {
         MapDownloadError::Io { .. } => tr!("messages.map.disk"),
         MapDownloadError::Database { .. } => database(),
         _ => stopped(),
+    };
+    StoreFailure::new(message, err.to_string())
+}
+
+/// A GameBanana map search that stopped on a failure a retry may fix.
+pub fn describe_gb_map_search(err: &GbMapSearchError) -> StoreFailure {
+    let message = match err {
+        GbMapSearchError::RateLimited { .. } => {
+            tr!("messages.shared.source_busy", source = GAMEBANANA)
+        }
+        GbMapSearchError::Network { .. } => {
+            tr!("messages.shared.source_unreachable", source = GAMEBANANA)
+        }
+        GbMapSearchError::Io { .. } => tr!("messages.map.disk"),
+        GbMapSearchError::BadName { .. }
+        | GbMapSearchError::NotSynced
+        | GbMapSearchError::NoMatch { .. }
+        | GbMapSearchError::Interrupted { .. }
+        | _ => stopped(),
     };
     StoreFailure::new(message, err.to_string())
 }

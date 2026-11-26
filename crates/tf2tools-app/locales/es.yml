@@ -221,6 +221,8 @@ demo_viewer:
   loading: "Cargando mapa..."
   downloading: "Descargando %{map} desde serveme.tf..."
   received: "%{done} / %{total}"
+  searching: "Buscando %{map} en GameBanana..."
+  searching_candidate: "Buscando %{map} en GameBanana (%{n} de %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} jugadores en %{time}"
   players_note: "No se pudieron leer los jugadores de esta demo."
@@ -238,7 +240,8 @@ demo_viewer:
     no_tf2: "No se encontró TF2, así que no se pueden cargar sus mapas."
     map_missing: "El mapa %{map} no está instalado. Juégalo una vez en TF2 o consigue un mapa personalizado en la página Mapas."
     map_unreadable: "Este mapa no se puede mostrar."
-    not_on_serveme: "serveme.tf no tiene %{map}. Búscalo en la pestaña GameBanana de la página Mapas."
+    not_on_gamebanana: "No se encontró ninguna coincidencia exacta para %{map} en serveme.tf ni en la lista de mapas de GameBanana de TF2Tools. Búscalo en la pestaña GameBanana de la página Mapas."
+    gb_not_synced: "serveme.tf no tiene %{map} y TF2Tools aún no ha cargado la lista de mapas de GameBanana. Abre la pestaña GameBanana de la página Mapas y vuelve a abrir la demo."
     download_failed: "No se pudo descargar %{map}."
     unsupported: "La vista 3D no es compatible con esta configuración gráfica."
 
