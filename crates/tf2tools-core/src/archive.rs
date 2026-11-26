@@ -269,6 +269,8 @@ fn extract_rar(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), A
     let (mut listed, mut entries) = (0u64, 0u64);
     for member in reader.members() {
         check_entry_name(archive, &String::from_utf8_lossy(&member.meta.name))?;
+        // A RAR5 member marked unknown-size is weighed by its raw listed size; the write
+        // guard is the real limit.
         listed = listed.saturating_add(member.meta.unpacked_size);
         entries += 1;
     }
@@ -277,7 +279,7 @@ fn extract_rar(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), A
     create_dir(dest)?;
     // Each output file must be `'static`, so the budget is lent to them through an Rc and
     // handed back once `rars` is done.
-    let shared = Rc::new(RefCell::new(std::mem::take(budget)));
+    let shared = Rc::new(RefCell::new(std::mem::replace(budget, Budget::new(0, 0))));
     // `rars` can only carry its own error type out, so our failures (an unsafe name, a
     // failed write) are kept in this slot and win over whatever `rars` reports.
     let failure: RarFailure = Rc::default();
@@ -288,7 +290,7 @@ fn extract_rar(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), A
             rars::Error::from(std::io::Error::other(message))
         })
     });
-    *budget = shared.take();
+    *budget = shared.replace(Budget::new(0, 0));
     match (failure.take(), result) {
         (Some(e), _) => Err(e),
         (None, Err(e)) => Err(rar_error(archive, &e)),
