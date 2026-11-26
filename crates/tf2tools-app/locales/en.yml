@@ -217,7 +217,8 @@ demo_viewer:
     no_tf2: "TF2 wasn't found, so its maps can't be loaded."
     map_missing: "The map %{map} isn't installed. Play it once in TF2, or get a custom map from the Maps page."
     map_unreadable: "This map can't be shown."
-    not_on_serveme: "serveme.tf doesn't have %{map}. Look for it on the Maps page's GameBanana tab."
+    not_on_gamebanana: "No exact match for %{map} was found on serveme.tf or in TF2Tools' GameBanana map list. Look for it on the Maps page's GameBanana tab."
+    gb_not_synced: "serveme.tf doesn't have %{map}, and TF2Tools hasn't loaded GameBanana's map list yet. Open the GameBanana tab on the Maps page, then open the demo again."
     download_failed: "Couldn't download %{map}."
     unsupported: "3D view isn't supported on this graphics setup."
 

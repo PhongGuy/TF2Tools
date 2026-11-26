@@ -58,24 +58,38 @@ fn the_download_bar_counts_bytes_without_repeating_the_status(cx: &mut TestAppCo
 }
 
 #[gpui_kit::test]
-fn a_map_serveme_does_not_have_points_to_gamebanana_without_retry(cx: &mut TestAppContext) {
+fn a_map_found_nowhere_says_so_without_retry(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
-    let route = format!("/fastdl/maps/{MAP}.bsp");
-    server.mount_status_after(&route, 404, Duration::from_millis(50));
-    let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
-    let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
-    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
-    let want =
-        format!("serveme.tf doesn't have {MAP}. Look for it on the Maps page's GameBanana tab.");
+    let w = open_searching(cx, &env, &server, &format!("{MAP}_rc1.bsp"), Duration::ZERO);
+    let want = format!(
+        "No exact match for {MAP} was found on serveme.tf or in TF2Tools' GameBanana map list. Look for it on the Maps page's GameBanana tab."
+    );
     support::wait_real(cx, &want, |cx| {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
     });
     assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_RETRY));
-    assert!(!support::present(
-        cx,
-        w.s.win,
-        ids::DEMO_VIEWER_STATUS_DETAIL
-    ));
+    assert_eq!(installed_rows(&env), 0);
+}
+
+#[gpui_kit::test]
+fn an_unsynced_catalogue_points_to_the_gamebanana_tab(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_status_after(
+        &format!("/fastdl/maps/{MAP}.bsp"),
+        404,
+        Duration::from_millis(50),
+    );
+    let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
+    let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    let want = format!(
+        "serveme.tf doesn't have {MAP}, and TF2Tools hasn't loaded GameBanana's map list yet. Open the GameBanana tab on the Maps page, then open the demo again."
+    );
+    support::wait_real(cx, &want, |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
+    });
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_RETRY));
+    assert_eq!(server.requests_where(|p| p.starts_with("/apiv11")), 0);
 }
 
 #[gpui_kit::test]

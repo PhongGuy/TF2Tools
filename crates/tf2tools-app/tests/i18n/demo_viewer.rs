@@ -67,3 +67,40 @@ fn the_loaded_bar_fits_the_default_page_in_german(cx: &mut TestAppContext) {
 fn the_loaded_bar_fits_the_default_page_in_russian(cx: &mut TestAppContext) {
     bar_fits("ru", 1200., 900., cx);
 }
+
+// The GameBanana fallback's lines exist in every language, keep their placeholders, and
+// serveme.tf's old dead-end line is gone.
+#[test]
+fn the_gamebanana_fallback_speaks_every_language() {
+    let text = |lang: &str, key: &str| {
+        tf2tools_app::_rust_i18n_try_translate(lang, key).map(|t| t.into_owned())
+    };
+    let langs = ["en", "de", "es", "fr", "pt-BR", "ru", "zh-CN"];
+    for key in [
+        "demo_viewer.searching",
+        "demo_viewer.searching_candidate",
+        "demo_viewer.error.not_on_gamebanana",
+        "demo_viewer.error.gb_not_synced",
+    ] {
+        let en = text("en", key).unwrap_or_else(|| panic!("en lacks {key}"));
+        for lang in langs {
+            let theirs = text(lang, key).unwrap_or_else(|| panic!("{lang} lacks {key}"));
+            assert!(theirs.contains("%{map}"), "{lang} {key}: {theirs}");
+            if lang != "en" {
+                assert_ne!(theirs, en, "{lang} {key} is untranslated");
+            }
+        }
+    }
+    for lang in langs {
+        let candidate = text(lang, "demo_viewer.searching_candidate").unwrap();
+        assert!(
+            candidate.contains("%{n}") && candidate.contains("%{of}"),
+            "{lang}: {candidate}"
+        );
+        assert_eq!(
+            text(lang, "demo_viewer.error.not_on_serveme"),
+            None,
+            "{lang} keeps not_on_serveme"
+        );
+    }
+}

@@ -995,14 +995,15 @@ async fn search_gamebanana(
                 if page.generation != generation {
                     return;
                 }
-                // No match keeps the old pointer to GameBanana; a failure a retry may fix
-                // keeps its reason and a Retry, which starts again from serveme.tf.
+                // No match or an unsynced catalogue is a dead end with no Retry; a failure a
+                // retry may fix keeps its reason and a Retry, which starts again from serveme.tf.
                 page.view = match failed {
-                    Ok(
-                        GbMapSearchError::NoMatch { .. }
-                        | GbMapSearchError::NotSynced
-                        | GbMapSearchError::BadName { .. },
-                    ) => View::Failed(tr!("demo_viewer.error.not_on_serveme", map = map)),
+                    Ok(GbMapSearchError::NoMatch { .. } | GbMapSearchError::BadName { .. }) => {
+                        View::Failed(tr!("demo_viewer.error.not_on_gamebanana", map = map))
+                    }
+                    Ok(GbMapSearchError::NotSynced) => {
+                        View::Failed(tr!("demo_viewer.error.gb_not_synced", map = map))
+                    }
                     failed => {
                         let failure = match failed {
                             Ok(e) => describe_gb_map_search(&e),
