@@ -1,9 +1,11 @@
 //! The Demo Viewer: shows a local TF2 demo's map in 3D inside the Demos.tf page.
 
 use std::cell::{Cell, RefCell};
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use gpui_kit::assets::IconName;
@@ -21,8 +23,8 @@ use gpui_kit::{
     WeakEntity, Window, canvas, div, px,
 };
 use tf2tools_core::{
-    DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError, GbMapSearchProgress,
-    LookSensitivity, MapDownloadError, Tf2Install,
+    DemoSnapshot, DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError,
+    GbMapSearchProgress, LookSensitivity, MapDownloadError, PlaybackEvent, Tf2Install,
 };
 
 use crate::i18n::{format, tr};
@@ -35,7 +37,7 @@ use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::toast::toast_error;
 use crate::store_download::{Progress, format_bytes, progress_percent};
 use crate::tokio_bridge;
-use crate::viewer::load::{LoadError, LoadedDemo, load_demo, snapshot_time};
+use crate::viewer::load::{DemoScene, LoadError, load_demo_scene, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
 use crate::widgets::{Named as _, labelled};
 
@@ -53,6 +55,37 @@ fn stem(path: &std::path::Path) -> SharedString {
 /// The bar's frame is the page width less this at each side; a bar dragged to an edge can
 /// still touch it.
 const BAR_MARGIN: Pixels = px(8.);
+
+/// How far the open demo's playback read has come.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadState {
+    /// Still reading, with the whole percent read once the reader has said.
+    Reading { percent: Option<u8> },
+    /// The tracks are in the viewport.
+    Ready,
+    /// The read ended without tracks; the still picture stays.
+    Failed,
+}
+
+/// What the load thread sends the page: the map first, then the reader's events.
+enum Load {
+    Map(Result<DemoScene, LoadError>),
+    Playback(PlaybackEvent),
+}
+
+/// Sets its flag when dropped, so a replaced or dropped load tells its reader to stop.
+struct CancelGuard(Arc<AtomicBool>);
+
+impl Drop for CancelGuard {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+}
+
+// A reader's fraction as a whole percent; the nudge keeps 0.29 from reading as 28.
+fn whole_percent(read: f32) -> u8 {
+    (f64::from(read) * 100.0 + 1e-6).floor().clamp(0.0, 100.0) as u8
+}
 
 /// What the page shows under its control bar.
 enum View {
@@ -175,6 +208,11 @@ pub struct DemoViewerPage {
     bar_saves: Rc<RefCell<SerialSaves<String>>>,
     /// The running map download; dropping it aborts the transfer and its partial file.
     download: Option<Task<()>>,
+    /// The task receiving the current load's events; dropping it closes their channel.
+    reading: Option<Task<()>>,
+    /// Stops the current load's reader once replaced or dropped.
+    _cancel: Option<CancelGuard>,
+    read_state: ReadState,
     /// How fast a drag turns the camera; every new viewport starts with it.
     look: LookSensitivity,
     /// Set once the player picks a sensitivity, so a slow stored one cannot undo it.
@@ -243,6 +281,9 @@ impl DemoViewerPage {
             bar_drag: None,
             bar_saves: Rc::default(),
             download: None,
+            reading: None,
+            _cancel: None,
+            read_state: ReadState::Reading { percent: None },
             look,
             look_touched: false,
             look_saves: Rc::default(),
@@ -264,6 +305,11 @@ impl DemoViewerPage {
     /// The open demo's file stem until its map is known, then the map's name.
     pub fn title(&self) -> SharedString {
         self.title.clone()
+    }
+
+    /// How far the open demo's playback read has come.
+    pub fn read_state(&self) -> ReadState {
+        self.read_state
     }
 
     /// The options popover's look sensitivity slider, in percent.
@@ -298,8 +344,9 @@ impl DemoViewerPage {
         .detach();
     }
 
-    // Reads the demo and meshes its map off the UI thread. A map that is missing the first time
-    // is downloaded and loaded once more; missing again after that, it shows as missing.
+    // Meshes the demo's map and then reads its playback on a thread of its own, streaming both
+    // to the page. A map missing the first time is downloaded and loaded once more; missing
+    // again after that, it shows as missing.
     fn load(
         &mut self,
         path: PathBuf,
@@ -309,35 +356,124 @@ impl DemoViewerPage {
         cx: &mut Context<Self>,
     ) {
         self.view = View::Loading;
+        self.read_state = ReadState::Reading { percent: None };
         cx.notify();
         let install = tf2_state(cx).read(cx).install().cloned();
-        let snapshots = Arc::clone(&cx.global::<Services>().demo_snapshots);
+        let reader = Arc::clone(&cx.global::<Services>().demo_playback);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = async_channel::unbounded();
         let reading = path.clone();
         let found = install.clone();
-        // A panic in the BSP reader is a map that cannot be shown, not a dead app.
-        let loading = cx.background_spawn(async move {
-            crate::crash::catching(|| load_demo(&reading, found.as_ref(), &snapshots))
-                .unwrap_or_else(|payload| {
-                    let message = crate::crash::panic_text(&*payload);
-                    tracing::warn!("the demo viewer's map loader panicked: {message}");
-                    Err(LoadError::MapUnreadable)
-                })
-        });
-        cx.spawn_in(window, async move |page, cx| {
-            let loaded = loading.await;
-            let _ = page.update_in(cx, |page, window, cx| {
-                if page.generation != generation {
+        let stop = Arc::clone(&cancel);
+        // A parse can take seconds, so it holds a thread of its own rather than an executor's.
+        // A thread the OS refuses closes the channel unsent, which reads as an unreadable map.
+        let _ = std::thread::Builder::new()
+            .name("demo-viewer-load".into())
+            .spawn(move || read_demo(&reading, found.as_ref(), &reader, &stop, &tx));
+        // Replacing the guard and the task cancels the previous load and closes its channel.
+        self._cancel = Some(CancelGuard(cancel));
+        self.reading = Some(cx.spawn_in(window, async move |page, cx| {
+            let map = match rx.recv().await {
+                Ok(Load::Map(map)) => map,
+                Ok(Load::Playback(_)) | Err(_) => Err(LoadError::MapUnreadable),
+            };
+            let scene = match map {
+                Ok(scene) => scene,
+                Err(error) => {
+                    let _ = page.update_in(cx, |page, window, cx| {
+                        if page.generation != generation {
+                            return;
+                        }
+                        match (error, install) {
+                            (LoadError::MapMissing(map), Some(install)) if !downloaded => {
+                                page.download_map(path, map, install, generation, window, cx);
+                            }
+                            (error, _) => {
+                                page.view = View::Failed(error.message());
+                                cx.notify();
+                            }
+                        }
+                    });
                     return;
                 }
-                match (loaded, install) {
-                    (Err(LoadError::MapMissing(map)), Some(install)) if !downloaded => {
-                        page.download_map(path, map, install, generation, window, cx);
-                    }
-                    (loaded, _) => page.show(loaded, window, cx),
+            };
+            // The map waits here for the still picture, so the viewport opens with its players.
+            let mut scene = Some(scene);
+            while let Ok(Load::Playback(event)) = rx.recv().await {
+                let done = page.update_in(cx, |page, window, cx| {
+                    page.on_playback(event, &mut scene, window, cx);
+                });
+                if done.is_err() {
+                    return;
                 }
-            });
-        })
-        .detach();
+            }
+            let _ = page.update_in(cx, |page, window, cx| page.read_ended(scene, window, cx));
+        }));
+    }
+
+    // One reader event: the still picture opens the viewport, progress and the tracks follow.
+    fn on_playback(
+        &mut self,
+        event: PlaybackEvent,
+        scene: &mut Option<DemoScene>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match event {
+            PlaybackEvent::Snapshot(snapshot) => {
+                // Missing players still leave a map to fly around, so the error only reaches the log.
+                let snapshot = snapshot
+                    .inspect_err(|error| {
+                        tracing::warn!(%error, "the demo viewer could not read the players");
+                    })
+                    .ok();
+                if let Some(scene) = scene.take() {
+                    self.show(scene, snapshot.as_ref(), window, cx);
+                }
+            }
+            PlaybackEvent::Progress(read) => {
+                let now = ReadState::Reading {
+                    percent: Some(whole_percent(read)),
+                };
+                if matches!(self.read_state, ReadState::Reading { .. }) && self.read_state != now {
+                    self.read_state = now;
+                    cx.notify();
+                }
+            }
+            PlaybackEvent::Tracks(tracks) => {
+                if let Some(scene) = scene.take() {
+                    self.show(scene, None, window, cx);
+                }
+                if let Some(viewport) = self.viewport() {
+                    viewport.update(cx, |v, cx| v.set_tracks(tracks, cx));
+                }
+                self.read_state = ReadState::Ready;
+                cx.notify();
+            }
+            PlaybackEvent::TracksFailed(error) => {
+                tracing::warn!(%error, "the demo viewer could not read the playback");
+                self.read_state = ReadState::Failed;
+                cx.notify();
+            }
+            _ => {}
+        }
+    }
+
+    // The stream closed: a map still waiting shows without players, and a read with no final
+    // word counts as failed.
+    fn read_ended(
+        &mut self,
+        scene: Option<DemoScene>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(scene) = scene {
+            self.show(scene, None, window, cx);
+        }
+        if matches!(self.read_state, ReadState::Reading { .. }) {
+            self.read_state = ReadState::Failed;
+            cx.notify();
+        }
     }
 
     // Runs a failed download again under a new generation; a TF2 install gone since then
@@ -593,54 +729,50 @@ impl DemoViewerPage {
     // Puts a loaded map in a fresh viewport; the old one drops with its renderer.
     fn show(
         &mut self,
-        loaded: Result<LoadedDemo, LoadError>,
+        scene: DemoScene,
+        snapshot: Option<&DemoSnapshot>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.view = match loaded {
-            Err(error) => View::Failed(error.message()),
-            Ok(loaded) => {
-                self.title = loaded.map.clone().into();
-                // A snapshot with nobody in it counts as no players read.
-                let players = loaded.snapshot.as_ref().filter(|s| !s.players().is_empty());
-                let caption = match players {
-                    Some(snapshot) => tr!(
-                        "demo_viewer.caption_players",
-                        map = loaded.map,
-                        count = snapshot.players().len(),
-                        time = snapshot_time(snapshot.tick(), loaded.seconds_per_tick)
-                    ),
-                    None => tr!("demo_viewer.caption", map = loaded.map),
-                };
-                let players_note = players.is_none();
-                let renderer = (cx.global::<Services>().renderers)();
-                let lock = (cx.global::<Services>().pointer_lock)();
-                let viewport = cx.new(|cx| {
-                    DemoViewport::new(
-                        Arc::new(loaded.mesh),
-                        loaded.snapshot.as_ref(),
-                        renderer,
-                        lock,
-                        Arc::new(Instant::now),
-                        self.look.scale(),
-                        window,
-                        cx,
-                    )
-                });
-                // A renderer that stops leaves nothing to look at, so its viewport goes too.
-                let watch = cx.observe(&viewport, |page, viewport, cx| {
-                    if viewport.read(cx).failure().is_some() {
-                        page.view = View::Failed(tr!("demo_viewer.error.unsupported"));
-                        cx.notify();
-                    }
-                });
-                View::Loaded {
-                    caption,
-                    players_note,
-                    viewport,
-                    _failure_watch: watch,
-                }
+        self.title = scene.map.clone().into();
+        // A snapshot with nobody in it counts as no players read.
+        let players = snapshot.filter(|s| !s.players().is_empty());
+        let caption = match players {
+            Some(snapshot) => tr!(
+                "demo_viewer.caption_players",
+                map = scene.map,
+                count = snapshot.players().len(),
+                time = snapshot_time(snapshot.tick(), scene.seconds_per_tick)
+            ),
+            None => tr!("demo_viewer.caption", map = scene.map),
+        };
+        let players_note = players.is_none();
+        let renderer = (cx.global::<Services>().renderers)();
+        let lock = (cx.global::<Services>().pointer_lock)();
+        let viewport = cx.new(|cx| {
+            DemoViewport::new(
+                Arc::new(scene.mesh),
+                snapshot,
+                renderer,
+                lock,
+                Arc::new(Instant::now),
+                self.look.scale(),
+                window,
+                cx,
+            )
+        });
+        // A renderer that stops leaves nothing to look at, so its viewport goes too.
+        let watch = cx.observe(&viewport, |page, viewport, cx| {
+            if viewport.read(cx).failure().is_some() {
+                page.view = View::Failed(tr!("demo_viewer.error.unsupported"));
+                cx.notify();
             }
+        });
+        self.view = View::Loaded {
+            caption,
+            players_note,
+            viewport,
+            _failure_watch: watch,
         };
         cx.notify();
     }
@@ -898,6 +1030,35 @@ impl Render for DemoViewerPage {
             .child(area_watch)
             .child(body)
             .child(frame)
+    }
+}
+
+// The load thread's body: the map first, then, only for a map that loaded, the reader's events
+// until it ends or the page stops listening. A panic in either is caught; one in the map is an
+// unreadable map, one in the reader simply ends the stream.
+fn read_demo(
+    dem: &std::path::Path,
+    install: Option<&Tf2Install>,
+    reader: &crate::viewer::PlaybackReader,
+    cancel: &AtomicBool,
+    tx: &async_channel::Sender<Load>,
+) {
+    let map = crate::crash::catching(|| load_demo_scene(dem, install)).unwrap_or_else(|payload| {
+        let message = crate::crash::panic_text(&*payload);
+        tracing::warn!("the demo viewer's map loader panicked: {message}");
+        Err(LoadError::MapUnreadable)
+    });
+    let loaded = map.is_ok();
+    if tx.try_send(Load::Map(map)).is_err() || !loaded {
+        return;
+    }
+    let mut emit = |event| match tx.try_send(Load::Playback(event)) {
+        Ok(()) => ControlFlow::Continue(()),
+        Err(_) => ControlFlow::Break(()),
+    };
+    if let Err(payload) = crate::crash::catching(|| reader(dem, cancel, &mut emit)) {
+        let message = crate::crash::panic_text(&*payload);
+        tracing::warn!("the demo viewer's playback reader panicked: {message}");
     }
 }
 
