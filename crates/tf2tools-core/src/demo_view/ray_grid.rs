@@ -29,6 +29,10 @@ fn key(c: [i64; 3]) -> u64 {
 
 // The cell box `(lo, hi)` a triangle covers, or None when it is non-finite or out of reach.
 fn cell_box(tri: &[[f32; 3]], cell: f32) -> Option<([i64; 3], [i64; 3])> {
+    // `f32::min` and `max` skip a NaN, so one bad corner is refused here before the fold.
+    if !tri.iter().flatten().all(|v| v.is_finite()) {
+        return None;
+    }
     let mut lo = [0; 3];
     let mut hi = [0; 3];
     for a in 0..3 {
@@ -333,6 +337,15 @@ mod tests {
                 .heap_bytes()
                 > 0
         );
+    }
+
+    #[test]
+    fn a_triangle_with_a_nan_corner_is_not_filed() {
+        let mut p = floor(0.);
+        p.extend([[f32::NAN, 0., 0.], [1000., 0., 0.], [0., 1000., 0.]]);
+        let with_nan = RayGrid::build(&p, CELL, MAX_GRID_ENTRIES).expect("grid");
+        let clean = RayGrid::build(&floor(0.), CELL, MAX_GRID_ENTRIES).expect("grid");
+        assert_eq!(with_nan.heap_bytes(), clean.heap_bytes());
     }
 
     #[test]
