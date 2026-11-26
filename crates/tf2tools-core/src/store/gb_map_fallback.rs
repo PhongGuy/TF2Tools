@@ -12,6 +12,9 @@ use crate::library::GbId;
 /// At most this many candidate profiles are asked for per search.
 const MAX_PROFILES: usize = 6;
 
+/// At most this many candidate archives are downloaded per search.
+const MAX_DOWNLOADS: usize = 3;
+
 /// How far a map search has come: the download of candidate `candidate` of `of`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -30,7 +33,7 @@ impl StoreClient {
     pub async fn find_gb_map(
         &self,
         name: &str,
-        _progress: &(dyn Fn(GbMapSearchProgress) + Send + Sync),
+        progress: &(dyn Fn(GbMapSearchProgress) + Send + Sync),
     ) -> Result<GbMapDownload, GbMapSearchError> {
         if !is_map_name(name) {
             return Err(GbMapSearchError::BadName {
@@ -38,14 +41,59 @@ impl StoreClient {
             });
         }
         let ids = self.candidates(name).await?;
+
+        // Every profile is fetched before any download, so the count shown is known up front.
+        // Listings the map cap refuses are dropped; a file named for the map jumps the queue.
         let catalog = self.addon_catalog();
+        let mut kept = Vec::new();
         for id in ids.into_iter().take(MAX_PROFILES) {
-            // Every outcome is ignored until the download loop judges the listings.
-            let _ = catalog.profile_at(id, Priority::Interactive).await;
+            if let Ok(profile) = catalog.profile_at(id, Priority::Interactive).await
+                && self.gb_map_refusal(&profile).is_none()
+            {
+                kept.push(profile);
+            }
+        }
+        let stem = strip_version(name).to_ascii_lowercase();
+        let (mut named, rest): (Vec<_>, Vec<_>) = kept.into_iter().partition(|p| {
+            p.files()
+                .first()
+                .is_some_and(|f| f.name().to_ascii_lowercase().contains(&stem))
+        });
+        named.extend(rest);
+        named.truncate(MAX_DOWNLOADS);
+        let of = u8::try_from(named.len()).unwrap_or(u8::MAX);
+
+        // Only an archive holding exactly one payload of this name counts, and the download
+        // keeps only that payload. Anything else is dropped, removing its scratch dir.
+        let mut tried = 0u8;
+        for (candidate, profile) in (1u8..).zip(named.iter()) {
+            let report = |download: DownloadProgress| {
+                progress(GbMapSearchProgress {
+                    candidate,
+                    of,
+                    download,
+                });
+            };
+            report(DownloadProgress::starting());
+            tried += 1;
+            let Ok(mut download) = self.download_gb_map(profile, &report).await else {
+                continue;
+            };
+            let matching = download
+                .maps
+                .iter()
+                .filter(|m| m.name().eq_ignore_ascii_case(name))
+                .count();
+            if matching == 1 {
+                download
+                    .maps
+                    .retain(|m| m.name().eq_ignore_ascii_case(name));
+                return Ok(download);
+            }
         }
         Err(GbMapSearchError::NoMatch {
             name: name.to_owned(),
-            tried: 0,
+            tried,
         })
     }
 

@@ -34,6 +34,15 @@ pub struct DownloadProgress {
 }
 
 impl DownloadProgress {
+    /// A download that has asked for its file but received nothing yet.
+    pub(crate) fn starting() -> Self {
+        Self {
+            phase: DownloadPhase::Downloading,
+            downloaded: 0,
+            total: None,
+        }
+    }
+
     /// What the download is doing.
     pub fn phase(self) -> DownloadPhase {
         self.phase

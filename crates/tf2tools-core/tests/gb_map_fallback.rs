@@ -196,3 +196,168 @@ async fn a_name_that_is_no_map_file_name_is_refused() {
     }
     assert!(env.server.received_requests().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn a_pack_matches_by_its_one_map_and_holds_only_that_map() {
+    let env = store_env().await;
+    seed(&env, &[(3, "cp_a and cp_b", 1, false)]);
+    let body = common::zip_bytes(&[
+        ("Pack/maps/cp_a.bsp", &bsp(b"a")),
+        ("Pack/maps/cp_b.bsp", &bsp(b"b")),
+    ]);
+    item(&env, 3, "pack.zip", &body).await;
+    let (result, progress) = find(&env, "cp_b").await;
+    let d = result.unwrap();
+    let names: Vec<&str> = d.maps().iter().map(|m| m.name()).collect();
+    assert_eq!(names, ["cp_b"]);
+    assert_eq!(
+        (d.gb_id(), d.file_id(), d.file_name()),
+        (GbId::new(3), 100, "pack.zip")
+    );
+    assert_eq!(
+        (
+            progress[0].candidate,
+            progress[0].of,
+            progress[0].download.downloaded()
+        ),
+        (1, 1, 0)
+    );
+    assert!(progress.iter().all(|p| (p.candidate, p.of) == (1, 1)));
+    assert!(!common::tmp_is_empty(&env.dir));
+    drop(d);
+    assert!(
+        common::tmp_is_empty(&env.dir),
+        "dropping it removes the scratch dir"
+    );
+}
+
+#[tokio::test]
+async fn the_name_matches_in_any_case_and_keeps_the_archive_spelling() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false)]);
+    item(
+        &env,
+        1,
+        "pack.zip",
+        &common::zip_bytes(&[("maps/koth_x.bsp", &bsp(b"x"))]),
+    )
+    .await;
+    let d = find(&env, "Koth_X").await.0.unwrap();
+    assert_eq!(d.maps()[0].name(), "koth_x");
+}
+
+#[tokio::test]
+async fn another_version_never_stands_in() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false)]);
+    item(
+        &env,
+        1,
+        "pack.zip",
+        &common::zip_bytes(&[("maps/koth_x_rc1.bsp", &bsp(b"r"))]),
+    )
+    .await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::NoMatch { tried: 1, .. })),
+        "{result:?}"
+    );
+    assert!(common::tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
+async fn a_map_file_without_vbsp_magic_is_no_map() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false)]);
+    item(
+        &env,
+        1,
+        "pack.zip",
+        &common::zip_bytes(&[("maps/koth_x.bsp", b"not a map")]),
+    )
+    .await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::NoMatch { tried: 1, .. })),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn at_most_three_archives_are_downloaded() {
+    let env = store_env().await;
+    seed(
+        &env,
+        &[
+            (1, "koth_x", 1, false),
+            (2, "koth_x", 2, false),
+            (3, "koth_x", 3, false),
+            (4, "koth_x", 4, false),
+        ],
+    );
+    let other = common::zip_bytes(&[("maps/cp_other.bsp", &bsp(b"o"))]);
+    for id in 1..=4 {
+        item(&env, id, "pack.zip", &other).await;
+    }
+    let (result, progress) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::NoMatch { tried: 3, .. })),
+        "{result:?}"
+    );
+    assert_eq!(profiles_asked(&env).await, [1, 2, 3, 4]);
+    assert_eq!(
+        downloads_asked(&env).await,
+        ["/dl/addon/1/0", "/dl/addon/2/0", "/dl/addon/3/0"]
+    );
+    assert!(progress.iter().all(|p| p.of == 3));
+    let mut seen: Vec<u8> = progress.iter().map(|p| p.candidate).collect();
+    seen.dedup();
+    assert_eq!(seen, [1, 2, 3]);
+}
+
+#[tokio::test]
+async fn at_most_six_profiles_are_fetched() {
+    let env = store_env().await;
+    let rows: Vec<(u64, &str, i64, bool)> = (1..=7)
+        .map(|i| (i, "koth_x", i64::try_from(i).unwrap(), false))
+        .collect();
+    seed(&env, &rows);
+    for id in 1..=7 {
+        profile(&env, id, vec![]).await;
+    }
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::NoMatch { tried: 0, .. })),
+        "{result:?}"
+    );
+    assert_eq!(profiles_asked(&env).await, [1, 2, 3, 4, 5, 6]);
+}
+
+#[tokio::test]
+async fn a_file_named_for_the_map_is_tried_first() {
+    let env = store_env().await;
+    seed(
+        &env,
+        &[
+            (1, "koth_x", 1, false),
+            (2, "koth_x", 2, false),
+            (3, "koth_x", 3, false),
+            (4, "koth_x", 4, false),
+        ],
+    );
+    let other = common::zip_bytes(&[("maps/cp_other.bsp", &bsp(b"o"))]);
+    for id in 1..=3 {
+        item(&env, id, "pack.zip", &other).await;
+    }
+    item(
+        &env,
+        4,
+        "KOTH_X.zip",
+        &common::zip_bytes(&[("maps/koth_x.bsp", &bsp(b"x"))]),
+    )
+    .await;
+    let (result, progress) = find(&env, "koth_x").await;
+    assert_eq!(result.unwrap().gb_id(), GbId::new(4));
+    assert_eq!(downloads_asked(&env).await, ["/dl/addon/4/0"]);
+    assert_eq!((progress[0].candidate, progress[0].of), (1, 3));
+}
