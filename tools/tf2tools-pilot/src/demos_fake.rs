@@ -1,36 +1,29 @@
 //! A loopback stand-in for demos.tf, so a seeded QA boot shows a Demos.tf list and can open a
-//! demo without the network. It serves six fixed rows and header-only demo files.
+//! demo without the network. The shared fake serves it under `/demostf`: six fixed rows and
+//! header-only demo files.
 
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::demo_view::{BspOptions, bsp, demo_header};
+use crate::fake_http;
 
 /// The map most rows name; `seed_map` writes it to the fake game.
 pub const SEEDED_MAP: &str = "cp_pilot";
 /// The map one row names and the seed never writes, so the page shows a missing map.
 pub const MISSING_MAP: &str = "koth_pilot";
 
-/// A running fake on 127.0.0.1; its thread serves until the process exits.
+/// The demos.tf routes of the shared fake on 127.0.0.1; it serves until the process exits.
 pub struct DemosFake {
     base: String,
 }
 
 impl DemosFake {
-    /// Binds 127.0.0.1:0 and serves on one detached thread until the process exits.
+    /// Starts the shared fake if needed; every call names the same listener.
     pub fn start() -> std::io::Result<DemosFake> {
-        let listener = TcpListener::bind("127.0.0.1:0")?;
-        let base = format!("http://{}/demostf", listener.local_addr()?);
-        let served = base.clone();
-        std::thread::spawn(move || {
-            for stream in listener.incoming().flatten() {
-                // One connection at a time; a failed one is dropped and never stops the loop.
-                let _ = serve(stream, &served);
-            }
-        });
-        Ok(DemosFake { base })
+        let root = fake_http::root()?;
+        Ok(DemosFake {
+            base: format!("{root}/demostf"),
+        })
     }
 
     /// `http://127.0.0.1:<port>/demostf`, the value for `DemosEndpoints::loopback`.
@@ -84,52 +77,9 @@ const ROWS: [Row; 6] = [
 
 /// Every row runs this long, in seconds.
 const DURATION: u32 = 1800;
-/// Bounds the request head, so a client that never ends it cannot grow the buffer.
-const HEAD_LIMIT: usize = 8 * 1024;
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs() as i64)
-}
-
-// Reads the head up to its blank line (it may span several reads) under a read timeout, so an
-// idle client cannot hold the only thread, then answers and closes.
-fn serve(mut stream: TcpStream, base: &str) -> std::io::Result<()> {
-    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
-    let mut head = Vec::new();
-    let mut chunk = [0u8; 1024];
-    while !head.windows(4).any(|w| w == b"\r\n\r\n") {
-        let n = stream.read(&mut chunk)?;
-        if n == 0 || head.len() + n > HEAD_LIMIT {
-            return Ok(());
-        }
-        head.extend_from_slice(&chunk[..n]);
-    }
-    let head = String::from_utf8_lossy(&head);
-    let target = head
-        .lines()
-        .next()
-        .and_then(|line| line.strip_prefix("GET "))
-        .and_then(|rest| rest.split(' ').next())
-        .unwrap_or("");
-    let (status, kind, body) = answer(target, base);
-    write!(
-        stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    )?;
-    stream.write_all(&body)?;
-    stream.flush()
-}
-
-// Routes are matched exactly after `/demostf`; the list honours only `before_id`.
-fn answer(target: &str, base: &str) -> (&'static str, &'static str, Vec<u8>) {
+// Routes are matched exactly on the path after `/demostf`; the list honours only `before_id`.
+pub(crate) fn answer(path: &str, query: &str, base: &str) -> (&'static str, &'static str, Vec<u8>) {
     let not_found = ("404 Not Found", "text/plain", b"not found".to_vec());
-    let (path, query) = target.split_once('?').unwrap_or((target, ""));
-    let Some(path) = path.strip_prefix("/demostf") else {
-        return not_found;
-    };
     if path == "/demos/" {
         let before = query
             .split('&')
@@ -161,7 +111,7 @@ fn answer(target: &str, base: &str) -> (&'static str, &'static str, Vec<u8>) {
 
 // Every string is fixed ASCII, so `format!` needs no escaping.
 fn list_json(base: &str, before: Option<u64>) -> String {
-    let now = now();
+    let now = fake_http::start_time();
     let rows: Vec<String> = ROWS
         .iter()
         .enumerate()
