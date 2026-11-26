@@ -1,9 +1,8 @@
-//! The demo viewer's UI-free pieces: the map mesh drawn behind a demo, the free-fly camera,
+//! The demo viewer's UI-free pieces: the map mesh drawn behind a demo, the free-fly and spectator cameras,
 //! the demo header, the players at one tick, their tracks over the whole demo and the
 //! playback clock.
 
-// Unused until the spectator camera lands.
-#[allow(dead_code)]
+mod camera;
 mod chase;
 mod clock;
 mod free_fly;
@@ -16,6 +15,7 @@ mod snapshot;
 pub(crate) mod test_support;
 mod tracks;
 
+pub use camera::{CameraMode, CameraView, SpectatorCamera, TargetLife};
 pub use clock::PlaybackClock;
 pub use free_fly::{FlyInput, FreeFly};
 pub use header::{DemoHeader, read_demo_header};
