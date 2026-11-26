@@ -187,9 +187,9 @@ fn http_status(url: String, status: u16) -> Result<(), GbMapSearchError> {
     }
 }
 
-/// Live catalogue ids in three tiers: the exact name, the name anywhere, then the name
-/// without its version suffix anywhere. Each tier runs in download order and an id is
-/// kept where it first appears. `None` when the catalogue has no rows at all.
+/// Live catalogue ids not already installed, in three tiers: the exact name, the name
+/// anywhere, then the name without its version suffix anywhere. Each tier runs in download
+/// order and an id is kept where it first appears. `None` when the catalogue has no rows at all.
 fn rank_candidates(conn: &Connection, name: &str) -> rusqlite::Result<Option<Vec<GbId>>> {
     let synced: bool = conn.query_row("SELECT EXISTS (SELECT 1 FROM store_gb_maps)", [], |r| {
         r.get(0)
@@ -197,10 +197,14 @@ fn rank_candidates(conn: &Connection, name: &str) -> rusqlite::Result<Option<Vec
     if !synced {
         return Ok(None);
     }
-    const LIVE: &str = "SELECT gb_id FROM store_gb_maps WHERE obsolete = 0 AND ";
-    const ORDER: &str = " ORDER BY download_rank, gb_id";
-    let exact = format!("{LIVE}name = ?1 COLLATE NOCASE{ORDER}");
-    let within = format!("{LIVE}name LIKE ?1 ESCAPE '\\'{ORDER}");
+    // An item the player already has is left out: installing only the demo's map from it
+    // would replace the install and remove the pack's other maps.
+    const LIVE: &str = "SELECT m.gb_id FROM store_gb_maps m WHERE m.obsolete = 0 \
+        AND NOT EXISTS (SELECT 1 FROM library_gb_addons a \
+        WHERE a.gb_id = m.gb_id AND a.installed = 1) AND ";
+    const ORDER: &str = " ORDER BY m.download_rank, m.gb_id";
+    let exact = format!("{LIVE}m.name = ?1 COLLATE NOCASE{ORDER}");
+    let within = format!("{LIVE}m.name LIKE ?1 ESCAPE '\\'{ORDER}");
     let mut tiers = vec![
         (exact, name.to_owned()),
         (within.clone(), like_pattern(name)),

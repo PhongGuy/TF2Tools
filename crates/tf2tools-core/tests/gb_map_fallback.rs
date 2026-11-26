@@ -567,3 +567,27 @@ async fn a_rate_limited_profile_aborts_the_search() {
     );
     assert!(downloads_asked(&env).await.is_empty());
 }
+
+#[tokio::test]
+async fn an_item_the_player_already_installed_is_never_a_candidate() {
+    let env = store_env().await;
+    seed(&env, &[(1, "cp_a", 1, false), (2, "cp_a", 2, false)]);
+    // Reinstalling item 1 with only the demo's map would remove the pack's other maps.
+    common::sql(&env.dir)
+        .execute(
+            "INSERT INTO library_gb_addons (gb_id, section, name, author, file_id, file_date,
+             latest_file_date, checked_at, payloads, files, installed)
+             VALUES (1, 'maps', 'Pack', 'vex', 100, 0, 0, 0, '[]', '[]', 1)",
+            [],
+        )
+        .unwrap();
+    let pack = common::zip_bytes(&[
+        ("maps/cp_a.bsp", &bsp(b"a")),
+        ("maps/cp_b.bsp", &bsp(b"b")),
+    ]);
+    item(&env, 1, "pack.zip", &pack).await;
+    item(&env, 2, "pack.zip", &pack).await;
+    let (result, _) = find(&env, "cp_a").await;
+    assert_eq!(result.unwrap().gb_id(), GbId::new(2));
+    assert_eq!(profiles_asked(&env).await, [2]);
+}
