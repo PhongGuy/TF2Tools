@@ -8,6 +8,8 @@ mod header;
 mod mesh;
 mod playback;
 mod snapshot;
+#[cfg(test)]
+pub(crate) mod test_support;
 mod tracks;
 
 pub use clock::PlaybackClock;
@@ -18,4 +20,6 @@ pub use mesh::{
 };
 pub use playback::{PlaybackEvent, read_demo_playback, read_demo_tracks};
 pub use snapshot::{DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer, read_demo_snapshot};
-pub use tracks::{DemoTracks, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, TrackCut};
+pub use tracks::{
+    DemoTracks, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, PlayerId, TrackCut, TrackedPlayer,
+};

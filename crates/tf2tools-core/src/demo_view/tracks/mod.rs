@@ -64,11 +64,66 @@ pub enum TrackCut {
     },
 }
 
+/// A player in a demo, named by its entity index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub struct PlayerId(pub(crate) u32);
+
+impl PlayerId {
+    /// The player's entity index in the demo.
+    pub fn entity(self) -> u32 {
+        self.0
+    }
+}
+
+/// A player the tracks hold, with the cleaned name the demo gave it, if any.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct TrackedPlayer {
+    id: PlayerId,
+    name: Option<String>,
+}
+
+impl TrackedPlayer {
+    pub(crate) fn new(id: PlayerId, name: Option<String>) -> Self {
+        Self { id, name }
+    }
+
+    /// The player's id.
+    pub fn id(&self) -> PlayerId {
+        self.id
+    }
+
+    /// The player's name, without control characters and at most 32 characters long.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+}
+
+/// The longest name kept whole; a longer one is cut to this many characters plus an ellipsis.
+const NAME_KEEP: usize = 31;
+
+/// `raw` without control characters and trimmed, cut to 32 characters; None when nothing is left.
+pub(crate) fn clean_name(raw: &str) -> Option<String> {
+    let kept: String = raw.chars().filter(|c| !c.is_control()).collect();
+    let trimmed = kept.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.chars().count() <= NAME_KEEP + 1 {
+        return Some(trimmed.to_owned());
+    }
+    let mut cut: String = trimmed.chars().take(NAME_KEEP).collect();
+    cut.push('…');
+    Some(cut)
+}
+
 /// Every RED and BLU player's positions over the read part of a demo.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DemoTracks {
     pub(crate) players: Vec<PlayerTrack>,
+    pub(crate) names: Vec<TrackedPlayer>,
     pub(crate) first_tick: u32,
     pub(crate) last_tick: u32,
     pub(crate) seconds_per_tick: f32,
@@ -102,6 +157,11 @@ impl DemoTracks {
         self.cut
     }
 
+    /// Every player with at least one run, in entity order, parallel to the tracks.
+    pub fn players(&self) -> &[TrackedPlayer] {
+        &self.names
+    }
+
     /// How many player entities have at least one run.
     pub fn player_count(&self) -> usize {
         self.players.len()
@@ -129,7 +189,13 @@ impl DemoTracks {
             .runs()
             .map(|r| r.samples.capacity() * size_of::<TrackSample>())
             .sum();
-        players + runs + samples + self.round_starts.capacity() * size_of::<u32>()
+        let names = self.names.capacity() * size_of::<TrackedPlayer>()
+            + self
+                .names
+                .iter()
+                .map(|p| p.name.as_ref().map_or(0, String::capacity))
+                .sum::<usize>();
+        players + runs + samples + names + self.round_starts.capacity() * size_of::<u32>()
     }
 
     /// How many samples repeat the previous one of their run in feet, yaw and pitch.
@@ -181,7 +247,7 @@ impl DemoTracks {
                 last_tick = Some(frame.tick());
             }
         }
-        let players = runs
+        let players: Vec<PlayerTrack> = runs
             .into_iter()
             .zip(1..)
             .map(|(run, entity)| PlayerTrack {
@@ -189,8 +255,13 @@ impl DemoTracks {
                 runs: vec![run],
             })
             .collect();
+        let names = players
+            .iter()
+            .map(|p| TrackedPlayer::new(PlayerId(p.entity), None))
+            .collect();
         Some(DemoTracks {
             players,
+            names,
             first_tick: first_tick?,
             last_tick: last_tick?,
             seconds_per_tick,
@@ -270,9 +341,10 @@ fn player_at(track: &PlayerTrack, tick: f64) -> Option<SnapshotPlayer> {
     };
     // A rounding f32 cast can land a tiny negative yaw on 360 itself.
     let yaw = if yaw >= 360. { 0. } else { yaw };
-    Some(SnapshotPlayer::new(
-        run.team, run.class, feet, yaw, pitch, eye, ducked,
-    ))
+    Some(
+        SnapshotPlayer::new(run.team, run.class, feet, yaw, pitch, eye, ducked)
+            .with_id(PlayerId(track.entity)),
+    )
 }
 
 fn keyframe_sample(p: &SnapshotPlayer, tick: u32) -> TrackSample {
@@ -327,8 +399,10 @@ mod tests {
     use super::build::TrackBuilder;
     use super::*;
     use crate::demo_view::snapshot::{TickFrame, TickRow};
+    use crate::demo_view::test_support;
     use crate::hud_maker::Team;
     use crate::weapons::TfClass;
+    use std::collections::BTreeMap;
 
     fn row(entity: u32, x: f32, yaw: f32) -> TickRow {
         TickRow {
@@ -464,5 +538,60 @@ mod tests {
         assert_eq!(seconds_per_tick(f32::NAN, 0., 0), 1. / 66.);
         assert_eq!(seconds_per_tick(5., 1., 0), 1. / 66.);
         assert_eq!(seconds_per_tick(0., 1e9, 10), 1. / 66.);
+    }
+
+    #[test]
+    fn players_come_in_entity_order_with_clean_names() {
+        let names = BTreeMap::from([(9, "Sniper\u{7}Main".to_owned()), (2, "   ".to_owned())]);
+        let t = test_support::tracks_named(
+            vec![(
+                0,
+                vec![
+                    test_support::row(9, [1., 1., 1.], 0.),
+                    test_support::row(2, [2., 2., 2.], 0.),
+                ],
+            )],
+            names,
+        );
+        let got: Vec<(u32, Option<&str>)> = t
+            .players()
+            .iter()
+            .map(|p| (p.id().entity(), p.name()))
+            .collect();
+        assert_eq!(got, [(2, None), (9, Some("SniperMain"))]);
+    }
+
+    #[test]
+    fn at_sets_each_players_id() {
+        let t = test_support::tracks(vec![(
+            0,
+            vec![
+                test_support::row(4, [1., 1., 1.], 0.),
+                test_support::row(7, [2., 2., 2.], 0.),
+            ],
+        )]);
+        let ids: Vec<u32> = t.at(0.).players().iter().map(|p| p.id().entity()).collect();
+        assert_eq!(ids, [4, 7]);
+    }
+
+    #[test]
+    fn names_lose_control_characters_and_are_capped_at_32() {
+        assert_eq!(clean_name("  Bob\n\t "), Some("Bob".to_owned()));
+        assert_eq!(clean_name("\u{1b}[31m"), Some("[31m".to_owned()));
+        assert_eq!(clean_name("\u{0}\u{7f}"), None);
+        assert_eq!(clean_name(""), None);
+        let exact: String = "é".repeat(32);
+        assert_eq!(clean_name(&exact), Some(exact.clone()));
+        let long: String = "é".repeat(40);
+        let cut = clean_name(&long).expect("a name");
+        assert_eq!(cut.chars().count(), 32);
+        assert_eq!(cut, format!("{}…", "é".repeat(31)));
+    }
+
+    #[test]
+    fn a_snapshot_player_built_by_hand_has_entity_zero() {
+        let p = SnapshotPlayer::new(Team::Red, TfClass::Scout, [0.; 3], 0., 0., 65., false);
+        assert_eq!(p.id().entity(), 0);
+        assert_eq!(p.with_id(PlayerId(5)).id().entity(), 5);
     }
 }

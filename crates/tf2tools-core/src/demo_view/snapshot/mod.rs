@@ -1,5 +1,6 @@
 //! One still frame of a demo: where each RED and BLU player stands and looks at one tick.
 
+use crate::demo_view::tracks::PlayerId;
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
@@ -44,6 +45,7 @@ impl DemoSnapshot {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct SnapshotPlayer {
+    id: PlayerId,
     team: Team,
     class: TfClass,
     feet: [f32; 3],
@@ -65,6 +67,7 @@ impl SnapshotPlayer {
         ducked: bool,
     ) -> Self {
         Self {
+            id: PlayerId(0),
             team,
             class,
             feet,
@@ -73,6 +76,15 @@ impl SnapshotPlayer {
             eye_height,
             ducked,
         }
+    }
+
+    /// The player's id; entity 0 for a player built by hand.
+    pub fn id(&self) -> PlayerId {
+        self.id
+    }
+
+    pub(crate) fn with_id(self, id: PlayerId) -> Self {
+        Self { id, ..self }
     }
 
     /// The player's side.

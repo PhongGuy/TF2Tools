@@ -1,6 +1,7 @@
 //! Picks the snapshot tick from a stream of per-tick player rows.
 
 use super::{DemoSnapshot, SnapshotPlayer, eye_height};
+use crate::demo_view::tracks::PlayerId;
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
@@ -175,9 +176,10 @@ pub(crate) fn into_snapshot(tick: u32, rows: Vec<TickRow>) -> DemoSnapshot {
         .filter_map(|row| {
             let (team, class) = (row.team?, row.class?);
             let eye = eye_height(&row, class);
-            Some(SnapshotPlayer::new(
-                team, class, row.feet, row.yaw, row.pitch, eye, row.ducked,
-            ))
+            Some(
+                SnapshotPlayer::new(team, class, row.feet, row.yaw, row.pitch, eye, row.ducked)
+                    .with_id(PlayerId(row.entity)),
+            )
         })
         .collect();
     DemoSnapshot::new(tick, players)
@@ -475,5 +477,12 @@ mod tests {
                 false
             )
         );
+    }
+
+    #[test]
+    fn the_still_pick_sets_ids() {
+        let snap = into_snapshot(10, vec![row(3, Team::Red), row(8, Team::Blue)]);
+        let ids: Vec<u32> = snap.players().iter().map(|p| p.id().entity()).collect();
+        assert_eq!(ids, [3, 8]);
     }
 }

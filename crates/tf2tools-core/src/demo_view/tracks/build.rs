@@ -2,7 +2,10 @@
 
 use std::collections::BTreeMap;
 
-use super::{DemoTracks, PlayerTrack, TrackCut, TrackRun, TrackSample, pack_sample};
+use super::{
+    DemoTracks, PlayerId, PlayerTrack, TrackCut, TrackRun, TrackSample, TrackedPlayer, clean_name,
+    pack_sample,
+};
 use crate::demo_view::snapshot::{SENTINEL_TICK, Step, TickFrame, TickRow, drawable, eye_height};
 use crate::weapons::TfClass;
 
@@ -32,6 +35,7 @@ pub(crate) struct TrackBuilder {
     last_state: Option<i64>,
     round_starts: Vec<u32>,
     capped: Option<u32>,
+    names: BTreeMap<u32, String>,
 }
 
 impl TrackBuilder {
@@ -47,7 +51,13 @@ impl TrackBuilder {
             last_state: None,
             round_starts: Vec::new(),
             capped: None,
+            names: BTreeMap::new(),
         }
+    }
+
+    /// The raw names by entity that `finish` cleans and hands to the tracks.
+    pub fn set_names(&mut self, names: BTreeMap<u32, String>) {
+        self.names = names;
     }
 
     /// Takes one frame and says whether the builder wants more.
@@ -155,10 +165,18 @@ impl TrackBuilder {
             player.runs.shrink_to_fit();
         }
         players.shrink_to_fit();
+        let names = players
+            .iter()
+            .map(|p| {
+                let name = self.names.get(&p.entity).and_then(|n| clean_name(n));
+                TrackedPlayer::new(PlayerId(p.entity), name)
+            })
+            .collect();
         let mut round_starts = self.round_starts;
         round_starts.shrink_to_fit();
         Some(DemoTracks {
             players,
+            names,
             first_tick,
             last_tick,
             seconds_per_tick,
