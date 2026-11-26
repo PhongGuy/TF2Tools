@@ -3,6 +3,7 @@
 
 pub mod demos_fake;
 pub mod fake_http;
+pub mod logs_fake;
 pub mod seed;
 
 // Core's stock HUD fixture, shared so the fake game carries the same files the tests load.

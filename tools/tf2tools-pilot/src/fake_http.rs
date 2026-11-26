@@ -6,7 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::demos_fake;
+use crate::{demos_fake, logs_fake};
 
 /// Bounds the request head, so a client that never ends it cannot grow the buffer.
 const HEAD_LIMIT: usize = 8 * 1024;
@@ -80,6 +80,9 @@ fn route(target: &str, root: &str) -> (&'static str, &'static str, Vec<u8>) {
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
     if let Some(rest) = path.strip_prefix("/demostf") {
         return demos_fake::answer(rest, query, &format!("{root}/demostf"));
+    }
+    if let Some(rest) = path.strip_prefix("/logstf") {
+        return logs_fake::answer(rest, query);
     }
     ("404 Not Found", "text/plain", b"not found".to_vec())
 }
