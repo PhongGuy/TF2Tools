@@ -21,8 +21,8 @@ use gpui_kit::{
     WeakEntity, Window, canvas, div, px,
 };
 use tf2tools_core::{
-    DownloadPhase, GbMapInstallError, GbMapSearchError, GbMapSearchProgress, LookSensitivity,
-    MapDownloadError, Tf2Install,
+    DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError, GbMapSearchProgress,
+    LookSensitivity, MapDownloadError, Tf2Install,
 };
 
 use crate::i18n::{format, tr};
@@ -901,9 +901,34 @@ impl Render for DemoViewerPage {
     }
 }
 
+// A found GameBanana download that removes its scratch dir on a plain thread when dropped
+// unused, so no cancel or closed window leaves that disk work on the UI thread.
+struct OffUi(Option<GbMapDownload>);
+
+impl OffUi {
+    fn new(download: GbMapDownload) -> Self {
+        Self(Some(download))
+    }
+
+    fn get(&self) -> Option<&GbMapDownload> {
+        self.0.as_ref()
+    }
+
+    fn into_inner(mut self) -> Option<GbMapDownload> {
+        self.0.take()
+    }
+}
+
+impl Drop for OffUi {
+    fn drop(&mut self) {
+        if let Some(download) = self.0.take() {
+            std::thread::spawn(move || drop(download));
+        }
+    }
+}
+
 // Searches GameBanana for `map` with live progress, installs the match and loads the demo
-// again. A download the page no longer wants is dropped on a pool thread, where its scratch
-// dir is removed.
+// again. The match travels as an `OffUi`, so an unwanted download is never dropped here.
 async fn search_gamebanana(
     page: WeakEntity<DemoViewerPage>,
     cx: &mut AsyncWindowContext,
@@ -924,7 +949,7 @@ async fn search_gamebanana(
             let report = move |p: GbMapSearchProgress| {
                 tx.send_replace(Some(p));
             };
-            store.find_gb_map(&name, &report).await
+            store.find_gb_map(&name, &report).await.map(OffUi::new)
         })
     }) else {
         return;
@@ -955,12 +980,10 @@ async fn search_gamebanana(
             let current = page
                 .update(cx, |page, _| page.generation == generation)
                 .unwrap_or(false);
-            if current {
-                Ok(found)
-            } else {
-                cx.background_spawn(async move { drop(found) }).detach();
+            if !current {
                 return;
             }
+            Ok(found)
         }
         Ok(Err(e)) => Err(Ok(e)),
         Err(e) => Err(Err(e)),
@@ -999,16 +1022,23 @@ async fn search_gamebanana(
         }
     };
 
-    let (gb_id, file_id) = (found.gb_id(), found.file_id());
+    let Some((gb_id, file_id)) = found.get().map(|d| (d.gb_id(), d.file_id())) else {
+        return;
+    };
     let Ok(installing) = cx.update(|_, cx| {
         let probe = Tf2Probe::get(cx);
         let chosen: Vec<String> = found
-            .maps()
-            .iter()
+            .get()
+            .into_iter()
+            .flat_map(|d| d.maps())
             .take(1)
             .map(|m| m.name().to_owned())
             .collect();
         run_blocking(cx, move |s| {
+            // into_inner consumes the only handle, so an empty one never reaches here.
+            let found = found
+                .into_inner()
+                .ok_or_else(|| OpError::Internal(std::any::type_name::<OffUi>().to_owned()))?;
             Ok(s.library.install_gb_map(found, &chosen, &install, &*probe))
         })
     }) else {
