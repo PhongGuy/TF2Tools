@@ -239,6 +239,7 @@ demo_viewer:
     step_back: "后退一个 tick"
     step_forward: "前进一个 tick"
     speed: "播放速度"
+    timeline: "时间轴"
     round: "第 %{n} 回合"
     reading: "正在读取录像 %{percent}%"
     reading_no_percent: "正在读取录像..."

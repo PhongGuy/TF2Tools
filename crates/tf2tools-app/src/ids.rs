@@ -3681,7 +3681,7 @@ pub const DEMO_VIEWER_STEP_FORWARD: &str = "demo-viewer-step-forward";
 pub const DEMO_VIEWER_TIMELINE: &str = "demo-viewer-timeline";
 /// The playback time beside the timeline, "m:ss / m:ss".
 pub const DEMO_VIEWER_TIME: &str = "demo-viewer-time";
-/// The bar's playback speed button, labelled "1×" and so on.
+/// The bar's playback speed button, showing "1×" and named "Playback speed 1×" and so on.
 pub const DEMO_VIEWER_SPEED: &str = "demo-viewer-speed";
 /// The muted note in the bar while the demo's playback is still being read.
 pub const DEMO_VIEWER_READING: &str = "demo-viewer-reading";

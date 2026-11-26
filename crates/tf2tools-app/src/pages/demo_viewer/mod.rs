@@ -381,9 +381,12 @@ impl DemoViewerPage {
         let stop = Arc::clone(&cancel);
         // A parse can take seconds, so it holds a thread of its own rather than an executor's.
         // A thread the OS refuses closes the channel unsent, which reads as an unreadable map.
-        let _ = std::thread::Builder::new()
+        if let Err(error) = std::thread::Builder::new()
             .name("demo-viewer-load".into())
-            .spawn(move || read_demo(&reading, found.as_ref(), &reader, &stop, &tx));
+            .spawn(move || read_demo(&reading, found.as_ref(), &reader, &stop, &tx))
+        {
+            tracing::warn!(%error, "the demo viewer could not start its load thread");
+        }
         // Replacing the guard and the task cancels the previous load and closes its channel.
         self._cancel = Some(CancelGuard(cancel));
         self.reading = Some(cx.spawn_in(window, async move |page, cx| {

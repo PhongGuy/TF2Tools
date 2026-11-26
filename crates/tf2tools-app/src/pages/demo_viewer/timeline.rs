@@ -241,11 +241,12 @@ impl DemoViewerPage {
                 page.on_viewport(cx, |v, cx| v.toggle_play(cx));
             }));
         let speed = state.map_or(1., |s| s.speed);
+        // The name carries the speed as well, so a screen reader hears what the button shows.
         let speed_button = Button::new(ids::DEMO_VIEWER_SPEED)
             .ghost()
             .small()
             .label(format!("{speed}×"))
-            .tooltip(tr!("demo_viewer.playback.speed"))
+            .named(format!("{} {speed}×", tr!("demo_viewer.playback.speed")))
             .disabled(waiting)
             .on_click(cx.listener(move |page, _, _, cx| {
                 page.on_viewport(cx, |v, cx| v.set_speed(next_speed(speed), cx));
@@ -256,6 +257,7 @@ impl DemoViewerPage {
         };
         let timeline = v_flex()
             .id(ids::DEMO_VIEWER_TIMELINE)
+            .aria_label(tr!("demo_viewer.playback.timeline"))
             .test_support()
             .flex_1()
             .min_w(px(160.))

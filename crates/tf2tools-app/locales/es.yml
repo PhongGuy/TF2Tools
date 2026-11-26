@@ -240,6 +240,7 @@ demo_viewer:
     step_back: "Retroceder un tick"
     step_forward: "Avanzar un tick"
     speed: "Velocidad de reproducción"
+    timeline: "Línea de tiempo"
     round: "Ronda %{n}"
     reading: "Leyendo la demo: %{percent}%"
     reading_no_percent: "Leyendo la demo..."

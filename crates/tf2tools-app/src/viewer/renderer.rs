@@ -116,10 +116,15 @@ impl Renderer {
         let worker_sender = sender.clone();
         let id = NEXT_WORKER.fetch_add(1, Ordering::Relaxed);
         let closing = Arc::new(AtomicBool::new(false));
+        let stopped = Arc::clone(&closing);
         let spawned = std::thread::Builder::new()
             .name("viewer-render".into())
             .spawn(move || {
                 wait_for_closing_workers(id);
+                // A viewer closed before or during the wait never needs its device.
+                if stopped.load(Ordering::Relaxed) {
+                    return;
+                }
                 // A panic (wgpu reports validation errors that way) ends the worker as a failure.
                 if let Err(payload) = crate::crash::catching(|| run(&inbox, &worker_sender)) {
                     let error = RendererError::Device(crate::crash::panic_text(payload.as_ref()));

@@ -120,6 +120,7 @@ fn the_playback_words_speak_every_language() {
         ("step_back", None),
         ("step_forward", None),
         ("speed", None),
+        ("timeline", None),
         ("round", Some("%{n}")),
         ("reading", Some("%{percent}")),
         ("reading_no_percent", None),

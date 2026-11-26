@@ -242,6 +242,7 @@ demo_viewer:
     step_back: "Reculer d'un tick"
     step_forward: "Avancer d'un tick"
     speed: "Vitesse de lecture"
+    timeline: "Chronologie"
     round: "Manche %{n}"
     reading: "Lecture de la démo : %{percent} %"
     reading_no_percent: "Lecture de la démo..."

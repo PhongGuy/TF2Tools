@@ -264,6 +264,7 @@ fn quit_stops_a_live_renderer_and_joins_it_quickly() {
 #[test]
 fn a_renderer_opened_after_one_closes_waits_for_its_teardown() {
     let _turn = one_at_a_time();
+    // This guards the order of teardown and creation; it does not reproduce the driver race.
     for _ in 0..3 {
         let (first, first_events) = ready_renderer();
         drop(first);

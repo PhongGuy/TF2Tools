@@ -240,6 +240,7 @@ demo_viewer:
     step_back: "Einen Tick zurück"
     step_forward: "Einen Tick vor"
     speed: "Wiedergabegeschwindigkeit"
+    timeline: "Zeitleiste"
     round: "Runde %{n}"
     reading: "Demo wird gelesen: %{percent} %"
     reading_no_percent: "Demo wird gelesen..."

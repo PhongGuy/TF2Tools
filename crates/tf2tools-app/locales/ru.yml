@@ -215,6 +215,7 @@ demo_viewer:
     step_back: "На тик назад"
     step_forward: "На тик вперёд"
     speed: "Скорость воспроизведения"
+    timeline: "Шкала времени"
     round: "Раунд %{n}"
     reading: "Чтение демо: %{percent}%"
     reading_no_percent: "Чтение демо..."

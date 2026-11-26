@@ -1,7 +1,9 @@
 //! The Demo Viewer's playback stream: the still picture first, reading progress, the tracks,
 //! a failed read, and a read cancelled by leaving the page.
 
-use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use gpui_kit::component::slider::{SliderEvent, SliderValue};
 use gpui_kit::{AppContext as _, TestAppContext};
@@ -135,7 +137,7 @@ fn the_speed_button_cycles_through_five_speeds(cx: &mut TestAppContext) {
     let env = support::env();
     let w = open_with_tracks(cx, &env, None);
     let label = |cx: &mut TestAppContext| support::label_of(cx, w.s.win, ids::DEMO_VIEWER_SPEED);
-    assert_eq!(label(cx).as_deref(), Some("1×"));
+    assert_eq!(label(cx).as_deref(), Some("Playback speed 1×"));
     let mut seen = Vec::new();
     for _ in 0..5 {
         support::click_id(cx, w.s.win, ids::DEMO_VIEWER_SPEED);
@@ -145,11 +147,11 @@ fn the_speed_button_cycles_through_five_speeds(cx: &mut TestAppContext) {
         ));
     }
     let expected = [
-        ("2×", 2.),
-        ("4×", 4.),
-        ("0.25×", 0.25),
-        ("0.5×", 0.5),
-        ("1×", 1.),
+        ("Playback speed 2×", 2.),
+        ("Playback speed 4×", 4.),
+        ("Playback speed 0.25×", 0.25),
+        ("Playback speed 0.5×", 0.5),
+        ("Playback speed 1×", 1.),
     ];
     let got: Vec<(&str, f32)> = seen.iter().map(|(l, s)| (l.as_ref(), *s)).collect();
     assert_eq!(got, expected);
@@ -234,6 +236,86 @@ fn a_cut_says_where_playback_ends(cx: &mut TestAppContext) {
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYBACK_NOTE).as_deref(),
         Some("This demo ends early, at 1:03.")
     );
+}
+
+#[gpui_kit::test]
+fn a_file_cap_says_where_playback_ends(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with_tracks(cx, &env, Some(TrackCut::FileCap { at_tick: 4100 }));
+    // 4100 ticks at 60/3960 s is 62.1 s.
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYBACK_NOTE).as_deref(),
+        Some("This demo is too large to play past 1:02.")
+    );
+}
+
+#[gpui_kit::test]
+fn a_sample_cap_says_where_playback_ends(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with_tracks(cx, &env, Some(TrackCut::SampleCap { at_tick: 4200 }));
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYBACK_NOTE).as_deref(),
+        Some("This demo is too long to play past 1:03.")
+    );
+}
+
+#[gpui_kit::test]
+fn the_timeline_is_named(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with_tracks(cx, &env, None);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_TIMELINE).as_deref(),
+        Some("Timeline")
+    );
+}
+
+// Playing sets the slider from each frame's tick without a Change, so the slider never seeks
+// the viewport back to where it was.
+#[gpui_kit::test]
+fn playing_moves_the_slider_without_seeking(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with_tracks(cx, &env, None);
+    let slider = cx.update(|cx| {
+        let page =
+            w.s.shell
+                .read(cx)
+                .demo_viewer_page(cx)
+                .expect("the Demo Viewer");
+        page.read(cx)
+            .timeline_slider()
+            .cloned()
+            .expect("the tracks' slider")
+    });
+    let changes = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&changes);
+    let _watch = cx.update(|cx| {
+        cx.subscribe(&slider, move |_, ev: &SliderEvent, _| {
+            if let SliderEvent::Change(_) = ev {
+                counted.fetch_add(1, Ordering::SeqCst);
+            }
+        })
+    });
+    let value = |cx: &mut TestAppContext| cx.update(|cx| slider.read(cx).value().start());
+    let start = value(cx);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_PLAY);
+    let mut seen = vec![start];
+    // The shell's viewport runs on the real clock, so each frame waits a little real time.
+    for _ in 0..6 {
+        std::thread::sleep(Duration::from_millis(40));
+        cx.update_window(w.s.win, |_, window, cx| window.simulate_next_frame(cx))
+            .unwrap();
+        cx.run_until_parked();
+        seen.push(value(cx));
+    }
+    assert!(seen.windows(2).all(|p| p[0] <= p[1]), "{seen:?}");
+    assert!(seen.last() > seen.first(), "{seen:?}");
+    let state = playback(cx, &w).unwrap();
+    assert!(state.playing);
+    assert!(
+        state.tick as f32 >= *seen.last().unwrap(),
+        "{state:?} {seen:?}"
+    );
+    assert_eq!(changes.load(Ordering::SeqCst), 0);
 }
 
 #[gpui_kit::test]

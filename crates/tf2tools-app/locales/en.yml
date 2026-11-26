@@ -217,6 +217,7 @@ demo_viewer:
     step_back: "Back one tick"
     step_forward: "Forward one tick"
     speed: "Playback speed"
+    timeline: "Timeline"
     round: "Round %{n}"
     reading: "Reading demo %{percent}%"
     reading_no_percent: "Reading demo..."
