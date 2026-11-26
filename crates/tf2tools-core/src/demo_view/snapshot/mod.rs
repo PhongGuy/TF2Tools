@@ -6,7 +6,8 @@ use crate::weapons::TfClass;
 mod parse;
 mod pick;
 
-pub use parse::read_demo_snapshot;
+pub use parse::{read_demo_snapshot, read_demo_tracks};
+pub(crate) use pick::{SENTINEL_TICK, Step, TickFrame, TickRow, drawable};
 
 /// The most of a demo read when looking for players; the early-match tick sits well inside it.
 pub const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;

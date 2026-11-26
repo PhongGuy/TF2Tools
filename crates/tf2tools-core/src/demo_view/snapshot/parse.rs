@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 use std::io::Read as _;
+use std::ops::ControlFlow;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tf_demo_parser::demo::data::{DemoTick, UserInfo};
 use tf_demo_parser::demo::message::Message;
@@ -20,7 +22,10 @@ use tf_demo_parser::{Demo, DemoParser, MessageType, ParserState};
 
 use super::pick::{SENTINEL_TICK, SnapshotPicker, Step, TickFrame, TickRow, into_snapshot};
 use super::{DemoSnapshot, MAX_SNAPSHOT_BYTES};
-use crate::error::DemoSnapshotError;
+use crate::demo_view::tracks::{
+    DemoTracks, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, TrackBuilder, seconds_per_tick,
+};
+use crate::error::{DemoSnapshotError, DemoTracksError};
 use crate::hud_maker::Team;
 use crate::panic_mark::catching;
 use crate::weapons::TfClass;
@@ -232,28 +237,68 @@ impl Tracker {
     }
 }
 
-// Steps packets until the picker is done or the input ends; a cut-off demo ends with Ok(None).
-fn pick(bytes: &[u8]) -> Result<Option<(u32, Vec<TickRow>)>, String> {
+/// What a parse knows about tick length: the header's totals and the server's interval.
+pub(crate) struct Clocking {
+    pub header_ticks: u32,
+    pub header_duration: f32,
+    pub server_interval: f32,
+}
+
+impl Clocking {
+    /// The tick length the tracks and the clock use.
+    pub fn seconds_per_tick(&self) -> f32 {
+        seconds_per_tick(
+            self.server_interval,
+            self.header_duration,
+            self.header_ticks,
+        )
+    }
+}
+
+// Steps packets, handing each real tick's frame to `on_frame` until it breaks or the input
+// ends; a cut-off demo simply ends. Signon ticks are skipped.
+pub(crate) fn drive(
+    bytes: &[u8],
+    mut on_frame: impl FnMut(TickFrame, &Clocking) -> ControlFlow<()>,
+) -> Result<Clocking, String> {
     let demo = Demo::new(bytes);
     let parser = DemoParser::new_with_analyser(demo.get_stream(), Tracker::default());
-    let (_header, mut ticker) = parser.ticker().map_err(|e| e.to_string())?;
-    let mut picker = SnapshotPicker::new();
+    let (header, mut ticker) = parser.ticker().map_err(|e| e.to_string())?;
+    let mut clocking = Clocking {
+        header_ticks: header.ticks,
+        header_duration: header.duration,
+        server_interval: 0.,
+    };
     loop {
-        let frame = match ticker.next() {
+        match ticker.next() {
             Ok(Some(tick)) => {
                 let at = u32::from(tick.tick);
                 if at >= SENTINEL_TICK {
                     continue;
                 }
-                tick.state.frame(at)
+                clocking.server_interval = tick.state.game.state.interval_per_tick;
+                if on_frame(tick.state.frame(at), &clocking).is_break() {
+                    break;
+                }
             }
             Ok(None) => break,
             Err(e) => return Err(e.to_string()),
-        };
-        if picker.push(frame) == Step::Done {
-            break;
         }
     }
+    Ok(clocking)
+}
+
+fn until_done(step: Step) -> ControlFlow<()> {
+    match step {
+        Step::Continue => ControlFlow::Continue(()),
+        Step::Done => ControlFlow::Break(()),
+    }
+}
+
+// Feeds frames to the picker until it settles; a cut-off demo ends with Ok(None).
+fn pick(bytes: &[u8]) -> Result<Option<(u32, Vec<TickRow>)>, String> {
+    let mut picker = SnapshotPicker::new();
+    drive(bytes, |frame, _| until_done(picker.push(frame)))?;
     Ok(picker.finish())
 }
 
@@ -262,6 +307,58 @@ pub fn read_demo_snapshot(dem: &Path) -> Result<DemoSnapshot, DemoSnapshotError>
     let bytes = read_prefix(dem, MAX_SNAPSHOT_BYTES)
         .map_err(|e| DemoSnapshotError::Unreadable(e.to_string()))?;
     snapshot_from_bytes(&bytes, || {})
+}
+
+/// Reads at most MAX_DEMO_BYTES of `dem` and builds every player's tracks over it. `cancel` is
+/// checked before and after the read and at every frame.
+pub fn read_demo_tracks(dem: &Path, cancel: &AtomicBool) -> Result<DemoTracks, DemoTracksError> {
+    let unreadable = |e: std::io::Error| DemoTracksError::Unreadable(e.to_string());
+    if cancel.load(Ordering::Relaxed) {
+        return Err(DemoTracksError::Cancelled);
+    }
+    let file_capped = std::fs::metadata(dem).map_err(unreadable)?.len() > MAX_DEMO_BYTES;
+    let bytes = read_prefix(dem, MAX_DEMO_BYTES).map_err(unreadable)?;
+    if cancel.load(Ordering::Relaxed) {
+        return Err(DemoTracksError::Cancelled);
+    }
+    let tracks = tracks_from_bytes(&bytes, file_capped, cancel, MAX_TRACK_SAMPLES, || {});
+    drop(bytes);
+    tracks
+}
+
+// Builds the tracks under the panic guard, as `snapshot_from_bytes` does; the sample cap is a
+// parameter so tests can hit it with a small demo.
+fn tracks_from_bytes(
+    bytes: &[u8],
+    file_capped: bool,
+    cancel: &AtomicBool,
+    sample_cap: usize,
+    before_parse: impl FnOnce(),
+) -> Result<DemoTracks, DemoTracksError> {
+    let built = catching(|| -> Result<_, String> {
+        before_parse();
+        let mut builder = TrackBuilder::new(sample_cap);
+        let mut cancelled = false;
+        let clocking = drive(bytes, |frame, clocking| {
+            if cancel.load(Ordering::Relaxed) {
+                cancelled = true;
+                return ControlFlow::Break(());
+            }
+            until_done(builder.push(&frame, clocking.seconds_per_tick()))
+        })?;
+        let spt = clocking.seconds_per_tick();
+        Ok((
+            cancelled,
+            builder.finish(spt, clocking.header_ticks, file_capped),
+        ))
+    })
+    .map_err(|_| DemoTracksError::Unreadable("the demo parser panicked".into()))?;
+    match built {
+        Err(text) => Err(DemoTracksError::Unreadable(text)),
+        Ok((true, _)) => Err(DemoTracksError::Cancelled),
+        Ok((false, None)) => Err(DemoTracksError::NoPlayers),
+        Ok((false, Some(tracks))) => Ok(tracks),
+    }
 }
 
 // The first `cap` bytes of the file, or all of it when shorter.
@@ -300,6 +397,19 @@ mod tests {
         let got = snapshot_from_bytes(b"HL2DEMO\0", || panic!("forced"));
         match got {
             Err(DemoSnapshotError::Unreadable(text)) => {
+                assert_eq!(text, "the demo parser panicked")
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(!crate::panic_mark::is_marked());
+    }
+
+    #[test]
+    fn a_parser_panic_while_building_tracks_is_unreadable() {
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let got = tracks_from_bytes(b"HL2DEMO\0", false, &cancel, 100, || panic!("forced"));
+        match got {
+            Err(crate::error::DemoTracksError::Unreadable(text)) => {
                 assert_eq!(text, "the demo parser panicked")
             }
             other => panic!("{other:?}"),
