@@ -242,7 +242,7 @@ demo_viewer:
     timeline: "时间轴"
     round: "第 %{n} 回合"
     reading: "正在读取录像 %{percent}%"
-    reading_no_percent: "正在读取录像..."
+    reading_no_percent: "正在读取录像…"
     cut_file: "此录像过大，只能播放到 %{time}。"
     cut_samples: "此录像过长，只能播放到 %{time}。"
     cut_ended: "此录像提前结束于 %{time}。"

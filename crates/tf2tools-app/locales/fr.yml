@@ -244,7 +244,7 @@ demo_viewer:
     speed: "Vitesse de lecture"
     timeline: "Chronologie"
     round: "Manche %{n}"
-    reading: "Lecture de la démo : %{percent} %"
+    reading: "Lecture de la démo : %{percent} %"
     reading_no_percent: "Lecture de la démo..."
     cut_file: "Cette démo est trop volumineuse pour être lue au-delà de %{time}."
     cut_samples: "Cette démo est trop longue pour être lue au-delà de %{time}."
