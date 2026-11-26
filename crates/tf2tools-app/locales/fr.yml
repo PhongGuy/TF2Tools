@@ -223,6 +223,8 @@ demo_viewer:
   loading: "Chargement de la carte..."
   downloading: "Téléchargement de %{map} depuis serveme.tf..."
   received: "%{done} / %{total}"
+  searching: "Recherche de %{map} sur GameBanana..."
+  searching_candidate: "Recherche de %{map} sur GameBanana (%{n} sur %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} joueurs à %{time}"
   players_note: "Impossible de lire les joueurs de cette démo."

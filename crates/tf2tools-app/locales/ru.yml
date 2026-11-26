@@ -196,6 +196,8 @@ demo_viewer:
   loading: "Загрузка карты..."
   downloading: "Загрузка %{map} с serveme.tf..."
   received: "%{done} / %{total}"
+  searching: "Поиск %{map} на GameBanana..."
+  searching_candidate: "Поиск %{map} на GameBanana (%{n} из %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, игроков: %{count}, момент %{time}"
   players_note: "Не удалось прочитать игроков из этого демо."

@@ -14,18 +14,22 @@ use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Anchor, AnyElement, AppContext as _, Context, CursorStyle, DispatchPhase, Entity, Hsla,
-    InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, ParentElement as _, Pixels, Point, Render, SharedString, Size,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
-    canvas, div, px,
+    Anchor, AnyElement, AppContext as _, AsyncWindowContext, Context, CursorStyle, DispatchPhase,
+    Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, SharedString, Size,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _,
+    WeakEntity, Window, canvas, div, px,
 };
-use tf2tools_core::{DownloadPhase, LookSensitivity, MapDownloadError, Tf2Install};
+use tf2tools_core::{
+    DownloadPhase, GbMapInstallError, GbMapSearchError, GbMapSearchProgress, LookSensitivity,
+    MapDownloadError, Tf2Install,
+};
 
 use crate::i18n::{format, tr};
 use crate::ids;
-use crate::local_messages::describe_settings;
-use crate::map_messages::{describe_map_download, map_stopped};
+use crate::local_messages::{describe_gb_map_install, describe_settings};
+use crate::map_messages::{describe_gb_map_search, describe_map_download, map_stopped};
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, run_blocking, tf2_state};
 use crate::shell::toast::toast_error;
@@ -53,11 +57,13 @@ const BAR_MARGIN: Pixels = px(8.);
 /// What the page shows under its control bar.
 enum View {
     Loading,
-    /// The demo's map is being fetched from serveme.tf: bytes so far and the announced size.
+    /// The demo's map is being fetched: bytes so far and the announced size. `searching` is
+    /// set once serveme.tf lacked it, holding the GameBanana candidate and the count, or 0s.
     Downloading {
         map: String,
         done: u64,
         total: Option<u64>,
+        searching: Option<(u8, u8)>,
     },
     Failed(SharedString),
     /// A map download that may work if tried again: what went wrong, and what to retry.
@@ -364,6 +370,7 @@ impl DemoViewerPage {
             map: map.clone(),
             done: 0,
             total: None,
+            searching: None,
         };
         cx.notify();
         if !tokio_bridge::is_running(cx) {
@@ -373,6 +380,7 @@ impl DemoViewerPage {
         let (tx, mut rx) = tokio::sync::watch::channel((0u64, None::<u64>));
         let name = map.clone();
         let failed_map = map.clone();
+        let searching = (path.clone(), install.clone());
         let job = tokio_bridge::spawn(cx, async move {
             let report = move |done, total| {
                 tx.send_replace((done, total));
@@ -393,19 +401,22 @@ impl DemoViewerPage {
                 });
             }
             let joined = job.await;
-            let _ = page.update_in(cx, |page, window, cx| {
+            let absent = page.update_in(cx, |page, window, cx| {
                 if page.generation != generation {
-                    return;
+                    return false;
                 }
-                // A 404 means serveme.tf lacks the map, so retrying is pointless; any other
-                // failure may pass, so it keeps its reason and a Retry.
+                // A 404 means serveme.tf lacks the map, so GameBanana is searched next; any
+                // other failure may pass, so it keeps its reason and a Retry.
                 let (failure, absent) = match joined {
                     // A map that landed meanwhile, say from the Maps page, is simply shown.
                     Ok(Ok(()))
                     | Ok(Err(
                         MapDownloadError::AlreadyDownloaded { .. }
                         | MapDownloadError::InGame { .. },
-                    )) => return page.load(path, generation, true, window, cx),
+                    )) => {
+                        page.load(path, generation, true, window, cx);
+                        return false;
+                    }
                     Ok(Err(e)) => (
                         describe_map_download(&e),
                         matches!(e, MapDownloadError::Http { status: 404, .. }),
@@ -415,16 +426,20 @@ impl DemoViewerPage {
                     Err(e) => (map_stopped(e.to_string()), false),
                 };
                 failure.log("map download");
-                page.view = match absent {
-                    true => View::Failed(tr!("demo_viewer.error.not_on_serveme", map = failed_map)),
-                    false => View::DownloadFailed {
+                if !absent {
+                    page.view = View::DownloadFailed {
                         path,
                         map: failed_map,
                         detail: failure.message.into(),
-                    },
-                };
-                cx.notify();
+                    };
+                    cx.notify();
+                }
+                absent
             });
+            if matches!(absent, Ok(true)) {
+                let (path, install) = searching;
+                search_gamebanana(page, cx, path, map, install, generation).await;
+            }
         }));
     }
 
@@ -655,13 +670,20 @@ impl Render for DemoViewerPage {
         };
         // A download shows its status over a bar and the bytes so far, centred like the status.
         // The label holds only the bytes, since the status already says what is happening.
-        let downloading = |map: &str, done: u64, total: Option<u64>| {
+        let downloading = |map: &str,
+                           done: u64,
+                           total: Option<u64>,
+                           searching: Option<(u8, u8)>| {
             let progress = Some(Progress {
                 phase: DownloadPhase::Downloading,
                 downloaded: done,
                 total,
             });
-            let words = tr!("demo_viewer.downloading", map = map);
+            let words = match searching {
+                None => tr!("demo_viewer.downloading", map = map),
+                Some((0, _)) => tr!("demo_viewer.searching", map = map),
+                Some((n, of)) => tr!("demo_viewer.searching_candidate", map = map, n = n, of = of),
+            };
             let received = match total {
                 Some(total) => tr!(
                     "demo_viewer.received",
@@ -720,7 +742,12 @@ impl Render for DemoViewerPage {
                 Some((caption.clone(), *players_note)),
             ),
             View::Loading => status(tr!("demo_viewer.loading")),
-            View::Downloading { map, done, total } => downloading(map, *done, *total),
+            View::Downloading {
+                map,
+                done,
+                total,
+                searching,
+            } => downloading(map, *done, *total, *searching),
             View::Failed(message) => status(message.clone()),
             View::DownloadFailed { map, detail, .. } => download_failed(map, detail.clone(), cx),
         };
@@ -872,4 +899,151 @@ impl Render for DemoViewerPage {
             .child(body)
             .child(frame)
     }
+}
+
+// Searches GameBanana for `map` with live progress, installs the match and loads the demo
+// again. A download the page no longer wants is dropped on a pool thread, where its scratch
+// dir is removed.
+async fn search_gamebanana(
+    page: WeakEntity<DemoViewerPage>,
+    cx: &mut AsyncWindowContext,
+    path: PathBuf,
+    map: String,
+    install: Tf2Install,
+    generation: u64,
+) {
+    let (tx, mut rx) = tokio::sync::watch::channel(None::<GbMapSearchProgress>);
+    let Ok(job) = page.update(cx, |page, cx| {
+        if let View::Downloading { searching, .. } = &mut page.view {
+            *searching = Some((0, 0));
+            cx.notify();
+        }
+        let store = cx.global::<Services>().store.clone();
+        let name = map.clone();
+        tokio_bridge::spawn(cx, async move {
+            let report = move |p: GbMapSearchProgress| {
+                tx.send_replace(Some(p));
+            };
+            store.find_gb_map(&name, &report).await
+        })
+    }) else {
+        return;
+    };
+    while rx.changed().await.is_ok() {
+        let Some(now) = *rx.borrow_and_update() else {
+            continue;
+        };
+        let _ = page.update(cx, |page, cx| {
+            if page.generation != generation {
+                return;
+            }
+            if let View::Downloading {
+                done,
+                total,
+                searching,
+                ..
+            } = &mut page.view
+            {
+                (*done, *total) = (now.download.downloaded(), now.download.total());
+                *searching = Some((now.candidate, now.of));
+                cx.notify();
+            }
+        });
+    }
+    let failed = match job.await {
+        Ok(Ok(found)) => {
+            let current = page
+                .update(cx, |page, _| page.generation == generation)
+                .unwrap_or(false);
+            if current {
+                Ok(found)
+            } else {
+                cx.background_spawn(async move { drop(found) }).detach();
+                return;
+            }
+        }
+        Ok(Err(e)) => Err(Ok(e)),
+        Err(e) => Err(Err(e)),
+    };
+    let found = match failed {
+        Ok(found) => found,
+        Err(failed) => {
+            let _ = page.update(cx, |page, cx| {
+                if page.generation != generation {
+                    return;
+                }
+                // No match keeps the old pointer to GameBanana; a failure a retry may fix
+                // keeps its reason and a Retry, which starts again from serveme.tf.
+                page.view = match failed {
+                    Ok(
+                        GbMapSearchError::NoMatch { .. }
+                        | GbMapSearchError::NotSynced
+                        | GbMapSearchError::BadName { .. },
+                    ) => View::Failed(tr!("demo_viewer.error.not_on_serveme", map = map)),
+                    failed => {
+                        let failure = match failed {
+                            Ok(e) => describe_gb_map_search(&e),
+                            Err(e) => map_stopped(e.to_string()),
+                        };
+                        failure.log("GameBanana map search");
+                        View::DownloadFailed {
+                            path,
+                            map,
+                            detail: failure.message.into(),
+                        }
+                    }
+                };
+                cx.notify();
+            });
+            return;
+        }
+    };
+
+    let (gb_id, file_id) = (found.gb_id(), found.file_id());
+    let Ok(installing) = cx.update(|_, cx| {
+        let probe = Tf2Probe::get(cx);
+        let chosen: Vec<String> = found
+            .maps()
+            .iter()
+            .take(1)
+            .map(|m| m.name().to_owned())
+            .collect();
+        run_blocking(cx, move |s| {
+            Ok(s.library.install_gb_map(found, &chosen, &install, &*probe))
+        })
+    }) else {
+        return;
+    };
+    let installed = installing.await;
+    let _ = page.update_in(cx, |page, window, cx| {
+        if page.generation != generation {
+            return;
+        }
+        // A map that landed meanwhile counts as installed; the demo loads either way.
+        let failure = match installed {
+            Ok(Ok(_)) => {
+                tracing::info!(%gb_id, file_id, "installed {map} from GameBanana for a demo");
+                return page.load(path, generation, true, window, cx);
+            }
+            Ok(Err(GbMapInstallError::AlreadyPresent { .. })) => {
+                return page.load(path, generation, true, window, cx);
+            }
+            Ok(Err(e)) => {
+                let failure = describe_gb_map_install(&e);
+                failure.log("GameBanana map install");
+                failure.message
+            }
+            Err(e) => {
+                let failure = map_stopped(e.to_string());
+                failure.log("GameBanana map install");
+                failure.message.into()
+            }
+        };
+        page.view = View::DownloadFailed {
+            path,
+            map,
+            detail: failure,
+        };
+        cx.notify();
+    });
 }

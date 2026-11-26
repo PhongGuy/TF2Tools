@@ -222,6 +222,8 @@ demo_viewer:
   loading: "Carregando mapa..."
   downloading: "Baixando %{map} do serveme.tf..."
   received: "%{done} / %{total}"
+  searching: "Procurando %{map} no GameBanana..."
+  searching_candidate: "Procurando %{map} no GameBanana (%{n} de %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} jogadores em %{time}"
   players_note: "Não foi possível ler os jogadores desta demo."

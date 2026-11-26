@@ -261,3 +261,181 @@ fn a_map_the_maps_page_finishes_first_is_simply_shown(cx: &mut TestAppContext) {
     );
     assert!(rt.block_on(other).unwrap().is_ok());
 }
+
+const GB_ID: u64 = 40;
+
+// serveme.tf lacks the map; the catalogue lists item 40 under the map's name, whose one file
+// `file` (the synthetic map) arrives after `delay`. Opens a demo on the map.
+fn open_searching(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+    file: &str,
+    delay: Duration,
+) -> support::demo_viewer::DemoViewerShell {
+    server.mount_status(&format!("/fastdl/maps/{MAP}.bsp"), 404);
+    server.mount_gb_addon_after(
+        GB_ID,
+        "Fetched",
+        &[(file, bsp(&BspOptions::default()), 100)],
+        delay,
+    );
+    let demo = demo_file(env, "match.dem", &demo_header(MAP, 60.0));
+    let w = demo_viewer_shell_served(cx, env, server, vec![demo], StubAnswer::Frames);
+    support::sql(env)
+        .execute("INSERT INTO store_gb_maps (gb_id, name, download_rank, fetched_at) VALUES (40, ?1, 1, 'x')", [MAP])
+        .unwrap();
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    w
+}
+
+fn searching_one() -> String {
+    format!("Searching GameBanana for {MAP} (1 of 1)...")
+}
+
+fn installed_rows(env: &support::Env) -> i64 {
+    support::sql(env)
+        .query_row("SELECT count(*) FROM library_gb_addons WHERE gb_id = 40 AND section = 'maps' AND installed = 1", [], |r| r.get(0))
+        .unwrap()
+}
+
+fn gb_folders(env: &support::Env) -> Vec<String> {
+    std::fs::read_dir(env.game.join("tf/custom"))
+        .unwrap()
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| n.starts_with("tf2tools-gb-40-"))
+        .collect()
+}
+
+#[gpui_kit::test]
+fn a_map_serveme_lacks_shows_its_gamebanana_search(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = open_searching(
+        cx,
+        &env,
+        &server,
+        &format!("{MAP}.bsp"),
+        Duration::from_secs(60),
+    );
+    let want = searching_one();
+    support::wait_real(cx, &want, |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
+    });
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_PROGRESS));
+    assert!(support::present(
+        cx,
+        w.s.win,
+        ids::DEMO_VIEWER_PROGRESS_LABEL
+    ));
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT));
+}
+
+#[gpui_kit::test]
+fn a_map_found_on_gamebanana_installs_and_opens(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = open_searching(
+        cx,
+        &env,
+        &server,
+        &format!("{MAP}.bsp"),
+        Duration::from_millis(200),
+    );
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some(MAP)
+    );
+    assert!(!env.game.join(format!("tf/maps/{MAP}.bsp")).exists());
+    assert_eq!(installed_rows(&env), 1);
+    assert_eq!(gb_folders(&env).len(), 1);
+}
+
+#[gpui_kit::test]
+fn a_map_that_lands_during_the_search_is_simply_shown(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = open_searching(
+        cx,
+        &env,
+        &server,
+        &format!("{MAP}.bsp"),
+        Duration::from_secs(2),
+    );
+    let want = searching_one();
+    support::wait_real(cx, &want, |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
+    });
+    install_map(&env, MAP);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some(MAP)
+    );
+    assert_eq!(installed_rows(&env), 0);
+    assert!(gb_folders(&env).is_empty());
+}
+
+#[gpui_kit::test]
+fn a_gamebanana_outage_offers_retry_which_installs_the_map(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let route = format!("/fastdl/maps/{MAP}.bsp");
+    server.mount_status(&route, 404);
+    server.mount_status("/dl/broken/40", 500);
+    server.mount_gb_profile(
+        GB_ID,
+        serde_json::json!({
+            "_idRow": 40, "_sName": "Fetched", "_aSubmitter": {"_sName": "vex"},
+            "_aFiles": [{"_idRow": 100, "_sFile": format!("{MAP}.bsp"), "_nFilesize": 10,
+                "_tsDateAdded": 100, "_sMd5Checksum": "", "_sAvResult": "clean",
+                "_sDownloadUrl": format!("{}/dl/broken/40", server.uri())}],
+        }),
+    );
+    let demo = demo_file(&env, "match.dem", &demo_header(MAP, 60.0));
+    let w = demo_viewer_shell_served(cx, &env, &server, vec![demo], StubAnswer::Frames);
+    support::sql(&env)
+        .execute("INSERT INTO store_gb_maps (gb_id, name, download_rank, fetched_at) VALUES (40, ?1, 1, 'x')", [MAP])
+        .unwrap();
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    let want = format!("Couldn't download {MAP}.");
+    support::wait_real(cx, &want, |cx| {
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS).as_deref() == Some(want.as_str())
+    });
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_STATUS_DETAIL).as_deref(),
+        Some("Couldn't reach GameBanana. Check your internet connection and try again.")
+    );
+    server.reset();
+    server.mount_status(&route, 404);
+    server.mount_gb_addon(
+        GB_ID,
+        "Fetched",
+        &[(&format!("{MAP}.bsp"), bsp(&BspOptions::default()), 100)],
+    );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_RETRY);
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+    assert_eq!(installed_rows(&env), 1);
+}
+
+#[gpui_kit::test]
+fn leaving_the_page_mid_search_clears_scratch(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = open_searching(
+        cx,
+        &env,
+        &server,
+        &format!("{MAP}.bsp"),
+        Duration::from_secs(60),
+    );
+    let tmp_empty = |env: &support::Env| {
+        std::fs::read_dir(env.data.tmp_dir()).map_or(true, |mut d| d.next().is_none())
+    };
+    support::wait_real(cx, "the scratch dir", |_| !tmp_empty(&env));
+    support::click_nav(cx, w.s.win, Page::Huds);
+    support::wait_real(cx, "the scratch dir to go", |_| tmp_empty(&env));
+    assert_eq!(installed_rows(&env), 0);
+}

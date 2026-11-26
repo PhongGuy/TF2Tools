@@ -220,6 +220,8 @@ demo_viewer:
   loading: "正在加载地图…"
   downloading: "正在从 serveme.tf 下载 %{map}…"
   received: "%{done} / %{total}"
+  searching: "正在 GameBanana 上搜索 %{map}…"
+  searching_candidate: "正在 GameBanana 上搜索 %{map}（第 %{n} 个，共 %{of} 个）…"
   caption: "%{map}"
   caption_players: "%{map}，%{time} 时的 %{count} 名玩家"
   players_note: "无法从此录像中读取玩家。"
