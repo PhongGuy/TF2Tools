@@ -6,6 +6,9 @@ use crate::weapons::TfClass;
 
 mod build;
 mod hermite;
+// Task 3 wires the fit into `eye_at`; until then only the tests call it.
+#[allow(dead_code)]
+mod smooth;
 
 pub(crate) use build::TrackBuilder;
 
