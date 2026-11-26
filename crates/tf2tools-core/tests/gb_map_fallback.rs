@@ -581,10 +581,7 @@ async fn an_item_the_player_already_installed_is_never_a_candidate() {
             [],
         )
         .unwrap();
-    let pack = common::zip_bytes(&[
-        ("maps/cp_a.bsp", &bsp(b"a")),
-        ("maps/cp_b.bsp", &bsp(b"b")),
-    ]);
+    let pack = common::zip_bytes(&[("maps/cp_a.bsp", &bsp(b"a")), ("maps/cp_b.bsp", &bsp(b"b"))]);
     item(&env, 1, "pack.zip", &pack).await;
     item(&env, 2, "pack.zip", &pack).await;
     let (result, _) = find(&env, "cp_a").await;
