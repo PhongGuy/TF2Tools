@@ -7,6 +7,7 @@ mod free_fly;
 mod header;
 mod mesh;
 mod playback;
+mod ray_grid;
 mod snapshot;
 #[cfg(test)]
 pub(crate) mod test_support;

@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use super::ray_grid::{CELL, MAX_GRID_ENTRIES, RayGrid};
 use crate::error::MapMeshError;
 use crate::panic_mark::catching;
 
@@ -17,6 +18,7 @@ pub struct MapMesh {
     positions: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
     start: Option<([f32; 3], f32)>,
+    grid: Option<RayGrid>,
 }
 
 impl MapMesh {
@@ -51,6 +53,36 @@ impl MapMesh {
     /// Origin and yaw in degrees of the first `info_player_teamspawn`, if the map has one.
     pub fn start(&self) -> Option<([f32; 3], f32)> {
         self.start
+    }
+
+    /// Distance along unit `dir` to the nearest triangle within `max_distance`; None on a miss,
+    /// a bad input (non-finite, |dir| not within 1e-3 of 1, max_distance not > 0) or no grid.
+    pub fn ray_hit(&self, origin: [f32; 3], dir: [f32; 3], max_distance: f32) -> Option<f32> {
+        let finite = origin.iter().chain(&dir).all(|v| v.is_finite()) && max_distance.is_finite();
+        let unit =
+            ((dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt() - 1.).abs() <= 1e-3;
+        if !(finite && unit && max_distance > 0.) {
+            return None;
+        }
+        self.grid
+            .as_ref()?
+            .hit(&self.positions, origin, dir, max_distance)
+    }
+
+    /// The ray grid's heap bytes; 0 with no grid.
+    pub fn grid_bytes(&self) -> usize {
+        self.grid.as_ref().map_or(0, RayGrid::heap_bytes)
+    }
+
+    /// A mesh over bare positions with zero normals, no start and its grid built.
+    #[cfg(test)]
+    pub(crate) fn from_positions(positions: Vec<[f32; 3]>) -> MapMesh {
+        MapMesh {
+            normals: vec![[0.0; 3]; positions.len()],
+            grid: RayGrid::build(&positions, CELL, MAX_GRID_ENTRIES),
+            positions,
+            start: None,
+        }
     }
 }
 
@@ -132,10 +164,12 @@ fn build(bsp: &[u8], max_triangles: usize) -> Result<MapMesh, MapMeshError> {
         .iter()
         .find(|e| e.prop("classname") == Some("info_player_teamspawn"))
         .map(|e| (vec3(e.prop("origin")), vec3(e.prop("angles"))[1]));
+    let grid = RayGrid::build(&positions, CELL, MAX_GRID_ENTRIES);
     Ok(MapMesh {
         positions,
         normals,
         start,
+        grid,
     })
 }
 
@@ -169,4 +203,33 @@ pub fn load_map_file_capped(
     }
     let bytes = std::fs::read(path).map_err(unreadable)?;
     load_capped(&bytes, max_triangles)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::demo_view::ray_grid::{CELL, RayGrid};
+
+    #[test]
+    fn a_map_past_the_grid_cap_has_no_ray_test() {
+        let p = vec![
+            [-1000., -1000., 0.],
+            [1000., -1000., 0.],
+            [1000., 1000., 0.],
+        ];
+        let mesh = MapMesh {
+            grid: RayGrid::build(&p, CELL, 1),
+            normals: vec![[0., 0., 1.]; 3],
+            positions: p,
+            start: None,
+        };
+        assert_eq!(mesh.grid_bytes(), 0);
+        assert_eq!(mesh.ray_hit([500., -500., 50.], [0., 0., -1.], 96.), None);
+        let built = MapMesh::from_positions(mesh.positions.clone());
+        assert!(
+            built
+                .ray_hit([500., -500., 50.], [0., 0., -1.], 96.)
+                .is_some()
+        );
+    }
 }
