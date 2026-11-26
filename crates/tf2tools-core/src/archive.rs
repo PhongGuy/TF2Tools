@@ -23,15 +23,93 @@ const RAR_MAGIC: &[u8] = b"Rar!";
 /// A failure part-way through can leave `dest` partly written, so extract into a scratch
 /// directory and remove it on error.
 pub fn extract_archive(archive: &Path, dest: &Path) -> Result<PathBuf, ArchiveError> {
+    extract_archive_within(archive, dest, &mut Budget::default())
+}
+
+/// Unpacked-size and entry-count caps shared by every archive kind.
+const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_ENTRIES: u64 = 65_536;
+
+/// What one unpack (outer archive plus any inner VPKs) may still write.
+#[derive(Debug)]
+pub(crate) struct Budget {
+    bytes_cap: u64,
+    entries_cap: u64,
+    bytes_used: u64,
+    entries_used: u64,
+}
+
+impl Budget {
+    pub(crate) fn new(bytes_cap: u64, entries_cap: u64) -> Self {
+        Self {
+            bytes_cap,
+            entries_cap,
+            bytes_used: 0,
+            entries_used: 0,
+        }
+    }
+
+    /// Weighs an archive's listed totals before anything is written: the bytes must fit in
+    /// what is left without being consumed (writing charges them), the entries are consumed.
+    pub(crate) fn admit(
+        &mut self,
+        archive: &Path,
+        listed_bytes: u64,
+        entries: u64,
+    ) -> Result<(), ArchiveError> {
+        let entries_used = self.entries_used.saturating_add(entries);
+        if entries_used > self.entries_cap {
+            return Err(ArchiveError::TooManyEntries {
+                path: archive.to_path_buf(),
+                limit: self.entries_cap,
+            });
+        }
+        if self.bytes_used.saturating_add(listed_bytes) > self.bytes_cap {
+            return Err(self.too_large(archive));
+        }
+        self.entries_used = entries_used;
+        Ok(())
+    }
+
+    /// Consumes `bytes` about to be written, refusing them if they would pass the cap.
+    pub(crate) fn charge(&mut self, archive: &Path, bytes: u64) -> Result<(), ArchiveError> {
+        let used = self.bytes_used.saturating_add(bytes);
+        if used > self.bytes_cap {
+            return Err(self.too_large(archive));
+        }
+        self.bytes_used = used;
+        Ok(())
+    }
+
+    fn too_large(&self, archive: &Path) -> ArchiveError {
+        ArchiveError::TooLarge {
+            path: archive.to_path_buf(),
+            limit: self.bytes_cap,
+        }
+    }
+}
+
+impl Default for Budget {
+    fn default() -> Self {
+        Self::new(MAX_UNPACKED_BYTES, MAX_ENTRIES)
+    }
+}
+
+/// [`extract_archive`] drawing on `budget`, so several unpacks can share one cap.
+pub(crate) fn extract_archive_within(
+    archive: &Path,
+    dest: &Path,
+    budget: &mut Budget,
+) -> Result<PathBuf, ArchiveError> {
     let header = sniff(archive)?;
     if ZIP_MAGIC.iter().any(|m| header.starts_with(m)) {
-        extract_zip(archive, dest)?;
+        extract_zip(archive, dest, budget)?;
     } else if header.starts_with(SEVEN_Z_MAGIC) {
-        extract_7z(archive, dest)?;
+        extract_7z(archive, dest, budget)?;
     } else if header.starts_with(VPK_MAGIC) {
-        extract_vpk(archive, dest)?;
+        extract_vpk(archive, dest, budget)?;
     } else if header.starts_with(RAR_MAGIC) {
-        extract_rar(archive, dest)?;
+        extract_rar(archive, dest, budget)?;
     } else {
         // A bare WAV or VTF download is its own content.
         return Ok(archive.to_path_buf());
@@ -69,14 +147,17 @@ pub(crate) fn sniff(archive: &Path) -> Result<Vec<u8>, ArchiveError> {
     Ok(header)
 }
 
-fn extract_zip(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
+fn extract_zip(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), ArchiveError> {
     let file = File::open(archive).map_err(|e| io_error(archive, e))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| malformed(archive, e))?;
 
     // Pass 1 resolves every entry to a path inside `dest` before pass 2 writes any.
+    // It also sums the listed sizes so an archive over budget is refused before `dest` exists.
     let mut targets = Vec::with_capacity(zip.len());
+    let mut listed: u64 = 0;
     for i in 0..zip.len() {
         let entry = zip.by_index(i).map_err(|e| malformed(archive, e))?;
+        listed = listed.saturating_add(entry.size());
         // `enclosed_name` quietly strips `C:` and a leading `/`, so the raw name is
         // judged first and `enclosed_name` stays only as a second guard.
         let raw = entry.name().map_err(|e| malformed(archive, e))?;
@@ -87,6 +168,7 @@ fn extract_zip(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
         targets.push((dest.join(relative), entry.is_dir()));
     }
 
+    budget.admit(archive, listed, zip.len() as u64)?;
     create_dir(dest)?;
     for (i, (target, is_dir)) in targets.into_iter().enumerate() {
         if is_dir {
@@ -94,32 +176,65 @@ fn extract_zip(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
             continue;
         }
         let mut entry = zip.by_index(i).map_err(|e| malformed(archive, e))?;
-        stream_to_file(archive, &mut entry, &target)?;
+        stream_to_file(archive, &mut entry, &target, budget)?;
     }
     Ok(())
 }
 
 /// sevenz-rust2 can panic on corrupt input, so both the listing and the
 /// extraction run under `catching`, which marks the panic as handled.
-fn extract_7z(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
+fn extract_7z(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), ArchiveError> {
     let listing = match catching(|| sevenz_rust2::Archive::open(archive)) {
         Ok(Ok(listing)) => listing,
         Ok(Err(e)) => return Err(malformed(archive, e)),
         Err(_) => return Err(malformed(archive, "the 7z reader panicked")),
     };
+    let mut listed: u64 = 0;
     for entry in &listing.files {
         check_entry_name(archive, entry.name())?;
+        listed = listed.saturating_add(entry.size());
     }
+    budget.admit(archive, listed, listing.files.len() as u64)?;
 
     create_dir(dest)?;
-    match catching(|| sevenz_rust2::decompress_file(archive, dest)) {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(malformed(archive, e)),
-        Err(_) => Err(malformed(archive, "the 7z reader panicked")),
+    // Our own failure (over budget, a failed write) is kept here and wins over the error
+    // sevenz reports for it, so `TooLarge` is not mistaken for a corrupt archive.
+    let mut failure: Option<ArchiveError> = None;
+    let result = catching(|| {
+        sevenz_rust2::decompress_file_with_extract_fn(archive, dest, |entry, reader, path| {
+            write_7z_entry(archive, entry.is_directory(), reader, path, budget)
+                .map(|()| true)
+                .map_err(|e| {
+                    let message = e.to_string();
+                    failure = Some(e);
+                    sevenz_rust2::Error::Other(message.into())
+                })
+        })
+    });
+    match (failure, result) {
+        (Some(e), _) => Err(e),
+        (None, Ok(Ok(()))) => Ok(()),
+        (None, Ok(Err(e))) => Err(malformed(archive, e)),
+        (None, Err(_)) => Err(malformed(archive, "the 7z reader panicked")),
     }
 }
 
-fn extract_vpk(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
+/// Writes one 7z entry through the budget guard: a directory is created, a file streamed.
+fn write_7z_entry(
+    archive: &Path,
+    is_dir: bool,
+    mut reader: &mut dyn Read,
+    path: &Path,
+    budget: &mut Budget,
+) -> Result<(), ArchiveError> {
+    if is_dir {
+        create_dir(path)
+    } else {
+        stream_to_file(archive, &mut reader, path, budget)
+    }
+}
+
+fn extract_vpk(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), ArchiveError> {
     let from_vpk = |e: VpkError| match e {
         VpkError::Io { path, source } => ArchiveError::Io { path, source },
         other @ VpkError::Malformed { .. } | other @ VpkError::NoWav { .. } => {
@@ -127,13 +242,21 @@ fn extract_vpk(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
         }
     };
     let vpk = pak::open_vpk(archive).map_err(from_vpk)?;
-    for name in vpk.tree.keys() {
+    // Entries may all point at the same bytes, so the listed lengths are what is weighed.
+    let (mut listed, mut entries) = (0u64, 0u64);
+    for (name, entry) in &vpk.tree {
         check_entry_name(archive, name)?;
+        let length =
+            u64::from(entry.dir_entry.preload_length) + u64::from(entry.dir_entry.file_length);
+        listed = listed.saturating_add(length);
+        entries += 1;
     }
+    budget.admit(archive, listed, entries)?;
 
     create_dir(dest)?;
     for (name, entry) in &vpk.tree {
         let bytes = pak::read_entry(archive, name, entry).map_err(from_vpk)?;
+        budget.charge(archive, bytes.len() as u64)?;
         write_file(&dest.join(name.replace('\\', "/")), &bytes)?;
     }
     Ok(())
@@ -141,23 +264,33 @@ fn extract_vpk(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
 
 /// RAR names come as raw bytes, so every member is checked from the index before
 /// `dest` exists, and again as it is written in case the stream disagrees with the index.
-fn extract_rar(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
+fn extract_rar(archive: &Path, dest: &Path, budget: &mut Budget) -> Result<(), ArchiveError> {
     let reader = rars::ArchiveReader::read_path(archive).map_err(|e| rar_error(archive, &e))?;
-    for member in reader.index().members() {
-        check_entry_name(archive, &String::from_utf8_lossy(member.name_bytes()))?;
+    let (mut listed, mut entries) = (0u64, 0u64);
+    for member in reader.members() {
+        check_entry_name(archive, &String::from_utf8_lossy(&member.meta.name))?;
+        // A RAR5 member marked unknown-size is weighed by its raw listed size; the write
+        // guard is the real limit.
+        listed = listed.saturating_add(member.meta.unpacked_size);
+        entries += 1;
     }
+    budget.admit(archive, listed, entries)?;
 
     create_dir(dest)?;
+    // Each output file must be `'static`, so the budget is lent to them through an Rc and
+    // handed back once `rars` is done.
+    let shared = Rc::new(RefCell::new(std::mem::replace(budget, Budget::new(0, 0))));
     // `rars` can only carry its own error type out, so our failures (an unsafe name, a
     // failed write) are kept in this slot and win over whatever `rars` reports.
     let failure: RarFailure = Rc::default();
     let result = reader.extract_to(None, |meta| {
-        open_rar_target(archive, dest, meta, &failure).map_err(|e| {
+        open_rar_target(archive, dest, meta, &failure, &shared).map_err(|e| {
             let message = e.to_string();
             *failure.borrow_mut() = Some(e);
             rars::Error::from(std::io::Error::other(message))
         })
     });
+    *budget = shared.replace(Budget::new(0, 0));
     match (failure.take(), result) {
         (Some(e), _) => Err(e),
         (None, Err(e)) => Err(rar_error(archive, &e)),
@@ -174,6 +307,7 @@ fn open_rar_target(
     dest: &Path,
     meta: &rars::ExtractedEntryMeta,
     failure: &RarFailure,
+    budget: &Rc<RefCell<Budget>>,
 ) -> Result<Box<dyn Write>, ArchiveError> {
     let name = String::from_utf8_lossy(&meta.name);
     check_entry_name(archive, &name)?;
@@ -189,20 +323,33 @@ fn open_rar_target(
     Ok(Box::new(RarFile {
         file,
         target,
+        archive: archive.to_path_buf(),
         failure: Rc::clone(failure),
+        budget: Rc::clone(budget),
     }))
 }
 
-/// An unbuffered output file that records its own write failure as `Io`, so a full disk
-/// is not reported as a corrupt archive.
+/// An unbuffered output file that charges the shared budget before each write and records
+/// its own failure (`TooLarge`, or `Io` for a full disk) so neither reads as a corrupt archive.
 struct RarFile {
     file: File,
     target: PathBuf,
+    archive: PathBuf,
     failure: RarFailure,
+    budget: Rc<RefCell<Budget>>,
 }
 
 impl Write for RarFile {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let charged = self
+            .budget
+            .borrow_mut()
+            .charge(&self.archive, buf.len() as u64);
+        if let Err(e) = charged {
+            let message = e.to_string();
+            self.failure.borrow_mut().get_or_insert(e);
+            return Err(std::io::Error::other(message));
+        }
         self.file.write(buf).inspect_err(|e| self.record(e))
     }
 
@@ -259,12 +406,13 @@ pub(crate) fn check_entry_name(archive: &Path, name: &str) -> Result<(), Archive
     }
 }
 
-/// Copies through a fixed buffer so a zip bomb cannot exhaust memory; a read
-/// failure is the archive's fault (`Malformed`), a write failure is `Io`.
+/// Copies through a fixed buffer so a zip bomb cannot exhaust memory, charging each chunk
+/// to `budget` before it is written; a read failure is `Malformed`, a write failure `Io`.
 fn stream_to_file(
     archive: &Path,
     entry: &mut impl Read,
     target: &Path,
+    budget: &mut Budget,
 ) -> Result<(), ArchiveError> {
     if let Some(parent) = target.parent() {
         create_dir(parent)?;
@@ -278,6 +426,7 @@ fn stream_to_file(
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(malformed(archive, e)),
         };
+        budget.charge(archive, n as u64)?;
         out.write_all(&buf[..n]).map_err(|e| io_error(target, e))?;
     }
 }
@@ -313,3 +462,7 @@ fn unsafe_path(archive: &Path, entry: String) -> ArchiveError {
         entry,
     }
 }
+
+#[cfg(test)]
+#[path = "archive_budget_tests.rs"]
+mod budget_tests;

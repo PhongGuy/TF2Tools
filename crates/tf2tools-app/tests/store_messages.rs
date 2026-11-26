@@ -23,6 +23,8 @@ const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
 const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
+const DL_TOO_BIG_UNPACKED: &str =
+    "This download unpacks to more than TF2Tools allows, so it wasn't installed.";
 
 fn io(text: &str) -> std::io::Error {
     std::io::Error::other(text.to_owned())
@@ -148,6 +150,22 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
                 message: "invalid Zip archive: bad magic".into(),
             }),
             DL_UNPACK,
+        ),
+        (
+            GB,
+            DownloadError::Archive(ArchiveError::TooLarge {
+                path: PathBuf::from("/tmp/hud.zip"),
+                limit: 1,
+            }),
+            DL_TOO_BIG_UNPACKED,
+        ),
+        (
+            GB,
+            DownloadError::Import(ImportError::Archive(ArchiveError::TooManyEntries {
+                path: PathBuf::from("/tmp/hud.zip"),
+                limit: 1,
+            })),
+            DL_TOO_BIG_UNPACKED,
         ),
         (
             GB,
@@ -712,6 +730,13 @@ fn addon_fetch_failures_read_as_plain_words() {
             },
             "The download stopped before it finished. Try again.",
         ),
+        (
+            GbAddonFetchError::Archive(ArchiveError::TooManyEntries {
+                path: p(),
+                limit: 1,
+            }),
+            "This download unpacks to more than TF2Tools allows, so it wasn't installed.",
+        ),
     ];
     for (err, want) in cases {
         let failure = describe_gb_fetch(&err);
@@ -783,7 +808,15 @@ fn map_fetch_failures_read_in_map_words() {
     }
     assert_eq!(
         describe_gb_fetch(&big()).message,
-        "This download is too big for TF2Tools to install."
+        "This download unpacks to more than TF2Tools allows, so it wasn't installed."
+    );
+    assert_eq!(
+        describe_gb_map_fetch(&GbAddonFetchError::Archive(ArchiveError::TooManyEntries {
+            path: PathBuf::from("/tmp/a.zip"),
+            limit: 1,
+        }))
+        .message,
+        "This download unpacks to more than TF2Tools allows, so it wasn't installed."
     );
 }
 

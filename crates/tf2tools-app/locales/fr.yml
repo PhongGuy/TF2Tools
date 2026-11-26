@@ -2819,6 +2819,7 @@ messages:
       unusable: "Ce téléchargement ne contient rien que TF2Tools puisse utiliser. Choisissez un autre fichier."
       locked: "Ce téléchargement est protégé par un mot de passe, donc TF2Tools ne peut pas l'ouvrir."
       unpack: "Le téléchargement n'a pas pu être décompressé. Réessayez, ou choisissez un autre fichier."
+      unpack_too_large: "Une fois décompressé, ce téléchargement dépasse ce que TF2Tools autorise, il n'a donc pas été installé."
       unknown: "Un problème est survenu avec le téléchargement. Réessayez plus tard."
     files:
       not_in_store: "Cet objet n'est plus dans le magasin."

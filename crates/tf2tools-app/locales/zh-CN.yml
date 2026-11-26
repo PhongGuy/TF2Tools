@@ -2816,6 +2816,7 @@ messages:
       unusable: "此下载中没有 TF2Tools 可用的内容。请选择其他文件。"
       locked: "此下载受密码保护，因此 TF2Tools 无法打开。"
       unpack: "无法解压下载的文件。请重试，或选择其他文件。"
+      unpack_too_large: "此下载解压后超出了 TF2Tools 允许的大小，因此未安装。"
       unknown: "下载出现问题。请稍后重试。"
     files:
       not_in_store: "此物品已不在商店中。"

@@ -2817,6 +2817,7 @@ messages:
       unusable: "Esta descarga no tiene nada que TF2Tools pueda usar. Elige otro archivo."
       locked: "Esta descarga está protegida con contraseña, así que TF2Tools no puede abrirla."
       unpack: "No se pudo descomprimir la descarga. Inténtalo de nuevo o elige otro archivo."
+      unpack_too_large: "Esta descarga ocupa al descomprimirse más de lo que TF2Tools permite, así que no se instaló."
       unknown: "Algo salió mal con la descarga. Inténtalo de nuevo más tarde."
     files:
       not_in_store: "Este objeto ya no está en la tienda."

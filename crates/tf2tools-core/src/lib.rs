@@ -33,6 +33,8 @@ mod setting_pictures;
 mod settings;
 mod store;
 mod templates;
+#[cfg(test)]
+mod test_archives;
 mod texture;
 mod tf2;
 mod timestamp;

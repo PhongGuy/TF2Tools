@@ -344,3 +344,22 @@ fn find_content_root_descends_only_through_lone_directories() {
     let err = find_content_root(&tmp.path().join("absent")).unwrap_err();
     assert!(matches!(err, ArchiveError::Io { .. }), "{err:?}");
 }
+
+#[test]
+fn a_hud_listed_past_the_cap_is_refused_and_leaves_no_scratch_behind() {
+    use tf2tools_core::{ImportError, Provenance};
+    let env = common::library_env();
+    let bomb = write(
+        &env.tmp.path().join("bomb.zip"),
+        &common::zip_with_listed_size("hud/info.vdf", b"\"hud\" {}", 3 * 1024 * 1024 * 1024, false),
+    );
+    let err = env.lib.import_hud(&bomb, Provenance::Local).unwrap_err();
+    assert!(
+        matches!(err, ImportError::Archive(ArchiveError::TooLarge { .. })),
+        "{err:?}"
+    );
+    let left: Vec<_> = fs::read_dir(env.dir.tmp_dir())
+        .map(|d| d.map(|e| e.unwrap().path()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "{left:?}");
+}
