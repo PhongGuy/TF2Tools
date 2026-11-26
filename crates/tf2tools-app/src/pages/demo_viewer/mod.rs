@@ -109,6 +109,8 @@ enum View {
     Loaded {
         /// The map's name, with the players' count and moment when they were read.
         caption: SharedString,
+        /// The caption once the tracks play, without the still picture's moment.
+        playing_caption: SharedString,
         /// Whether the players could not be read, so a note says so.
         players_note: bool,
         viewport: Entity<DemoViewport>,
@@ -755,14 +757,24 @@ impl DemoViewerPage {
         self.title = scene.map.clone().into();
         // A snapshot with nobody in it counts as no players read.
         let players = snapshot.filter(|s| !s.players().is_empty());
-        let caption = match players {
-            Some(snapshot) => tr!(
-                "demo_viewer.caption_players",
-                map = scene.map,
-                count = snapshot.players().len(),
-                time = snapshot_time(snapshot.tick(), scene.seconds_per_tick)
+        let (caption, playing_caption) = match players {
+            Some(snapshot) => (
+                tr!(
+                    "demo_viewer.caption_players",
+                    map = scene.map,
+                    count = snapshot.players().len(),
+                    time = snapshot_time(snapshot.tick(), scene.seconds_per_tick)
+                ),
+                tr!(
+                    "demo_viewer.caption_players_playing",
+                    map = scene.map,
+                    count = snapshot.players().len()
+                ),
             ),
-            None => tr!("demo_viewer.caption", map = scene.map),
+            None => {
+                let caption = tr!("demo_viewer.caption", map = scene.map);
+                (caption.clone(), caption)
+            }
         };
         let players_note = players.is_none();
         let renderer = (cx.global::<Services>().renderers)();
@@ -791,6 +803,7 @@ impl DemoViewerPage {
         self.timeline = None;
         self.view = View::Loaded {
             caption,
+            playing_caption,
             players_note,
             viewport,
             _failure_watch: watch,
@@ -887,13 +900,22 @@ impl Render for DemoViewerPage {
         let (body, caption) = match &self.view {
             View::Loaded {
                 caption,
+                playing_caption,
                 players_note,
                 viewport,
                 ..
-            } => (
-                viewport.clone().into_any_element(),
-                Some((caption.clone(), *players_note)),
-            ),
+            } => {
+                // Once the tracks play, the timeline's clock holds the time.
+                let caption = if self.read_state == ReadState::Ready {
+                    playing_caption
+                } else {
+                    caption
+                };
+                (
+                    viewport.clone().into_any_element(),
+                    Some((caption.clone(), *players_note)),
+                )
+            }
             View::Loading => status(tr!("demo_viewer.loading")),
             View::Downloading {
                 map,

@@ -225,6 +225,7 @@ demo_viewer:
   searching_candidate: "正在 GameBanana 上搜索 %{map}（第 %{n} 个，共 %{of} 个）…"
   caption: "%{map}"
   caption_players: "%{map}，%{time} 时的 %{count} 名玩家"
+  caption_players_playing: "%{map}，%{count} 名玩家"
   players_note: "无法从此录像中读取玩家。"
   hint: "拖动以环顾，WASD 移动，Shift 减速。"
   bar_collapse: "收起控制栏"
