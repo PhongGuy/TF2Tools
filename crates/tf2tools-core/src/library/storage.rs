@@ -4,6 +4,7 @@ use std::path::{Component, Path};
 
 use super::space::walk_files;
 use super::{IoFailure, Library};
+use crate::cleanup::{CleanupRoots, is_staged_appimage, is_staged_installer};
 use crate::error::StorageError;
 use crate::logstf::logs_cache_bytes;
 
@@ -27,11 +28,13 @@ pub enum StorageKind {
     ImageCache,
     /// Demos downloaded to watch from demos.tf and logs.tf.
     DemoCache,
+    /// Install scratch and downloaded updates waiting to install.
+    Temporary,
 }
 
 impl StorageKind {
     /// Every kind, in the order the Settings page lists them.
-    pub const ALL: [StorageKind; 8] = [
+    pub const ALL: [StorageKind; 9] = [
         StorageKind::Huds,
         StorageKind::Sounds,
         StorageKind::Crosshairs,
@@ -40,6 +43,7 @@ impl StorageKind {
         StorageKind::StoreData,
         StorageKind::ImageCache,
         StorageKind::DemoCache,
+        StorageKind::Temporary,
     ];
 
     fn index(self) -> usize {
@@ -52,6 +56,7 @@ impl StorageKind {
             StorageKind::StoreData => 5,
             StorageKind::ImageCache => 6,
             StorageKind::DemoCache => 7,
+            StorageKind::Temporary => 8,
         }
     }
 }
@@ -60,8 +65,8 @@ impl StorageKind {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StorageUse {
-    bytes: [u64; 8],
-    unpacked: [u64; 8],
+    bytes: [u64; 9],
+    unpacked: [u64; 9],
 }
 
 impl StorageUse {
@@ -89,11 +94,13 @@ impl StorageUse {
 
 impl Library {
     /// Measures every kind TF2Tools keeps. Blocking: it walks the library, image and demo caches
-    /// and reads the database sizes in one read transaction.
+    /// and `<data>/tmp`, looks for staged updates, and reads the database sizes in one read
+    /// transaction.
     ///
     /// # Errors
-    /// `StorageError::Io` when a folder or database file cannot be read, and
-    /// `StorageError::Database` when SQLite cannot measure the logs.tf tables.
+    /// `StorageError::Io` when a data folder or database file cannot be read, and
+    /// `StorageError::Database` when SQLite cannot measure the logs.tf tables. An unreadable
+    /// system temp or AppImage folder is left out, not an error.
     pub fn storage(&self) -> Result<StorageUse, StorageError> {
         let mut use_ = StorageUse::default();
         // The copies guard covers only the library walk, so no conversion swaps an item
@@ -122,6 +129,12 @@ impl Library {
             use_.add(StorageKind::DemoCache, len, len);
         })
         .map_err(io_error)?;
+        walk_files(&self.dir.tmp_dir(), false, |_, len, _| {
+            use_.add(StorageKind::Temporary, len, len);
+        })
+        .map_err(io_error)?;
+        let staged = staged_update_bytes(&CleanupRoots::for_data_dir(&self.dir));
+        use_.add(StorageKind::Temporary, staged, staged);
         // Read the file lengths inside the same transaction as the logs.tf pages, which narrows
         // how far a commit between the two can skew the store data share.
         let db_path = self.dir.db_path();
@@ -178,6 +191,93 @@ fn database_files(db: &Path) -> Result<u64, IoFailure> {
     Ok(total)
 }
 
+/// Bytes of staged update installers in the temp folder and staged AppImages beside the
+/// running AppImage. Never fails: an unreadable folder or entry counts nothing.
+fn staged_update_bytes(roots: &CleanupRoots) -> u64 {
+    let beside = roots
+        .appimage()
+        .and_then(Path::parent)
+        .map_or(0, |dir| staged_in(dir, is_staged_appimage));
+    staged_in(roots.temp(), is_staged_installer).saturating_add(beside)
+}
+
+/// The summed lengths of the regular files directly in `dir` whose names `ours` accepts.
+/// Links and folders are never followed or counted.
+fn staged_in(dir: &Path, ours: fn(&str) -> bool) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .filter(|entry| entry.file_name().to_str().is_some_and(ours))
+        .filter_map(|entry| std::fs::symlink_metadata(entry.path()).ok())
+        .filter(|meta| meta.file_type().is_file())
+        .fold(0, |sum, meta| sum.saturating_add(meta.len()))
+}
+
 fn io_error(IoFailure { path, source }: IoFailure) -> StorageError {
     StorageError::Io { path, source }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write(path: &Path, len: usize) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, vec![0u8; len]).unwrap();
+    }
+
+    #[test]
+    fn both_staged_appimage_names_count_beside_the_appimage() {
+        let tmp = tempfile::tempdir().unwrap();
+        let apps = tmp.path().join("apps");
+        let temp = tmp.path().join("temp");
+        std::fs::create_dir_all(&temp).unwrap();
+        write(&apps.join("TF2Tools.AppImage"), 9000);
+        write(&apps.join(".tf2tools-update-6.1.0"), 100);
+        write(&apps.join(".tf2tools-update-6.2.0.part"), 20);
+        write(&apps.join(".tf2tools-update-nope"), 5000);
+        write(&apps.join("TF2Tools.AppImage.bak"), 5000);
+        write(&temp.join("tf2tools-update-6.1.0-setup.exe"), 3);
+        let roots = CleanupRoots::new(tmp.path(), tmp.path(), tmp.path(), &temp)
+            .with_appimage(apps.join("TF2Tools.AppImage"));
+        assert_eq!(staged_update_bytes(&roots), 123);
+    }
+
+    #[test]
+    fn missing_folders_count_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let gone = tmp.path().join("gone");
+        let roots = CleanupRoots::new(&gone, &gone, &gone, &gone)
+            .with_appimage(gone.join("TF2Tools.AppImage"));
+        assert_eq!(staged_update_bytes(&roots), 0);
+    }
+
+    // Folder permissions that refuse a listing are a Unix feature.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_temp_folder_is_left_out() {
+        use std::os::unix::fs::PermissionsExt as _;
+        struct Unlock(std::path::PathBuf);
+        impl Drop for Unlock {
+            fn drop(&mut self) {
+                let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o755));
+            }
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let temp = tmp.path().join("temp");
+        let apps = tmp.path().join("apps");
+        write(&temp.join("tf2tools-update-6.1.0-setup.exe"), 50);
+        write(&apps.join(".tf2tools-update-6.1.0"), 7);
+        std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let _unlock = Unlock(temp.clone());
+        if std::fs::read_dir(&temp).is_ok() {
+            eprintln!("skipped: this user can list a folder with no permissions");
+            return;
+        }
+        let roots = CleanupRoots::new(tmp.path(), tmp.path(), tmp.path(), &temp)
+            .with_appimage(apps.join("TF2Tools.AppImage"));
+        assert_eq!(staged_update_bytes(&roots), 7);
+    }
 }

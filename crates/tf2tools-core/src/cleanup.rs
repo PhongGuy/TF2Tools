@@ -268,13 +268,13 @@ fn is_download_part(name: &str) -> bool {
 }
 
 // `.tf2tools-update-<version>` and its `.part`, staged beside the AppImage.
-fn is_staged_appimage(name: &str) -> bool {
+pub(crate) fn is_staged_appimage(name: &str) -> bool {
     name.strip_prefix(".tf2tools-update-")
         .is_some_and(|rest| is_version(rest.strip_suffix(".part").unwrap_or(rest)))
 }
 
 // `tf2tools-update-<version>-setup.exe` and its `.part`, staged in temp.
-fn is_staged_installer(name: &str) -> bool {
+pub(crate) fn is_staged_installer(name: &str) -> bool {
     let name = name.strip_suffix(".part").unwrap_or(name);
     name.strip_prefix("tf2tools-update-")
         .and_then(|r| r.strip_suffix("-setup.exe"))

@@ -33,6 +33,7 @@ fn the_kinds_are_listed_in_card_order() {
             StorageKind::StoreData,
             StorageKind::ImageCache,
             StorageKind::DemoCache,
+            StorageKind::Temporary,
         ]
     );
     assert_eq!(StorageUse::default().total(), 0);
@@ -49,6 +50,7 @@ fn an_empty_library_has_only_the_database() {
         StorageKind::Addons,
         StorageKind::ImageCache,
         StorageKind::DemoCache,
+        StorageKind::Temporary,
     ] {
         assert_eq!((s.bytes(kind), s.unpacked(kind)), (0, 0), "{kind:?}");
     }
@@ -264,4 +266,34 @@ fn a_folder_that_cannot_be_read_fails_the_measure() {
     }
     let err = env.lib.storage().unwrap_err();
     assert!(matches!(err, StorageError::Io { .. }), "{err:?}");
+}
+
+#[test]
+fn scratch_files_and_staged_updates_are_temporary() {
+    let env = library_env();
+    let root = env.dir.root().to_path_buf();
+    // Install scratch under <data>/tmp counts in full, nested too.
+    write_file(&env.dir.tmp_dir().join("a.zip"), &[1u8; 1000]);
+    write_file(&env.dir.tmp_dir().join("x/y/b.vtf"), &[2u8; 200]);
+    // A non-default data folder stages updates in its own root.
+    write_file(&root.join("tf2tools-update-6.1.0-setup.exe"), &[3u8; 30]);
+    write_file(
+        &root.join("tf2tools-update-6.2.0-setup.exe.part"),
+        &[4u8; 4],
+    );
+    // Decoys: a bad version, a folder with a staged name, and a link to a real file.
+    write_file(&root.join("tf2tools-update-six-setup.exe"), &[5u8; 7000]);
+    std::fs::create_dir_all(root.join("tf2tools-update-6.3.0-setup.exe")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(
+        env.dir.tmp_dir().join("a.zip"),
+        root.join("tf2tools-update-6.4.0-setup.exe"),
+    )
+    .unwrap();
+    let s = env.lib.storage().unwrap();
+    assert_eq!(s.bytes(StorageKind::Temporary), 1234);
+    assert_eq!(s.unpacked(StorageKind::Temporary), 1234);
+    let sum: u64 = StorageKind::ALL.iter().map(|k| s.bytes(*k)).sum();
+    assert_eq!(s.total(), sum);
+    assert!(s.total() >= 1234);
 }
