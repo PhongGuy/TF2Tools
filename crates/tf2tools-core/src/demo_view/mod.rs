@@ -2,6 +2,9 @@
 //! the demo header, the players at one tick, their tracks over the whole demo and the
 //! playback clock.
 
+// Unused until the spectator camera lands.
+#[allow(dead_code)]
+mod chase;
 mod clock;
 mod free_fly;
 mod header;
