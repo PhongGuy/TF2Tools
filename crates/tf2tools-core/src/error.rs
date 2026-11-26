@@ -2779,3 +2779,18 @@ pub enum DemoSnapshotError {
     #[error("the demo shows no players to draw")]
     NoPlayers,
 }
+
+/// Why a demo's player tracks could not be read for playback.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum DemoTracksError {
+    /// The file cannot be read, or the parser failed or panicked on its packets.
+    #[error("the demo's players cannot be read: {0}")]
+    Unreadable(String),
+    /// No frame in the read part of the demo has a RED or BLU player to draw.
+    #[error("the demo shows no players to draw")]
+    NoPlayers,
+    /// The caller cancelled the read.
+    #[error("reading the demo was cancelled")]
+    Cancelled,
+}

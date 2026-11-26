@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::Read as _;
+use std::ops::ControlFlow;
 use std::path::Path;
 
 use tf_demo_parser::demo::data::{DemoTick, UserInfo};
@@ -232,28 +233,57 @@ impl Tracker {
     }
 }
 
-// Steps packets until the picker is done or the input ends; a cut-off demo ends with Ok(None).
-fn pick(bytes: &[u8]) -> Result<Option<(u32, Vec<TickRow>)>, String> {
+/// What a parse knows about tick length: the header's totals and the server's interval.
+pub(crate) struct Clocking {
+    pub header_ticks: u32,
+    pub header_duration: f32,
+    pub server_interval: f32,
+}
+
+// Steps packets, handing each real tick's frame to `on_frame` until it breaks or the input
+// ends; a cut-off demo simply ends. Signon ticks are skipped.
+pub(crate) fn drive(
+    bytes: &[u8],
+    mut on_frame: impl FnMut(TickFrame, &Clocking) -> ControlFlow<()>,
+) -> Result<Clocking, String> {
     let demo = Demo::new(bytes);
     let parser = DemoParser::new_with_analyser(demo.get_stream(), Tracker::default());
-    let (_header, mut ticker) = parser.ticker().map_err(|e| e.to_string())?;
-    let mut picker = SnapshotPicker::new();
+    let (header, mut ticker) = parser.ticker().map_err(|e| e.to_string())?;
+    let mut clocking = Clocking {
+        header_ticks: header.ticks,
+        header_duration: header.duration,
+        server_interval: 0.,
+    };
     loop {
-        let frame = match ticker.next() {
+        match ticker.next() {
             Ok(Some(tick)) => {
                 let at = u32::from(tick.tick);
                 if at >= SENTINEL_TICK {
                     continue;
                 }
-                tick.state.frame(at)
+                clocking.server_interval = tick.state.game.state.interval_per_tick;
+                if on_frame(tick.state.frame(at), &clocking).is_break() {
+                    break;
+                }
             }
             Ok(None) => break,
             Err(e) => return Err(e.to_string()),
-        };
-        if picker.push(frame) == Step::Done {
-            break;
         }
     }
+    Ok(clocking)
+}
+
+fn until_done(step: Step) -> ControlFlow<()> {
+    match step {
+        Step::Continue => ControlFlow::Continue(()),
+        Step::Done => ControlFlow::Break(()),
+    }
+}
+
+// Feeds frames to the picker until it settles; a cut-off demo ends with Ok(None).
+fn pick(bytes: &[u8]) -> Result<Option<(u32, Vec<TickRow>)>, String> {
+    let mut picker = SnapshotPicker::new();
+    drive(bytes, |frame, _| until_done(picker.push(frame)))?;
     Ok(picker.finish())
 }
 
@@ -265,7 +295,7 @@ pub fn read_demo_snapshot(dem: &Path) -> Result<DemoSnapshot, DemoSnapshotError>
 }
 
 // The first `cap` bytes of the file, or all of it when shorter.
-fn read_prefix(dem: &Path, cap: u64) -> std::io::Result<Vec<u8>> {
+pub(crate) fn read_prefix(dem: &Path, cap: u64) -> std::io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     std::fs::File::open(dem)?
         .take(cap)

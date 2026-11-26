@@ -1,15 +1,16 @@
 //! TF2's spectator free-fly: a camera that accelerates toward the keys held and slides to a
 //! stop, stepped at a fixed rate so the path does not depend on the frame rate.
 
+use super::clock::sane_dt;
+
 /// TF2's defaults: specspeed 3, maxspeed 320, specaccelerate 5, friction 4, move speed 450.
 const SPEC_SPEED: f32 = 3.0;
 const MAX_SPEED: f32 = 320.0 * SPEC_SPEED;
 const ACCELERATE: f32 = 5.0;
 const FRICTION: f32 = 4.0;
 const MOVE_SPEED: f32 = 450.0;
-/// The fixed physics step, and the longest frame that is simulated.
+/// The fixed physics step.
 const STEP: f32 = 1.0 / 240.0;
-const LONGEST_FRAME: f32 = 0.25;
 const MAX_PITCH: f32 = 89.0;
 
 /// The movement keys held for a frame.
@@ -72,10 +73,10 @@ impl FreeFly {
         self.pitch = (self.pitch + d_pitch_deg).clamp(-MAX_PITCH, MAX_PITCH);
     }
 
-    /// Moves the camera by `dt_seconds` (at most a quarter second counts) in whole fixed
-    /// steps, carrying the remainder to the next call.
+    /// Moves the camera by `dt_seconds` (at most a quarter second counts, and a negative or
+    /// NaN frame none) in whole fixed steps, carrying the remainder to the next call.
     pub fn advance(&mut self, dt_seconds: f32, input: FlyInput) {
-        self.accumulator += dt_seconds.min(LONGEST_FRAME);
+        self.accumulator += sane_dt(dt_seconds);
         while self.accumulator >= STEP {
             self.accumulator -= STEP;
             self.step(input);

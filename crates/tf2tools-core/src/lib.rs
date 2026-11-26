@@ -50,9 +50,10 @@ pub use cleanup::{CleanupRoots, Freed, sweep_game_leftovers, sweep_leftovers};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use demo_view::{
-    DemoHeader, DemoSnapshot, FlyInput, FreeFly, MAX_MAP_BYTES, MAX_MAP_TRIANGLES,
-    MAX_SNAPSHOT_BYTES, MapMesh, SnapshotPlayer, load_map_file, load_map_file_capped,
-    load_map_mesh, read_demo_header, read_demo_snapshot,
+    DemoHeader, DemoSnapshot, DemoTracks, FlyInput, FreeFly, MAX_DEMO_BYTES, MAX_MAP_BYTES,
+    MAX_MAP_TRIANGLES, MAX_SNAPSHOT_BYTES, MAX_TRACK_SAMPLES, MapMesh, PlaybackClock,
+    PlaybackEvent, SnapshotPlayer, TrackCut, load_map_file, load_map_file_capped, load_map_mesh,
+    read_demo_header, read_demo_playback, read_demo_snapshot, read_demo_tracks,
 };
 pub use demostf::{
     DEMO_CACHE_HIGH, DEMO_CACHE_LOW, DEMO_LIMIT, DemoCache, DemoCursor, DemoDetail, DemoFormat,
@@ -62,12 +63,12 @@ pub use demostf::{
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DemoCacheError, DemoClearError,
-    DemoHeaderError, DemoSnapshotError, DemosError, DetectError, DownloadError, FilesError,
-    FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
-    GbMapInstallError, GbMapRemoveError, GbMapSearchError, HistoryError, HudFilesError,
-    HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError, KeepHudError,
-    KvParseError, LibraryError, LogError, LogParseError, LogsCacheError, LogsFetchError,
-    LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
+    DemoHeaderError, DemoSnapshotError, DemoTracksError, DemosError, DetectError, DownloadError,
+    FilesError, FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError,
+    GbAddonInstallError, GbMapInstallError, GbMapRemoveError, GbMapSearchError, HistoryError,
+    HudFilesError, HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError,
+    KeepHudError, KvParseError, LibraryError, LogError, LogParseError, LogsCacheError,
+    LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
     MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
     ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
