@@ -14,10 +14,12 @@ use tf2tools_app::viewer::load::timeline_time;
 use tf2tools_core::{DemoTracksError, PlaybackEvent, TrackCut};
 
 use crate::support;
+use crate::support::demo_view_fixtures::demo_header;
 use crate::support::demo_viewer::{
-    gated_playback, open_scripted, open_with_tracks, playback, read_state, still_then, walking,
-    walking_tracks,
+    StubAnswer, demo_file, demo_viewer_shell_with, gated_playback, install_map, open_scripted,
+    open_with_tracks, playback, read_state, still_then, walking, walking_tracks,
 };
+use crate::support::graphics::found;
 
 #[gpui_kit::test]
 fn the_still_picture_shows_before_the_tracks_and_they_start_at_its_tick(cx: &mut TestAppContext) {
@@ -316,6 +318,26 @@ fn playing_moves_the_slider_without_seeking(cx: &mut TestAppContext) {
         "{state:?} {seen:?}"
     );
     assert_eq!(changes.load(Ordering::SeqCst), 0);
+}
+
+#[gpui_kit::test]
+fn a_renderer_that_fails_cancels_the_read(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, gate) = still_then(|| vec![PlaybackEvent::Tracks(walking_tracks(None))]);
+    install_map(&env, "cp_synthetic");
+    let demo = demo_file(&env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell_with(
+        cx,
+        &env,
+        found(&env),
+        vec![demo],
+        StubAnswer::NoAdapter,
+        Some(reader),
+    );
+    support::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    support::wait_real(cx, "the cancel", |_| {
+        gate.cancelled.load(Ordering::SeqCst) && gate.broke.load(Ordering::SeqCst)
+    });
 }
 
 #[gpui_kit::test]

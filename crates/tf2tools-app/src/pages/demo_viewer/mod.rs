@@ -779,10 +779,12 @@ impl DemoViewerPage {
                 cx,
             )
         });
-        // A renderer that stops leaves nothing to look at, so its viewport goes too.
+        // A renderer that stops leaves nothing to look at, so its viewport and the read go too.
         let watch = cx.observe(&viewport, |page, viewport, cx| {
             if viewport.read(cx).failure().is_some() {
                 page.view = View::Failed(tr!("demo_viewer.error.unsupported"));
+                page._cancel = None;
+                page.reading = None;
                 cx.notify();
             }
         });
