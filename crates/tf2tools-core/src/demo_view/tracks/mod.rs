@@ -150,6 +150,55 @@ impl DemoTracks {
         DemoSnapshot::new(tick.floor() as u32, players)
     }
 
+    /// Tracks through `frames`, for tests outside the crate: player `i` of each frame is one
+    /// player with one run. `None` when no frame holds a player.
+    #[doc(hidden)]
+    pub fn from_keyframes(
+        seconds_per_tick: f32,
+        frames: &[DemoSnapshot],
+        round_starts: Vec<u32>,
+        cut: Option<TrackCut>,
+    ) -> Option<DemoTracks> {
+        let mut runs: Vec<TrackRun> = Vec::new();
+        let (mut first_tick, mut last_tick, mut kept) = (None, None, None::<u32>);
+        for frame in frames {
+            if kept.is_some_and(|k| frame.tick() <= k) {
+                continue;
+            }
+            kept = Some(frame.tick());
+            for (i, p) in frame.players().iter().enumerate() {
+                if i == runs.len() {
+                    runs.push(TrackRun {
+                        team: p.team(),
+                        class: p.class(),
+                        samples: Vec::new(),
+                    });
+                }
+                runs[i].samples.push(keyframe_sample(p, frame.tick()));
+            }
+            if !frame.players().is_empty() {
+                first_tick.get_or_insert(frame.tick());
+                last_tick = Some(frame.tick());
+            }
+        }
+        let players = runs
+            .into_iter()
+            .zip(1..)
+            .map(|(run, entity)| PlayerTrack {
+                entity,
+                runs: vec![run],
+            })
+            .collect();
+        Some(DemoTracks {
+            players,
+            first_tick: first_tick?,
+            last_tick: last_tick?,
+            seconds_per_tick,
+            round_starts,
+            cut,
+        })
+    }
+
     fn runs(&self) -> impl Iterator<Item = &TrackRun> {
         self.players.iter().flat_map(|p| &p.runs)
     }
@@ -224,6 +273,20 @@ fn player_at(track: &PlayerTrack, tick: f64) -> Option<SnapshotPlayer> {
     Some(SnapshotPlayer::new(
         run.team, run.class, feet, yaw, pitch, eye, ducked,
     ))
+}
+
+// A drawn player packed the way the builder packs a row: yaw wrapped to -180..180 in
+// centidegrees, the eye rounded into 1..=100.
+fn keyframe_sample(p: &SnapshotPlayer, tick: u32) -> TrackSample {
+    let yaw = (p.yaw() + 180.).rem_euclid(360.) - 180.;
+    TrackSample {
+        tick,
+        feet: p.feet(),
+        yaw: (yaw * 100.).round() as i16,
+        pitch: (p.pitch() * 100.).round() as i16,
+        eye_z: p.eye_height().round().clamp(1., 100.) as u8,
+        flags: if p.ducked() { DUCKED } else { 0 },
+    }
 }
 
 /// The tick length: the server's interval when plausible, else the header's average, else 66 tick.
