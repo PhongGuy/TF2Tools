@@ -1,5 +1,6 @@
 //! The demo viewer's 3D view as a GPUI element: drag to look, WASD to fly, Shift to slow down.
-//! It asks its renderer for a frame only when the camera moves or the device size changes.
+//! It asks its renderer for a frame only when the camera or the playback tick moves, or the
+//! device size changes.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -7,12 +8,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    Bounds, Context, DispatchPhase, FocusHandle, InteractiveElement as _, IntoElement,
-    KeyDownEvent, KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    ParentElement as _, Pixels, Point, Render, RenderImage, Styled as _, TestSupportExt as _,
-    Window, canvas, div, img,
+    Bounds, Context, DispatchPhase, EventEmitter, FocusHandle, InteractiveElement as _,
+    IntoElement, KeyDownEvent, KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, ParentElement as _, Pixels, Point, Render, RenderImage, Styled as _,
+    TestSupportExt as _, Window, canvas, div, img,
 };
-use tf2tools_core::{DemoSnapshot, FlyInput, FreeFly, MapMesh};
+use tf2tools_core::{DemoSnapshot, DemoTracks, FlyInput, FreeFly, MapMesh, PlaybackClock};
 
 use super::pointer::PointerLock;
 use super::{DrawRequest, PlayerBox, RenderEvent, RendererError, SceneRenderer, math};
@@ -59,13 +60,38 @@ fn sane_scale(scale: f32) -> f32 {
     }
 }
 
+/// Where playback stands, for the bar.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlaybackState {
+    pub tick: f64,
+    pub playing: bool,
+    pub speed: f32,
+    pub elapsed_seconds: f64,
+    pub total_seconds: f64,
+}
+
+/// Sent whenever the playback state changes: a frame that moved the tick, a play or pause,
+/// a seek, a step or a new speed.
+pub struct PlaybackMoved(pub PlaybackState);
+
+impl EventEmitter<PlaybackMoved> for DemoViewport {}
+
+/// The demo's tracks and the clock that walks them.
+struct Playback {
+    tracks: Arc<DemoTracks>,
+    clock: PlaybackClock,
+}
+
 /// A free-fly view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
 pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
     lock: Box<dyn PointerLock>,
     camera: FreeFly,
-    /// The snapshot's boxes, shared by every draw so the worker uploads them once.
+    /// The boxes at the shown tick, shared by every draw so the worker uploads them once.
     boxes: Arc<[PlayerBox]>,
+    /// The still snapshot's tick, where playback starts so the picture does not jump.
+    snapshot_tick: Option<u32>,
+    playback: Option<Playback>,
     /// Multiplies the turn per dragged pixel; always finite and positive.
     look_scale: f32,
     keys: HeldKeys,
@@ -146,6 +172,8 @@ impl DemoViewport {
             lock,
             camera: FreeFly::new(origin, yaw, pitch),
             boxes: math::player_boxes(snapshot),
+            snapshot_tick: snapshot.map(DemoSnapshot::tick),
+            playback: None,
             look_scale: sane_scale(look_scale),
             keys: HeldKeys::default(),
             shown: None,
@@ -181,6 +209,99 @@ impl DemoViewport {
     /// Why the renderer stopped, once it has.
     pub fn failure(&self) -> Option<&RendererError> {
         self.failure.as_ref()
+    }
+
+    /// Takes the tracks and starts a paused clock at the shown snapshot's tick (clamped), or at
+    /// the first tick without one; the boxes become `tracks.at(tick)`'s and one frame draws.
+    pub fn set_tracks(&mut self, tracks: Arc<DemoTracks>, cx: &mut Context<Self>) {
+        let mut clock = PlaybackClock::new(
+            tracks.first_tick(),
+            tracks.last_tick(),
+            tracks.seconds_per_tick(),
+        );
+        if let Some(tick) = self.snapshot_tick {
+            clock.seek(f64::from(tick));
+        }
+        self.playback = Some(Playback { tracks, clock });
+        self.moved_while_paused(cx);
+    }
+
+    pub fn playback(&self) -> Option<PlaybackState> {
+        self.playback.as_ref().map(|p| PlaybackState {
+            tick: p.clock.tick(),
+            playing: p.clock.is_playing(),
+            speed: p.clock.speed(),
+            elapsed_seconds: p.clock.elapsed_seconds(),
+            total_seconds: p.clock.total_seconds(),
+        })
+    }
+
+    /// Play from paused (from the last tick it restarts), pause from playing.
+    pub fn toggle_play(&mut self, cx: &mut Context<Self>) {
+        let Some(p) = self.playback.as_mut() else {
+            return;
+        };
+        if p.clock.is_playing() {
+            p.clock.pause();
+            self.moved_while_paused(cx);
+        } else {
+            p.clock.play();
+            // A restart from the last tick jumps, so the boxes follow before the loop runs.
+            self.reread_boxes();
+            self.emit_playback(cx);
+            cx.notify();
+        }
+    }
+
+    pub fn seek(&mut self, tick: f64, cx: &mut Context<Self>) {
+        self.with_clock(cx, |clock| clock.seek(tick));
+    }
+
+    pub fn step(&mut self, delta: i32, cx: &mut Context<Self>) {
+        self.with_clock(cx, |clock| clock.step(delta));
+    }
+
+    pub fn set_speed(&mut self, speed: f32, cx: &mut Context<Self>) {
+        let Some(p) = self.playback.as_mut() else {
+            return;
+        };
+        p.clock.set_speed(speed);
+        self.emit_playback(cx);
+    }
+
+    /// Moves the clock outside the frame loop: a playing clock lets the next frame draw, a
+    /// paused one draws the new tick at once.
+    fn with_clock(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut PlaybackClock)) {
+        let Some(p) = self.playback.as_mut() else {
+            return;
+        };
+        f(&mut p.clock);
+        if p.clock.is_playing() {
+            self.reread_boxes();
+            self.emit_playback(cx);
+        } else {
+            self.moved_while_paused(cx);
+        }
+    }
+
+    /// Re-reads the boxes, draws once and reports, without starting the frame loop.
+    fn moved_while_paused(&mut self, cx: &mut Context<Self>) {
+        self.reread_boxes();
+        self.draw();
+        self.emit_playback(cx);
+        cx.notify();
+    }
+
+    fn reread_boxes(&mut self) {
+        if let Some(p) = &self.playback {
+            self.boxes = math::player_boxes(Some(&p.tracks.at(p.clock.tick())));
+        }
+    }
+
+    fn emit_playback(&mut self, cx: &mut Context<Self>) {
+        if let Some(state) = self.playback() {
+            cx.emit(PlaybackMoved(state));
+        }
     }
 
     fn handle_event(&mut self, event: RenderEvent, cx: &mut Context<Self>) {
@@ -290,18 +411,29 @@ impl Render for DemoViewport {
         if !self.focus.is_focused(window) {
             self.keys = HeldKeys::default();
         }
-        if self.keys.any() || self.camera.is_moving() {
-            // Flight steps once per display frame. A render between ticks, such as one for an
-            // arriving frame, must not step, or each frame would draw the next at once.
+        let flying = self.keys.any() || self.camera.is_moving();
+        let playing = self.playback.as_ref().is_some_and(|p| p.clock.is_playing());
+        if flying || playing {
+            // Flight and playback step once per display frame. A render between ticks, such as
+            // one for an arriving frame, must not step, or each frame would draw the next at once.
             if !self.tick_pending {
-                // The first moving frame steps by nothing, so time spent at rest is not flown.
+                // The first moving frame steps by nothing, so time spent at rest is not played.
                 let dt = self.last_tick.map_or(0.0, |t| (now - t).as_secs_f32());
                 self.last_tick = Some(now);
-                let k = self.keys;
-                let shift = window.modifiers().shift;
-                self.camera
-                    .advance(dt, FlyInput::new(axis(k.w, k.s), axis(k.d, k.a), shift));
-                self.draw();
+                if flying {
+                    let k = self.keys;
+                    let shift = window.modifiers().shift;
+                    self.camera
+                        .advance(dt, FlyInput::new(axis(k.w, k.s), axis(k.d, k.a), shift));
+                }
+                let ticked = self.playback.as_mut().is_some_and(|p| p.clock.advance(dt));
+                if ticked {
+                    self.reread_boxes();
+                    self.emit_playback(cx);
+                }
+                if flying || ticked {
+                    self.draw();
+                }
                 self.tick_pending = true;
                 cx.on_next_frame(window, |v, _, cx| {
                     v.tick_pending = false;
