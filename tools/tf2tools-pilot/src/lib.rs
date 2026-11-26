@@ -2,6 +2,8 @@
 //! or with `TF2TOOLS_PILOT_REAL=1` against the user's own library and TF2 install.
 
 pub mod demos_fake;
+pub mod fake_http;
+pub mod logs_fake;
 pub mod seed;
 
 // Core's stock HUD fixture, shared so the fake game carries the same files the tests load.
@@ -16,7 +18,7 @@ pub(crate) mod demo_view;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use gpui_kit::{App, AssetSource};
 use gpui_pilot_host::{Launch, PilotApp};
@@ -25,7 +27,7 @@ use tf2tools_app::assets::{AppAssets, AssetRoot};
 use tf2tools_app::audio::RecordingAudio;
 use tf2tools_app::picker::{NativePicker, PathPicker};
 use tf2tools_app::updater::UpdateBoot;
-use tf2tools_core::{DataDir, DemosEndpoints, Endpoints, FontHost, FontHostError};
+use tf2tools_core::{DataDir, DemosEndpoints, Endpoints, FontHost, FontHostError, LogsEndpoints};
 
 /// Overrides the launch's data dir, so a QA run can point the pilot at a kept library.
 pub const DATA_VAR: &str = "TF2TOOLS_PILOT_DATA";
@@ -228,23 +230,16 @@ pub fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         locales: tf2tools_app::i18n::system_locales(),
     }
     // A pilot QA run never reaches the real stores: its endpoints are a closed loopback port
-    // (demos.tf goes to the loopback fake), and the offline mask refuses any other host on top.
+    // (demos.tf and logs.tf go to the loopback fake), and the offline mask refuses any other host.
     .offline(None);
-    // `offline` replaces the endpoints, so the demos fake is pointed at only after it.
-    let fake = shared_demos_fake();
-    let fake = fake
-        .as_ref()
-        .map_err(|e| anyhow::anyhow!("demos fake: {e}"))?;
+    // `offline` replaces the endpoints, so the fakes are pointed at only after it.
+    let demos = demos_fake::DemosFake::start().map_err(|e| anyhow::anyhow!("demos fake: {e}"))?;
+    let logs = logs_fake::LogsFake::start().map_err(|e| anyhow::anyhow!("logs fake: {e}"))?;
     Ok(Boot {
         endpoints: boot
             .endpoints
-            .with_demos(DemosEndpoints::loopback(fake.base())),
+            .with_demos(DemosEndpoints::loopback(demos.base()))
+            .with_logs(LogsEndpoints::loopback(logs.base())),
         ..boot
     })
-}
-
-// One fake per process: `Boot` cannot own it, and its thread outlives every launch.
-fn shared_demos_fake() -> &'static std::io::Result<demos_fake::DemosFake> {
-    static FAKE: OnceLock<std::io::Result<demos_fake::DemosFake>> = OnceLock::new();
-    FAKE.get_or_init(demos_fake::DemosFake::start)
 }

@@ -9,8 +9,7 @@ use gpui_kit::AppContext as _;
 use gpui_kit::{App, Entity, Global, SharedString, Task};
 use tf2tools_core::{
     ActivityLog, BuiltinCrosshairs, DataDir, Database, DemosClient, DetectError, Endpoints,
-    FontHost, Library, LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient, StoreConfig,
-    Tf2Install,
+    FontHost, Library, LogsCache, LogsClient, OpenError, StoreClient, StoreConfig, Tf2Install,
 };
 
 use crate::assets::{AssetRoot, AssetRootError};
@@ -93,13 +92,14 @@ impl Services {
             tracing::warn!(%error, "could not retire mastercomfig's override addons");
         }
         let demos_endpoints = endpoints.demos().clone();
+        let logs_endpoints = endpoints.logs().clone();
         // Offline narrows the client to loopback; online keeps the default config `new` built.
         let mut store = StoreClient::new(db.clone(), data.clone(), endpoints);
         if offline {
             store = store.with_config(StoreConfig::default().with_loopback_only(true));
         }
         let activity = ActivityLog::new(db.clone());
-        let mut logs = LogsClient::new(LogsCache::new(db.clone()), LogsEndpoints::default());
+        let mut logs = LogsClient::new(LogsCache::new(db.clone()), logs_endpoints);
         if offline {
             logs = logs.with_config(LogsClient::default_config().with_loopback_only(true));
         }
@@ -129,7 +129,8 @@ impl Services {
     }
 
     /// Points the store client at `endpoints`, keeping the GameBanana pacer the old client
-    /// had; tests aim it at a local or closed port.
+    /// had; tests aim it at a local or closed port. Only the store client is rebuilt: the
+    /// logs.tf and demos.tf clients stay as `open` built them.
     pub fn with_endpoints(self, endpoints: Endpoints) -> Self {
         let store = StoreClient::new(self.db.clone(), self.data.clone(), endpoints)
             .with_pacer_of(&self.store);

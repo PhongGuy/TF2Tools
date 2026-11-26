@@ -181,3 +181,23 @@ fn the_seeded_boot_lists_demos_from_the_fake() {
         6
     );
 }
+
+#[test]
+fn every_start_shares_one_listener_and_one_clock() {
+    let a = DemosFake::start().unwrap();
+    let b = DemosFake::start().unwrap();
+    assert_eq!(a.base(), b.base());
+    assert_eq!(
+        a.base(),
+        format!("{}/demostf", tf2tools_pilot::fake_http::root().unwrap())
+    );
+
+    let start = tf2tools_pilot::fake_http::start_time();
+    assert_eq!(start, tf2tools_pilot::fake_http::start_time());
+    assert!(start <= now() && start > now() - 3600, "{start}");
+
+    // The newest row is anchored to the shared clock, not to the request's own now.
+    let demos = first_page(&client(&a));
+    assert_eq!(demos[0].id(), 9006);
+    assert_eq!(demos[0].time(), start - 3600);
+}

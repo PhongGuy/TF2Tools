@@ -324,3 +324,30 @@ fn open_builds_the_demos_client_on_the_callers_endpoints() {
     assert_eq!(live.endpoints().api(), "https://api.demos.tf");
     assert!(!live.is_loopback_only());
 }
+
+#[test]
+fn open_builds_the_logs_client_on_the_callers_endpoints() {
+    let env = support::env();
+    let open = |endpoints, offline| {
+        Services::open(
+            env.data.clone(),
+            support::repo_asset_root(),
+            Arc::new(ScriptedPicker::empty()),
+            support::no_steam(),
+            Arc::new(RecordingAudio::new()),
+            endpoints,
+            offline,
+        )
+        .unwrap()
+        .logs
+    };
+    let local = open(Endpoints::loopback("http://127.0.0.1:9"), true);
+    assert_eq!(local.endpoints().logs_tf(), "http://127.0.0.1:9/logstf");
+    assert_eq!(
+        local.endpoints().steam_community(),
+        "http://127.0.0.1:9/logstf/steam"
+    );
+
+    let live = open(Endpoints::default(), false);
+    assert_eq!(live.endpoints().logs_tf(), "https://logs.tf");
+}

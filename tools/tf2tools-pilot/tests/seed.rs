@@ -308,3 +308,20 @@ fn the_seeded_game_holds_the_stock_hud_files() {
             .is_some()
     );
 }
+
+#[test]
+fn the_seed_tracks_the_first_fake_logs_player() {
+    let tmp = tempfile::tempdir().unwrap();
+    let data = tmp.path().join("com.tf2tools.app");
+    let game = tmp.path().join("fake-tf2/Team Fortress 2");
+    seed(&data, &game, &assets()).unwrap();
+    let db = Database::open(&DataDir::at(&data)).unwrap();
+    let players = tf2tools_core::LogsCache::new(db).players().unwrap();
+    let (steam3, name) = tf2tools_pilot::logs_fake::PLAYERS[0];
+    assert_eq!(players.len(), 1);
+    assert_eq!(
+        players[0].steam_id(),
+        tf2tools_core::SteamId::from_steam3(steam3).unwrap()
+    );
+    assert_eq!(players[0].name(), name);
+}
