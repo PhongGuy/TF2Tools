@@ -1,6 +1,6 @@
-//! The demo viewer's UI-free pieces: the map mesh drawn behind a demo, the free-fly and spectator cameras,
-//! the demo header, the players at one tick, their tracks over the whole demo and the
-//! playback clock.
+//! The demo viewer's UI-free pieces: the map mesh drawn behind a demo, the free-fly and
+//! spectator cameras, the demo header, the players at one tick, their tracks over the whole
+//! demo and the playback clock.
 
 mod camera;
 mod chase;

@@ -221,6 +221,8 @@ impl SpectatorCamera {
                 }
             }
             Some((id, TargetLife::Alive, pose)) if self.mode == CameraMode::FirstPerson => {
+                // The next death cuts to its chase in place rather than growing from a stale distance.
+                self.snap = true;
                 CameraView {
                     origin: pose.eye(),
                     yaw: pose.yaw(),
@@ -436,6 +438,38 @@ mod tests {
         assert!(close(v.origin(), [32., 0., 132.]), "{:?}", v.origin());
         c.snap();
         let v = c.view(Some(&t), None, 10., 0., FlyInput::default());
+        assert!(close(v.origin(), [4., 0., 132.]), "{:?}", v.origin());
+    }
+
+    #[test]
+    fn every_death_seen_from_first_person_snaps_the_chase() {
+        let frames = (0..=130u32)
+            .map(|k| {
+                let up = k < 10 || (60..70).contains(&k);
+                (
+                    k,
+                    if up {
+                        vec![row(1, [100., 0., 64.], 0.)]
+                    } else {
+                        vec![]
+                    },
+                )
+            })
+            .collect();
+        let t = tracks(frames);
+        let (a, b, cc, d) = (
+            [50., -1000., -1000.],
+            [50., 1000., -1000.],
+            [50., 1000., 1000.],
+            [50., -1000., 1000.],
+        );
+        let mesh = MapMesh::from_positions(vec![a, b, cc, a, cc, d]);
+        let mut c = camera();
+        c.next(&t, 5.);
+        let v = c.view(Some(&t), Some(&mesh), 30., 0.016, FlyInput::default());
+        assert!(close(v.origin(), [56., 0., 132.]), "{:?}", v.origin());
+        c.view(Some(&t), None, 65., 0.016, FlyInput::default());
+        let v = c.view(Some(&t), None, 100., 0.016, FlyInput::default());
         assert!(close(v.origin(), [4., 0., 132.]), "{:?}", v.origin());
     }
 }
