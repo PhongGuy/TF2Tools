@@ -922,7 +922,9 @@ impl OffUi {
 impl Drop for OffUi {
     fn drop(&mut self) {
         if let Some(download) = self.0.take() {
-            std::thread::spawn(move || drop(download));
+            // If the OS refuses a thread, the download drops here instead of a panic
+            // inside a Drop.
+            let _ = std::thread::Builder::new().spawn(move || drop(download));
         }
     }
 }
