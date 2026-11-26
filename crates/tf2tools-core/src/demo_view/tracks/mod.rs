@@ -103,12 +103,26 @@ impl TrackedPlayer {
     }
 }
 
-/// The longest name kept whole; a longer one is cut to this many characters plus an ellipsis.
+/// How many characters a cut name keeps before its ellipsis.
 const NAME_KEEP: usize = 31;
 
 /// `raw` without control characters and trimmed, cut to 32 characters; None when nothing is left.
 pub(crate) fn clean_name(raw: &str) -> Option<String> {
-    let kept: String = raw.chars().filter(|c| !c.is_control()).collect();
+    // Format and bidi controls are not `is_control`, yet they hide or reorder a name's text.
+    let hidden = |c: char| {
+        matches!(
+            c,
+            '\u{200b}'..='\u{200f}'
+                | '\u{202a}'..='\u{202e}'
+                | '\u{2060}'..='\u{2064}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{feff}'
+        )
+    };
+    let kept: String = raw
+        .chars()
+        .filter(|&c| !c.is_control() && !hidden(c))
+        .collect();
     let trimmed = kept.trim();
     if trimmed.is_empty() {
         return None;
@@ -116,7 +130,8 @@ pub(crate) fn clean_name(raw: &str) -> Option<String> {
     if trimmed.chars().count() <= NAME_KEEP + 1 {
         return Some(trimmed.to_owned());
     }
-    let mut cut: String = trimmed.chars().take(NAME_KEEP).collect();
+    let cut: String = trimmed.chars().take(NAME_KEEP).collect();
+    let mut cut = cut.trim_end().to_owned();
     cut.push('…');
     Some(cut)
 }
@@ -589,6 +604,13 @@ mod tests {
         let cut = clean_name(&long).expect("a name");
         assert_eq!(cut.chars().count(), 32);
         assert_eq!(cut, format!("{}…", "é".repeat(31)));
+    }
+
+    #[test]
+    fn names_lose_bidi_controls_and_a_cut_drops_its_trailing_space() {
+        assert_eq!(clean_name("a\u{202e}b\u{200b}c"), Some("abc".to_owned()));
+        let spaced = format!("{} {}", "a".repeat(30), "b".repeat(10));
+        assert_eq!(clean_name(&spaced), Some(format!("{}…", "a".repeat(30))));
     }
 
     #[test]
