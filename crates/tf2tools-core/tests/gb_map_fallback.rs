@@ -1,8 +1,5 @@
 //! Finding a demo's missing map on GameBanana through the local map catalogue.
 
-// Tasks 2 and 3 use the download helpers; Task 3 removes this allowance.
-#![allow(dead_code, unused_imports)]
-
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -360,4 +357,213 @@ async fn a_file_named_for_the_map_is_tried_first() {
     assert_eq!(result.unwrap().gb_id(), GbId::new(4));
     assert_eq!(downloads_asked(&env).await, ["/dl/addon/4/0"]);
     assert_eq!((progress[0].candidate, progress[0].of), (1, 3));
+}
+
+/// Item `id` whose one file is answered at `route` with `status` and no body.
+async fn failing_item(env: &StoreEnv, id: u64, route: &str, status: u16) {
+    Mock::given(method("GET"))
+        .and(path(route))
+        .respond_with(ResponseTemplate::new(status))
+        .mount(&env.server)
+        .await;
+    let mut f = gb_addon_file(env, id, 0, "pack.zip", b"PK", 100).await;
+    f["_sDownloadUrl"] = json!(format!("{}{route}", env.server.uri()));
+    profile(env, id, vec![f]).await;
+}
+
+fn good() -> Vec<u8> {
+    common::zip_bytes(&[("maps/koth_x.bsp", &bsp(b"x"))])
+}
+
+#[tokio::test]
+async fn a_virus_flagged_candidate_is_skipped_before_download() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+    let mut f = gb_addon_file(&env, 1, 0, "pack.zip", &good(), 100).await;
+    f["_sAvResult"] = json!("infected");
+    profile(&env, 1, vec![f]).await;
+    item(&env, 2, "pack.zip", &good()).await;
+    let (result, progress) = find(&env, "koth_x").await;
+    assert_eq!(result.unwrap().gb_id(), GbId::new(2));
+    assert_eq!(downloads_asked(&env).await, ["/dl/addon/2/0"]);
+    assert!(progress.iter().all(|p| p.of == 1));
+}
+
+#[tokio::test]
+async fn missing_gone_absent_or_damaged_candidates_are_skipped() {
+    let env = store_env().await;
+    let rows: Vec<(u64, &str, i64, bool)> = (1..=5)
+        .map(|i| (i, "koth_x", i64::try_from(i).unwrap(), false))
+        .collect();
+    seed(&env, &rows);
+    // 1 has no profile (404); 2 is trashed; 3's file is 404; 4 fails its checksum.
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Mod/2/ProfilePage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "_idRow": 2, "_sName": "Gone", "_bIsTrashed": true, "_aFiles": []})))
+        .mount(&env.server)
+        .await;
+    failing_item(&env, 3, "/dl/fail/3", 404).await;
+    let mut f = gb_addon_file(&env, 4, 0, "pack.zip", &good(), 100).await;
+    f["_sMd5Checksum"] = json!("00000000000000000000000000000000");
+    profile(&env, 4, vec![f]).await;
+    item(&env, 5, "pack.zip", &good()).await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert_eq!(result.unwrap().gb_id(), GbId::new(5));
+    assert_eq!(profiles_asked(&env).await, [1, 2, 3, 4, 5]);
+    assert_eq!(
+        downloads_asked(&env).await,
+        ["/dl/fail/3", "/dl/addon/4/0", "/dl/addon/5/0"]
+    );
+}
+
+#[tokio::test]
+async fn unsafe_or_oversized_archives_are_skipped_and_write_nothing_outside_scratch() {
+    let env = store_env().await;
+    seed(
+        &env,
+        &[
+            (1, "koth_x", 1, false),
+            (2, "koth_x", 2, false),
+            (3, "koth_x", 3, false),
+        ],
+    );
+    item(
+        &env,
+        1,
+        "evil.rar",
+        &common::rar5_stored(&["ok.txt", "..\\evil.txt"], 0),
+    )
+    .await;
+    let huge =
+        common::zip_with_listed_size("maps/koth_x.bsp", &bsp(b"x"), 3 * 1024 * 1024 * 1024, false);
+    item(&env, 2, "huge.zip", &huge).await;
+    item(&env, 3, "pack.zip", &good()).await;
+    let d = find(&env, "koth_x").await.0.unwrap();
+    assert_eq!(d.gb_id(), GbId::new(3));
+    assert!(
+        !common::tree(env.tmp.path())
+            .iter()
+            .any(|p| p.ends_with("evil.txt"))
+    );
+    drop(d);
+    assert!(common::tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
+async fn rate_limits_and_server_errors_on_a_file_abort_the_search() {
+    for status in [429u16, 503] {
+        let env = store_env().await;
+        seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+        failing_item(&env, 1, "/dl/fail/1", status).await;
+        item(&env, 2, "pack.zip", &good()).await;
+        let (result, _) = find(&env, "koth_x").await;
+        match status {
+            429 => assert!(
+                matches!(result, Err(GbMapSearchError::RateLimited { .. })),
+                "{result:?}"
+            ),
+            _ => assert!(
+                matches!(result, Err(GbMapSearchError::Network { .. })),
+                "{result:?}"
+            ),
+        }
+        assert_eq!(downloads_asked(&env).await, ["/dl/fail/1"], "{status}");
+        assert!(common::tmp_is_empty(&env.dir));
+    }
+}
+
+#[tokio::test]
+async fn an_unreachable_file_aborts_as_network() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+    let mut f = gb_addon_file(&env, 1, 0, "pack.zip", &good(), 100).await;
+    f["_sDownloadUrl"] = json!("http://127.0.0.1:1/dl/refused");
+    profile(&env, 1, vec![f]).await;
+    item(&env, 2, "pack.zip", &good()).await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::Network { .. })),
+        "{result:?}"
+    );
+    assert!(downloads_asked(&env).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_profile_outage_aborts_before_the_next_profile() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Mod/1/ProfilePage"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&env.server)
+        .await;
+    item(&env, 2, "pack.zip", &good()).await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::Network { .. })),
+        "{result:?}"
+    );
+    assert_eq!(profiles_asked(&env).await, [1]);
+}
+
+#[tokio::test]
+async fn a_failed_write_while_unpacking_aborts_as_io() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+    // A file named `maps` blocks the folder the next entry needs, so the unpack cannot write.
+    let clash = common::zip_bytes(&[("maps", b"x"), ("maps/koth_x.bsp", &bsp(b"x"))]);
+    item(&env, 1, "pack.zip", &clash).await;
+    item(&env, 2, "pack.zip", &good()).await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::Io { .. })),
+        "{result:?}"
+    );
+    assert_eq!(downloads_asked(&env).await, ["/dl/addon/1/0"]);
+    assert!(common::tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
+async fn dropping_the_search_mid_download_leaves_tmp_empty() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false)]);
+    Mock::given(method("GET"))
+        .and(path("/dl/slow/1"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(good())
+                .set_delay(Duration::from_secs(30)),
+        )
+        .mount(&env.server)
+        .await;
+    let mut f = gb_addon_file(&env, 1, 0, "pack.zip", &good(), 100).await;
+    f["_sDownloadUrl"] = json!(format!("{}/dl/slow/1", env.server.uri()));
+    profile(&env, 1, vec![f]).await;
+    let ran = tokio::time::timeout(
+        Duration::from_millis(500),
+        env.client.find_gb_map("koth_x", &|_| {}),
+    )
+    .await;
+    assert!(ran.is_err(), "the search was still downloading");
+    assert_eq!(downloads_asked(&env).await, ["/dl/slow/1"]);
+    assert!(common::tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
+async fn a_rate_limited_profile_aborts_the_search() {
+    let env = store_env().await;
+    seed(&env, &[(1, "koth_x", 1, false), (2, "koth_x", 2, false)]);
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Mod/1/ProfilePage"))
+        .respond_with(ResponseTemplate::new(429))
+        .mount(&env.server)
+        .await;
+    item(&env, 2, "pack.zip", &good()).await;
+    let (result, _) = find(&env, "koth_x").await;
+    assert!(
+        matches!(result, Err(GbMapSearchError::RateLimited { .. })),
+        "{result:?}"
+    );
+    assert!(downloads_asked(&env).await.is_empty());
 }

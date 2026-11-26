@@ -6,7 +6,7 @@ use rusqlite::{Connection, params};
 use super::cards::like_pattern;
 use super::pacer::Priority;
 use super::{DownloadProgress, GbMapDownload, StoreClient, is_map_name};
-use crate::error::GbMapSearchError;
+use crate::error::{ArchiveError, BrowseError, GbAddonFetchError, GbMapSearchError};
 use crate::library::GbId;
 
 /// At most this many candidate profiles are asked for per search.
@@ -47,10 +47,10 @@ impl StoreClient {
         let catalog = self.addon_catalog();
         let mut kept = Vec::new();
         for id in ids.into_iter().take(MAX_PROFILES) {
-            if let Ok(profile) = catalog.profile_at(id, Priority::Interactive).await
-                && self.gb_map_refusal(&profile).is_none()
-            {
-                kept.push(profile);
+            match catalog.profile_at(id, Priority::Interactive).await {
+                Ok(profile) if self.gb_map_refusal(&profile).is_none() => kept.push(profile),
+                Ok(_) => {}
+                Err(e) => on_profile(e)?,
             }
         }
         let stem = strip_version(name).to_ascii_lowercase();
@@ -76,8 +76,12 @@ impl StoreClient {
             };
             report(DownloadProgress::starting());
             tried += 1;
-            let Ok(mut download) = self.download_gb_map(profile, &report).await else {
-                continue;
+            let mut download = match self.download_gb_map(profile, &report).await {
+                Ok(download) => download,
+                Err(e) => {
+                    on_fetch(e)?;
+                    continue;
+                }
             };
             let matching = download
                 .maps
@@ -90,6 +94,9 @@ impl StoreClient {
                     .retain(|m| m.name().eq_ignore_ascii_case(name));
                 return Ok(download);
             }
+            // Removing a large scratch tree blocks, so a rejected download is dropped off
+            // the async workers. A failed join only means the removal itself panicked.
+            let _ = tokio::task::spawn_blocking(move || drop(download)).await;
         }
         Err(GbMapSearchError::NoMatch {
             name: name.to_owned(),
@@ -116,6 +123,67 @@ impl StoreClient {
                 message: e.to_string(),
             }),
         }
+    }
+}
+
+/// Sorts a failed candidate download: `Ok` skips to the next candidate, while a failure
+/// a later retry may fix stops the search. No wildcard, so a new variant must be sorted here.
+fn on_fetch(e: GbAddonFetchError) -> Result<(), GbMapSearchError> {
+    match e {
+        GbAddonFetchError::RateLimited { url } => Err(GbMapSearchError::RateLimited { url }),
+        GbAddonFetchError::Http { url, status } => http_status(url, status),
+        GbAddonFetchError::Network { url, message } => {
+            Err(GbMapSearchError::Network { url, message })
+        }
+        GbAddonFetchError::Io { path, source }
+        | GbAddonFetchError::Archive(ArchiveError::Io { path, source }) => {
+            Err(GbMapSearchError::Io { path, source })
+        }
+        GbAddonFetchError::Interrupted { message } => {
+            Err(GbMapSearchError::Interrupted { message })
+        }
+        GbAddonFetchError::Archive(
+            ArchiveError::Encrypted { .. }
+            | ArchiveError::Malformed { .. }
+            | ArchiveError::UnsafePath { .. }
+            | ArchiveError::TooLarge { .. }
+            | ArchiveError::TooManyEntries { .. },
+        )
+        | GbAddonFetchError::NoFiles { .. }
+        | GbAddonFetchError::VirusScan { .. }
+        | GbAddonFetchError::TooLarge { .. }
+        | GbAddonFetchError::EmptyBody { .. }
+        | GbAddonFetchError::ChecksumMismatch { .. }
+        | GbAddonFetchError::OnlyExe { .. }
+        | GbAddonFetchError::UnknownLayout { .. } => Ok(()),
+    }
+}
+
+/// Sorts a failed profile fetch the same way: rate limits and outages stop the search,
+/// while a missing, gone or odd listing is skipped.
+fn on_profile(e: BrowseError) -> Result<(), GbMapSearchError> {
+    match e {
+        BrowseError::RateLimited { url } | BrowseError::Throttled { url } => {
+            Err(GbMapSearchError::RateLimited { url })
+        }
+        BrowseError::Http { url, status } => http_status(url, status),
+        BrowseError::Network { url, message } => Err(GbMapSearchError::Network { url, message }),
+        BrowseError::TooLarge { .. } | BrowseError::Malformed { .. } | BrowseError::Gone { .. } => {
+            Ok(())
+        }
+    }
+}
+
+/// A 429 is a rate limit and a 5xx an outage, both worth stopping for; any other
+/// status, such as a 404, only rules this candidate out.
+fn http_status(url: String, status: u16) -> Result<(), GbMapSearchError> {
+    match status {
+        429 => Err(GbMapSearchError::RateLimited { url }),
+        500.. => Err(GbMapSearchError::Network {
+            url,
+            message: format!("HTTP {status}"),
+        }),
+        _ => Ok(()),
     }
 }
 
