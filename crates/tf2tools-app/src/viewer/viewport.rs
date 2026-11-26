@@ -15,7 +15,7 @@ use gpui_kit::{
 use tf2tools_core::{DemoSnapshot, FlyInput, FreeFly, MapMesh};
 
 use super::pointer::PointerLock;
-use super::{DrawRequest, RenderEvent, RendererError, SceneRenderer, math};
+use super::{DrawRequest, PlayerBox, RenderEvent, RendererError, SceneRenderer, math};
 use crate::ids;
 
 /// The time source the viewport steps its camera by; read once per render.
@@ -64,6 +64,8 @@ pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
     lock: Box<dyn PointerLock>,
     camera: FreeFly,
+    /// The snapshot's boxes, shared by every draw so the worker uploads them once.
+    boxes: Arc<[PlayerBox]>,
     /// Multiplies the turn per dragged pixel; always finite and positive.
     look_scale: f32,
     keys: HeldKeys,
@@ -87,7 +89,7 @@ pub struct DemoViewport {
 }
 
 impl DemoViewport {
-    /// Loads `mesh` and the snapshot's boxes into `renderer`, starts the camera at
+    /// Loads `mesh` into `renderer`, keeps the snapshot's boxes for every draw, starts the camera at
     /// `start_camera` and listens for frames.
     #[expect(
         clippy::too_many_arguments,
@@ -105,7 +107,6 @@ impl DemoViewport {
     ) -> Self {
         let (origin, yaw, pitch) = math::start_camera(&mesh, snapshot);
         renderer.load_scene(mesh);
-        renderer.set_players(math::player_boxes(snapshot));
         let events = renderer.events();
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(event) = events.recv().await {
@@ -144,6 +145,7 @@ impl DemoViewport {
             renderer,
             lock,
             camera: FreeFly::new(origin, yaw, pitch),
+            boxes: math::player_boxes(snapshot),
             look_scale: sane_scale(look_scale),
             keys: HeldKeys::default(),
             shown: None,
@@ -223,6 +225,7 @@ impl DemoViewport {
             height,
             view_proj,
             seq: self.last_seq,
+            players: Arc::clone(&self.boxes),
         });
         self.drawn_size = Some((width, height));
     }

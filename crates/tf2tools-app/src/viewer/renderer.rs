@@ -86,7 +86,6 @@ static WORKERS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
 enum Command {
     LoadScene(Arc<MapMesh>),
     Draw(DrawRequest),
-    SetPlayers(Arc<[PlayerBox]>),
 }
 
 /// The real renderer. Dropping it ends the worker without waiting for it.
@@ -139,10 +138,6 @@ impl SceneRenderer for Renderer {
 
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.events.clone()
-    }
-
-    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
-        let _ = self.commands.send(Command::SetPlayers(boxes));
     }
 }
 
@@ -246,7 +241,6 @@ fn step(
         match command {
             Command::LoadScene(mesh) => gpu.load_scene(&mesh),
             Command::Draw(request) => draw = Some(request),
-            Command::SetPlayers(boxes) => gpu.set_players(&boxes),
         }
         next = match inbox.try_recv() {
             Ok(command) => Some(command),
@@ -289,6 +283,16 @@ struct Targets {
     readback: [wgpu::Buffer; 2],
 }
 
+// The one player vertex buffer, reused across draws: its byte capacity, how many vertices
+// the last write holds, and which boxes those were.
+#[derive(Default)]
+struct Players {
+    buffer: Option<wgpu::Buffer>,
+    capacity: u64,
+    count: u32,
+    written: Option<Arc<[PlayerBox]>>,
+}
+
 struct Gpu {
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
@@ -299,7 +303,7 @@ struct Gpu {
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertices: Option<(wgpu::Buffer, u32)>,
-    players: Option<(wgpu::Buffer, u32)>,
+    players: Players,
     targets: Option<Targets>,
     next_slot: usize,
 }
@@ -426,7 +430,7 @@ impl Gpu {
             uniforms,
             bind_group,
             vertices: None,
-            players: None,
+            players: Players::default(),
             targets: None,
             next_slot: 0,
         })
@@ -483,25 +487,39 @@ impl Gpu {
         });
     }
 
-    // Uploads 36 `[position, colour]` vertices a box; no boxes leaves nothing to draw.
-    fn set_players(&mut self, boxes: &[PlayerBox]) {
+    // Writes 36 `[position, colour]` vertices a box into the one player buffer, growing it
+    // to the next power of two only when too small. The same boxes as last time write nothing.
+    fn set_players(&mut self, boxes: &Arc<[PlayerBox]>) {
+        if self
+            .players
+            .written
+            .as_ref()
+            .is_some_and(|last| Arc::ptr_eq(last, boxes))
+        {
+            return;
+        }
         let mut bytes = Vec::with_capacity(boxes.len() * 36 * VERTEX_STRIDE as usize);
         for vertex in boxes.iter().flat_map(player_box_vertices) {
             for value in vertex.position.iter().chain(&vertex.color) {
                 bytes.extend_from_slice(&value.to_ne_bytes());
             }
         }
-        let count = u32::try_from(boxes.len() * 36).unwrap_or(u32::MAX);
-        self.players = (count > 0).then(|| {
-            let buffer = self
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("viewer players"),
-                    contents: &bytes,
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-            (buffer, count)
-        });
+        let needed = bytes.len() as u64;
+        if needed > self.players.capacity {
+            let capacity = needed.next_power_of_two();
+            self.players.buffer = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("viewer players"),
+                size: capacity,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }));
+            self.players.capacity = capacity;
+        }
+        if let Some(buffer) = self.players.buffer.as_ref().filter(|_| needed > 0) {
+            self.queue.write_buffer(buffer, 0, &bytes);
+        }
+        self.players.count = u32::try_from(boxes.len() * 36).unwrap_or(u32::MAX);
+        self.players.written = Some(Arc::clone(boxes));
     }
 
     // Rebuilds the targets for a new size, finishing the in-flight frame first since it reads
@@ -579,6 +597,7 @@ impl Gpu {
         events: &async_channel::Sender<RenderEvent>,
     ) -> Result<Pending, Option<RendererError>> {
         self.ensure_targets(request.width, request.height, pending, events)?;
+        self.set_players(&request.players);
         let Some(targets) = self.targets.as_ref() else {
             return Err(Some(RendererError::Device("no render target".into())));
         };
@@ -625,11 +644,17 @@ impl Gpu {
                 pass.draw(0..*count, 0..1);
             }
             // The boxes share the map's depth, so walls hide the players behind them.
-            if let Some((vertices, count)) = &self.players {
+            if let Some(vertices) = self
+                .players
+                .buffer
+                .as_ref()
+                .filter(|_| self.players.count > 0)
+            {
+                let bytes = u64::from(self.players.count) * VERTEX_STRIDE;
                 pass.set_pipeline(&self.box_pipeline);
                 pass.set_bind_group(0, &self.bind_group, &[]);
-                pass.set_vertex_buffer(0, vertices.slice(..));
-                pass.draw(0..*count, 0..1);
+                pass.set_vertex_buffer(0, vertices.slice(..bytes));
+                pass.draw(0..self.players.count, 0..1);
             }
         }
         let slot = self.next_slot;

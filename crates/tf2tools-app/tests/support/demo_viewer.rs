@@ -42,7 +42,6 @@ pub enum StubAnswer {
 pub struct StubHandle {
     pub draws: Arc<Mutex<Vec<DrawRequest>>>,
     pub scenes: Arc<Mutex<usize>>,
-    pub players: Arc<Mutex<Vec<Arc<[PlayerBox]>>>>,
     pub alive: Arc<AtomicBool>,
     pub events: async_channel::Sender<RenderEvent>,
 }
@@ -54,8 +53,18 @@ impl StubHandle {
     pub fn scenes(&self) -> usize {
         *self.scenes.lock().unwrap()
     }
+    /// The boxes of each recorded draw, with consecutive draws sharing one `Arc` as one entry.
     pub fn players(&self) -> Vec<Arc<[PlayerBox]>> {
-        self.players.lock().unwrap().clone()
+        let mut sent: Vec<Arc<[PlayerBox]>> = Vec::new();
+        for draw in self.draws.lock().unwrap().iter() {
+            if !sent
+                .last()
+                .is_some_and(|last| Arc::ptr_eq(last, &draw.players))
+            {
+                sent.push(Arc::clone(&draw.players));
+            }
+        }
+        sent
     }
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::SeqCst)
@@ -79,11 +88,12 @@ impl SceneRenderer for StubRenderer {
         *self.handle.scenes.lock().unwrap() += 1;
     }
     fn draw(&self, request: DrawRequest) {
+        let seq = request.seq;
         self.handle.draws.lock().unwrap().push(request);
         if self.answer == StubAnswer::Frames {
             let frame = RenderEvent::Frame {
                 image: one_pixel(),
-                seq: request.seq,
+                seq,
                 stats: FrameStats::default(),
             };
             let _ = self.handle.events.try_send(frame);
@@ -91,9 +101,6 @@ impl SceneRenderer for StubRenderer {
     }
     fn events(&self) -> async_channel::Receiver<RenderEvent> {
         self.receiver.clone()
-    }
-    fn set_players(&self, boxes: Arc<[PlayerBox]>) {
-        self.handle.players.lock().unwrap().push(boxes);
     }
 }
 
@@ -119,7 +126,6 @@ pub fn stub(answer: StubAnswer) -> (Box<dyn SceneRenderer>, StubHandle) {
     let handle = StubHandle {
         draws: Arc::default(),
         scenes: Arc::default(),
-        players: Arc::default(),
         alive: Arc::new(AtomicBool::new(true)),
         events,
     };

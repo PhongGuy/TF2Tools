@@ -306,6 +306,56 @@ fn a_viewport_with_players_sends_their_boxes_and_starts_at_the_red_eye(cx: &mut 
     assert_eq!((origin, yaw, pitch), ([100., 200., 139.], 270., 12.));
 }
 
+#[gpui_kit::test]
+fn every_draw_carries_the_snapshot_boxes(cx: &mut TestAppContext) {
+    let snapshot = DemoSnapshot::new(
+        1668,
+        vec![
+            SnapshotPlayer::new(
+                Team::Blue,
+                TfClass::Scout,
+                [0., 0., 64.],
+                90.,
+                0.,
+                65.,
+                false,
+            ),
+            SnapshotPlayer::new(
+                Team::Red,
+                TfClass::Medic,
+                [100., 200., 64.],
+                270.,
+                12.,
+                75.,
+                false,
+            ),
+        ],
+    );
+    let (win, _viewport, stub) = viewport_window_with(
+        cx,
+        StubAnswer::Frames,
+        Some(snapshot),
+        fake_lock(LockMode::Grabbed).0,
+    );
+    let at = centre(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_down(at, MouseButton::Left, cx);
+        w.pointer_move(at + point(px(30.), px(0.)), Some(MouseButton::Left), cx);
+        w.pointer_move(at + point(px(60.), px(0.)), Some(MouseButton::Left), cx);
+        w.pointer_up(at + point(px(60.), px(0.)), MouseButton::Left, cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    let draws = stub.draws();
+    assert!(draws.len() >= 2, "{draws:?}");
+    for draw in &draws {
+        let teams: Vec<Team> = draw.players.iter().map(|b| b.team).collect();
+        assert_eq!(teams, [Team::Blue, Team::Red], "draw {}", draw.seq);
+    }
+    // One set of boxes, shared by every draw rather than rebuilt for each.
+    assert_eq!(stub.players().len(), 1);
+}
+
 fn yaw_pitch(cx: &mut TestAppContext, viewport: &Entity<DemoViewport>) -> (f32, f32) {
     cx.update(|cx| {
         let camera = viewport.read(cx).camera();

@@ -17,13 +17,15 @@ pub mod viewport;
 
 pub use renderer::{Renderer, join_render_workers, wgpu_renderers};
 
-/// One frame to draw: its pixel size, the camera, and a sequence number the frame echoes back.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// One frame to draw: its pixel size, the camera, a sequence number the frame echoes back,
+/// and the player boxes to draw in it.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DrawRequest {
     pub width: u32,
     pub height: u32,
     pub view_proj: [[f32; 4]; 4],
     pub seq: u64,
+    pub players: Arc<[PlayerBox]>,
 }
 
 /// Where one frame's time went on the worker.
@@ -77,8 +79,6 @@ pub trait SceneRenderer {
     fn draw(&self, request: DrawRequest);
     /// The renderer's events; closed once the renderer has stopped.
     fn events(&self) -> async_channel::Receiver<RenderEvent>;
-    /// Replaces the player boxes drawn by later draws; an empty slice clears them.
-    fn set_players(&self, boxes: Arc<[PlayerBox]>);
 }
 
 /// Makes a renderer for a page; tests swap the wgpu one for a stub.
