@@ -50,10 +50,11 @@ pub use cleanup::{CleanupRoots, Freed, sweep_game_leftovers, sweep_leftovers};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use demo_view::{
-    DemoHeader, DemoSnapshot, DemoTracks, FlyInput, FreeFly, MAX_DEMO_BYTES, MAX_MAP_BYTES,
-    MAX_MAP_TRIANGLES, MAX_SNAPSHOT_BYTES, MAX_TRACK_SAMPLES, MapMesh, PlaybackClock,
-    PlaybackEvent, PlayerId, SnapshotPlayer, TrackCut, load_map_file, load_map_file_capped,
-    load_map_mesh, read_demo_header, read_demo_playback, read_demo_snapshot, read_demo_tracks,
+    DemoHeader, DemoSnapshot, DemoTracks, EyePose, FlyInput, FollowPose, FreeFly, MAX_DEMO_BYTES,
+    MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MAX_SNAPSHOT_BYTES, MAX_TRACK_SAMPLES, MapMesh,
+    PlaybackClock, PlaybackEvent, PlayerId, SnapshotPlayer, TrackCut, load_map_file,
+    load_map_file_capped, load_map_mesh, read_demo_header, read_demo_playback, read_demo_snapshot,
+    read_demo_tracks,
 };
 // The logs page already owns `TrackedPlayer` at the root, so the demo one is renamed here.
 pub use demo_view::TrackedPlayer as DemoTrackedPlayer;

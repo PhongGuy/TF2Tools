@@ -6,8 +6,6 @@ use crate::weapons::TfClass;
 
 mod build;
 mod hermite;
-// Task 3 wires the fit into `eye_at`; until then only the tests call it.
-#[allow(dead_code)]
 mod smooth;
 
 pub(crate) use build::TrackBuilder;
@@ -136,6 +134,78 @@ pub(crate) fn clean_name(raw: &str) -> Option<String> {
     Some(cut)
 }
 
+/// A gap between runs shorter than this, in seconds, holds the last pose as alive.
+pub(crate) const GAP_HOLD: f32 = 0.5;
+
+/// Where a followed player's eye is at one tick, and whether they are alive there.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum FollowPose {
+    /// Inside a run, or inside a gap shorter than `GAP_HOLD`.
+    Alive(EyePose),
+    /// Between runs or after the last one, on the death spot; before the first, where it starts.
+    Dead(EyePose),
+    /// No such player, or a NaN tick.
+    Absent,
+}
+
+/// A player's eye, view angles in degrees (yaw 0..360), crouch, team and class.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct EyePose {
+    eye: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+    ducked: bool,
+    team: Team,
+    class: TfClass,
+}
+
+impl EyePose {
+    /// The eye position in map units.
+    pub fn eye(&self) -> [f32; 3] {
+        self.eye
+    }
+
+    /// The yaw in degrees, 0..360.
+    pub fn yaw(&self) -> f32 {
+        self.yaw
+    }
+
+    /// The pitch in degrees, positive looking down.
+    pub fn pitch(&self) -> f32 {
+        self.pitch
+    }
+
+    /// Whether the player is crouched.
+    pub fn ducked(&self) -> bool {
+        self.ducked
+    }
+
+    /// The player's team.
+    pub fn team(&self) -> Team {
+        self.team
+    }
+
+    /// The player's class.
+    pub fn class(&self) -> TfClass {
+        self.class
+    }
+
+    // A stored sample as it is, without smoothing.
+    fn raw(run: &TrackRun, s: &TrackSample) -> Self {
+        let yaw = (f32::from(s.yaw) / 100.).rem_euclid(360.);
+        Self {
+            eye: [s.feet[0], s.feet[1], s.feet[2] + f32::from(s.eye_z)],
+            yaw: if yaw >= 360. { 0. } else { yaw },
+            pitch: f32::from(s.pitch) / 100.,
+            ducked: s.flags & DUCKED != 0,
+            team: run.team,
+            class: run.class,
+        }
+    }
+}
+
 /// Every RED and BLU player's positions over the read part of a demo.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -232,6 +302,69 @@ impl DemoTracks {
             players.extend(self.players.iter().filter_map(|p| player_at(p, tick)));
         }
         DemoSnapshot::new(tick.floor() as u32, players)
+    }
+
+    /// Where player `id` looks from at the fractional `tick`: the smoothed eye inside a run,
+    /// the last pose through a gap under `GAP_HOLD`, the death spot past it.
+    pub fn eye_at(&self, id: PlayerId, tick: f64) -> FollowPose {
+        if tick.is_nan() {
+            return FollowPose::Absent;
+        }
+        let Some(track) = self.players.iter().find(|p| p.entity == id.0) else {
+            return FollowPose::Absent;
+        };
+        let first = |r: &TrackRun| {
+            r.samples
+                .first()
+                .map_or(f64::INFINITY, |s| f64::from(s.tick))
+        };
+        // Before the first run, the camera waits on that run's first sample.
+        let Some(found) = track
+            .runs
+            .partition_point(|r| first(r) <= tick)
+            .checked_sub(1)
+        else {
+            return match track
+                .runs
+                .first()
+                .and_then(|r| Some((r, r.samples.first()?)))
+            {
+                Some((run, s)) => FollowPose::Dead(EyePose::raw(run, s)),
+                None => FollowPose::Absent,
+            };
+        };
+        let run = &track.runs[found];
+        let Some(last) = run.samples.last() else {
+            return FollowPose::Absent;
+        };
+        if let Some(p) = player_at(track, tick) {
+            let sigma = smooth::sigma_ticks(self.seconds_per_tick);
+            let feet = p.feet();
+            return FollowPose::Alive(EyePose {
+                eye: [
+                    feet[0],
+                    feet[1],
+                    feet[2] + smooth::eye(&run.samples, tick, sigma),
+                ],
+                yaw: smooth::yaw(&run.samples, tick, sigma),
+                pitch: smooth::pitch(&run.samples, tick, sigma),
+                ducked: p.ducked(),
+                team: run.team,
+                class: run.class,
+            });
+        }
+        // Past this run: a short gap to the next run is a dropped frame, not a death.
+        let pose = EyePose::raw(run, last);
+        let next = track.runs.get(found + 1).and_then(|r| r.samples.first());
+        match next {
+            Some(n)
+                if f64::from(n.tick - last.tick) * f64::from(self.seconds_per_tick)
+                    < f64::from(GAP_HOLD) =>
+            {
+                FollowPose::Alive(pose)
+            }
+            _ => FollowPose::Dead(pose),
+        }
     }
 
     /// Tracks through `frames`, for tests outside the crate: player `i` of each frame is one
@@ -618,5 +751,118 @@ mod tests {
         let p = SnapshotPlayer::new(Team::Red, TfClass::Scout, [0.; 3], 0., 0., 65., false);
         assert_eq!(p.id().entity(), 0);
         assert_eq!(p.with_id(PlayerId(5)).id().entity(), 5);
+    }
+
+    fn alive(p: FollowPose) -> EyePose {
+        match p {
+            FollowPose::Alive(e) => e,
+            other @ (FollowPose::Dead(_) | FollowPose::Absent) => panic!("not alive: {other:?}"),
+        }
+    }
+
+    fn dead(p: FollowPose) -> EyePose {
+        match p {
+            FollowPose::Dead(e) => e,
+            other @ (FollowPose::Alive(_) | FollowPose::Absent) => panic!("not dead: {other:?}"),
+        }
+    }
+
+    // Entity 1 at x = 100 for `a` ticks, then at x = 500 for `b` ticks, with empty frames
+    // between so the builder closes the first run.
+    fn two_runs(a: std::ops::RangeInclusive<u32>, b: std::ops::RangeInclusive<u32>) -> DemoTracks {
+        let (a_end, b_start) = (*a.end(), *b.start());
+        let mut frames: Vec<_> = a
+            .map(|t| (t, vec![test_support::row(1, [100., 0., 64.], 0.)]))
+            .collect();
+        frames.extend((a_end + 1..b_start).map(|t| (t, vec![])));
+        frames.extend(b.map(|t| (t, vec![test_support::row(1, [500., 0., 64.], 0.)])));
+        test_support::tracks(frames)
+    }
+
+    #[test]
+    fn a_living_player_is_seen_from_the_smoothed_eye() {
+        let frames = (0..=20u32)
+            .map(|t| {
+                (
+                    t,
+                    vec![test_support::row(1, [100., 0., 64.], 10. + 2. * t as f32)],
+                )
+            })
+            .collect();
+        let t = test_support::tracks(frames);
+        let e = alive(t.eye_at(PlayerId(1), 5.5));
+        assert!((e.yaw() - 21.).abs() < 1e-3, "{}", e.yaw());
+        let [x, y, z] = e.eye();
+        assert!(
+            (x - 100.).abs() < 1e-3 && y.abs() < 1e-3 && (z - 132.).abs() < 1e-3,
+            "{:?}",
+            e.eye()
+        );
+        assert_eq!(
+            (e.team(), e.class(), e.ducked()),
+            (Team::Blue, TfClass::Soldier, false)
+        );
+    }
+
+    #[test]
+    fn a_death_holds_the_death_spot_then_the_player_is_followed_again() {
+        let t = two_runs(0..=10, 100..=110);
+        assert_eq!(t.run_count(), 2);
+        assert!((alive(t.eye_at(PlayerId(1), 5.)).eye()[0] - 100.).abs() < 1e-3);
+        let d = dead(t.eye_at(PlayerId(1), 50.));
+        assert!((d.eye()[0] - 100.).abs() < 1e-3);
+        assert!((d.eye()[2] - 132.).abs() < 1e-3);
+        assert!((alive(t.eye_at(PlayerId(1), 105.)).eye()[0] - 500.).abs() < 1e-3);
+        assert!((dead(t.eye_at(PlayerId(1), 500.)).eye()[0] - 500.).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_short_gap_stays_alive_on_the_last_pose() {
+        let t = two_runs(0..=10, 21..=30);
+        assert_eq!(t.run_count(), 2);
+        assert!(t.at(15.).players().is_empty());
+        assert!((alive(t.eye_at(PlayerId(1), 15.)).eye()[0] - 100.).abs() < 1e-3);
+    }
+
+    #[test]
+    fn before_the_first_run_the_camera_waits_where_the_player_appears() {
+        let frames = (50..=60u32)
+            .map(|t| (t, vec![test_support::row(1, [300., 0., 64.], 0.)]))
+            .collect();
+        let t = test_support::tracks(frames);
+        assert!((dead(t.eye_at(PlayerId(1), 10.)).eye()[0] - 300.).abs() < 1e-3);
+    }
+
+    #[test]
+    fn an_unknown_player_or_nan_tick_is_absent() {
+        let t = two_runs(0..=10, 100..=110);
+        assert_eq!(t.eye_at(PlayerId(99), 5.), FollowPose::Absent);
+        assert_eq!(t.eye_at(PlayerId(1), f64::NAN), FollowPose::Absent);
+    }
+
+    #[test]
+    fn angles_are_never_smoothed_across_a_run_break() {
+        let mut frames: Vec<_> = (0..=9u32)
+            .map(|t| (t, vec![test_support::row(1, [100., 0., 64.], 0.)]))
+            .collect();
+        frames.extend((10..=19u32).map(|t| (t, vec![test_support::row(1, [6000., 0., 64.], 90.)])));
+        let t = test_support::tracks(frames);
+        assert_eq!(t.run_count(), 2);
+        assert!(alive(t.eye_at(PlayerId(1), 9.5)).yaw().abs() < 1e-3);
+        assert!((alive(t.eye_at(PlayerId(1), 10.)).yaw() - 90.).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_crouch_eases_the_followed_eye() {
+        let frames = (0..=20u32)
+            .map(|t| {
+                let mut r = test_support::row(1, [100., 0., 64.], 0.);
+                r.view_offset_z = Some(if t < 10 { 68. } else { 45. });
+                (t, vec![r])
+            })
+            .collect();
+        let t = test_support::tracks(frames);
+        let h = alive(t.eye_at(PlayerId(1), 10.)).eye()[2] - 64.;
+        assert!(h > 46. && h < 67., "{h}");
     }
 }

@@ -7,6 +7,10 @@ pub(crate) const ANGLE_SIGMA: f32 = 0.015;
 
 /// ANGLE_SIGMA in ticks for a tick length, never under one tick.
 pub(crate) fn sigma_ticks(seconds_per_tick: f32) -> f64 {
+    // `from_keyframes` takes any tick length, so a nonsense one falls back to a tick.
+    if !(seconds_per_tick.is_finite() && seconds_per_tick > 0.) {
+        return 1.0;
+    }
     (f64::from(ANGLE_SIGMA) / f64::from(seconds_per_tick)).max(1.0)
 }
 
@@ -108,6 +112,9 @@ mod tests {
         assert!((sigma_ticks(1. / 66.) - 1.).abs() < 1e-6);
         assert!((sigma_ticks(1. / 33.) - 1.).abs() < 1e-6);
         assert!((sigma_ticks(1. / 132.) - 1.98).abs() < 1e-3);
+        assert_eq!(sigma_ticks(0.), 1.);
+        assert_eq!(sigma_ticks(f32::NAN), 1.);
+        assert_eq!(sigma_ticks(-1.), 1.);
     }
 
     #[test]
