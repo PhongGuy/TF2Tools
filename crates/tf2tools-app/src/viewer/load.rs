@@ -71,6 +71,15 @@ pub fn snapshot_time(tick: u32, seconds_per_tick: f32) -> String {
     format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
+/// The timeline's "elapsed / total", each floored to whole seconds as m:ss.
+pub fn timeline_time(elapsed: f64, total: f64) -> String {
+    let mmss = |seconds: f64| {
+        let seconds = seconds.max(0.).floor() as u64;
+        format!("{}:{:02}", seconds / 60, seconds % 60)
+    };
+    format!("{} / {}", mmss(elapsed), mmss(total))
+}
+
 // Reads the header and meshes the map it names.
 fn load_header_and_map(
     dem: &Path,

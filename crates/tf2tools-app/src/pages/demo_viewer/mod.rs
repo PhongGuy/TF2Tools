@@ -42,6 +42,7 @@ use crate::viewer::viewport::DemoViewport;
 use crate::widgets::{Named as _, labelled};
 
 mod bar;
+mod timeline;
 
 pub use bar::BarPlace;
 
@@ -221,6 +222,10 @@ pub struct DemoViewerPage {
     look_slider: Entity<SliderState>,
     options_open: bool,
     _look_watch: [Subscription; 2],
+    /// The open demo's timeline, once its tracks arrive.
+    timeline: Option<timeline::Timeline>,
+    /// The disabled slider the row shows until then.
+    timeline_placeholder: Entity<SliderState>,
 }
 
 impl DemoViewerPage {
@@ -270,6 +275,7 @@ impl DemoViewerPage {
                 },
             ),
         ];
+        let timeline_placeholder = cx.new(|_| SliderState::new().min(0.).max(1.).step(1.));
         Self {
             view: View::Loading,
             title: SharedString::default(),
@@ -290,6 +296,8 @@ impl DemoViewerPage {
             look_slider,
             options_open: false,
             _look_watch: look_watch,
+            timeline: None,
+            timeline_placeholder,
         }
     }
 
@@ -315,6 +323,11 @@ impl DemoViewerPage {
     /// The options popover's look sensitivity slider, in percent.
     pub fn look_slider(&self) -> &Entity<SliderState> {
         &self.look_slider
+    }
+
+    /// The timeline's slider over the open demo's ticks, once its tracks arrive.
+    pub fn timeline_slider(&self) -> Option<&Entity<SliderState>> {
+        self.timeline.as_ref().map(|t| &t.slider)
     }
 
     /// The viewport over the loaded map, if one shows.
@@ -356,6 +369,7 @@ impl DemoViewerPage {
         cx: &mut Context<Self>,
     ) {
         self.view = View::Loading;
+        self.timeline = None;
         self.read_state = ReadState::Reading { percent: None };
         cx.notify();
         let install = tf2_state(cx).read(cx).install().cloned();
@@ -444,8 +458,9 @@ impl DemoViewerPage {
                 if let Some(scene) = scene.take() {
                     self.show(scene, None, window, cx);
                 }
-                if let Some(viewport) = self.viewport() {
-                    viewport.update(cx, |v, cx| v.set_tracks(tracks, cx));
+                if let Some(viewport) = self.viewport().cloned() {
+                    viewport.update(cx, |v, cx| v.set_tracks(Arc::clone(&tracks), cx));
+                    self.start_timeline(&tracks, &viewport, window, cx);
                 }
                 self.read_state = ReadState::Ready;
                 cx.notify();
@@ -768,6 +783,7 @@ impl DemoViewerPage {
                 cx.notify();
             }
         });
+        self.timeline = None;
         self.view = View::Loaded {
             caption,
             players_note,
@@ -912,6 +928,28 @@ impl Render for DemoViewerPage {
             .named(tip)
             .on_click(cx.listener(|page, _, window, cx| page.toggle_bar(window, cx)));
         let options = (!collapsed).then(|| self.options(cx));
+        // The playback row and its notes show under a viewport until its tracks fail.
+        let failed = self.read_state == ReadState::Failed;
+        let row = match self.viewport().cloned() {
+            Some(viewport) if !collapsed && !failed => Some(self.playback_row(&viewport, cx)),
+            _ => None,
+        };
+        let reading = match self.read_state {
+            ReadState::Reading { percent: Some(p) } => {
+                Some(tr!("demo_viewer.playback.reading", percent = p))
+            }
+            ReadState::Reading { percent: None } => {
+                Some(tr!("demo_viewer.playback.reading_no_percent"))
+            }
+            ReadState::Ready | ReadState::Failed => None,
+        };
+        // A failed read only needs its own note when the still picture showed players.
+        let had_players = caption.as_ref().is_some_and(|(_, note)| !note);
+        let playback_note = self
+            .timeline
+            .as_ref()
+            .and_then(|t| t.cut_note())
+            .or_else(|| (failed && had_players).then(|| tr!("demo_viewer.playback.tracks_failed")));
 
         // Both watchers keep last frame's sizes and ask for one more frame when either moves,
         // so the bar settles at its place a frame after it first draws.
@@ -965,23 +1003,10 @@ impl Render for DemoViewerPage {
         // The bar's room is a fixed-width frame, so where it sits never changes how it wraps.
         let room = (self.area.get().width - BAR_MARGIN * 2.).max(px(0.));
         let theme = cx.theme();
-        let bar = h_flex()
-            .id(ids::DEMO_VIEWER_BAR)
-            .test_support()
-            .occlude()
-            .max_w_full()
+        let first_row = h_flex()
             .min_w_0()
             .items_center()
             .gap_3()
-            .pl_2()
-            .pr_1()
-            .py_1()
-            .rounded_md()
-            .border_1()
-            .border_color(theme.border)
-            .bg(theme.background)
-            .shadow_md()
-            .child(bar_watch)
             .child(grip)
             // Minimised, only the grip and the expand button stay. The caption, note and hint
             // share one column, the only part that shrinks and wraps on a narrow page.
@@ -995,6 +1020,17 @@ impl Render for DemoViewerPage {
                             let note = tr!("demo_viewer.players_note");
                             words.child(line(
                                 ids::DEMO_VIEWER_PLAYERS_NOTE,
+                                note,
+                                Some(muted),
+                                true,
+                            ))
+                        })
+                        .when_some(reading.clone(), |words, reading| {
+                            words.child(line(ids::DEMO_VIEWER_READING, reading, Some(muted), true))
+                        })
+                        .when_some(playback_note.clone(), |words, note| {
+                            words.child(line(
+                                ids::DEMO_VIEWER_PLAYBACK_NOTE,
                                 note,
                                 Some(muted),
                                 true,
@@ -1014,6 +1050,24 @@ impl Render for DemoViewerPage {
                 })
             })
             .child(div().flex_none().child(collapse));
+        let bar = v_flex()
+            .id(ids::DEMO_VIEWER_BAR)
+            .test_support()
+            .occlude()
+            .max_w_full()
+            .min_w_0()
+            .gap_1()
+            .pl_2()
+            .pr_1()
+            .py_1()
+            .rounded_md()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .shadow_md()
+            .child(bar_watch)
+            .child(first_row)
+            .children(row);
         let frame = div()
             .absolute()
             .left(at.x)

@@ -611,6 +611,20 @@ pub fn still_then(
     )
 }
 
+/// Opens the fixture demo with `walking_tracks(cut)` already read, and waits for the tracks.
+pub fn open_with_tracks(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    cut: Option<TrackCut>,
+) -> DemoViewerShell {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(walking_tracks(cut))]);
+    gate.open();
+    let w = open_scripted(cx, env, reader);
+    super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    super::settle(cx, w.s.win);
+    w
+}
+
 /// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.
 pub fn install_map(env: &super::Env, name: &str) {
     let dir = env.game.join("tf/maps");
