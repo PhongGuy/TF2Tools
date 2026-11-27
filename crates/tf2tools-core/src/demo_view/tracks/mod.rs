@@ -8,14 +8,42 @@ use crate::weapons::TfClass;
 
 mod build;
 mod hermite;
+mod kills;
+mod projectiles;
 mod smooth;
 
+use crate::demo_view::snapshot::{KillRow, PartyRow, ProjectileRow};
 pub(crate) use build::TrackBuilder;
+pub use kills::{DemoKill, KillParty};
+use projectiles::{ProjectileBuilder, ProjectileSample, ProjectileTrack};
+pub use projectiles::{ProjectileKind, ProjectileView};
 
 /// The most of a demo read for its tracks; a longer demo plays up to where this prefix ends.
 pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
 /// The most samples the tracks hold; the timeline ends at the last frame kept under it.
 pub const MAX_TRACK_SAMPLES: usize = 8_000_000;
+/// The most projectile samples one demo's tracks hold (64 MB at 16 B).
+pub const MAX_PROJECTILE_SAMPLES: usize = 4_000_000;
+/// The most kills one demo's tracks hold.
+pub const MAX_KILLS: usize = 20_000;
+
+/// `(tick, serial, kind, team, critical, origin)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestShot = (u32, u32, ProjectileKind, Team, bool, [f32; 3]);
+/// `(entity, raw name, team, class)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestParty<'a> = (u32, &'a str, Team, TfClass);
+/// `(tick, killer, assister, victim, raw weapon, critical, feigned)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestKill<'a> = (
+    u32,
+    Option<DemoTestParty<'a>>,
+    Option<DemoTestParty<'a>>,
+    DemoTestParty<'a>,
+    &'a str,
+    bool,
+    bool,
+);
 
 /// The sample flag bit for a crouched player.
 pub(crate) const DUCKED: u8 = 1;
@@ -219,6 +247,9 @@ pub struct DemoTracks {
     pub(crate) seconds_per_tick: f32,
     pub(crate) round_starts: Vec<u32>,
     pub(crate) cut: Option<TrackCut>,
+    pub(crate) projectiles: Vec<ProjectileTrack>,
+    pub(crate) projectile_samples: Vec<ProjectileSample>,
+    pub(crate) kills: Vec<DemoKill>,
 }
 
 impl DemoTracks {
@@ -267,6 +298,26 @@ impl DemoTracks {
         self.runs().map(|r| r.samples.len()).sum()
     }
 
+    /// How many projectile tracks the demo holds.
+    pub fn projectile_count(&self) -> usize {
+        self.projectiles.len()
+    }
+
+    /// How many samples all projectile tracks hold together.
+    pub fn projectile_sample_count(&self) -> usize {
+        self.projectile_samples.len()
+    }
+
+    /// Every kill in the read part of the demo, by tick, same-tick kills in event order.
+    pub fn kills(&self) -> &[DemoKill] {
+        &self.kills
+    }
+
+    /// How many kills the tracks hold.
+    pub fn kill_count(&self) -> usize {
+        self.kills.len()
+    }
+
     /// The heap the tracks hold: every vector's capacity times its element size.
     pub fn heap_bytes(&self) -> usize {
         let players = self.players.capacity() * size_of::<PlayerTrack>();
@@ -285,7 +336,17 @@ impl DemoTracks {
                 .iter()
                 .map(|p| p.name.as_ref().map_or(0, String::capacity))
                 .sum::<usize>();
-        players + runs + samples + names + self.round_starts.capacity() * size_of::<u32>()
+        let projectiles = self.projectiles.capacity() * size_of::<ProjectileTrack>()
+            + self.projectile_samples.capacity() * size_of::<ProjectileSample>();
+        let kills = self.kills.capacity() * size_of::<DemoKill>()
+            + self.kills.iter().map(DemoKill::heap_bytes).sum::<usize>();
+        players
+            + runs
+            + samples
+            + names
+            + projectiles
+            + kills
+            + self.round_starts.capacity() * size_of::<u32>()
     }
 
     /// How many samples repeat the previous one of their run in feet, yaw and pitch.
@@ -371,6 +432,90 @@ impl DemoTracks {
         }
     }
 
+    /// Every projectile whose track covers the fractional `tick`, in first-tick order.
+    pub fn projectiles_at(&self, tick: f64) -> Vec<ProjectileView> {
+        if tick.is_nan() {
+            return Vec::new();
+        }
+        // Tracks are sorted by first tick, so none past this point has started yet.
+        let started = self.projectiles.partition_point(|t| {
+            self.projectile_samples
+                .get(t.start as usize)
+                .is_some_and(|s| f64::from(s.tick) <= tick)
+        });
+        self.projectiles[..started]
+            .iter()
+            .filter_map(|t| projectiles::view_at(t, &self.projectile_samples, tick))
+            .collect()
+    }
+
+    /// The kills from `hold_s` seconds before `tick` up to it, at most the last `max`.
+    pub fn killfeed_at(&self, tick: f64, hold_s: f32, max: usize) -> &[DemoKill] {
+        let hold = f64::from(hold_s) / f64::from(self.seconds_per_tick);
+        if tick.is_nan() || max == 0 || !hold.is_finite() || hold <= 0. {
+            return &[];
+        }
+        // Kills are kept by tick, so the window is two binary searches, newest `max` kept.
+        let end = self.kills.partition_point(|k| f64::from(k.tick()) <= tick);
+        let start = self
+            .kills
+            .partition_point(|k| f64::from(k.tick()) < tick - hold);
+        &self.kills[start.max(end.saturating_sub(max))..end]
+    }
+
+    /// These tracks with their kills replaced by `kills`, cleaned as a parse cleans them.
+    #[doc(hidden)]
+    pub fn with_test_kills(mut self, kills: &[DemoTestKill<'_>]) -> Self {
+        let party = |&(entity, name, team, class): &DemoTestParty<'_>| PartyRow {
+            entity,
+            name: Some(name.to_owned()),
+            team: Some(team),
+            class: Some(class),
+        };
+        self.kills = kills
+            .iter()
+            .map(
+                |(tick, killer, assister, victim, weapon, critical, feigned)| {
+                    DemoKill::from(&KillRow {
+                        tick: *tick,
+                        killer: killer.as_ref().map(party),
+                        assister: assister.as_ref().map(party),
+                        victim: party(victim),
+                        weapon: (*weapon).to_owned(),
+                        critical: *critical,
+                        feigned: *feigned,
+                    })
+                },
+            )
+            .collect();
+        self.kills.sort_by_key(DemoKill::tick);
+        self
+    }
+
+    /// These tracks with their projectiles replaced by `rows`, built by the real builder, one
+    /// frame per distinct tick.
+    #[doc(hidden)]
+    pub fn with_test_projectiles(mut self, rows: &[DemoTestShot]) -> Self {
+        let mut rows = rows.to_vec();
+        rows.sort_by_key(|r| r.0);
+        let mut builder = ProjectileBuilder::default();
+        for frame in rows.chunk_by(|a, b| a.0 == b.0) {
+            let shots: Vec<ProjectileRow> = frame
+                .iter()
+                .map(|&(_, serial, kind, team, critical, origin)| ProjectileRow {
+                    serial,
+                    kind,
+                    team: Some(team),
+                    critical,
+                    origin: Some(origin),
+                })
+                .collect();
+            builder.push(frame[0].0, &shots);
+        }
+        (self.projectiles, self.projectile_samples) = builder.finish();
+        self
+    }
+
     /// Tracks through `frames`, for tests outside the crate: player `i` of each frame is one
     /// player with one run. `None` when no frame holds a player.
     #[doc(hidden)]
@@ -422,6 +567,9 @@ impl DemoTracks {
             seconds_per_tick,
             round_starts,
             cut,
+            projectiles: Vec::new(),
+            projectile_samples: Vec::new(),
+            kills: Vec::new(),
         })
     }
 
@@ -441,6 +589,7 @@ impl DemoTracks {
                 tick: *tick,
                 round_state: 4,
                 rows: rows.collect(),
+                ..Default::default()
             };
             builder.push(&frame, seconds_per_tick);
         }
@@ -654,6 +803,7 @@ mod tests {
                     tick,
                     round_state: 4,
                     rows,
+                    ..Default::default()
                 },
                 1. / 66.,
             );

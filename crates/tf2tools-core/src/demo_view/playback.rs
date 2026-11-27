@@ -272,6 +272,7 @@ mod tests {
             tick,
             round_state,
             rows: vec![row(1, Team::Red), row(101, Team::Blue)],
+            ..Default::default()
         }
     }
 

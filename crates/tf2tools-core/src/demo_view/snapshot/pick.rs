@@ -1,5 +1,7 @@
 //! Picks the snapshot tick from a stream of per-tick player rows.
 
+use super::kills::KillRow;
+use super::shots::ProjectileRow;
 use super::{DemoSnapshot, SnapshotPlayer, eye_height};
 use crate::demo_view::tracks::PlayerId;
 use crate::hud_maker::Team;
@@ -36,11 +38,13 @@ pub(crate) struct TickRow {
 }
 
 /// Every player row of one tick, with the game's round state at that tick.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct TickFrame {
     pub tick: u32,
     pub round_state: i64,
     pub rows: Vec<TickRow>,
+    pub projectiles: Vec<ProjectileRow>,
+    pub kills: Vec<KillRow>,
 }
 
 /// Whether the picker wants more frames.
@@ -220,6 +224,7 @@ mod tests {
             tick,
             round_state,
             rows,
+            ..Default::default()
         }
     }
 

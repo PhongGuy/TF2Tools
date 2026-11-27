@@ -42,6 +42,7 @@ pub(crate) fn tracks_named(
                 tick,
                 round_state: 4,
                 rows,
+                ..Default::default()
             },
             SPT,
         );
