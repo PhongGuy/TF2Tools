@@ -586,6 +586,22 @@ pub fn camera_tracks() -> Arc<DemoTracks> {
     Arc::new(DemoTracks::from_entity_frames(60. / 3960., &frames, &names).expect("tracks"))
 }
 
+/// A full server over ticks 4000..=4200 at the fixture's tick: entities 1..=9 RED and 10..=18
+/// BLU, each standing alone along +y and named "Player N".
+pub fn full_server_tracks() -> Arc<DemoTracks> {
+    let soldier = |e: u32| {
+        let team = if e <= 9 { Team::Red } else { Team::Blue };
+        let at = [60., 32. * e as f32, 64.];
+        SnapshotPlayer::new(team, TfClass::Soldier, at, 0., 0., 68., false)
+    };
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (4000..=4200u32)
+        .map(|t| (t, (1..=18u32).map(|e| (e, soldier(e))).collect()))
+        .collect();
+    let names: Vec<(u32, String)> = (1..=18u32).map(|e| (e, format!("Player {e}"))).collect();
+    let names: Vec<(u32, &str)> = names.iter().map(|(e, n)| (*e, n.as_str())).collect();
+    Arc::new(DemoTracks::from_entity_frames(60. / 3960., &frames, &names).expect("tracks"))
+}
+
 /// Opens the fixture demo with `reader` and waits for the viewport.
 pub fn open_scripted(
     cx: &mut TestAppContext,

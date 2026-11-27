@@ -204,6 +204,10 @@ pub struct DemoViewerPage {
     area: Rc<Cell<Size<Pixels>>>,
     /// The bar's own size from the last frame, which the clamp keeps inside the page.
     bar_size: Rc<Cell<Size<Pixels>>>,
+    /// The bar's and the camera row's window tops from the last frame, which lift the players
+    /// list clear of the bar.
+    bar_top: Rc<Cell<Pixels>>,
+    chip_top: Rc<Cell<Pixels>>,
     /// The player's place for the bar, as stored; drawing clamps it but never writes back.
     bar: BarPlace,
     /// Set once the player moves or minimises the bar, so a slow stored place cannot undo it.
@@ -286,6 +290,8 @@ impl DemoViewerPage {
             generation: 0,
             area: Rc::default(),
             bar_size: Rc::default(),
+            bar_top: Rc::default(),
+            chip_top: Rc::default(),
             bar: BarPlace::DEFAULT,
             bar_touched: false,
             bar_drag: None,
@@ -1020,12 +1026,14 @@ impl Render for DemoViewerPage {
         .absolute()
         .size_full();
         let bar_size = Rc::clone(&self.bar_size);
+        let bar_top = Rc::clone(&self.bar_top);
         let bar_watch = canvas(
             move |inner, window, _| {
                 // The watcher fills the inside of the 1 px border; the bar is that much bigger.
-                let size = inner.dilate(px(1.)).size;
-                if bar_size.get() != size {
-                    bar_size.set(size);
+                let outer = inner.dilate(px(1.));
+                if bar_size.get() != outer.size || bar_top.get() != outer.top() {
+                    bar_size.set(outer.size);
+                    bar_top.set(outer.top());
                     window.request_animation_frame();
                 }
             },

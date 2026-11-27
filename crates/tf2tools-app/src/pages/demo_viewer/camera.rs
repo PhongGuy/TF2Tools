@@ -2,13 +2,16 @@
 //! player's name and a dead badge while that player waits to respawn. The name opens the
 //! players list, RED then BLU, where a pick follows that player.
 
+use std::rc::Rc;
+
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::popover::Popover;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     Anchor, AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    Pixels, SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
+    canvas, div, px,
 };
 use tf2tools_core::{CameraMode, DemoTracks, FollowPose, PlayerId, Team};
 
@@ -20,8 +23,14 @@ use crate::widgets::{Named as _, labelled};
 
 /// The widest the target's name draws before it ends in an ellipsis.
 const TARGET_CAP: f32 = 160.;
-/// The tallest the players list grows before it scrolls, so a full server fits at 600 px.
+/// The tallest the players list grows before it scrolls.
 const PLAYERS_CAP: f32 = 320.;
+/// The gap between the players list's surface and the bar's top.
+const POPOVER_GAP: Pixels = px(4.);
+/// The popover surface's own padding around the list, the kit's `p_3`.
+const SURFACE_PAD: Pixels = px(12.);
+/// The room the list's surface keeps from the page's top.
+const PAGE_MARGIN: Pixels = px(8.);
 
 /// One players-list row: who, their team at the shown tick and whether they are dead there.
 struct PlayerRow {
@@ -154,10 +163,24 @@ impl DemoViewerPage {
                 tr!("demo_viewer.camera.dead"),
             )
         });
+        let chip_top = Rc::clone(&self.chip_top);
+        let row_watch = canvas(
+            move |row, window, _| {
+                if chip_top.get() != row.top() {
+                    chip_top.set(row.top());
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
         h_flex()
+            .relative()
             .w_full()
             .gap_0p5()
             .items_center()
+            .child(row_watch)
             .child(mode)
             .child(prev)
             .child(target_button)
@@ -181,11 +204,16 @@ impl DemoViewerPage {
         let tracks = v.tracks().cloned();
         let muted = cx.theme().muted_foreground;
         let header = |text: &'static str| div().pt_1().text_xs().text_color(muted).child(text);
+        // The list opens from the bar's top rather than the chip's, and takes only the room
+        // between the page's top and the bar, so a full server scrolls instead of covering it.
+        let lift = (self.chip_top.get() - self.bar_top.get()).max(px(0.));
+        let bar_at = self.bar.clamp(self.area.get(), self.bar_size.get()).y;
+        let room = bar_at - POPOVER_GAP - SURFACE_PAD * 2. - PAGE_MARGIN;
         let mut list = v_flex()
             .id(ids::DEMO_VIEWER_PLAYERS)
             .test_support()
             .min_w(px(160.))
-            .max_h(px(PLAYERS_CAP))
+            .max_h(room.clamp(px(0.), px(PLAYERS_CAP)))
             .overflow_y_scroll()
             .gap_0p5();
         // "RED" and "BLU" are the game's own names, so they stay untranslated.
@@ -225,6 +253,7 @@ impl DemoViewerPage {
         let page = cx.entity().downgrade();
         Popover::new(ids::DEMO_VIEWER_PLAYERS_POPOVER)
             .anchor(Anchor::BottomLeft)
+            .offset(lift + POPOVER_GAP)
             .open(self.players_open)
             .on_open_change(move |&open, _, cx| {
                 let _ = page.update(cx, |page, cx| {

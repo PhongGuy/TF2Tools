@@ -1,6 +1,8 @@
 //! The Demo Viewer bar's camera chip and players list, on tracks with names and a death.
 
-use gpui_kit::{ElementId, Entity, TestAppContext};
+use gpui_kit::{
+    AppContext as _, ElementId, Entity, Modifiers, ScrollDelta, TestAppContext, point, px, size,
+};
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
 use tf2tools_core::PlayerId;
@@ -8,8 +10,8 @@ use tf2tools_core::{CameraMode, PlaybackEvent};
 
 use crate::support;
 use crate::support::demo_viewer::{
-    DemoViewerShell, LockCall, camera_tracks, gated_playback, open_scripted, open_with,
-    open_with_locked, walking,
+    DemoViewerShell, LockCall, camera_tracks, full_server_tracks, gated_playback, open_scripted,
+    open_with, open_with_locked, walking,
 };
 
 fn viewport(cx: &mut TestAppContext, w: &DemoViewerShell) -> Entity<DemoViewport> {
@@ -241,4 +243,65 @@ fn space_still_cycles_after_a_click_on_play(cx: &mut TestAppContext) {
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_PLAY);
     support::press(cx, w.s.win, "space");
     assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
+}
+
+// Opens the players list of a full server at `width` x `height` and checks it stays inside the
+// page and above the bar, then wheels its last BLU row into view and follows that player.
+fn full_list_fits(cx: &mut TestAppContext, width: f32, height: f32) {
+    let env = support::env();
+    let w = open_with(cx, &env, full_server_tracks());
+    cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
+    support::settle(cx, w.s.win);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
+    let page = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER).expect("the page");
+    let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).expect("the bar");
+    let list = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS).expect("the list");
+    assert!(
+        support::demo_viewer::inside(list, page),
+        "{width}: the list {list:?} leaves the page {page:?}"
+    );
+    assert!(
+        list.bottom() <= bar.top() + px(0.5),
+        "{width}: the list {list:?} runs into the bar {bar:?}"
+    );
+    let last = ids::demo_viewer_player(18);
+    for _ in 0..20 {
+        let row = support::bounds_of(cx, w.s.win, last.clone()).expect("the last BLU row");
+        if row.bottom() <= list.bottom() + px(0.5) {
+            break;
+        }
+        cx.update_window(w.s.win, |_, win, cx| {
+            let wheel = gpui_kit::ScrollEvent {
+                position: list.center(),
+                delta: ScrollDelta::Lines(point(0., -3.)),
+                modifiers: Modifiers::default(),
+                touch_phase: gpui_kit::TouchPhase::Moved,
+                source: Default::default(),
+            };
+            let _ = win.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
+        })
+        .unwrap();
+        support::settle(cx, w.s.win);
+    }
+    let row = support::bounds_of(cx, w.s.win, last.clone()).expect("the last BLU row");
+    assert!(
+        support::demo_viewer::inside(row, list),
+        "{width}: the last BLU row {row:?} never scrolls into {list:?}"
+    );
+    support::click_id(cx, w.s.win, last);
+    assert_eq!(
+        state(cx, &w).target.map(PlayerId::entity),
+        Some(18),
+        "{width}: the last BLU row's pick"
+    );
+}
+
+#[gpui_kit::test]
+fn a_full_players_list_fits_above_the_bar_and_scrolls_at_1280(cx: &mut TestAppContext) {
+    full_list_fits(cx, 1280., 800.);
+}
+
+#[gpui_kit::test]
+fn a_full_players_list_fits_above_the_bar_and_scrolls_at_800(cx: &mut TestAppContext) {
+    full_list_fits(cx, 800., 600.);
 }
