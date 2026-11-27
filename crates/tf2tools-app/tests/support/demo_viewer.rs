@@ -789,6 +789,12 @@ pub const LONG_VICTIM: &str = "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM";
 /// scattergun at 4020..=4060 every 10 ticks, Bob dies to the world at 4070, an unnamed RED pyro
 /// (3) kills Alice with Bob's assist at 4150, and the two long names meet at 4160.
 pub fn killfeed_tracks() -> Arc<DemoTracks> {
+    let tracks = Arc::into_inner(camera_tracks()).expect("a fresh Arc");
+    Arc::new(tracks.with_test_kills(&killfeed_kills()))
+}
+
+/// The kills of `killfeed_tracks`, for a test that adds its own.
+pub fn killfeed_kills() -> Vec<DemoTestKill<'static>> {
     let alice = (1, "Alice", Team::Blue, TfClass::Scout);
     let bob = (2, "Bob", Team::Red, TfClass::Soldier);
     let mut kills: Vec<DemoTestKill<'static>> = (0..5)
@@ -818,8 +824,7 @@ pub fn killfeed_tracks() -> Arc<DemoTracks> {
     let spy = (4, LONG_KILLER, Team::Blue, TfClass::Spy);
     let heavy = (5, LONG_VICTIM, Team::Red, TfClass::Heavy);
     kills.push((4160, Some(spy), None, heavy, "knife", false, false));
-    let tracks = Arc::into_inner(camera_tracks()).expect("a fresh Arc");
-    Arc::new(tracks.with_test_kills(&kills))
+    kills
 }
 
 /// Seeks the open viewer to `tick` and lets the page draw it.

@@ -3,9 +3,9 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    Pixels, SharedString, Size, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
-    div, hsla, px,
+    AnyElement, App, Context, ElementId, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, div, hsla, px,
 };
 use tf2tools_core::{DemoKill, DemoTracks, KillParty, Team, TfClass, WeaponNames};
 
@@ -15,9 +15,31 @@ use crate::ids;
 use crate::kill_icons::{ICON_SLOT, SLOT_GAP, weapon_icon};
 
 /// The feed's widest; a narrower page takes its width less the bar's margins.
-const FEED_WIDTH: Pixels = px(340.);
-/// The share of the feed's width each name side may take before it ends in an ellipsis.
-const SIDE_SHARE: f32 = 0.3;
+const FEED_WIDTH: Pixels = px(600.);
+/// A row's room besides its three names: padding, two gaps, the icon slot and the "+".
+const ROW_CHROME: Pixels = px(112.);
+/// The widest a name grows before it ends in an ellipsis.
+pub const NAME_CAP: Pixels = px(160.);
+/// The narrowest a name's cap shrinks to on a small page, so it never reads as a bare ellipsis.
+pub const NAME_MIN: Pixels = px(48.);
+
+/// The feed's width and each name's cap on a page `page_width` wide.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FeedLayout {
+    pub width: Pixels,
+    pub name: Pixels,
+}
+
+/// The feed takes the page less the bar's margins up to `FEED_WIDTH`. Each of a row's three
+/// names gets the same cap, shrunk on a narrow page so all three and the chrome still fit.
+pub fn feed_layout(page_width: Pixels) -> FeedLayout {
+    let width = FEED_WIDTH.min((page_width - BAR_MARGIN * 2.).max(px(0.)));
+    let share = ((width - ROW_CHROME) / 3.).max(px(0.));
+    FeedLayout {
+        width,
+        name: share.min(NAME_CAP).max(NAME_MIN),
+    }
+}
 
 /// How long a kill stays in the feed, in demo seconds.
 pub const FEED_HOLD_S: f32 = 6.0;
@@ -125,9 +147,12 @@ fn party_colour(team: Option<Team>, cx: &App) -> Hsla {
     }
 }
 
-// One name, coloured by team and cut with an ellipsis when its side runs out of room.
-fn name(party: &FeedParty, cx: &App) -> gpui_kit::Div {
+// One name, coloured by team and cut with an ellipsis past its cap.
+fn name(id: ElementId, party: &FeedParty, cap: Pixels, cx: &App) -> impl IntoElement {
     div()
+        .id(id)
+        .test_support()
+        .max_w(cap)
         .min_w_0()
         .flex_shrink(1.)
         .truncate()
@@ -141,9 +166,7 @@ impl DemoViewerPage {
     pub(super) fn killfeed(&self, cx: &Context<Self>) -> Option<AnyElement> {
         let timeline = self.timeline.as_ref()?;
         let area = self.area.get();
-        let width = FEED_WIDTH.min((area.width - BAR_MARGIN * 2.).max(px(0.)));
-        // Each side's cap plus the icon slot, two gaps and the padding stay within `width`.
-        let side = width * SIDE_SHARE;
+        let FeedLayout { width, name: cap } = feed_layout(area.width);
         let names = self.weapon_names.read(cx).names();
         let icons = self.kill_icons.read(cx).icons();
         let rows = timeline.feed.iter().enumerate().map(|(n, row)| {
@@ -155,13 +178,12 @@ impl DemoViewerPage {
                 .map(|image| weapon_icon(ids::demo_viewer_kill_icon(n), image));
             let killer = row.killer.as_ref().map(|killer| {
                 h_flex()
-                    .max_w(side)
                     .min_w_0()
-                    .overflow_hidden()
-                    .child(name(killer, cx))
+                    .child(name(ids::demo_viewer_kill_killer(n), killer, cap, cx))
                     .when_some(row.assister.as_ref(), |el, assister| {
+                        let assister = name(ids::demo_viewer_kill_assister(n), assister, cap, cx);
                         el.child(div().flex_none().px_1().child("+"))
-                            .child(name(assister, cx))
+                            .child(assister)
                     })
             });
             h_flex()
@@ -179,7 +201,7 @@ impl DemoViewerPage {
                 .text_sm()
                 .children(killer)
                 .children(icon.map(|i| h_flex().max_w(ICON_SLOT).flex_none().child(i)))
-                .child(h_flex().max_w(side).min_w_0().child(name(&row.victim, cx)))
+                .child(name(ids::demo_viewer_kill_victim(n), &row.victim, cap, cx))
         });
         let feed = v_flex()
             .id(ids::DEMO_VIEWER_KILLFEED)

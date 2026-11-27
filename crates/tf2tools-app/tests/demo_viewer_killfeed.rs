@@ -11,17 +11,18 @@ use gpui_kit::{
 use tf2tools_app::ids;
 use tf2tools_app::kill_icons::KillIconImages;
 use tf2tools_app::pages::demo_viewer::{
-    BarPlace, feed_key, feed_on_top, feed_rows, feed_words, timeline_fraction,
+    BarPlace, NAME_CAP, NAME_MIN, feed_key, feed_layout, feed_on_top, feed_rows, feed_words,
+    timeline_fraction,
 };
 use tf2tools_core::{CameraMode, PlayerId};
 use tf2tools_core::{Team, TfClass, WeaponNames};
 
 use crate::support;
-use crate::support::demo_viewer::killfeed_tracks;
 use crate::support::demo_viewer::{
-    DemoViewerShell, LONG_KILLER, LockCall, assert_feed_fits, inside, open_with, open_with_icons,
-    open_with_locked, open_with_tracks, seek_to as seek, send, walking_tracks,
+    DemoViewerShell, LONG_KILLER, LONG_VICTIM, LockCall, assert_feed_fits, inside, open_with,
+    open_with_icons, open_with_locked, open_with_tracks, seek_to as seek, send, walking_tracks,
 };
+use crate::support::demo_viewer::{camera_tracks, killfeed_kills, killfeed_tracks};
 
 #[test]
 fn the_feed_holds_the_last_five_kills_with_both_sides() {
@@ -204,6 +205,103 @@ fn the_feed_fits_at_800_beside_a_bar_at_the_bottom_or_the_top(cx: &mut TestAppCo
 #[gpui_kit::test]
 fn the_feed_fits_at_1280_beside_a_bar_at_the_bottom_or_the_top(cx: &mut TestAppContext) {
     feed_fits(cx, 1280., 800.);
+}
+
+#[test]
+fn the_feed_grows_to_600_and_caps_each_name_on_its_own() {
+    // 1023 is the page beside the sidebar in a 1280 window.
+    let wide = feed_layout(px(1023.));
+    assert_eq!((wide.width, wide.name), (px(600.), NAME_CAP));
+    // An 800 window leaves a page of about 543: the caps shrink but three names still fit.
+    let narrow = feed_layout(px(543.));
+    assert_eq!(narrow.width, px(543.) - px(16.));
+    assert!(
+        narrow.name < NAME_CAP && narrow.name >= NAME_MIN,
+        "{narrow:?}"
+    );
+    assert!(narrow.name * 3. + px(64.) < narrow.width, "{narrow:?}");
+    // However narrow the page, a name keeps room for a few letters.
+    assert_eq!(feed_layout(px(150.)).name, NAME_MIN);
+    assert_eq!(feed_layout(px(0.)).width, px(0.));
+}
+
+const MASTER: &str = "TheMasterOfDisaster";
+const FORGOTTEN: &str = ".forgotten";
+const IMPACT: &str = "Тов. Impact";
+
+// `killfeed_tracks` with one more kill at 4155: three typical names, killer, assister and
+// victim, which at 4160 is the feed's fourth row (3) above the two 32-character names (4).
+fn typical_names_tracks() -> Arc<tf2tools_core::DemoTracks> {
+    let mut kills = killfeed_kills();
+    let master = (6, MASTER, Team::Blue, TfClass::Soldier);
+    let forgotten = (7, FORGOTTEN, Team::Blue, TfClass::Medic);
+    let impact = (8, IMPACT, Team::Red, TfClass::Sniper);
+    kills.push((
+        4155,
+        Some(master),
+        Some(forgotten),
+        impact,
+        "rocketlauncher",
+        false,
+        false,
+    ));
+    let tracks = Arc::into_inner(camera_tracks()).expect("a fresh Arc");
+    Arc::new(tracks.with_test_kills(&kills))
+}
+
+fn width_of(cx: &mut TestAppContext, w: &DemoViewerShell, id: ElementId) -> f32 {
+    let bounds = support::bounds_of(cx, w.s.win, id.clone()).unwrap_or_else(|| panic!("no {id:?}"));
+    f32::from(bounds.size.width)
+}
+
+// At `width` x `height`, bar at the bottom then the top: the feed fits, and every name of the
+// typical row and the long row keeps at least `NAME_MIN`. Returns the typical row's widths.
+fn typical_names_fit(cx: &mut TestAppContext, width: f32, height: f32) -> [f32; 3] {
+    let mut widths = [0.; 3];
+    for top in [false, true] {
+        let env = support::env();
+        let w = open_with(cx, &env, typical_names_tracks());
+        cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
+        support::settle(cx, w.s.win);
+        let at = format!("{width}x{height} top={top}");
+        assert_feed_fits(cx, &w, top, &at);
+        widths = [
+            width_of(cx, &w, ids::demo_viewer_kill_killer(3)),
+            width_of(cx, &w, ids::demo_viewer_kill_assister(3)),
+            width_of(cx, &w, ids::demo_viewer_kill_victim(3)),
+        ];
+        let long = [
+            width_of(cx, &w, ids::demo_viewer_kill_killer(4)),
+            width_of(cx, &w, ids::demo_viewer_kill_victim(4)),
+        ];
+        for name in widths.iter().chain(&long) {
+            assert!(
+                *name >= f32::from(NAME_MIN) - 0.5,
+                "{at}: {widths:?} {long:?}"
+            );
+        }
+        assert!(
+            long.iter().all(|n| *n <= f32::from(NAME_CAP) + 0.5),
+            "{at}: {LONG_KILLER} and {LONG_VICTIM} stay capped: {long:?}"
+        );
+    }
+    widths
+}
+
+#[gpui_kit::test]
+fn typical_names_show_in_full_at_1280(cx: &mut TestAppContext) {
+    let [killer, assister, victim] = typical_names_fit(cx, 1280., 800.);
+    // ".forgotten" is short enough to show whole anywhere; it gives one letter's width. Widths
+    // round to whole pixels, so a whole name may read up to 2 px short; a cut one loses a letter.
+    let letter = assister / FORGOTTEN.chars().count() as f32;
+    let whole = |name: &str| name.chars().count() as f32 * letter - 2.;
+    assert!(killer >= whole(MASTER), "{MASTER} is cut to {killer}");
+    assert!(victim >= whole(IMPACT), "{IMPACT} is cut to {victim}");
+}
+
+#[gpui_kit::test]
+fn typical_names_keep_room_at_800(cx: &mut TestAppContext) {
+    typical_names_fit(cx, 800., 600.);
 }
 
 // The widest icon the game has (128 x 32) between two 32-character names, at 800x600: the row
