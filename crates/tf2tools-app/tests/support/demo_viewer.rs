@@ -339,15 +339,8 @@ pub fn demo_viewer_shell_with(
     demo_viewer_shell_in(cx, env, state, picks, answer, playback, None, None, None)
 }
 
-/// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
-/// with `stored` saved as the look sensitivity before the page opens.
-pub fn demo_viewer_shell_locked(
-    cx: &mut TestAppContext,
-    env: &super::Env,
-    state: Tf2State,
-    picks: Vec<PathBuf>,
-    stored: Option<LookSensitivity>,
-) -> (DemoViewerShell, FakeLockHandle) {
+/// A lock factory whose fake locks grab and share the one handle returned beside it.
+fn fake_locks() -> (PointerLockFactory, FakeLockHandle) {
     let handle = FakeLockHandle {
         calls: Arc::default(),
         motions: Arc::default(),
@@ -360,6 +353,19 @@ pub fn demo_viewer_shell_locked(
             locked: false,
         })
     });
+    (locks, handle)
+}
+
+/// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
+/// with `stored` saved as the look sensitivity before the page opens.
+pub fn demo_viewer_shell_locked(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    stored: Option<LookSensitivity>,
+) -> (DemoViewerShell, FakeLockHandle) {
+    let (locks, handle) = fake_locks();
     let w = demo_viewer_shell_in(
         cx,
         env,
@@ -561,6 +567,41 @@ pub fn walking_tracks(cut: Option<TrackCut>) -> Arc<DemoTracks> {
     )
 }
 
+/// Alice (entity 1, BLU) walks +x over ticks 4000..=4200 at the fixture's tick; Bob (2, RED)
+/// stands and is dead from 4120 to 4169 (0.76 s); entity 3 (RED) has no name.
+pub fn camera_tracks() -> Arc<DemoTracks> {
+    let soldier =
+        |team, x| SnapshotPlayer::new(team, TfClass::Soldier, [x, 32., 0.], 0., 0., 68., false);
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (4000..=4200u32)
+        .map(|t| {
+            let mut rows = vec![(1, soldier(Team::Blue, (t - 4000) as f32))];
+            if !(4120..4170).contains(&t) {
+                rows.push((2, soldier(Team::Red, 20.)));
+            }
+            rows.push((3, soldier(Team::Red, 40.)));
+            (t, rows)
+        })
+        .collect();
+    let names = [(1, "Alice"), (2, "Bob")];
+    Arc::new(DemoTracks::from_entity_frames(60. / 3960., &frames, &names).expect("tracks"))
+}
+
+/// A full server over ticks 4000..=4200 at the fixture's tick: entities 1..=9 RED and 10..=18
+/// BLU, each standing alone along +y and named "Player N".
+pub fn full_server_tracks() -> Arc<DemoTracks> {
+    let soldier = |e: u32| {
+        let team = if e <= 9 { Team::Red } else { Team::Blue };
+        let at = [60., 32. * e as f32, 64.];
+        SnapshotPlayer::new(team, TfClass::Soldier, at, 0., 0., 68., false)
+    };
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (4000..=4200u32)
+        .map(|t| (t, (1..=18u32).map(|e| (e, soldier(e))).collect()))
+        .collect();
+    let names: Vec<(u32, String)> = (1..=18u32).map(|e| (e, format!("Player {e}"))).collect();
+    let names: Vec<(u32, &str)> = names.iter().map(|(e, n)| (*e, n.as_str())).collect();
+    Arc::new(DemoTracks::from_entity_frames(60. / 3960., &frames, &names).expect("tracks"))
+}
+
 /// Opens the fixture demo with `reader` and waits for the viewport.
 pub fn open_scripted(
     cx: &mut TestAppContext,
@@ -617,12 +658,49 @@ pub fn open_with_tracks(
     env: &super::Env,
     cut: Option<TrackCut>,
 ) -> DemoViewerShell {
-    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(walking_tracks(cut))]);
+    open_with(cx, env, walking_tracks(cut))
+}
+
+/// Opens the fixture demo with `tracks` already read, and waits for them.
+pub fn open_with(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    tracks: Arc<DemoTracks>,
+) -> DemoViewerShell {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(Arc::clone(&tracks))]);
     gate.open();
     let w = open_scripted(cx, env, reader);
     super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
     super::settle(cx, w.s.win);
     w
+}
+
+/// `open_with` whose viewport takes fake locks that share the returned handle.
+pub fn open_with_locked(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    tracks: Arc<DemoTracks>,
+) -> (DemoViewerShell, FakeLockHandle) {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(Arc::clone(&tracks))]);
+    gate.open();
+    install_map(env, "cp_synthetic");
+    let demo = demo_file(env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let (locks, handle) = fake_locks();
+    let w = demo_viewer_shell_in(
+        cx,
+        env,
+        found(env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+        None,
+        Some(locks),
+        None,
+    );
+    super::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    super::settle(cx, w.s.win);
+    (w, handle)
 }
 
 /// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.

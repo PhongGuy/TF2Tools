@@ -118,3 +118,11 @@ fn a_nan_frame_does_not_move_the_camera() {
     camera.advance(f32::NAN, forward());
     assert_eq!(camera.origin(), [0.; 3]);
 }
+
+#[test]
+fn the_spectator_camera_shows_its_free_fly() {
+    use tf2tools_core::SpectatorCamera;
+    let camera = SpectatorCamera::new(FreeFly::new([1., 2., 3.], 10., 5.));
+    assert_eq!(camera.fly().origin(), [1., 2., 3.]);
+    assert_eq!((camera.fly().yaw(), camera.fly().pitch()), (10., 5.));
+}

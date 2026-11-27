@@ -18,7 +18,9 @@ use super::DemoViewerPage;
 use crate::i18n::tr;
 use crate::ids;
 use crate::viewer::load::{snapshot_time, timeline_time};
-use crate::viewer::viewport::{DemoViewport, PlaybackMoved, PlaybackState};
+use crate::viewer::viewport::{
+    CameraMoved, CameraState, DemoViewport, PlaybackMoved, PlaybackState,
+};
 use crate::widgets::tip::tip_box;
 use crate::widgets::{Named as _, labelled};
 
@@ -47,7 +49,9 @@ pub(super) struct Timeline {
     rounds: Vec<u32>,
     cut_note: Option<SharedString>,
     shown: Option<(u64, bool, f32)>,
-    _watch: [Subscription; 2],
+    /// The camera state the bar last drew.
+    camera: CameraState,
+    _watch: [Subscription; 3],
 }
 
 impl Timeline {
@@ -112,6 +116,9 @@ impl DemoViewerPage {
                     page.playback_moved(ev.0, window, cx);
                 },
             ),
+            cx.subscribe(viewport, |page, _, ev: &CameraMoved, cx| {
+                page.camera_moved(ev.0, cx);
+            }),
         ];
         self.timeline = Some(Timeline {
             slider,
@@ -120,6 +127,7 @@ impl DemoViewerPage {
             rounds: tracks.round_starts().to_vec(),
             cut_note: cut_note(tracks),
             shown: state.map(shown),
+            camera: viewport.read(cx).camera_state(),
             _watch: watch,
         });
         cx.notify();
@@ -145,19 +153,32 @@ impl DemoViewerPage {
         }
     }
 
+    fn camera_moved(&mut self, state: CameraState, cx: &mut Context<Self>) {
+        if let Some(timeline) = self.timeline.as_mut()
+            && timeline.camera != state
+        {
+            timeline.camera = state;
+            cx.notify();
+        }
+    }
+
     fn seek(&mut self, tick: f64, cx: &mut Context<Self>) {
         if let Some(viewport) = self.viewport().cloned() {
             viewport.update(cx, |v, cx| v.seek(tick, cx));
         }
     }
 
-    fn on_viewport(
+    // A bar control acts on the viewport, then hands it the keyboard back, so Space works
+    // after a click on the bar without a page-wide key handler that text inputs would lose.
+    pub(super) fn on_viewport(
         &self,
+        window: &mut Window,
         cx: &mut Context<Self>,
         f: impl FnOnce(&mut DemoViewport, &mut Context<DemoViewport>),
     ) {
         if let Some(viewport) = self.viewport().cloned() {
             viewport.update(cx, f);
+            viewport.update(cx, |v, cx| v.focus(window, cx));
         }
     }
 
@@ -211,8 +232,8 @@ impl DemoViewerPage {
                 .icon(icon)
                 .named(words)
                 .disabled(waiting)
-                .on_click(cx.listener(move |page, _, _, cx| {
-                    page.on_viewport(cx, |v, cx| v.step(delta, cx));
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.on_viewport(window, cx, |v, cx| v.step(delta, cx));
                 }))
         };
         let back = step(
@@ -237,8 +258,8 @@ impl DemoViewerPage {
             .icon(icon)
             .named(words)
             .disabled(waiting)
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.toggle_play(cx));
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.toggle_play(cx));
             }));
         let speed = state.map_or(1., |s| s.speed);
         // The name carries the speed as well, so a screen reader hears what the button shows.
@@ -248,8 +269,8 @@ impl DemoViewerPage {
             .label(format!("{speed}×"))
             .named(format!("{} {speed}×", tr!("demo_viewer.playback.speed")))
             .disabled(waiting)
-            .on_click(cx.listener(move |page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.set_speed(next_speed(speed), cx));
+            .on_click(cx.listener(move |page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.set_speed(next_speed(speed), cx));
             }));
         let slider = match &self.timeline {
             Some(timeline) => Slider::new(&timeline.slider),

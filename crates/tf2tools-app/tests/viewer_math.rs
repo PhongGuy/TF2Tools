@@ -345,3 +345,36 @@ fn every_triangle_faces_out_of_the_box() {
         }
     }
 }
+
+#[test]
+fn a_hidden_player_has_no_box() {
+    use tf2tools_core::DemoTracks;
+    let at = |tick| {
+        DemoSnapshot::new(
+            tick,
+            vec![
+                SnapshotPlayer::new(Team::Blue, TfClass::Scout, [0., 0., 0.], 0., 0., 65., false),
+                SnapshotPlayer::new(
+                    Team::Red,
+                    TfClass::Medic,
+                    [100., 0., 0.],
+                    0.,
+                    0.,
+                    75.,
+                    false,
+                ),
+            ],
+        )
+    };
+    let tracks = DemoTracks::from_keyframes(1. / 66., &[at(0), at(10)], vec![], None).unwrap();
+    let snapshot = tracks.at(5.);
+    let red = snapshot.players()[1].id();
+    let boxes = math::player_boxes_except(Some(&snapshot), Some(red));
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].team, Team::Blue);
+    assert_eq!(math::player_boxes_except(Some(&snapshot), None).len(), 2);
+    assert_eq!(
+        &*math::player_boxes(Some(&snapshot)),
+        &*math::player_boxes_except(Some(&snapshot), None)
+    );
+}

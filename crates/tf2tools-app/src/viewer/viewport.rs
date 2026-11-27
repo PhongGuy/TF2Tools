@@ -1,6 +1,6 @@
-//! The demo viewer's 3D view as a GPUI element: drag to look, WASD to fly, Shift to slow down.
-//! It asks its renderer for a frame only when the camera or the playback tick moves, or the
-//! device size changes.
+//! The demo viewer's 3D view as a GPUI element: drag to look, WASD to fly, Shift to slow down,
+//! or follow a player in first person or chase. It asks its renderer for a frame only when the
+//! camera or the playback tick moves, or the device size changes.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -8,12 +8,15 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    Bounds, Context, DispatchPhase, EventEmitter, FocusHandle, InteractiveElement as _,
+    App, Bounds, Context, DispatchPhase, EventEmitter, FocusHandle, InteractiveElement as _,
     IntoElement, KeyDownEvent, KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, ParentElement as _, Pixels, Point, Render, RenderImage, Styled as _,
     TestSupportExt as _, Window, canvas, div, img,
 };
-use tf2tools_core::{DemoSnapshot, DemoTracks, FlyInput, FreeFly, MapMesh, PlaybackClock};
+use tf2tools_core::{
+    CameraMode, CameraView, DemoSnapshot, DemoTracks, FlyInput, FreeFly, MapMesh, PlaybackClock,
+    PlayerId, SpectatorCamera, TargetLife,
+};
 
 use super::pointer::PointerLock;
 use super::{DrawRequest, PlayerBox, RenderEvent, RendererError, SceneRenderer, math};
@@ -47,6 +50,18 @@ impl HeldKeys {
     }
 }
 
+/// A press under way: it stays a click until its summed motion passes `CLICK_SLOP`.
+#[derive(Debug, Clone, Copy)]
+struct Drag {
+    last: Point<Pixels>,
+    button: MouseButton,
+    travel: Point<Pixels>,
+    turned: bool,
+}
+
+/// How far a press may travel, in logical pixels, and still be a click.
+const CLICK_SLOP: f32 = 4.;
+
 fn axis(plus: bool, minus: bool) -> f32 {
     f32::from(u8::from(plus)) - f32::from(u8::from(minus))
 }
@@ -76,19 +91,42 @@ pub struct PlaybackMoved(pub PlaybackState);
 
 impl EventEmitter<PlaybackMoved> for DemoViewport {}
 
+/// What the bar shows of the camera: the mode, the kept target, and whether a followed target is dead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CameraState {
+    pub mode: CameraMode,
+    pub target: Option<PlayerId>,
+    pub dead: bool,
+}
+
+/// Sent whenever `camera_state()` changes.
+pub struct CameraMoved(pub CameraState);
+
+impl EventEmitter<CameraMoved> for DemoViewport {}
+
 /// The demo's tracks and the clock that walks them.
 struct Playback {
     tracks: Arc<DemoTracks>,
     clock: PlaybackClock,
 }
 
-/// A free-fly view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
+/// A spectator view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
 pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
     lock: Box<dyn PointerLock>,
-    camera: FreeFly,
+    camera: SpectatorCamera,
+    /// The map the chase is kept out of.
+    mesh: Arc<MapMesh>,
+    /// The pose of the latest camera step, which every draw uses.
+    view: CameraView,
+    /// The last step moved the drawn pose, so the frame loop keeps running until it rests.
+    settling: bool,
+    /// The state last reported by `CameraMoved`.
+    reported: CameraState,
     /// The boxes at the shown tick, shared by every draw so the worker uploads them once.
     boxes: Arc<[PlayerBox]>,
+    /// The tick and hidden player the boxes were built for, once tracks drive them.
+    boxes_for: Option<(f64, Option<PlayerId>)>,
     /// The still snapshot's tick, where playback starts so the picture does not jump.
     snapshot_tick: Option<u32>,
     playback: Option<Playback>,
@@ -106,7 +144,9 @@ pub struct DemoViewport {
     last_tick: Option<Instant>,
     /// A next-frame tick is scheduled; renders before it leave the camera be.
     tick_pending: bool,
-    drag: Option<Point<Pixels>>,
+    drag: Option<Drag>,
+    /// The button and spot of a still press a buttonless move ended; its release there is still a click.
+    loose: Option<(MouseButton, Point<Pixels>)>,
     focus: FocusHandle,
     failure: Option<RendererError>,
     clock: Clock,
@@ -132,7 +172,9 @@ impl DemoViewport {
         cx: &mut Context<Self>,
     ) -> Self {
         let (origin, yaw, pitch) = math::start_camera(&mesh, snapshot);
-        renderer.load_scene(mesh);
+        let mut camera = SpectatorCamera::new(FreeFly::new(origin, yaw, pitch));
+        let view = camera.view(None, None, 0., 0., FlyInput::default());
+        renderer.load_scene(Arc::clone(&mesh));
         let events = renderer.events();
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(event) = events.recv().await {
@@ -153,6 +195,7 @@ impl DemoViewport {
         cx.observe_window_activation(window, |v, window, cx| {
             if !window.is_window_active() {
                 v.keys = HeldKeys::default();
+                v.loose = None;
                 v.end_drag(cx);
                 cx.notify();
             }
@@ -170,8 +213,17 @@ impl DemoViewport {
         Self {
             renderer,
             lock,
-            camera: FreeFly::new(origin, yaw, pitch),
+            reported: CameraState {
+                mode: camera.mode(),
+                target: camera.target(),
+                dead: false,
+            },
+            camera,
+            mesh,
+            view,
+            settling: false,
             boxes: math::player_boxes(snapshot),
+            boxes_for: None,
             snapshot_tick: snapshot.map(DemoSnapshot::tick),
             playback: None,
             look_scale: sane_scale(look_scale),
@@ -184,6 +236,7 @@ impl DemoViewport {
             last_tick: None,
             tick_pending: false,
             drag: None,
+            loose: None,
             focus: cx.focus_handle(),
             failure: None,
             clock,
@@ -197,8 +250,70 @@ impl DemoViewport {
         self.look_scale = sane_scale(scale);
     }
 
+    /// The free-fly pose; stale while following a player.
     pub fn camera(&self) -> &FreeFly {
+        self.camera.fly()
+    }
+
+    pub fn spectator(&self) -> &SpectatorCamera {
         &self.camera
+    }
+
+    /// The pose of the latest step.
+    pub fn camera_view(&self) -> &CameraView {
+        &self.view
+    }
+
+    pub fn camera_state(&self) -> CameraState {
+        CameraState {
+            mode: self.camera.mode(),
+            target: self.camera.target(),
+            dead: matches!(self.view.target(), Some((_, TargetLife::Dead))),
+        }
+    }
+
+    /// Gives the viewport keyboard focus, so Space and the flight keys reach it.
+    pub fn focus(&self, window: &mut Window, cx: &mut App) {
+        self.focus.focus(window, cx);
+    }
+
+    pub fn tracks(&self) -> Option<&Arc<DemoTracks>> {
+        self.playback.as_ref().map(|p| &p.tracks)
+    }
+
+    /// Space: first person, chase, free-fly.
+    pub fn cycle_camera(&mut self, cx: &mut Context<Self>) {
+        self.control(cx, SpectatorCamera::cycle);
+    }
+
+    /// Mouse1: the next alive player.
+    pub fn next_target(&mut self, cx: &mut Context<Self>) {
+        self.control(cx, SpectatorCamera::next);
+    }
+
+    /// Mouse2: the previous alive player.
+    pub fn prev_target(&mut self, cx: &mut Context<Self>) {
+        self.control(cx, SpectatorCamera::prev);
+    }
+
+    pub fn follow(&mut self, id: PlayerId, cx: &mut Context<Self>) {
+        self.control(cx, |camera, _, _| camera.follow(id));
+    }
+
+    /// Applies a camera control at the shown tick and draws its pose at once; without tracks
+    /// there is nobody to follow, so it does nothing.
+    fn control(
+        &mut self,
+        cx: &mut Context<Self>,
+        f: impl FnOnce(&mut SpectatorCamera, &DemoTracks, f64),
+    ) {
+        let Some(p) = &self.playback else {
+            return;
+        };
+        f(&mut self.camera, &p.tracks, p.clock.tick());
+        self.step_camera(0., FlyInput::default(), cx);
+        self.draw();
+        cx.notify();
     }
 
     /// The seq of the frame on screen, if any has arrived.
@@ -223,6 +338,9 @@ impl DemoViewport {
             clock.seek(f64::from(tick));
         }
         self.playback = Some(Playback { tracks, clock });
+        // New tracks may share a tick with the old ones, so the boxes always rebuild.
+        self.boxes_for = None;
+        self.camera.snap();
         self.moved_while_paused(cx);
     }
 
@@ -245,9 +363,13 @@ impl DemoViewport {
             p.clock.pause();
             self.moved_while_paused(cx);
         } else {
+            let from = p.clock.tick();
             p.clock.play();
-            // A restart from the last tick jumps, so the boxes follow before the loop runs.
-            self.reread_boxes();
+            // A restart from the last tick jumps, so the camera and boxes follow before the loop runs.
+            if p.clock.tick() != from {
+                self.camera.snap();
+            }
+            self.step_camera(0., FlyInput::default(), cx);
             self.draw();
             self.emit_playback(cx);
             cx.notify();
@@ -280,8 +402,10 @@ impl DemoViewport {
             return;
         };
         f(&mut p.clock);
+        // A jump in the tick cuts the chase straight to its new distance.
+        self.camera.snap();
         if p.clock.is_playing() {
-            self.reread_boxes();
+            self.step_camera(0., FlyInput::default(), cx);
             self.draw();
             self.emit_playback(cx);
         } else {
@@ -289,18 +413,40 @@ impl DemoViewport {
         }
     }
 
-    /// Re-reads the boxes, draws once and reports, without starting the frame loop.
+    /// Steps the camera by nothing, draws once and reports, without starting the frame loop.
     fn moved_while_paused(&mut self, cx: &mut Context<Self>) {
-        self.reread_boxes();
+        self.step_camera(0., FlyInput::default(), cx);
         self.draw();
         self.emit_playback(cx);
         cx.notify();
     }
 
-    fn reread_boxes(&mut self) {
-        if let Some(p) = &self.playback {
-            self.boxes = math::player_boxes(Some(&p.tracks.at(p.clock.tick())));
+    /// Advances the camera to the clock's tick and keeps the boxes and the reported state in
+    /// step with its pose; never draws, so each caller draws once. True when the pose moved.
+    fn step_camera(&mut self, dt: f32, input: FlyInput, cx: &mut Context<Self>) -> bool {
+        let tick = self.playback.as_ref().map_or(0., |p| p.clock.tick());
+        let tracks = self.playback.as_ref().map(|p| Arc::clone(&p.tracks));
+        let before = (self.view.origin(), self.view.yaw(), self.view.pitch());
+        self.view = self
+            .camera
+            .view(tracks.as_deref(), Some(&self.mesh), tick, dt, input);
+        let moved = before != (self.view.origin(), self.view.yaw(), self.view.pitch());
+        // A step of no time cannot tell a resting chase from one still growing, so only a
+        // timed step may end the settling.
+        self.settling = moved || (dt == 0. && self.settling);
+        if let Some(tracks) = tracks {
+            let key = (tick, self.view.hidden());
+            if self.boxes_for != Some(key) {
+                self.boxes = math::player_boxes_except(Some(&tracks.at(tick)), key.1);
+                self.boxes_for = Some(key);
+            }
         }
+        let state = self.camera_state();
+        if state != self.reported {
+            self.reported = state;
+            cx.emit(CameraMoved(state));
+        }
+        moved
     }
 
     fn emit_playback(&mut self, cx: &mut Context<Self>) {
@@ -341,9 +487,9 @@ impl DemoViewport {
         self.last_seq += 1;
         let aspect = width as f32 / height as f32;
         let view_proj = math::view_proj(
-            self.camera.origin(),
-            self.camera.yaw(),
-            self.camera.pitch(),
+            self.view.origin(),
+            self.view.yaw(),
+            self.view.pitch(),
             aspect,
         );
         self.renderer.draw(DrawRequest {
@@ -364,9 +510,33 @@ impl DemoViewport {
         }
         // Before the first prepaint there is no measured centre, so the press point stands in.
         let centre = self.bounds.get().map_or(ev.position, |b| b.center());
+        self.loose = None;
         self.lock.lock(ev.position, centre, window);
-        self.drag = Some(ev.position);
+        self.drag = Some(Drag {
+            last: ev.position,
+            button: ev.button,
+            travel: Point::default(),
+            turned: false,
+        });
         cx.notify();
+    }
+
+    /// Ends the press on a button's release: one that never travelled past the slop is a
+    /// click, left for the next player and right for the previous.
+    fn release(&mut self, button: MouseButton, at: Point<Pixels>, cx: &mut Context<Self>) {
+        let loose = self.loose.take();
+        let click = match self.drag {
+            Some(drag) => !drag.turned && drag.button == button,
+            None => loose == Some((button, at)),
+        };
+        if click {
+            match button {
+                MouseButton::Left => self.next_target(cx),
+                MouseButton::Right => self.prev_target(cx),
+                MouseButton::Middle | MouseButton::Navigate(_) => {}
+            }
+        }
+        self.end_drag(cx);
     }
 
     /// Ends a drag, whichever way it ended; does nothing when none is under way.
@@ -377,25 +547,47 @@ impl DemoViewport {
         }
     }
 
-    /// Turns the camera by the drag since the last move, as the lock measures it when it can;
-    /// a move with no button held ends it.
+    /// Turns the free-fly by the drag since the last move, as the lock measures it when it can;
+    /// the motion is held until it passes the click slop, then turns by all of it at once.
+    /// A move with no button held ends the press.
     fn drag_to(&mut self, ev: &MouseMoveEvent, window: &Window, cx: &mut Context<Self>) {
-        let Some(last) = self.drag else {
+        if self.loose.is_some_and(|(_, at)| at != ev.position) {
+            self.loose = None;
+        }
+        let Some(mut drag) = self.drag else {
             return;
         };
         if ev.pressed_button.is_none() {
+            // The Linux client ends its lock on a release with a buttonless move before the
+            // MouseUp, so a still press stays a click for a release at the same spot.
+            if !drag.turned {
+                self.loose = Some((drag.button, ev.position));
+            }
             return self.end_drag(cx);
         }
-        self.drag = Some(ev.position);
-        let by = self
+        let mut by = self
             .lock
             .motion(window)
-            .unwrap_or_else(|| ev.position - last);
-        if by == Point::default() {
+            .unwrap_or_else(|| ev.position - drag.last);
+        drag.last = ev.position;
+        drag.travel += by;
+        if !drag.turned {
+            let (x, y) = (drag.travel.x.as_f32(), drag.travel.y.as_f32());
+            if x.hypot(y) <= CLICK_SLOP {
+                self.drag = Some(drag);
+                return;
+            }
+            drag.turned = true;
+            by = drag.travel;
+        }
+        self.drag = Some(drag);
+        // A follow mode ignores the look, so its drag draws nothing new.
+        if by == Point::default() || self.camera.mode() != CameraMode::FreeFly {
             return;
         }
         let (d_yaw, d_pitch) = math::drag_look(by.x.as_f32(), by.y.as_f32(), self.look_scale);
         self.camera.look(d_yaw, d_pitch);
+        self.step_camera(0., FlyInput::default(), cx);
         self.draw();
         cx.notify();
     }
@@ -416,9 +608,10 @@ impl Render for DemoViewport {
         if !self.focus.is_focused(window) {
             self.keys = HeldKeys::default();
         }
-        let flying = self.keys.any() || self.camera.is_moving();
+        let flying = self.camera.mode() == CameraMode::FreeFly
+            && (self.keys.any() || self.camera.fly().is_moving());
         let playing = self.playback.as_ref().is_some_and(|p| p.clock.is_playing());
-        if flying || playing {
+        if flying || playing || self.settling {
             // Flight and playback step once per display frame. A render between ticks, such as
             // one for an arriving frame, must not step, or each frame would draw the next at once.
             if !self.tick_pending {
@@ -426,22 +619,22 @@ impl Render for DemoViewport {
                 // or played.
                 let dt = self.last_tick.map_or(0.0, |t| (now - t).as_secs_f32());
                 self.last_tick = Some(now);
-                if flying {
-                    let k = self.keys;
-                    let shift = window.modifiers().shift;
-                    self.camera
-                        .advance(dt, FlyInput::new(axis(k.w, k.s), axis(k.d, k.a), shift));
-                }
                 // A clock already on its last tick pauses without moving; that pause still counts.
                 let ticked = self.playback.as_mut().is_some_and(|p| {
                     let was_playing = p.clock.is_playing();
                     p.clock.advance(dt) || (was_playing && !p.clock.is_playing())
                 });
+                let k = self.keys;
+                let input = if flying {
+                    FlyInput::new(axis(k.w, k.s), axis(k.d, k.a), window.modifiers().shift)
+                } else {
+                    FlyInput::default()
+                };
+                let moved = self.step_camera(dt, input, cx);
                 if ticked {
-                    self.reread_boxes();
                     self.emit_playback(cx);
                 }
-                if flying || ticked {
+                if flying || ticked || moved {
                     self.draw();
                 }
                 self.tick_pending = true;
@@ -462,7 +655,7 @@ impl Render for DemoViewport {
         let measured = Rc::clone(&self.device_size);
         let logical = Rc::clone(&self.bounds);
         let paint_taken = Rc::clone(&self.taken);
-        let dragging = self.drag.is_some().then(|| cx.entity().downgrade());
+        let this = cx.entity().downgrade();
         let watch = canvas(
             move |bounds, window, _| {
                 logical.set(Some(bounds));
@@ -475,21 +668,20 @@ impl Render for DemoViewport {
                 }
             },
             move |_, _, window, _| {
-                // A drag follows the pointer anywhere in the window, so moves and the release
-                // past the viewport's edge still reach it.
-                if let Some(view) = dragging {
-                    let moved = view.clone();
-                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-                        if phase == DispatchPhase::Capture {
-                            let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
-                        }
-                    });
-                    window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
-                        if phase == DispatchPhase::Capture {
-                            let _ = view.update(cx, |v, cx| v.end_drag(cx));
-                        }
-                    });
-                }
+                // A press follows the pointer anywhere in the window, so moves and the release
+                // past the viewport's edge still reach it. The listeners stand on every paint,
+                // idle without a press, since a fast tap's release comes before any repaint.
+                let moved = this.clone();
+                window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
+                    }
+                });
+                window.on_mouse_event(move |ev: &MouseUpEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = this.update(cx, |v, cx| v.release(ev.button, ev.position, cx));
+                    }
+                });
                 if let Some((taken, seq)) = paint_taken.take() {
                     tracing::info!(
                         target: super::stats::TARGET,
@@ -517,8 +709,10 @@ impl Render for DemoViewport {
             .child(watch)
             .children(frame)
             .on_key_down(cx.listener(|v, ev: &KeyDownEvent, _, cx| {
-                if ev.keystroke.key == "escape" {
-                    v.end_drag(cx);
+                match ev.keystroke.key.as_str() {
+                    "escape" => v.end_drag(cx),
+                    "space" if !ev.is_held => v.cycle_camera(cx),
+                    _ => {}
                 }
                 v.set_key(&ev.keystroke.key, true, cx);
             }))

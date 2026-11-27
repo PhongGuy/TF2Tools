@@ -16,14 +16,14 @@ use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Anchor, AnyElement, AppContext as _, AsyncWindowContext, Context, CursorStyle, DispatchPhase,
-    Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
+    Anchor, AnyElement, AppContext as _, AsyncWindowContext, Bounds, Context, CursorStyle,
+    DispatchPhase, Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, SharedString, Size,
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _,
     WeakEntity, Window, canvas, div, px,
 };
 use tf2tools_core::{
-    DemoSnapshot, DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError,
+    CameraMode, DemoSnapshot, DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError,
     GbMapSearchProgress, LookSensitivity, MapDownloadError, PlaybackEvent, Tf2Install,
 };
 
@@ -42,6 +42,7 @@ use crate::viewer::viewport::DemoViewport;
 use crate::widgets::{Named as _, labelled};
 
 mod bar;
+mod camera;
 mod timeline;
 
 pub use bar::BarPlace;
@@ -203,6 +204,10 @@ pub struct DemoViewerPage {
     area: Rc<Cell<Size<Pixels>>>,
     /// The bar's own size from the last frame, which the clamp keeps inside the page.
     bar_size: Rc<Cell<Size<Pixels>>>,
+    /// The bar's window top and the camera row's window bounds from the last frame, which move
+    /// the players list clear of the bar.
+    bar_top: Rc<Cell<Pixels>>,
+    chip_row: Rc<Cell<Bounds<Pixels>>>,
     /// The player's place for the bar, as stored; drawing clamps it but never writes back.
     bar: BarPlace,
     /// Set once the player moves or minimises the bar, so a slow stored place cannot undo it.
@@ -223,6 +228,7 @@ pub struct DemoViewerPage {
     look_saves: Rc<RefCell<SerialSaves<LookSensitivity>>>,
     look_slider: Entity<SliderState>,
     options_open: bool,
+    players_open: bool,
     _look_watch: [Subscription; 2],
     /// The open demo's timeline, once its tracks arrive.
     timeline: Option<timeline::Timeline>,
@@ -284,6 +290,8 @@ impl DemoViewerPage {
             generation: 0,
             area: Rc::default(),
             bar_size: Rc::default(),
+            bar_top: Rc::default(),
+            chip_row: Rc::default(),
             bar: BarPlace::DEFAULT,
             bar_touched: false,
             bar_drag: None,
@@ -297,6 +305,7 @@ impl DemoViewerPage {
             look_saves: Rc::default(),
             look_slider,
             options_open: false,
+            players_open: false,
             _look_watch: look_watch,
             timeline: None,
             timeline_placeholder,
@@ -955,11 +964,15 @@ impl Render for DemoViewerPage {
             .named(tip)
             .on_click(cx.listener(|page, _, window, cx| page.toggle_bar(window, cx)));
         let options = (!collapsed).then(|| self.options(cx));
-        // The playback row and its notes show under a viewport until its tracks fail.
+        // The playback row, the camera row under it and their notes show under a viewport
+        // until its tracks fail.
         let failed = self.read_state == ReadState::Failed;
-        let row = match self.viewport().cloned() {
-            Some(viewport) if !collapsed && !failed => Some(self.playback_row(&viewport, cx)),
-            _ => None,
+        let (row, camera_row) = match self.viewport().cloned() {
+            Some(viewport) if !collapsed && !failed => (
+                Some(self.playback_row(&viewport, cx)),
+                Some(self.camera_chip(&viewport, cx)),
+            ),
+            _ => (None, None),
         };
         let reading = match self.read_state {
             ReadState::Reading { percent: Some(p) } => {
@@ -1013,12 +1026,14 @@ impl Render for DemoViewerPage {
         .absolute()
         .size_full();
         let bar_size = Rc::clone(&self.bar_size);
+        let bar_top = Rc::clone(&self.bar_top);
         let bar_watch = canvas(
             move |inner, window, _| {
                 // The watcher fills the inside of the 1 px border; the bar is that much bigger.
-                let size = inner.dilate(px(1.)).size;
-                if bar_size.get() != size {
-                    bar_size.set(size);
+                let outer = inner.dilate(px(1.));
+                if bar_size.get() != outer.size || bar_top.get() != outer.top() {
+                    bar_size.set(outer.size);
+                    bar_top.set(outer.top());
                     window.request_animation_frame();
                 }
             },
@@ -1026,6 +1041,14 @@ impl Render for DemoViewerPage {
         )
         .absolute()
         .size_full();
+        // Following a player, the hint names the follow controls instead of the flight keys.
+        let following = self
+            .viewport()
+            .is_some_and(|v| v.read(cx).camera_state().mode != CameraMode::FreeFly);
+        let hint = match following {
+            true => tr!("demo_viewer.hint_follow"),
+            false => tr!("demo_viewer.hint"),
+        };
         let at = self.bar.clamp(self.area.get(), self.bar_size.get());
         // The bar's room is a fixed-width frame, so where it sits never changes how it wraps.
         let room = (self.area.get().width - BAR_MARGIN * 2.).max(px(0.));
@@ -1063,12 +1086,7 @@ impl Render for DemoViewerPage {
                                 true,
                             ))
                         })
-                        .child(line(
-                            ids::DEMO_VIEWER_HINT,
-                            tr!("demo_viewer.hint"),
-                            Some(muted),
-                            true,
-                        ));
+                        .child(line(ids::DEMO_VIEWER_HINT, hint.clone(), Some(muted), true));
                     bar.child(words)
                 })
                 .child(div().flex_none().child(open))
@@ -1094,7 +1112,8 @@ impl Render for DemoViewerPage {
             .shadow_md()
             .child(bar_watch)
             .child(first_row)
-            .children(row);
+            .children(row)
+            .children(camera_row);
         let frame = div()
             .absolute()
             .left(at.x)

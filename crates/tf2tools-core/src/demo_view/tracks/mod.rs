@@ -1,6 +1,8 @@
 //! Every player's positions over a whole demo, cut into runs the viewer may blend inside.
 
-use crate::demo_view::snapshot::{DemoSnapshot, SnapshotPlayer};
+use std::collections::BTreeMap;
+
+use crate::demo_view::snapshot::{DemoSnapshot, SnapshotPlayer, TickFrame, TickRow};
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
@@ -423,8 +425,52 @@ impl DemoTracks {
         })
     }
 
+    /// Tracks through `(tick, [(entity, player)])` frames for tests outside the crate, built by
+    /// the real track builder, so a player missing for longer than the gap hold reads as dead.
+    /// Its filters apply too: a player with feet exactly at the origin counts as unspawned.
+    #[doc(hidden)]
+    pub fn from_entity_frames(
+        seconds_per_tick: f32,
+        frames: &[(u32, Vec<(u32, SnapshotPlayer)>)],
+        names: &[(u32, &str)],
+    ) -> Option<DemoTracks> {
+        let mut builder = TrackBuilder::new(MAX_TRACK_SAMPLES);
+        for (tick, players) in frames {
+            let rows = players.iter().map(|(entity, p)| entity_row(*entity, p));
+            let frame = TickFrame {
+                tick: *tick,
+                round_state: 4,
+                rows: rows.collect(),
+            };
+            builder.push(&frame, seconds_per_tick);
+        }
+        let names = names.iter().map(|&(e, n)| (e, n.to_owned()));
+        builder.set_names(names.collect::<BTreeMap<_, _>>());
+        builder.finish(seconds_per_tick, 0, false)
+    }
+
     fn runs(&self) -> impl Iterator<Item = &TrackRun> {
         self.players.iter().flat_map(|p| &p.runs)
+    }
+}
+
+// A live, drawable row for `p`, its view offset carrying the eye height back out.
+fn entity_row(entity: u32, p: &SnapshotPlayer) -> TickRow {
+    TickRow {
+        entity,
+        team: Some(p.team()),
+        class: Some(p.class()),
+        feet: p.feet(),
+        yaw: p.yaw(),
+        pitch: p.pitch(),
+        view_offset_z: Some(p.eye_height()),
+        ducked: p.ducked(),
+        has_userinfo: true,
+        deleted: false,
+        connected: true,
+        life_alive: true,
+        resource_alive: true,
+        in_pvs: true,
     }
 }
 

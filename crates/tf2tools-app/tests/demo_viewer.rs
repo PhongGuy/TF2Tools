@@ -148,7 +148,7 @@ fn an_installed_map_opens_in_the_viewport_under_its_caption(cx: &mut TestAppCont
     );
     assert_eq!(
         support::label_of(cx, w.s.win, ids::DEMO_VIEWER_HINT).as_deref(),
-        Some("Drag to look, WASD to move, Shift to slow down.")
+        Some("Drag to look, WASD to move, Shift to slow down, Space to follow a player.")
     );
     // The core reader finds no players in a header-only demo, so the note shows.
     assert_eq!(
