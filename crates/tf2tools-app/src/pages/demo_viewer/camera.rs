@@ -102,8 +102,8 @@ impl DemoViewerPage {
                 mode = mode_words(state.mode)
             ))
             .disabled(waiting)
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.cycle_camera(cx));
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.cycle_camera(cx));
             }));
         let prev = Button::new(ids::DEMO_VIEWER_CAMERA_TARGET_PREV)
             .ghost()
@@ -112,8 +112,8 @@ impl DemoViewerPage {
             .icon(IconName::ChevronLeft)
             .named(tr!("demo_viewer.camera.prev"))
             .disabled(waiting)
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.prev_target(cx));
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.prev_target(cx));
             }));
         let next = Button::new(ids::DEMO_VIEWER_CAMERA_TARGET_NEXT)
             .ghost()
@@ -122,8 +122,8 @@ impl DemoViewerPage {
             .icon(IconName::ChevronRight)
             .named(tr!("demo_viewer.camera.next"))
             .disabled(waiting)
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.next_target(cx));
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.next_target(cx));
             }));
         // A screen reader hears the death in the name, as the badge beside it is only seen.
         let heard = match state.dead {
@@ -207,9 +207,9 @@ impl DemoViewerPage {
                     .small()
                     .label(name)
                     .accessibility_label(heard)
-                    .on_click(cx.listener(move |page, _, _, cx| {
+                    .on_click(cx.listener(move |page, _, window, cx| {
                         page.players_open = false;
-                        page.on_viewport(cx, |v, cx| v.follow(id, cx));
+                        page.on_viewport(window, cx, |v, cx| v.follow(id, cx));
                         cx.notify();
                     }));
                 let badge = row.dead.then(|| {

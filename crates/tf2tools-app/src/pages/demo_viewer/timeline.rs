@@ -168,13 +168,17 @@ impl DemoViewerPage {
         }
     }
 
+    // A bar control acts on the viewport, then hands it the keyboard back, so Space works
+    // after a click on the bar without a page-wide key handler that text inputs would lose.
     pub(super) fn on_viewport(
         &self,
+        window: &mut Window,
         cx: &mut Context<Self>,
         f: impl FnOnce(&mut DemoViewport, &mut Context<DemoViewport>),
     ) {
         if let Some(viewport) = self.viewport().cloned() {
             viewport.update(cx, f);
+            viewport.update(cx, |v, cx| v.focus(window, cx));
         }
     }
 
@@ -228,8 +232,8 @@ impl DemoViewerPage {
                 .icon(icon)
                 .named(words)
                 .disabled(waiting)
-                .on_click(cx.listener(move |page, _, _, cx| {
-                    page.on_viewport(cx, |v, cx| v.step(delta, cx));
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.on_viewport(window, cx, |v, cx| v.step(delta, cx));
                 }))
         };
         let back = step(
@@ -254,8 +258,8 @@ impl DemoViewerPage {
             .icon(icon)
             .named(words)
             .disabled(waiting)
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.toggle_play(cx));
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.toggle_play(cx));
             }));
         let speed = state.map_or(1., |s| s.speed);
         // The name carries the speed as well, so a screen reader hears what the button shows.
@@ -265,8 +269,8 @@ impl DemoViewerPage {
             .label(format!("{speed}×"))
             .named(format!("{} {speed}×", tr!("demo_viewer.playback.speed")))
             .disabled(waiting)
-            .on_click(cx.listener(move |page, _, _, cx| {
-                page.on_viewport(cx, |v, cx| v.set_speed(next_speed(speed), cx));
+            .on_click(cx.listener(move |page, _, window, cx| {
+                page.on_viewport(window, cx, |v, cx| v.set_speed(next_speed(speed), cx));
             }));
         let slider = match &self.timeline {
             Some(timeline) => Slider::new(&timeline.slider),

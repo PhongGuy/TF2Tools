@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    Bounds, Context, DispatchPhase, EventEmitter, FocusHandle, InteractiveElement as _,
+    App, Bounds, Context, DispatchPhase, EventEmitter, FocusHandle, InteractiveElement as _,
     IntoElement, KeyDownEvent, KeyUpEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, ParentElement as _, Pixels, Point, Render, RenderImage, Styled as _,
     TestSupportExt as _, Window, canvas, div, img,
@@ -270,6 +270,11 @@ impl DemoViewport {
             target: self.camera.target(),
             dead: matches!(self.view.target(), Some((_, TargetLife::Dead))),
         }
+    }
+
+    /// Gives the viewport keyboard focus, so Space and the flight keys reach it.
+    pub fn focus(&self, window: &mut Window, cx: &mut App) {
+        self.focus.focus(window, cx);
     }
 
     pub fn tracks(&self) -> Option<&Arc<DemoTracks>> {

@@ -223,3 +223,22 @@ fn a_players_list_pick_never_reaches_the_map(cx: &mut TestAppContext) {
     // A click on the map would step from Alice to Bob, so entity 3 means only the pick landed.
     assert_eq!(state(cx, &w).target.map(PlayerId::entity), Some(3));
 }
+
+#[gpui_kit::test]
+fn space_changes_the_camera_after_a_click_on_next_player(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
+    support::press(cx, w.s.win, "space");
+    assert_eq!(state(cx, &w).mode, CameraMode::Chase);
+}
+
+#[gpui_kit::test]
+fn space_still_cycles_after_a_click_on_play(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_PLAY);
+    support::press(cx, w.s.win, "space");
+    assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
+}
