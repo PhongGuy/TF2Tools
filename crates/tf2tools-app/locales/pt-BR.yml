@@ -230,6 +230,7 @@ demo_viewer:
   caption_players_playing: "%{map}, %{count} jogadores"
   players_note: "Não foi possível ler os jogadores desta demo."
   hint: "Arraste para olhar, WASD para se mover, Shift para ir mais devagar, Espaço para seguir um jogador."
+  hint_follow: "Espaço para trocar de câmera, clique para o próximo jogador, clique direito para o anterior."
   bar_collapse: "Minimizar controles"
   bar_expand: "Mostrar controles"
   bar_grip: "Arraste para mover"

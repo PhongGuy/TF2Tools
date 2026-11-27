@@ -23,7 +23,7 @@ use gpui_kit::{
     WeakEntity, Window, canvas, div, px,
 };
 use tf2tools_core::{
-    DemoSnapshot, DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError,
+    CameraMode, DemoSnapshot, DownloadPhase, GbMapDownload, GbMapInstallError, GbMapSearchError,
     GbMapSearchProgress, LookSensitivity, MapDownloadError, PlaybackEvent, Tf2Install,
 };
 
@@ -1041,6 +1041,14 @@ impl Render for DemoViewerPage {
         )
         .absolute()
         .size_full();
+        // Following a player, the hint names the follow controls instead of the flight keys.
+        let following = self
+            .viewport()
+            .is_some_and(|v| v.read(cx).camera_state().mode != CameraMode::FreeFly);
+        let hint = match following {
+            true => tr!("demo_viewer.hint_follow"),
+            false => tr!("demo_viewer.hint"),
+        };
         let at = self.bar.clamp(self.area.get(), self.bar_size.get());
         // The bar's room is a fixed-width frame, so where it sits never changes how it wraps.
         let room = (self.area.get().width - BAR_MARGIN * 2.).max(px(0.));
@@ -1078,12 +1086,7 @@ impl Render for DemoViewerPage {
                                 true,
                             ))
                         })
-                        .child(line(
-                            ids::DEMO_VIEWER_HINT,
-                            tr!("demo_viewer.hint"),
-                            Some(muted),
-                            true,
-                        ));
+                        .child(line(ids::DEMO_VIEWER_HINT, hint.clone(), Some(muted), true));
                     bar.child(words)
                 })
                 .child(div().flex_none().child(open))

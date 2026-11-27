@@ -228,6 +228,7 @@ demo_viewer:
   caption_players_playing: "%{map}，%{count} 名玩家"
   players_note: "无法从此录像中读取玩家。"
   hint: "拖动以环顾，WASD 移动，Shift 减速，空格键跟随玩家。"
+  hint_follow: "空格键切换镜头，单击切换到下一位玩家，右键单击切换到上一位。"
   bar_collapse: "收起控制栏"
   bar_expand: "显示控制栏"
   bar_grip: "拖动以移动"

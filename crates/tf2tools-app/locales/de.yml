@@ -229,6 +229,7 @@ demo_viewer:
   caption_players_playing: "%{map}, %{count} Spieler"
   players_note: "Die Spieler konnten aus dieser Demo nicht gelesen werden."
   hint: "Ziehen zum Umsehen, WASD zum Bewegen, Shift zum Verlangsamen, Leertaste zum Folgen."
+  hint_follow: "Leertaste wechselt die Kamera, Klick zum nächsten Spieler, Rechtsklick zum vorherigen."
   bar_collapse: "Steuerung minimieren"
   bar_expand: "Steuerung anzeigen"
   bar_grip: "Zum Verschieben ziehen"

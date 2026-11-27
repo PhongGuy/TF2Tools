@@ -11,6 +11,8 @@ use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks};
 
 const ENGLISH_HINT: &str =
     "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
+const ENGLISH_FOLLOW_HINT: &str =
+    "Space to change camera, click for the next player, right-click for the previous one.";
 
 /// Whether `a` and `b` cover a shared area, beyond half a pixel of rounding.
 fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
@@ -21,8 +23,8 @@ fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
         && b.top() + slack < a.bottom()
 }
 
-// Follows a player, or Bob through his death when `dead`, then checks that every part of the
-// bar lies inside it and the page, no two parts cover each other, and the name stays readable.
+// Checks that every part of the bar lies inside it and the page and no two parts cover each
+// other, first in free-fly, then following a player, or Bob through his death when `dead`.
 fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch(lang);
     let env = support::env();
@@ -35,10 +37,9 @@ fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppCon
     // The hint must be the translated one, or the widths below prove nothing about it.
     let hint = support::label_of(cx, w.s.win, ids::DEMO_VIEWER_HINT);
     assert!(
-        hint.is_some_and(|h| h != ENGLISH_HINT),
+        hint.as_ref().is_some_and(|h| h != ENGLISH_HINT),
         "{lang}: the hint is not translated"
     );
-    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
     let mut parts = vec![
         ids::DEMO_VIEWER_HINT,
         ids::DEMO_VIEWER_OPEN,
@@ -54,6 +55,39 @@ fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppCon
         ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
         ids::DEMO_VIEWER_CAMERA_TARGET,
     ];
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
+    let fits = |cx: &mut TestAppContext, parts: &[&'static str], phase: &str| {
+        let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
+        assert!(
+            inside(bar, page),
+            "{lang} {width} {phase}: {bar:?} leaves {page:?}"
+        );
+        let mut seen: Vec<(&str, Bounds<Pixels>)> = Vec::new();
+        for &id in parts {
+            let part = support::bounds_of(cx, w.s.win, id)
+                .unwrap_or_else(|| panic!("{lang} {width} {phase}: {id} is missing"));
+            assert!(
+                inside(part, bar) && inside(part, page),
+                "{lang} {width} {phase}: {id} at {part:?} leaves the bar {bar:?} or the page {page:?}"
+            );
+            for (other, at) in &seen {
+                assert!(
+                    !overlap(part, *at),
+                    "{lang} {width} {phase}: {id} at {part:?} covers {other} at {at:?}"
+                );
+            }
+            seen.push((id, part));
+        }
+    };
+    fits(cx, &parts, "free");
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    let follow = support::label_of(cx, w.s.win, ids::DEMO_VIEWER_HINT);
+    assert!(
+        follow
+            .as_ref()
+            .is_some_and(|h| h != ENGLISH_FOLLOW_HINT && h != hint.as_ref().unwrap()),
+        "{lang}: the follow hint {follow:?} is not the translated one"
+    );
     let width_of = |cx: &mut TestAppContext| {
         support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET)
             .unwrap()
@@ -74,25 +108,7 @@ fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppCon
         support::settle(cx, w.s.win);
         parts.push(ids::DEMO_VIEWER_CAMERA_DEAD);
     }
-    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
-    let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
-    assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
-    let mut seen = Vec::new();
-    for id in parts {
-        let part = support::bounds_of(cx, w.s.win, id)
-            .unwrap_or_else(|| panic!("{lang} {width}: {id} is missing"));
-        assert!(
-            inside(part, bar) && inside(part, page),
-            "{lang} {width}: {id} at {part:?} leaves the bar {bar:?} or the page {page:?}"
-        );
-        for (other, at) in &seen {
-            assert!(
-                !overlap(part, *at),
-                "{lang} {width}: {id} at {part:?} covers {other} at {at:?}"
-            );
-        }
-        seen.push((id, part));
-    }
+    fits(cx, &parts, "following");
     let shown = width_of(cx);
     match alive_width {
         Some(alive) => assert!(
@@ -270,5 +286,17 @@ fn the_camera_words_speak_every_language() {
     for lang in langs.iter().filter(|l| **l != "en") {
         let hint = text(lang, "demo_viewer.hint").unwrap();
         assert_ne!(hint, en_hint, "{lang} hint is untranslated");
+    }
+    // Following a player has its own hint, which every language translates and tells apart.
+    let en_follow = text("en", "demo_viewer.hint_follow").expect("en lacks hint_follow");
+    assert!(en_follow.contains("Space"), "{en_follow}");
+    for lang in langs {
+        let follow = text(lang, "demo_viewer.hint_follow")
+            .unwrap_or_else(|| panic!("{lang} lacks hint_follow"));
+        let free = text(lang, "demo_viewer.hint").unwrap();
+        assert_ne!(follow, free, "{lang} hint_follow repeats the free hint");
+        if lang != "en" {
+            assert_ne!(follow, en_follow, "{lang} hint_follow is untranslated");
+        }
     }
 }

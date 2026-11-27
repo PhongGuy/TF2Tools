@@ -305,3 +305,27 @@ fn a_full_players_list_fits_above_the_bar_and_scrolls_at_1280(cx: &mut TestAppCo
 fn a_full_players_list_fits_above_the_bar_and_scrolls_at_800(cx: &mut TestAppContext) {
     full_list_fits(cx, 800., 600.);
 }
+
+#[gpui_kit::test]
+fn the_hint_follows_the_camera(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    let free = "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
+    let follow =
+        "Space to change camera, click for the next player, right-click for the previous one.";
+    assert_eq!(label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(), Some(free));
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(),
+        Some(follow)
+    );
+    support::press(cx, w.s.win, "space");
+    assert_eq!(state(cx, &w).mode, CameraMode::Chase);
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(),
+        Some(follow)
+    );
+    support::press(cx, w.s.win, "space");
+    assert_eq!(state(cx, &w).mode, CameraMode::FreeFly);
+    assert_eq!(label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(), Some(free));
+}

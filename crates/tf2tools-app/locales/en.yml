@@ -206,6 +206,7 @@ demo_viewer:
   caption_players_playing: "%{map}, %{count} players"
   players_note: "Players couldn't be read from this demo."
   hint: "Drag to look, WASD to move, Shift to slow down, Space to follow a player."
+  hint_follow: "Space to change camera, click for the next player, right-click for the previous one."
   bar_collapse: "Minimise controls"
   bar_expand: "Show controls"
   bar_grip: "Drag to move"
