@@ -13,12 +13,14 @@ use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::viewer::pointer::{FallbackLock, PointerLockFactory};
 use tf2tools_app::weapon_names::LoadedWeaponNames;
 use tf2tools_core::{
     DemosClient, DemosEndpoints, LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId,
     StoreConfig, TrackedPlayer, WeaponNames,
 };
 
+use super::demo_viewer::{StubAnswer, StubHandle, stub_factory};
 use crate::support;
 
 pub fn sid(account: u64) -> SteamId {
@@ -94,6 +96,45 @@ pub fn shell_with_demos(
     picker: Arc<ScriptedPicker>,
 ) -> support::ShellWindow {
     open_logs_shell(cx, env, base, Some(demos_base), players, picker)
+}
+
+/// Like `shell_with_demos`, on a found TF2 with stub demo renderers, so a viewed demo opens.
+pub fn shell_with_demo_viewer(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    demos_base: &str,
+    players: &[(u64, &'static str)],
+) -> (support::ShellWindow, Arc<Mutex<Vec<StubHandle>>>) {
+    cx.executor().allow_parking();
+    let (factory, stubs) = stub_factory(StubAnswer::Frames);
+    let (base, demos_base) = (base.to_owned(), demos_base.to_owned());
+    let players = players.to_vec();
+    let s = super::open_shell(
+        cx,
+        env,
+        super::graphics::found(env),
+        Arc::new(ScriptedPicker::empty()),
+        super::no_steam(),
+        None,
+        move |services| {
+            let logs = logs_client(services, &base);
+            for (account, name) in &players {
+                logs.cache()
+                    .add_player(&TrackedPlayer::new(sid(*account), *name))
+                    .unwrap();
+            }
+            let mut tweaked = services
+                .clone()
+                .with_logs(logs)
+                .with_demos(demos_client(&demos_base));
+            tweaked.renderers = factory;
+            let fallback: PointerLockFactory = Arc::new(|| Box::new(FallbackLock));
+            tweaked.pointer_lock = fallback;
+            *services = tweaked;
+        },
+    );
+    (s, stubs)
 }
 
 // The one shell both helpers open: logs.tf at `base`, `players` tracked, and demos.tf at
@@ -514,10 +555,11 @@ pub fn demo_footer_at_800(cx: &mut TestAppContext, env: &support::Env) -> DemoFo
 /// Asserts every button in log `log`'s footer lies inside its panel, left and right.
 pub fn assert_footer_fits(cx: &mut TestAppContext, s: &support::ShellWindow, log: u64) {
     let panel = support::bounds_of(cx, s.win, ids::logstf_log_panel(log)).expect("the panel");
-    let buttons: [gpui_kit::ElementId; 5] = [
+    let buttons: [gpui_kit::ElementId; 6] = [
         ids::LOGSTF_CHAT_TOGGLE.into(),
         ids::LOGSTF_STREAKS_TOGGLE.into(),
         ids::logstf_download(log),
+        ids::logstf_demo_view(log),
         ids::logstf_demo_download(log),
         ids::logstf_demo_link(log),
     ];

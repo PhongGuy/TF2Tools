@@ -1,5 +1,5 @@
 //! The open log's footer buttons, Show Chat, Show Killstreaks, Download log and its demo's
-//! two, and the dialogs the first two open.
+//! three, and the dialogs the first two open.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
@@ -17,7 +17,9 @@ use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::demo::DemoButton;
 use crate::pages::logs_tf::tables::ChatRow;
-use crate::pages::logs_tf::text::{DEMOS_TF, demo_button_label, duration_text, streaks_label};
+use crate::pages::logs_tf::text::{
+    DEMOS_TF, demo_button_label, demo_view_label, duration_text, streaks_label,
+};
 use crate::services::Services;
 use crate::widgets::dialog_frame::content_max_height;
 use crate::widgets::tip::tip;
@@ -58,7 +60,8 @@ pub(in crate::pages::logs_tf) fn streak_rows(log: &LogDetail) -> Vec<StreakRow> 
 
 /// The buttons under the kill matrix: Show Chat and Show Killstreaks ask `page` to open
 /// their dialogs (Killstreaks disabled when the log has none); Download log saves log `id`.
-/// A found `demo` adds Download demo, disabled while it runs, and a link to its demos.tf page.
+/// A found `demo` adds View demo and Download demo, each disabled while it runs, and a link
+/// to its demos.tf page.
 pub(super) fn footer(
     id: u64,
     log: &LogDetail,
@@ -67,6 +70,7 @@ pub(super) fn footer(
 ) -> Div {
     let chat_page = page.clone();
     let download_page = page.clone();
+    let view_page = page.clone();
     let demo_page = page.clone();
     let streaks = log.killstreaks().len();
     // Buttons that outgrow the panel move to the next line whole; a label is never cut.
@@ -101,6 +105,16 @@ pub(super) fn footer(
                     let _ = download_page.update(cx, |page, cx| page.download_log(id, window, cx));
                 }),
         )
+        .children(demo.map(|demo| {
+            Button::new(ids::logstf_demo_view(id))
+                .outline()
+                .small()
+                .label(demo_view_label(demo.viewing))
+                .disabled(demo.viewing.is_some())
+                .on_click(move |_, window, cx| {
+                    let _ = view_page.update(cx, |page, cx| page.view_demo(id, window, cx));
+                })
+        }))
         .children(demo.map(|demo| {
             Button::new(ids::logstf_demo_download(id))
                 .outline()

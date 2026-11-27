@@ -303,7 +303,7 @@ fn a_cancelled_save_downloads_nothing(cx: &mut TestAppContext) {
     assert_eq!(requests_to(&d.server, DEMO_ROUTE), 0, "nothing downloaded");
 }
 
-// At 800 px the footer's five buttons outgrow one line; each must stay whole inside the panel.
+// At 800 px the footer's six buttons outgrow one line; each must stay whole inside the panel.
 #[gpui_kit::test]
 fn the_footer_fits_an_800_px_window(cx: &mut TestAppContext) {
     let env = support::env();

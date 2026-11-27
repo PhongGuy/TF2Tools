@@ -11,7 +11,7 @@ pub mod sort;
 pub mod tables;
 pub mod text;
 
-pub use demo::DemoLookup;
+pub use demo::{DemoLookup, ViewDemo};
 pub use list::STAT_COLUMNS;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -114,6 +114,10 @@ pub struct LogsTfPage {
     demos: HashMap<u64, DemoLookup>,
     // Demo downloads running by log id, each with its whole percent once the size is known.
     demo_downloads: HashMap<u64, Option<u8>>,
+    // View demo opens running, by log id, holding the whole percent once known.
+    demo_views: HashMap<u64, Option<u8>>,
+    // True while another page shows, so a finished View demo only caches.
+    hidden: bool,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
     // The kill matrix tab and its sort, kept the same way.
@@ -247,6 +251,8 @@ impl LogsTfPage {
             fetching: HashSet::new(),
             demos: HashMap::new(),
             demo_downloads: HashMap::new(),
+            demo_views: HashMap::new(),
+            hidden: false,
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
             matrix_sort: None,
@@ -280,6 +286,7 @@ impl LogsTfPage {
     /// Kept pages hear when they leave and return; coming back rereads the cache and syncs
     /// the active player if their logs are stale.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        self.hidden = hidden;
         if !hidden {
             self.load(true, cx).detach();
         }
