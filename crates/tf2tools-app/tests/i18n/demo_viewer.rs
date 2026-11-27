@@ -104,6 +104,14 @@ fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppCon
             "{lang} {width}: the followed name has only {shown:?}"
         ),
     }
+    // The players list opens upward from the bar and must stay on the page.
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
+    let list = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS)
+        .unwrap_or_else(|| panic!("{lang} {width}: the players list did not open"));
+    assert!(
+        inside(list, page),
+        "{lang} {width}: the players list at {list:?} leaves the page {page:?}"
+    );
 }
 
 #[gpui_kit::test]

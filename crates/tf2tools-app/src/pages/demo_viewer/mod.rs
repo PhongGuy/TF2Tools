@@ -222,6 +222,7 @@ pub struct DemoViewerPage {
     look_saves: Rc<RefCell<SerialSaves<LookSensitivity>>>,
     look_slider: Entity<SliderState>,
     options_open: bool,
+    players_open: bool,
     _look_watch: [Subscription; 2],
     /// The open demo's timeline, once its tracks arrive.
     timeline: Option<timeline::Timeline>,
@@ -296,6 +297,7 @@ impl DemoViewerPage {
             look_saves: Rc::default(),
             look_slider,
             options_open: false,
+            players_open: false,
             _look_watch: look_watch,
             timeline: None,
             timeline_placeholder,

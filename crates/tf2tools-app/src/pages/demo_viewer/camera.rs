@@ -1,14 +1,16 @@
 //! The Demo Viewer bar's camera chip: the mode, the previous and next player, the followed
-//! player's name and a dead badge while that player waits to respawn.
+//! player's name and a dead badge while that player waits to respawn. The name opens the
+//! players list, RED then BLU, where a pick follows that player.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex};
+use gpui_kit::component::popover::Popover;
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, Context, Entity, IntoElement, ParentElement as _, SharedString, Styled as _, div,
-    px,
+    Anchor, AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
-use tf2tools_core::{CameraMode, DemoTracks, PlayerId};
+use tf2tools_core::{CameraMode, DemoTracks, FollowPose, PlayerId, Team};
 
 use super::DemoViewerPage;
 use crate::i18n::tr;
@@ -18,6 +20,38 @@ use crate::widgets::{Named as _, labelled};
 
 /// The widest the target's name draws before it ends in an ellipsis.
 const TARGET_CAP: f32 = 160.;
+/// The tallest the players list grows before it scrolls, so a full server fits at 600 px.
+const PLAYERS_CAP: f32 = 320.;
+
+/// One players-list row: who, their team at the shown tick and whether they are dead there.
+struct PlayerRow {
+    id: PlayerId,
+    red: bool,
+    dead: bool,
+}
+
+/// The players present at `tick`, RED first then BLU, each in entity order.
+fn player_rows(tracks: &DemoTracks, tick: f64) -> Vec<PlayerRow> {
+    let mut rows: Vec<PlayerRow> = tracks
+        .players()
+        .iter()
+        .filter_map(|p| {
+            let (pose, dead) = match tracks.eye_at(p.id(), tick) {
+                FollowPose::Alive(pose) => (pose, false),
+                FollowPose::Dead(pose) => (pose, true),
+                FollowPose::Absent | _ => return None,
+            };
+            let red = pose.team() == Team::Red;
+            Some(PlayerRow {
+                id: p.id(),
+                red,
+                dead,
+            })
+        })
+        .collect();
+    rows.sort_by_key(|r| (!r.red, r.id.entity()));
+    rows
+}
 
 fn mode_icon(mode: CameraMode) -> IconName {
     match mode {
@@ -104,6 +138,7 @@ impl DemoViewerPage {
             .tooltip(tr!("demo_viewer.camera.choose"))
             .accessibility_label(heard)
             .disabled(waiting);
+        let target_button = self.players_list(viewport, target_button, cx);
         let dead = state.dead.then(|| {
             let theme = cx.theme();
             labelled(
@@ -128,6 +163,77 @@ impl DemoViewerPage {
             .child(target_button)
             .children(dead)
             .child(next)
+            .into_any_element()
+    }
+
+    /// The target button as the trigger of the players list, opening upward from the bar.
+    fn players_list(
+        &self,
+        viewport: &Entity<DemoViewport>,
+        trigger: Button,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let v = viewport.read(cx);
+        let rows = match (v.tracks(), v.playback()) {
+            (Some(tracks), Some(p)) if self.players_open => player_rows(tracks, p.tick),
+            _ => Vec::new(),
+        };
+        let tracks = v.tracks().cloned();
+        let muted = cx.theme().muted_foreground;
+        let header = |text: &'static str| div().pt_1().text_xs().text_color(muted).child(text);
+        let mut list = v_flex()
+            .id(ids::DEMO_VIEWER_PLAYERS)
+            .test_support()
+            .min_w(px(160.))
+            .max_h(px(PLAYERS_CAP))
+            .overflow_y_scroll()
+            .gap_0p5();
+        // "RED" and "BLU" are the game's own names, so they stay untranslated.
+        for (red, title) in [(true, "RED"), (false, "BLU")] {
+            let group: Vec<&PlayerRow> = rows.iter().filter(|r| r.red == red).collect();
+            if group.is_empty() {
+                continue;
+            }
+            list = list.child(header(title));
+            for row in group {
+                let name = target_words(Some(row.id), tracks.as_deref());
+                let heard = match row.dead {
+                    true => tr!("demo_viewer.camera.target_dead", name = name.clone()),
+                    false => name.clone(),
+                };
+                let id = row.id;
+                let pick = Button::new(ids::demo_viewer_player(id.entity()))
+                    .ghost()
+                    .small()
+                    .label(name)
+                    .accessibility_label(heard)
+                    .on_click(cx.listener(move |page, _, _, cx| {
+                        page.players_open = false;
+                        page.on_viewport(cx, |v, cx| v.follow(id, cx));
+                        cx.notify();
+                    }));
+                let badge = row.dead.then(|| {
+                    div()
+                        .flex_none()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(tr!("demo_viewer.camera.dead"))
+                });
+                list = list.child(h_flex().gap_1().items_center().child(pick).children(badge));
+            }
+        }
+        let page = cx.entity().downgrade();
+        Popover::new("demo-viewer-players-popover")
+            .anchor(Anchor::BottomLeft)
+            .open(self.players_open)
+            .on_open_change(move |&open, _, cx| {
+                let _ = page.update(cx, |page, cx| {
+                    page.players_open = open;
+                    cx.notify();
+                });
+            })
+            .trigger(trigger)
+            .child(list)
             .into_any_element()
     }
 }

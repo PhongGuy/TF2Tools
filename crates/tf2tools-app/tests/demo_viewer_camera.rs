@@ -3,6 +3,7 @@
 use gpui_kit::{ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
+use tf2tools_core::PlayerId;
 use tf2tools_core::{CameraMode, PlaybackEvent};
 
 use crate::support;
@@ -153,4 +154,57 @@ fn the_chip_waits_for_the_tracks(cx: &mut TestAppContext) {
     support::wait_real(cx, "the tracks", |cx| {
         !support::disabled_of(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_MODE)
     });
+}
+
+#[gpui_kit::test]
+fn the_players_list_groups_red_then_blu_and_follows_the_pick(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS));
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_player(1)).as_deref(),
+        Some("Alice")
+    );
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_player(2)).as_deref(),
+        Some("Bob")
+    );
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_player(3)).as_deref(),
+        Some("Player 3")
+    );
+    let top = |cx: &mut TestAppContext, e: u32| {
+        support::bounds_of(cx, w.s.win, ids::demo_viewer_player(e))
+            .unwrap()
+            .top()
+    };
+    let (alice, bob, three) = (top(cx, 1), top(cx, 2), top(cx, 3));
+    assert!(
+        bob < three && three < alice,
+        "RED rows first: {bob:?} {three:?} {alice:?}"
+    );
+    support::click_id(cx, w.s.win, ids::demo_viewer_player(3));
+    let s = state(cx, &w);
+    assert_eq!(
+        (s.mode, s.target.map(PlayerId::entity)),
+        (CameraMode::FirstPerson, Some(3))
+    );
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_PLAYERS));
+}
+
+#[gpui_kit::test]
+fn the_players_list_marks_the_dead(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    seek(cx, &w, 4140.);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_player(2)).as_deref(),
+        Some("Bob, dead")
+    );
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_player(1)).as_deref(),
+        Some("Alice")
+    );
 }
