@@ -7,21 +7,12 @@ use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
 use crate::support;
-use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks};
+use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks, overlap};
 
 const ENGLISH_HINT: &str =
     "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
 const ENGLISH_FOLLOW_HINT: &str =
     "Space to change camera, click for the next player, right-click for the previous one.";
-
-/// Whether `a` and `b` cover a shared area, beyond half a pixel of rounding.
-fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
-    let slack = px(0.5);
-    a.left() + slack < b.right()
-        && b.left() + slack < a.right()
-        && a.top() + slack < b.bottom()
-        && b.top() + slack < a.bottom()
-}
 
 // Checks that every part of the bar lies inside it and the page and no two parts cover each
 // other, first in free-fly, then following a player, or Bob through his death when `dead`.

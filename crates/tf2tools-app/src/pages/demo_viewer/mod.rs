@@ -43,9 +43,13 @@ use crate::widgets::{Named as _, labelled};
 
 mod bar;
 mod camera;
+mod killfeed;
 mod timeline;
 
 pub use bar::BarPlace;
+pub use killfeed::{
+    FEED_HOLD_S, FEED_ROWS, FeedParty, FeedRow, feed_key, feed_on_top, feed_rows, feed_words,
+};
 
 // A demo's file name without its extension, for the title before its map is read.
 fn stem(path: &std::path::Path) -> SharedString {

@@ -7,9 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
-    AnyWindowHandle, Bounds, Context, Entity, Pixels, Point, RenderImage, TestAppContext, Window,
-    div, px, relative,
+    AnyWindowHandle, Bounds, Context, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, Pixels, Point, RenderImage, TestAppContext, Window, div, point,
+    px, relative,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::demo_viewer::ReadState;
@@ -23,8 +25,9 @@ use tf2tools_app::viewer::{
     RendererFactory, SceneRenderer,
 };
 use tf2tools_core::{
-    DemoSnapshot, DemoSnapshotError, DemoTracks, DemoTracksError, Endpoints, LookSensitivity,
-    MapMesh, PlaybackEvent, SnapshotPlayer, Team, Tf2Install, TfClass, TrackCut, load_map_mesh,
+    DemoSnapshot, DemoSnapshotError, DemoTestKill, DemoTracks, DemoTracksError, Endpoints,
+    LookSensitivity, MapMesh, PlaybackEvent, SnapshotPlayer, Team, Tf2Install, TfClass, TrackCut,
+    load_map_mesh,
 };
 
 use super::demo_view_fixtures::{BspOptions, bsp, demo_header};
@@ -724,4 +727,94 @@ pub fn inside(inner: Bounds<Pixels>, outer: Bounds<Pixels>) -> bool {
         && inner.top() >= outer.top() - slack
         && inner.right() <= outer.right() + slack
         && inner.bottom() <= outer.bottom() + slack
+}
+
+/// Whether `a` and `b` cover a shared area, beyond half a pixel of rounding.
+pub fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
+    let slack = px(0.5);
+    a.left() + slack < b.right()
+        && b.left() + slack < a.right()
+        && a.top() + slack < b.bottom()
+        && b.top() + slack < a.bottom()
+}
+
+pub fn send(cx: &mut TestAppContext, w: &DemoViewerShell, event: impl InputEvent) {
+    cx.update_window(w.s.win, |_, win, cx| {
+        let _ = win.dispatch_event(event.to_platform_input(), cx);
+        win.render_frame(cx);
+    })
+    .unwrap();
+    super::settle(cx, w.s.win);
+}
+
+// Drags the bar's grip far past the page's top, so the bar pins there.
+pub fn bar_to_top(cx: &mut TestAppContext, w: &DemoViewerShell) {
+    let from = super::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR_GRIP)
+        .expect("the grip")
+        .center();
+    let to = from + point(px(0.), px(-2000.));
+    let modifiers = Modifiers::default();
+    let moved = |position, pressed_button| MouseMoveEvent {
+        position,
+        pressed_button,
+        modifiers,
+    };
+    send(cx, w, moved(from, None));
+    let down = MouseDownEvent {
+        button: MouseButton::Left,
+        position: from,
+        modifiers,
+        click_count: 1,
+        first_mouse: false,
+    };
+    send(cx, w, down);
+    send(cx, w, moved(to, Some(MouseButton::Left)));
+    let up = MouseUpEvent {
+        button: MouseButton::Left,
+        position: to,
+        modifiers,
+        click_count: 1,
+    };
+    send(cx, w, up);
+}
+
+/// A killer and a victim whose names are 32 characters, the most a cleaned name keeps.
+pub const LONG_KILLER: &str = "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+pub const LONG_VICTIM: &str = "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM";
+
+/// `camera_tracks` with eight kills: Alice (1, BLU scout) kills Bob (2, RED soldier) with a
+/// scattergun at 4020..=4060 every 10 ticks, Bob dies to the world at 4070, an unnamed RED pyro
+/// (3) kills Alice with Bob's assist at 4150, and the two long names meet at 4160.
+pub fn killfeed_tracks() -> Arc<DemoTracks> {
+    let alice = (1, "Alice", Team::Blue, TfClass::Scout);
+    let bob = (2, "Bob", Team::Red, TfClass::Soldier);
+    let mut kills: Vec<DemoTestKill<'static>> = (0..5)
+        .map(|i| {
+            (
+                4020 + 10 * i,
+                Some(alice),
+                None,
+                bob,
+                "scattergun",
+                false,
+                false,
+            )
+        })
+        .collect();
+    kills.push((4070, None, None, bob, "world", false, false));
+    let pyro = (3, "", Team::Red, TfClass::Pyro);
+    kills.push((
+        4150,
+        Some(pyro),
+        Some(bob),
+        alice,
+        "tf_projectile_rocket",
+        true,
+        false,
+    ));
+    let spy = (4, LONG_KILLER, Team::Blue, TfClass::Spy);
+    let heavy = (5, LONG_VICTIM, Team::Red, TfClass::Heavy);
+    kills.push((4160, Some(spy), None, heavy, "knife", false, false));
+    let tracks = Arc::into_inner(camera_tracks()).expect("a fresh Arc");
+    Arc::new(tracks.with_test_kills(&kills))
 }

@@ -2,10 +2,8 @@
 
 use std::sync::Arc;
 
-use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
-    AppContext as _, ElementId, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, ScrollDelta, TestAppContext, point, px, size,
+    AppContext as _, ElementId, Entity, Modifiers, ScrollDelta, TestAppContext, point, px, size,
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
@@ -14,8 +12,8 @@ use tf2tools_core::{CameraMode, DemoTracks, PlaybackEvent, SnapshotPlayer, Team,
 
 use crate::support;
 use crate::support::demo_viewer::{
-    DemoViewerShell, LockCall, camera_tracks, full_server_tracks, gated_playback, open_scripted,
-    open_with, open_with_locked, walking,
+    DemoViewerShell, LockCall, bar_to_top, camera_tracks, full_server_tracks, gated_playback,
+    open_scripted, open_with, open_with_locked, walking,
 };
 
 fn viewport(cx: &mut TestAppContext, w: &DemoViewerShell) -> Entity<DemoViewport> {
@@ -247,46 +245,6 @@ fn space_still_cycles_after_a_click_on_play(cx: &mut TestAppContext) {
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_PLAY);
     support::press(cx, w.s.win, "space");
     assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
-}
-
-fn send(cx: &mut TestAppContext, w: &DemoViewerShell, event: impl InputEvent) {
-    cx.update_window(w.s.win, |_, win, cx| {
-        let _ = win.dispatch_event(event.to_platform_input(), cx);
-        win.render_frame(cx);
-    })
-    .unwrap();
-    support::settle(cx, w.s.win);
-}
-
-// Drags the bar's grip far past the page's top, so the bar pins there.
-fn bar_to_top(cx: &mut TestAppContext, w: &DemoViewerShell) {
-    let from = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR_GRIP)
-        .expect("the grip")
-        .center();
-    let to = from + point(px(0.), px(-2000.));
-    let modifiers = Modifiers::default();
-    let moved = |position, pressed_button| MouseMoveEvent {
-        position,
-        pressed_button,
-        modifiers,
-    };
-    send(cx, w, moved(from, None));
-    let down = MouseDownEvent {
-        button: MouseButton::Left,
-        position: from,
-        modifiers,
-        click_count: 1,
-        first_mouse: false,
-    };
-    send(cx, w, down);
-    send(cx, w, moved(to, Some(MouseButton::Left)));
-    let up = MouseUpEvent {
-        button: MouseButton::Left,
-        position: to,
-        modifiers,
-        click_count: 1,
-    };
-    send(cx, w, up);
 }
 
 // Opens the players list of a full server at `width` x `height`, with the bar at the page's top

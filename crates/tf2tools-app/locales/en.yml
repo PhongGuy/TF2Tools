@@ -226,6 +226,12 @@ demo_viewer:
     dead: "Dead"
     target_dead: "%{name}, dead"
     players: "Players"
+  killfeed:
+    title: "Kill feed"
+    kill: "%{killer} killed %{victim} with %{weapon}"
+    assisted: "%{killer} and %{assister} killed %{victim} with %{weapon}"
+    died: "%{victim} died"
+    unknown_weapon: "an unknown weapon"
   playback:
     play: "Play"
     pause: "Pause"

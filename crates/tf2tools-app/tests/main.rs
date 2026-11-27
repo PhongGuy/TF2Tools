@@ -55,6 +55,7 @@ mod demo_viewer;
 mod demo_viewer_bar;
 mod demo_viewer_camera;
 mod demo_viewer_download;
+mod demo_viewer_killfeed;
 mod demo_viewer_playback;
 mod demo_viewport;
 mod demo_viewport_camera;
