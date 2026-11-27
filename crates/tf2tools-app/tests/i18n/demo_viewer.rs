@@ -7,21 +7,15 @@ use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
 use crate::support;
-use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks};
+use support::demo_viewer::{
+    assert_feed_fits, camera_tracks, inside, killfeed_tracks, open_with, open_with_tracks, overlap,
+    seek_to,
+};
 
 const ENGLISH_HINT: &str =
     "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
 const ENGLISH_FOLLOW_HINT: &str =
     "Space to change camera, click for the next player, right-click for the previous one.";
-
-/// Whether `a` and `b` cover a shared area, beyond half a pixel of rounding.
-fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
-    let slack = px(0.5);
-    a.left() + slack < b.right()
-        && b.left() + slack < a.right()
-        && a.top() + slack < b.bottom()
-        && b.top() + slack < a.bottom()
-}
 
 // Checks that every part of the bar lies inside it and the page and no two parts cover each
 // other, first in free-fly, then following a player, or Bob through his death when `dead`.
@@ -299,4 +293,91 @@ fn the_camera_words_speak_every_language() {
             assert_ne!(follow, en_follow, "{lang} hint_follow is untranslated");
         }
     }
+}
+
+// The feed's rows and their cached words hold translated text, so switching language while
+// the feed stands still must still rename the unnamed pyro and reword the row.
+#[gpui_kit::test]
+fn the_kill_feed_renames_an_unnamed_player_when_the_language_changes(cx: &mut TestAppContext) {
+    let guard = LocaleGuard::hold();
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    seek_to(cx, &w, 4160.);
+    let row = |cx: &mut TestAppContext| {
+        support::label_of(cx, w.s.win, ids::demo_viewer_kill(3)).unwrap_or_default()
+    };
+    assert!(row(cx).starts_with("Player 3 "), "{}", row(cx));
+    tf2tools_app::i18n::apply("de");
+    cx.update(|cx| cx.refresh_windows());
+    support::settle(cx, w.s.win);
+    let german = row(cx);
+    assert!(
+        german.starts_with("Spieler 3 ") && !german.contains(" killed "),
+        "{german}"
+    );
+    drop(guard);
+}
+
+// The kill feed's words exist in every language, keep their placeholders, and are translated.
+#[test]
+fn the_killfeed_words_speak_every_language() {
+    let text = |lang: &str, key: &str| {
+        tf2tools_app::_rust_i18n_try_translate(lang, key).map(|t| t.into_owned())
+    };
+    let langs = ["en", "de", "es", "fr", "pt-BR", "ru", "zh-CN"];
+    let keys: [(&str, &[&str]); 6] = [
+        ("title", &[]),
+        ("kill", &["%{killer}", "%{victim}", "%{weapon}"]),
+        (
+            "assisted",
+            &["%{killer}", "%{assister}", "%{victim}", "%{weapon}"],
+        ),
+        ("died", &["%{victim}"]),
+        ("unknown_weapon", &[]),
+        ("markers", &["%{count}"]),
+    ];
+    for (key, placeholders) in keys {
+        let key = format!("demo_viewer.killfeed.{key}");
+        let en = text("en", &key).unwrap_or_else(|| panic!("en lacks {key}"));
+        for lang in langs {
+            let theirs = text(lang, &key).unwrap_or_else(|| panic!("{lang} lacks {key}"));
+            for p in placeholders {
+                assert!(theirs.contains(p), "{lang} {key} lacks {p}: {theirs}");
+            }
+            if lang != "en" {
+                assert_ne!(theirs, en, "{lang} {key} is untranslated");
+            }
+        }
+    }
+}
+
+// In `lang` on the narrowest page, with the bar at the bottom or the top: the feed fits, and
+// its rows read translated.
+fn feed_fits(lang: &str, top: bool, cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    cx.simulate_window_resize(w.s.win, size(px(800.), px(600.)));
+    support::settle(cx, w.s.win);
+    assert_feed_fits(cx, &w, top, &format!("{lang} top={top}"));
+    let row = support::label_of(cx, w.s.win, ids::demo_viewer_kill(3)).unwrap_or_default();
+    assert!(
+        row.contains("Alice") && !row.contains(" killed "),
+        "{lang}: the row reads {row:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_killfeed_fits_the_narrowest_page_in_german(cx: &mut TestAppContext) {
+    feed_fits("de", false, cx);
+}
+
+#[gpui_kit::test]
+fn the_killfeed_fits_under_a_top_bar_on_the_narrowest_page_in_german(cx: &mut TestAppContext) {
+    feed_fits("de", true, cx);
+}
+
+#[gpui_kit::test]
+fn the_killfeed_fits_the_narrowest_page_in_russian(cx: &mut TestAppContext) {
+    feed_fits("ru", false, cx);
 }

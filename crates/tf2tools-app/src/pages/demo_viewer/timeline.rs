@@ -8,13 +8,15 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div, px, relative,
+    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    ParentElement as _, Role, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, canvas, div, fill, point, px, relative, size,
 };
-use tf2tools_core::{DemoTracks, TrackCut};
+use tf2tools_core::{DemoTracks, KillParty, Team, TrackCut, WeaponNames};
 
 use super::DemoViewerPage;
+use super::killfeed::{FeedRow, feed_key, feed_rows, feed_words};
+use crate::i18n;
 use crate::i18n::tr;
 use crate::ids;
 use crate::viewer::load::{snapshot_time, timeline_time};
@@ -40,6 +42,14 @@ fn shown(state: PlaybackState) -> (u64, bool, f32) {
     (second, state.playing, state.speed)
 }
 
+/// `tick`'s share of the timeline from `first` to `end`, clamped to 0..=1; 0 when the span is empty.
+pub fn timeline_fraction(tick: u32, first: u32, end: u32) -> f32 {
+    if end <= first {
+        return 0.;
+    }
+    (tick.saturating_sub(first) as f32 / (end - first) as f32).clamp(0., 1.)
+}
+
 /// The open demo's timeline once its tracks arrive.
 pub(super) struct Timeline {
     pub(super) slider: Entity<SliderState>,
@@ -47,14 +57,34 @@ pub(super) struct Timeline {
     /// The slider's top end; one past `first` when the tracks hold a single tick.
     end: u32,
     rounds: Vec<u32>,
+    /// Each kill's share of the timeline and its killer's team, painted under the round markers.
+    kill_marks: Arc<[(f32, Option<Team>)]>,
     cut_note: Option<SharedString>,
     shown: Option<(u64, bool, f32)>,
     /// The camera state the bar last drew.
     camera: CameraState,
+    tracks: Arc<DemoTracks>,
+    /// The feed's rows at `feed_tick`, built in `feed_locale`, and the key they were built for.
+    pub(super) feed: Vec<FeedRow>,
+    /// Each row's accessible name, built with the rows and again when the weapon names land.
+    pub(super) feed_words: Vec<SharedString>,
+    feed_key: (usize, Option<u32>),
+    feed_tick: f64,
+    feed_locale: &'static str,
     _watch: [Subscription; 3],
 }
 
 impl Timeline {
+    // Rebuilds the rows at `feed_tick` and their words, so a render only reads them.
+    fn rebuild_feed(&mut self, names: &WeaponNames) {
+        self.feed = feed_rows(&self.tracks, self.feed_tick);
+        self.reword_feed(names);
+    }
+
+    pub(super) fn reword_feed(&mut self, names: &WeaponNames) {
+        self.feed_words = self.feed.iter().map(|row| feed_words(row, names)).collect();
+    }
+
     /// The note naming where playback stops early, if the tracks were cut.
     pub(super) fn cut_note(&self) -> Option<SharedString> {
         self.cut_note.clone()
@@ -120,16 +150,34 @@ impl DemoViewerPage {
                 page.camera_moved(ev.0, cx);
             }),
         ];
+        let tick = state.map_or(f64::from(first), |s| s.tick);
         self.timeline = Some(Timeline {
             slider,
             first,
             end,
             rounds: tracks.round_starts().to_vec(),
+            kill_marks: tracks
+                .kills()
+                .iter()
+                .map(|kill| {
+                    let team = kill.killer().and_then(KillParty::team);
+                    (timeline_fraction(kill.tick(), first, end), team)
+                })
+                .collect(),
             cut_note: cut_note(tracks),
             shown: state.map(shown),
             camera: viewport.read(cx).camera_state(),
+            tracks: Arc::clone(tracks),
+            feed: Vec::new(),
+            feed_words: Vec::new(),
+            feed_key: feed_key(tracks, tick),
+            feed_tick: tick,
+            feed_locale: i18n::current(),
             _watch: watch,
         });
+        if let Some(timeline) = self.timeline.as_mut() {
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
+        }
         cx.notify();
     }
 
@@ -146,10 +194,28 @@ impl DemoViewerPage {
         timeline
             .slider
             .update(cx, |st, cx| st.set_value(state.tick as f32, window, cx));
+        // The key is two searches and no allocation, so only a changed feed builds rows.
+        timeline.feed_tick = state.tick;
+        let key = feed_key(&timeline.tracks, state.tick);
+        let fed = timeline.feed_key != key;
+        if fed {
+            timeline.feed_key = key;
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
+        }
         let now = Some(shown(state));
-        if timeline.shown != now {
+        if fed || timeline.shown != now {
             timeline.shown = now;
             cx.notify();
+        }
+    }
+
+    // The rows hold translated fallback names, so a language switch rebuilds them as it draws.
+    pub(super) fn refresh_feed_locale(&mut self, cx: &App) {
+        if let Some(timeline) = self.timeline.as_mut()
+            && timeline.feed_locale != i18n::current()
+        {
+            timeline.feed_locale = i18n::current();
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
         }
     }
 
@@ -187,26 +253,30 @@ impl DemoViewerPage {
         let Some(timeline) = &self.timeline else {
             return Vec::new();
         };
-        let colour = cx.theme().muted_foreground;
-        let span = (timeline.end - timeline.first) as f32;
+        let (colour, ring) = (cx.theme().foreground, cx.theme().background);
         timeline
             .rounds
             .iter()
             .enumerate()
             .map(|(n, &tick)| {
-                let fraction = (tick.saturating_sub(timeline.first) as f32 / span).clamp(0., 1.);
+                let fraction = timeline_fraction(tick, timeline.first, timeline.end);
                 let words = tr!("demo_viewer.playback.round", n = n + 1);
                 let tip = words.clone();
                 div()
                     .id(ids::demo_viewer_round_marker(n))
+                    .role(Role::Button)
                     .aria_label(words)
                     .test_support()
+                    // Taller than the strip and ringed in the bar's colour, so a dot stays
+                    // distinct over the kill lines it is drawn after.
                     .absolute()
-                    .top_0()
+                    .top(px(-2.))
                     .left(relative(fraction))
-                    .ml(px(-3.))
-                    .size(px(6.))
+                    .ml(px(-5.))
+                    .size(px(10.))
                     .rounded_full()
+                    .border_2()
+                    .border_color(ring)
                     .bg(colour)
                     .cursor_pointer()
                     .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))
@@ -214,6 +284,62 @@ impl DemoViewerPage {
                     .into_any_element()
             })
             .collect()
+    }
+
+    // One painted strip with a 2 px line per kill in its killer's colour. It has no handlers,
+    // so the round markers drawn after it keep every click and tooltip.
+    fn kill_strip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let timeline = self
+            .timeline
+            .as_ref()
+            .filter(|t| !t.kill_marks.is_empty())?;
+        let theme = cx.theme();
+        let (red, blue, muted) = (theme.red, theme.blue, theme.muted_foreground);
+        let marks = Arc::clone(&timeline.kill_marks);
+        let count = marks.len();
+        let paint = canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                // Each 2 px line centres on its kill but stays inside the strip at either end.
+                let (left, right) = (
+                    bounds.origin.x,
+                    bounds.origin.x + bounds.size.width - px(2.),
+                );
+                for &(fraction, team) in marks.iter() {
+                    let colour = match team {
+                        Some(Team::Red) => red,
+                        Some(_) => blue,
+                        None => muted,
+                    };
+                    let mut x = left + bounds.size.width * fraction - px(1.);
+                    if x > right {
+                        x = right;
+                    }
+                    if x < left {
+                        x = left;
+                    }
+                    let at = point(x, bounds.origin.y);
+                    window.paint_quad(fill(
+                        gpui_kit::Bounds::new(at, size(px(2.), bounds.size.height)),
+                        colour,
+                    ));
+                }
+            },
+        )
+        .size_full();
+        Some(
+            div()
+                .id(ids::DEMO_VIEWER_KILL_MARKERS)
+                .role(Role::Image)
+                .aria_label(tr!("demo_viewer.killfeed.markers", count = count))
+                .test_support()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .child(paint)
+                .into_any_element(),
+        )
     }
 
     /// The bar's second row for `viewport`; every control waits, disabled, for the tracks.
@@ -288,6 +414,7 @@ impl DemoViewerPage {
                     .relative()
                     .w_full()
                     .h(px(6.))
+                    .children(self.kill_strip(cx))
                     .children(self.round_markers(cx)),
             )
             .child(slider);

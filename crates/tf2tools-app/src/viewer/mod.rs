@@ -20,7 +20,7 @@ pub mod viewport;
 pub use renderer::{Renderer, join_render_workers, wgpu_renderers};
 
 /// One frame to draw: its pixel size, the camera, a sequence number the frame echoes back,
-/// and the player boxes to draw in it.
+/// and the player boxes and projectiles to draw in it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrawRequest {
     pub width: u32,
@@ -28,6 +28,7 @@ pub struct DrawRequest {
     pub view_proj: [[f32; 4]; 4],
     pub seq: u64,
     pub players: Arc<[PlayerBox]>,
+    pub projectiles: Arc<[ProjectileShot]>,
 }
 
 /// Where one frame's time went on the worker.
@@ -71,6 +72,18 @@ pub struct PlayerBox {
     pub yaw_deg: f32,
     pub ducked: bool,
     pub team: Team,
+}
+
+/// One projectile drawn as an octahedron: where it is, its unit heading, whether it lies long
+/// along that heading, and the team that fired it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ProjectileShot {
+    pub position: [f32; 3],
+    pub heading: Option<[f32; 3]>,
+    pub long: bool,
+    pub team: Team,
+    /// Multiplies the base size, so a far shot still covers `MIN_SHOT_PX`; 1 up close.
+    pub scale: f32,
 }
 
 /// A map renderer the viewport drives; the real one runs wgpu on its own thread.

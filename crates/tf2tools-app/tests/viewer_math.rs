@@ -2,8 +2,15 @@
 
 use crate::support::demo_view_fixtures::{BspOptions, bsp};
 use tf2tools_app::viewer::PlayerBox;
+use tf2tools_app::viewer::ProjectileShot;
 use tf2tools_app::viewer::math::{self, BLU, BoxVertex, EYE_HEIGHT, FAR, NEAR, RED};
-use tf2tools_core::{DemoSnapshot, SnapshotPlayer, Team, TfClass, load_map_mesh};
+use tf2tools_app::viewer::math::{
+    MIN_SHOT_PX, PROJECTILE_HIDE_NEAR, SHOT_ROUND, ShotSight, projectile_shots, projectile_vertices,
+};
+use tf2tools_core::{
+    DemoSnapshot, DemoTestShot, DemoTracks, ProjectileKind, SnapshotPlayer, Team, TfClass,
+    load_map_mesh,
+};
 
 // `p` through `m`, divided by w: [x, y, depth].
 fn project(m: [[f32; 4]; 4], p: [f32; 3]) -> [f32; 3] {
@@ -377,4 +384,282 @@ fn a_hidden_player_has_no_box() {
         &*math::player_boxes(Some(&snapshot)),
         &*math::player_boxes_except(Some(&snapshot), None)
     );
+}
+
+// One RED soldier standing at (500, 0, 64) over ticks 100..=110, with `shots` through the
+// real projectile builder.
+fn shot_tracks(shots: &[DemoTestShot]) -> DemoTracks {
+    let soldier = SnapshotPlayer::new(
+        Team::Red,
+        TfClass::Soldier,
+        [500., 0., 64.],
+        0.,
+        0.,
+        68.,
+        false,
+    );
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (100..=110u32)
+        .map(|t| (t, vec![(1, soldier.clone())]))
+        .collect();
+    let tracks = DemoTracks::from_entity_frames(1. / 66., &frames, &[]).expect("tracks");
+    tracks.with_test_projectiles(shots)
+}
+
+fn close(a: [f32; 3], b: [f32; 3], within: f32) -> bool {
+    (0..3).all(|i| (a[i] - b[i]).abs() < within)
+}
+fn sub3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [0, 1, 2].map(|i| a[i] - b[i])
+}
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    (0..3).map(|i| a[i] * b[i]).sum()
+}
+fn cross3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+// The (min, max) of `f` over a shot's corners.
+fn shot_extent(shot: &ProjectileShot, f: impl Fn([f32; 3]) -> f32) -> (f32, f32) {
+    let values = projectile_vertices(shot).map(|v| f(sub3(v.position, shot.position)));
+    let min = values.iter().copied().fold(f32::MAX, f32::min);
+    (min, values.iter().copied().fold(f32::MIN, f32::max))
+}
+
+#[test]
+fn a_flying_rocket_lies_long_and_everything_else_is_round() {
+    let mut rows = vec![
+        (
+            100,
+            1,
+            ProjectileKind::Rocket,
+            Team::Red,
+            false,
+            [100., 50., 80.],
+        ),
+        (
+            101,
+            1,
+            ProjectileKind::Rocket,
+            Team::Red,
+            false,
+            [120., 50., 80.],
+        ),
+        // A rocket seen once never moved, so it has no heading to lie along.
+        (
+            100,
+            2,
+            ProjectileKind::Rocket,
+            Team::Blue,
+            false,
+            [10., 600., 80.],
+        ),
+    ];
+    let round = [
+        ProjectileKind::Pipe,
+        ProjectileKind::Sticky,
+        ProjectileKind::Thrown,
+        ProjectileKind::Other,
+    ];
+    for (serial, kind) in (3..).zip(round) {
+        let y = 100. * serial as f32;
+        rows.push((100, serial, kind, Team::Blue, false, [10., y, 80.]));
+        rows.push((101, serial, kind, Team::Blue, false, [30., y, 80.]));
+    }
+    let shots = projectile_shots(&shot_tracks(&rows).projectiles_at(100.5), None, None);
+    assert_eq!(shots.len(), 6, "{shots:?}");
+    let rocket = *shots
+        .iter()
+        .find(|s| s.team == Team::Red)
+        .expect("the RED rocket");
+    assert!(rocket.long, "{rocket:?}");
+    assert!(
+        close(rocket.heading.expect("a heading"), [1., 0., 0.], 1e-3),
+        "{rocket:?}"
+    );
+    assert!(close(rocket.position, [110., 50., 80.], 1.), "{rocket:?}");
+    assert!(
+        shots
+            .iter()
+            .filter(|s| s.team == Team::Blue)
+            .all(|s| !s.long),
+        "{shots:?}"
+    );
+}
+
+#[test]
+fn the_first_person_eye_hides_the_shots_beside_it() {
+    let near = [100., 50., 80.];
+    let far = [100. + PROJECTILE_HIDE_NEAR + 1., 50., 80.];
+    let tracks = shot_tracks(&[
+        (100, 1, ProjectileKind::Sticky, Team::Red, false, near),
+        (100, 2, ProjectileKind::Sticky, Team::Red, false, far),
+    ]);
+    let views = tracks.projectiles_at(100.);
+    assert_eq!(projectile_shots(&views, None, None).len(), 2);
+    let shown = projectile_shots(&views, Some(near), None);
+    assert_eq!(shown.len(), 1);
+    assert!(close(shown[0].position, far, 1e-3), "{shown:?}");
+}
+
+#[test]
+fn a_long_shot_spans_24_by_6_and_a_round_one_8() {
+    let h = [0.6, 0.8, 0.];
+    let long = ProjectileShot {
+        position: [10., 20., 30.],
+        heading: Some(h),
+        long: true,
+        team: Team::Red,
+        scale: 1.0,
+    };
+    let (min, max) = shot_extent(&long, |d| dot3(d, h));
+    assert!(
+        (max - 12.).abs() < 1e-3 && (min + 12.).abs() < 1e-3,
+        "{min} {max}"
+    );
+    let (_, across) = shot_extent(&long, |d| {
+        let t = dot3(d, h);
+        let off = sub3(d, h.map(|c| c * t));
+        dot3(off, off).sqrt()
+    });
+    assert!((across - 3.).abs() < 1e-3, "{across}");
+    let round = ProjectileShot {
+        heading: None,
+        long: false,
+        ..long
+    };
+    for axis in 0..3 {
+        let (min, max) = shot_extent(&round, |d| d[axis]);
+        assert!(
+            (max - 4.).abs() < 1e-3 && (min + 4.).abs() < 1e-3,
+            "axis {axis}: {min} {max}"
+        );
+    }
+}
+
+#[test]
+fn every_shot_face_points_outward_in_a_lighter_team_colour() {
+    let at = [5., 6., 7.];
+    let shots = [
+        ProjectileShot {
+            position: at,
+            heading: Some([0., 0., 1.]),
+            long: true,
+            team: Team::Red,
+            scale: 1.0,
+        },
+        ProjectileShot {
+            position: at,
+            heading: Some([0.6, 0., 0.8]),
+            long: true,
+            team: Team::Blue,
+            scale: 1.0,
+        },
+        ProjectileShot {
+            position: at,
+            heading: None,
+            long: false,
+            team: Team::Red,
+            scale: 1.0,
+        },
+    ];
+    for shot in shots {
+        let vertices = projectile_vertices(&shot);
+        for tri in vertices.chunks(3) {
+            let (a, b, c) = (tri[0].position, tri[1].position, tri[2].position);
+            let normal = cross3(sub3(b, a), sub3(c, a));
+            let centroid = [0, 1, 2].map(|i| (a[i] + b[i] + c[i]) / 3.);
+            assert!(dot3(normal, sub3(centroid, at)) > 0., "{shot:?} {tri:?}");
+        }
+        let base = if shot.team == Team::Red { RED } else { BLU };
+        assert!(
+            vertices
+                .iter()
+                .all(|v| (0..3).all(|i| v.color[i] > base[i])),
+            "{shot:?}"
+        );
+    }
+}
+
+// The on-screen size in pixels of `shot`'s smaller side, seen from `eye` facing +X at the real
+// field of view in a 1280 x `height` viewport.
+fn shot_pixels(shot: &ProjectileShot, eye: [f32; 3], height: f32) -> f32 {
+    let m = math::view_proj(eye, 0., 0., 1280. / height);
+    let points = projectile_vertices(shot).map(|v| project(m, v.position));
+    let span = |axis: usize| {
+        let min = points.iter().map(|p| p[axis]).fold(f32::MAX, f32::min);
+        let max = points.iter().map(|p| p[axis]).fold(f32::MIN, f32::max);
+        max - min
+    };
+    (span(0) * 1280. / 2.).min(span(1) * height / 2.)
+}
+
+#[test]
+fn far_shots_grow_to_stay_six_pixels_on_screen() {
+    let eye = [0., 0., 0.];
+    let far = [1500., 0., 0.];
+    let tracks = shot_tracks(&[
+        (100, 1, ProjectileKind::Sticky, Team::Red, false, far),
+        (
+            100,
+            2,
+            ProjectileKind::Rocket,
+            Team::Blue,
+            false,
+            [1500., -12., 0.],
+        ),
+        (
+            101,
+            2,
+            ProjectileKind::Rocket,
+            Team::Blue,
+            false,
+            [1500., 12., 0.],
+        ),
+    ]);
+    let sight = ShotSight {
+        eye,
+        height_px: 800,
+    };
+    let shots = projectile_shots(&tracks.projectiles_at(100.5), None, Some(sight));
+    assert_eq!(shots.len(), 2, "{shots:?}");
+    for shot in shots.iter() {
+        // 6 px, give or take float rounding in the projection.
+        let pixels = shot_pixels(shot, eye, 800.);
+        assert!(pixels >= MIN_SHOT_PX - 0.01, "{shot:?} covers {pixels} px");
+    }
+    let long = shots.iter().find(|s| s.long).expect("the rocket");
+    let h = long.heading.expect("a heading");
+    let (min, max) = shot_extent(long, |d| dot3(d, h));
+    assert!(
+        max > 12. && (max + min).abs() < 1e-3,
+        "it still lies along {h:?}: {min} {max}"
+    );
+}
+
+#[test]
+fn a_near_shot_keeps_its_base_size() {
+    let tracks = shot_tracks(&[(
+        100,
+        1,
+        ProjectileKind::Sticky,
+        Team::Red,
+        false,
+        [200., 0., 0.],
+    )]);
+    let sight = ShotSight {
+        eye: [0., 0., 0.],
+        height_px: 800,
+    };
+    let shots = projectile_shots(&tracks.projectiles_at(100.), None, Some(sight));
+    assert_eq!(shots[0].scale, 1.0, "{shots:?}");
+    for axis in 0..3 {
+        let (min, max) = shot_extent(&shots[0], |d| d[axis]);
+        assert!(
+            (max - SHOT_ROUND / 2.).abs() < 1e-3 && (min + SHOT_ROUND / 2.).abs() < 1e-3,
+            "axis {axis}: {min} {max}"
+        );
+    }
 }

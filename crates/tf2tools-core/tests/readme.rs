@@ -591,3 +591,16 @@ fn the_readme_describes_the_demos_tf_list() {
         "the demos.tf credit"
     );
 }
+
+#[test]
+fn the_maps_section_describes_projectiles_and_the_kill_feed() {
+    let readme = repo_file("README.md");
+    let (_, maps) = readme.split_once("### Maps").expect("a Maps section");
+    let (maps, _) = maps.split_once("\n### ").expect("a section after it");
+    for needle in ["rockets", "stickies", "kill feed", "timeline"] {
+        assert!(
+            maps.contains(needle),
+            "Maps section lacks {needle:?}: {maps}"
+        );
+    }
+}

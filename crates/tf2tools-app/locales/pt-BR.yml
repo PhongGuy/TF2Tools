@@ -250,6 +250,13 @@ demo_viewer:
     dead: "Morto"
     target_dead: "%{name}, morto"
     players: "Jogadores"
+  killfeed:
+    title: "Killfeed"
+    kill: "%{killer} matou %{victim} com %{weapon}"
+    assisted: "%{killer} e %{assister} mataram %{victim} com %{weapon}"
+    died: "%{victim} morreu"
+    unknown_weapon: "uma arma desconhecida"
+    markers: "Abates na linha do tempo: %{count}"
   playback:
     play: "Reproduzir"
     pause: "Pausar"

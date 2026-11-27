@@ -248,6 +248,13 @@ demo_viewer:
     dead: "阵亡"
     target_dead: "%{name}，阵亡"
     players: "玩家"
+  killfeed:
+    title: "击杀信息"
+    kill: "%{killer} 用 %{weapon} 击杀了 %{victim}"
+    assisted: "%{killer} 和 %{assister} 用 %{weapon} 击杀了 %{victim}"
+    died: "%{victim} 阵亡"
+    unknown_weapon: "未知武器"
+    markers: "时间轴上的击杀：%{count}"
   playback:
     play: "播放"
     pause: "暂停"

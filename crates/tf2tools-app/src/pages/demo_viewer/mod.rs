@@ -29,6 +29,7 @@ use tf2tools_core::{
 
 use crate::i18n::{format, tr};
 use crate::ids;
+use crate::kill_icons::LoadedKillIcons;
 use crate::local_messages::{describe_gb_map_install, describe_settings};
 use crate::map_messages::{describe_gb_map_search, describe_map_download, map_stopped};
 use crate::pages::profiles::probe::Tf2Probe;
@@ -39,13 +40,20 @@ use crate::store_download::{Progress, format_bytes, progress_percent};
 use crate::tokio_bridge;
 use crate::viewer::load::{DemoScene, LoadError, load_demo_scene, snapshot_time};
 use crate::viewer::viewport::DemoViewport;
+use crate::weapon_names::LoadedWeaponNames;
 use crate::widgets::{Named as _, labelled};
 
 mod bar;
 mod camera;
+mod killfeed;
 mod timeline;
 
 pub use bar::BarPlace;
+pub use killfeed::{
+    FEED_HOLD_S, FEED_ROWS, FeedLayout, FeedParty, FeedRow, NAME_CAP, NAME_MIN, feed_key,
+    feed_layout, feed_on_top, feed_rows, feed_words,
+};
+pub use timeline::timeline_fraction;
 
 // A demo's file name without its extension, for the title before its map is read.
 fn stem(path: &std::path::Path) -> SharedString {
@@ -234,6 +242,9 @@ pub struct DemoViewerPage {
     timeline: Option<timeline::Timeline>,
     /// The disabled slider the row shows until then.
     timeline_placeholder: Entity<SliderState>,
+    kill_icons: Entity<LoadedKillIcons>,
+    weapon_names: Entity<LoadedWeaponNames>,
+    _feed_watch: [Subscription; 2],
 }
 
 impl DemoViewerPage {
@@ -284,6 +295,18 @@ impl DemoViewerPage {
             ),
         ];
         let timeline_placeholder = cx.new(|_| SliderState::new().min(0.).max(1.).step(1.));
+        // The game's kill icons and weapon names landing redraw the feed.
+        let kill_icons = LoadedKillIcons::global(cx);
+        let weapon_names = LoadedWeaponNames::global(cx);
+        let feed_watch = [
+            cx.observe(&kill_icons, |_, _, cx| cx.notify()),
+            cx.observe(&weapon_names, |page: &mut Self, names, cx| {
+                if let Some(timeline) = page.timeline.as_mut() {
+                    timeline.reword_feed(names.read(cx).names());
+                }
+                cx.notify();
+            }),
+        ];
         Self {
             view: View::Loading,
             title: SharedString::default(),
@@ -309,6 +332,9 @@ impl DemoViewerPage {
             _look_watch: look_watch,
             timeline: None,
             timeline_placeholder,
+            kill_icons,
+            weapon_names,
+            _feed_watch: feed_watch,
         }
     }
 
@@ -823,6 +849,7 @@ impl DemoViewerPage {
 
 impl Render for DemoViewerPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.refresh_feed_locale(cx);
         let muted = cx.theme().muted_foreground;
         // A line of the bar's text column wraps; the status stays on one line.
         let line = |id: &'static str, words: SharedString, muted: Option<Hsla>, wraps: bool| {
@@ -1129,6 +1156,7 @@ impl Render for DemoViewerPage {
             .size_full()
             .child(area_watch)
             .child(body)
+            .children(self.killfeed(cx))
             .child(frame)
     }
 }

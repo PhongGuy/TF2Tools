@@ -3692,6 +3692,30 @@ pub const DEMO_VIEWER_PLAYBACK_NOTE: &str = "demo-viewer-playback-note";
 pub fn demo_viewer_round_marker(n: usize) -> ElementId {
     ElementId::Name(format!("demo-viewer-round-marker-{n}").into())
 }
+/// The Demo Viewer's kill feed overlay.
+pub const DEMO_VIEWER_KILLFEED: &str = "demo-viewer-killfeed";
+/// The kill feed's `n`th shown row, oldest first, from 0.
+pub fn demo_viewer_kill(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-{n}").into())
+}
+/// The killer's name in the feed's `n`th row.
+pub fn demo_viewer_kill_killer(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-killer-{n}").into())
+}
+/// The assister's name in the feed's `n`th row.
+pub fn demo_viewer_kill_assister(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-assister-{n}").into())
+}
+/// The victim's name in the feed's `n`th row.
+pub fn demo_viewer_kill_victim(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-victim-{n}").into())
+}
+/// The painted strip marking every kill above the timeline.
+pub const DEMO_VIEWER_KILL_MARKERS: &str = "demo-viewer-kill-markers";
+/// The kill icon in the feed's `n`th row.
+pub fn demo_viewer_kill_icon(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-icon-{n}").into())
+}
 
 /// The camera chip's mode button, which cycles free, first person and chase.
 pub const DEMO_VIEWER_CAMERA_MODE: &str = "demo-viewer-camera-mode";

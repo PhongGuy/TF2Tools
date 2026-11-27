@@ -19,7 +19,9 @@ use tf2tools_core::{
 };
 
 use super::pointer::PointerLock;
-use super::{DrawRequest, PlayerBox, RenderEvent, RendererError, SceneRenderer, math};
+use super::{
+    DrawRequest, PlayerBox, ProjectileShot, RenderEvent, RendererError, SceneRenderer, math,
+};
 use crate::ids;
 
 /// The time source the viewport steps its camera by; read once per render.
@@ -110,6 +112,9 @@ struct Playback {
     clock: PlaybackClock,
 }
 
+// The tick, hidden player, eye and logical viewport height one shot list was built for.
+type ShotsKey = (f64, Option<PlayerId>, [f32; 3], u32);
+
 /// A spectator view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
 pub struct DemoViewport {
     renderer: Box<dyn SceneRenderer>,
@@ -125,8 +130,12 @@ pub struct DemoViewport {
     reported: CameraState,
     /// The boxes at the shown tick, shared by every draw so the worker uploads them once.
     boxes: Arc<[PlayerBox]>,
+    /// The projectiles at the shown tick, sized for the eye and shared like the boxes.
+    shots: Arc<[ProjectileShot]>,
     /// The tick and hidden player the boxes were built for, once tracks drive them.
     boxes_for: Option<(f64, Option<PlayerId>)>,
+    /// The tick, hidden player, eye and logical viewport height the shots were built for.
+    shots_for: Option<ShotsKey>,
     /// The still snapshot's tick, where playback starts so the picture does not jump.
     snapshot_tick: Option<u32>,
     playback: Option<Playback>,
@@ -223,7 +232,9 @@ impl DemoViewport {
             view,
             settling: false,
             boxes: math::player_boxes(snapshot),
+            shots: Arc::from([]),
             boxes_for: None,
+            shots_for: None,
             snapshot_tick: snapshot.map(DemoSnapshot::tick),
             playback: None,
             look_scale: sane_scale(look_scale),
@@ -340,6 +351,7 @@ impl DemoViewport {
         self.playback = Some(Playback { tracks, clock });
         // New tracks may share a tick with the old ones, so the boxes always rebuild.
         self.boxes_for = None;
+        self.shots_for = None;
         self.camera.snap();
         self.moved_while_paused(cx);
     }
@@ -478,6 +490,27 @@ impl DemoViewport {
         }
     }
 
+    /// Rebuilds the shots only when the tick, the hidden player, the eye or the logical viewport
+    /// height moved, so an unchanged frame shares the last list and the worker skips its upload.
+    fn refresh_shots(&mut self, height: u32) {
+        let Some(p) = self.playback.as_ref() else {
+            return;
+        };
+        let (tick, eye) = (p.clock.tick(), self.view.origin());
+        let key = (tick, self.view.hidden(), eye, height);
+        if self.shots_for == Some(key) {
+            return;
+        }
+        // First person hides the shots at the eye, as it hides the followed box.
+        let hide = key.1.map(|_| eye);
+        let sight = math::ShotSight {
+            eye,
+            height_px: height,
+        };
+        self.shots = math::projectile_shots(&p.tracks.projectiles_at(tick), hide, Some(sight));
+        self.shots_for = Some(key);
+    }
+
     /// Asks for a frame of the current camera at the measured size; nothing before a measure.
     fn draw(&mut self) {
         let (width, height) = self.device_size.get();
@@ -485,6 +518,12 @@ impl DemoViewport {
             return;
         }
         self.last_seq += 1;
+        // Shots size in logical pixels, so a 2x display draws them as large as a 1x one.
+        let logical = self
+            .bounds
+            .get()
+            .map_or(0, |b| b.size.height.as_f32().round() as u32);
+        self.refresh_shots(logical);
         let aspect = width as f32 / height as f32;
         let view_proj = math::view_proj(
             self.view.origin(),
@@ -498,6 +537,7 @@ impl DemoViewport {
             view_proj,
             seq: self.last_seq,
             players: Arc::clone(&self.boxes),
+            projectiles: Arc::clone(&self.shots),
         });
         self.drawn_size = Some((width, height));
     }

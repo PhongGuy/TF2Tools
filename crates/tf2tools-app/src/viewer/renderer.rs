@@ -12,9 +12,10 @@ use gpui_kit::RenderImage;
 use tf2tools_core::MapMesh;
 use wgpu::util::DeviceExt as _;
 
-use super::math::{padded_row_bytes, player_box_vertices, unpad_rows};
+use super::math::{padded_row_bytes, player_box_vertices, projectile_vertices, unpad_rows};
 use super::{
-    DrawRequest, FrameStats, PlayerBox, RenderEvent, RendererError, RendererFactory, SceneRenderer,
+    DrawRequest, FrameStats, PlayerBox, ProjectileShot, RenderEvent, RendererError,
+    RendererFactory, SceneRenderer,
 };
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
@@ -355,14 +356,17 @@ struct Targets {
     readback: [wgpu::Buffer; 2],
 }
 
+// The boxes and shots one player-buffer write was made from.
+type WrittenScene = (Arc<[PlayerBox]>, Arc<[ProjectileShot]>);
+
 // The one player vertex buffer, reused across draws: its byte capacity, how many vertices
-// the last write holds, and which boxes those were.
+// the last write holds, and which boxes and shots those were.
 #[derive(Default)]
 struct Players {
     buffer: Option<wgpu::Buffer>,
     capacity: u64,
     count: u32,
-    written: Option<Arc<[PlayerBox]>>,
+    written: Option<WrittenScene>,
 }
 
 struct Gpu {
@@ -559,19 +563,24 @@ impl Gpu {
         });
     }
 
-    // Writes 36 `[position, colour]` vertices a box into the one player buffer, growing it
-    // to the next power of two only when too small. The same boxes as last time write nothing.
-    fn set_players(&mut self, boxes: &Arc<[PlayerBox]>) {
+    // Writes 36 `[position, colour]` vertices a box, then 24 a shot, into the one player
+    // buffer, growing it to the next power of two only when too small. The same boxes and
+    // shots as last time write nothing.
+    fn set_players(&mut self, boxes: &Arc<[PlayerBox]>, shots: &Arc<[ProjectileShot]>) {
         if self
             .players
             .written
             .as_ref()
-            .is_some_and(|last| Arc::ptr_eq(last, boxes))
+            .is_some_and(|(last, last_shots)| {
+                Arc::ptr_eq(last, boxes) && Arc::ptr_eq(last_shots, shots)
+            })
         {
             return;
         }
-        let mut bytes = Vec::with_capacity(boxes.len() * 36 * VERTEX_STRIDE as usize);
-        for vertex in boxes.iter().flat_map(player_box_vertices) {
+        let vertices = boxes.len() * 36 + shots.len() * 24;
+        let mut bytes = Vec::with_capacity(vertices * VERTEX_STRIDE as usize);
+        let box_vertices = boxes.iter().flat_map(player_box_vertices);
+        for vertex in box_vertices.chain(shots.iter().flat_map(projectile_vertices)) {
             for value in vertex.position.iter().chain(&vertex.color) {
                 bytes.extend_from_slice(&value.to_ne_bytes());
             }
@@ -592,7 +601,7 @@ impl Gpu {
         }
         // Counted from the bytes written, so a draw never reads past them.
         self.players.count = u32::try_from(needed / VERTEX_STRIDE).unwrap_or(0);
-        self.players.written = Some(Arc::clone(boxes));
+        self.players.written = Some((Arc::clone(boxes), Arc::clone(shots)));
     }
 
     // Rebuilds the targets for a new size, finishing the in-flight frame first since it reads
@@ -670,7 +679,7 @@ impl Gpu {
         events: &async_channel::Sender<RenderEvent>,
     ) -> Result<Pending, Option<RendererError>> {
         self.ensure_targets(request.width, request.height, pending, events)?;
-        self.set_players(&request.players);
+        self.set_players(&request.players, &request.projectiles);
         let Some(targets) = self.targets.as_ref() else {
             return Err(Some(RendererError::Device("no render target".into())));
         };

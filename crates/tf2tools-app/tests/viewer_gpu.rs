@@ -5,9 +5,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::support::demo_view_fixtures::{BspOptions, bsp};
-use tf2tools_app::viewer::PlayerBox;
 use tf2tools_app::viewer::renderer::join_render_workers;
 use tf2tools_app::viewer::{DrawRequest, RenderEvent, Renderer, SceneRenderer, math};
+use tf2tools_app::viewer::{PlayerBox, ProjectileShot};
 use tf2tools_core::Team;
 use tf2tools_core::load_map_mesh;
 
@@ -62,6 +62,7 @@ fn the_worker_renders_the_synthetic_map_and_stops_when_dropped() {
         view_proj: above(64. / 48.),
         seq: 7,
         players: Arc::from([]),
+        projectiles: Arc::from([]),
     });
     let RenderEvent::Frame { image, seq, .. } = next_event(&events, "the frame") else {
         panic!("expected a frame");
@@ -106,6 +107,7 @@ fn a_burst_of_draws_ends_on_the_newest_at_an_unaligned_width() {
             view_proj: above(1.5),
             seq,
             players: Arc::from([]),
+            projectiles: Arc::from([]),
         });
     }
     let mut seen = Vec::new();
@@ -149,6 +151,7 @@ fn centre_with_a_red_box(view_proj: [[f32; 4]; 4]) -> (u8, u8, u8) {
             ducked: false,
             team: Team::Red,
         }]),
+        projectiles: Arc::from([]),
     });
     let RenderEvent::Frame { image, .. } = next_event(&events, "the frame") else {
         panic!("expected a frame");
@@ -194,6 +197,7 @@ fn centre_of(
         view_proj: math::view_proj([50., 32., 200.], 0., 89., 64. / 48.),
         seq,
         players: boxes,
+        projectiles: Arc::from([]),
     });
     let RenderEvent::Frame { image, .. } = next_event(events, "the frame") else {
         panic!("expected a frame");
@@ -257,6 +261,7 @@ fn quit_stops_a_live_renderer_and_joins_it_quickly() {
         view_proj: above(1.),
         seq: 1,
         players: Arc::from([]),
+        projectiles: Arc::from([]),
     });
     drop(renderer);
 }
@@ -283,6 +288,53 @@ fn a_renderer_opened_after_one_closes_waits_for_its_teardown() {
 fn a_dropped_renderer_ends_its_worker_without_any_join() {
     let _turn = one_at_a_time();
     let (renderer, events) = ready_renderer();
+    drop(renderer);
+    wait_closed(&events);
+}
+
+#[test]
+fn a_shot_draws_lighter_than_its_box_and_moves_under_unchanged_boxes() {
+    let _turn = one_at_a_time();
+    let (renderer, events) = ready_renderer();
+    let boxed = centre_of(&renderer, &events, Arc::from([standing(Team::Red, 50.)]), 1);
+    // One box list for both frames, so only the shots tell them apart.
+    let none: Arc<[PlayerBox]> = Arc::from([]);
+    let centre = |seq: u64, x: f32| {
+        let shot = ProjectileShot {
+            position: [x, 32., 150.],
+            heading: Some([1., 0., 0.]),
+            long: true,
+            team: Team::Red,
+            scale: 1.0,
+        };
+        renderer.draw(DrawRequest {
+            width: 64,
+            height: 48,
+            view_proj: math::view_proj([50., 32., 200.], 0., 89., 64. / 48.),
+            seq,
+            players: Arc::clone(&none),
+            projectiles: Arc::from([shot]),
+        });
+        let RenderEvent::Frame { image, .. } = next_event(&events, "the frame") else {
+            panic!("expected a frame");
+        };
+        let bytes = image.as_bytes(0).expect("one frame");
+        let at = (24 * 64 + 32) * 4;
+        (bytes[at + 2], bytes[at + 1], bytes[at])
+    };
+    let (r, g, b) = centre(2, 50.);
+    assert!(r > g && r > b, "the rocket is not red: {:?}", (r, g, b));
+    assert!(
+        g > boxed.1,
+        "the rocket {:?} is no lighter than the box {boxed:?}",
+        (r, g, b)
+    );
+    let (r, g, b) = centre(3, 1000.);
+    assert!(
+        !(r > g && r > b),
+        "the moved rocket stayed: {:?}",
+        (r, g, b)
+    );
     drop(renderer);
     wait_closed(&events);
 }
