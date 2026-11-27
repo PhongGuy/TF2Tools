@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use gpui_kit::test::TestEventExt as _;
 use gpui_kit::{
-    AnyWindowHandle, AppContext as _, Entity, MouseButton, Pixels, Point, TestAppContext, point, px,
+    AnyWindowHandle, AppContext as _, Entity, InputEvent as _, Modifiers, MouseButton,
+    MouseDownEvent, MouseUpEvent, Pixels, Point, TestAppContext, point, px,
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraMoved, CameraState, DemoViewport};
@@ -468,4 +469,84 @@ fn space_cycles_the_camera_and_a_held_repeat_does_not(cx: &mut TestAppContext) {
     assert_eq!(state(cx, &viewport).mode, CameraMode::Chase);
     tap(cx);
     assert_eq!(state(cx, &viewport).mode, CameraMode::FreeFly);
+}
+
+// A fast tap delivers the press and the release before any repaint between them; the test
+// helpers repaint around every step, so the raw events go in one batch.
+#[gpui_kit::test]
+fn a_press_and_release_in_one_frame_is_a_click(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    let at = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
+        .expect("the viewport")
+        .center();
+    cx.update_window(win, |_, w, cx| {
+        let modifiers = Modifiers::default();
+        let (button, click_count) = (MouseButton::Left, 1);
+        let down = MouseDownEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count,
+            first_mouse: false,
+        };
+        w.dispatch_event(down.to_platform_input(), cx);
+        let up = MouseUpEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count,
+        };
+        w.dispatch_event(up.to_platform_input(), cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+    click(cx, win, MouseButton::Left, still());
+    assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(2));
+}
+
+#[gpui_kit::test]
+fn a_release_outside_the_viewport_still_clicks(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    let b = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT).expect("the viewport");
+    let at = b.origin + point(px(1.), px(1.));
+    cx.update_window(win, |_, w, cx| w.pointer_down(at, MouseButton::Left, cx))
+        .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        w.pointer_up(at - point(px(2.), px(2.)), MouseButton::Left, cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+}
+
+#[gpui_kit::test]
+fn escape_mid_press_never_clicks(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    let at = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
+        .expect("the viewport")
+        .center();
+    cx.update_window(win, |_, w, cx| w.pointer_down(at, MouseButton::Left, cx))
+        .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        w.key_down("escape", false, cx);
+        w.key_up("escape", cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| w.pointer_up(at, MouseButton::Left, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FreeFly, None, false)
+    );
 }

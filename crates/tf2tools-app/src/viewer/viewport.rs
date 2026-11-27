@@ -635,7 +635,7 @@ impl Render for DemoViewport {
         let measured = Rc::clone(&self.device_size);
         let logical = Rc::clone(&self.bounds);
         let paint_taken = Rc::clone(&self.taken);
-        let dragging = self.drag.is_some().then(|| cx.entity().downgrade());
+        let this = cx.entity().downgrade();
         let watch = canvas(
             move |bounds, window, _| {
                 logical.set(Some(bounds));
@@ -648,21 +648,20 @@ impl Render for DemoViewport {
                 }
             },
             move |_, _, window, _| {
-                // A drag follows the pointer anywhere in the window, so moves and the release
-                // past the viewport's edge still reach it.
-                if let Some(view) = dragging {
-                    let moved = view.clone();
-                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-                        if phase == DispatchPhase::Capture {
-                            let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
-                        }
-                    });
-                    window.on_mouse_event(move |ev: &MouseUpEvent, phase, _, cx| {
-                        if phase == DispatchPhase::Capture {
-                            let _ = view.update(cx, |v, cx| v.release(ev.button, cx));
-                        }
-                    });
-                }
+                // A press follows the pointer anywhere in the window, so moves and the release
+                // past the viewport's edge still reach it. The listeners stand on every paint,
+                // idle without a press, since a fast tap's release comes before any repaint.
+                let moved = this.clone();
+                window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
+                    }
+                });
+                window.on_mouse_event(move |ev: &MouseUpEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = this.update(cx, |v, cx| v.release(ev.button, cx));
+                    }
+                });
                 if let Some((taken, seq)) = paint_taken.take() {
                     tracing::info!(
                         target: super::stats::TARGET,
