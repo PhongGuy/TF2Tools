@@ -4,10 +4,12 @@ use crate::demo_view::tracks::PlayerId;
 use crate::hud_maker::Team;
 use crate::weapons::TfClass;
 
+mod kills;
 mod parse;
 mod pick;
 mod shots;
 
+pub(crate) use kills::{KillRow, PartyRow};
 pub use parse::read_demo_snapshot;
 pub(crate) use parse::{Clocking, drive, read_prefix};
 pub(crate) use pick::{

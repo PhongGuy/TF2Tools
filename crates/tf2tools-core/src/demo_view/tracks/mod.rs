@@ -8,11 +8,13 @@ use crate::weapons::TfClass;
 
 mod build;
 mod hermite;
+mod kills;
 mod projectiles;
 mod smooth;
 
 use crate::demo_view::snapshot::ProjectileRow;
 pub(crate) use build::TrackBuilder;
+pub use kills::{DemoKill, KillParty};
 use projectiles::{ProjectileBuilder, ProjectileSample, ProjectileTrack};
 pub use projectiles::{ProjectileKind, ProjectileView};
 
@@ -22,6 +24,8 @@ pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_TRACK_SAMPLES: usize = 8_000_000;
 /// The most projectile samples one demo's tracks hold (64 MB at 16 B).
 pub const MAX_PROJECTILE_SAMPLES: usize = 4_000_000;
+/// The most kills one demo's tracks hold.
+pub const MAX_KILLS: usize = 20_000;
 
 /// `(tick, serial, kind, team, critical, origin)`, for tests outside the crate.
 #[doc(hidden)]
@@ -231,6 +235,7 @@ pub struct DemoTracks {
     pub(crate) cut: Option<TrackCut>,
     pub(crate) projectiles: Vec<ProjectileTrack>,
     pub(crate) projectile_samples: Vec<ProjectileSample>,
+    pub(crate) kills: Vec<DemoKill>,
 }
 
 impl DemoTracks {
@@ -289,6 +294,16 @@ impl DemoTracks {
         self.projectile_samples.len()
     }
 
+    /// Every kill in the read part of the demo, by tick, same-tick kills in event order.
+    pub fn kills(&self) -> &[DemoKill] {
+        &self.kills
+    }
+
+    /// How many kills the tracks hold.
+    pub fn kill_count(&self) -> usize {
+        self.kills.len()
+    }
+
     /// The heap the tracks hold: every vector's capacity times its element size.
     pub fn heap_bytes(&self) -> usize {
         let players = self.players.capacity() * size_of::<PlayerTrack>();
@@ -309,11 +324,14 @@ impl DemoTracks {
                 .sum::<usize>();
         let projectiles = self.projectiles.capacity() * size_of::<ProjectileTrack>()
             + self.projectile_samples.capacity() * size_of::<ProjectileSample>();
+        let kills = self.kills.capacity() * size_of::<DemoKill>()
+            + self.kills.iter().map(DemoKill::heap_bytes).sum::<usize>();
         players
             + runs
             + samples
             + names
             + projectiles
+            + kills
             + self.round_starts.capacity() * size_of::<u32>()
     }
 
@@ -494,6 +512,7 @@ impl DemoTracks {
             cut,
             projectiles: Vec::new(),
             projectile_samples: Vec::new(),
+            kills: Vec::new(),
         })
     }
 

@@ -317,6 +317,7 @@ impl Tracker {
             round_state: self.round_state,
             rows,
             projectiles: self.shots.rows(),
+            kills: Vec::new(),
         }
     }
 }
