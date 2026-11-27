@@ -16,6 +16,8 @@ pub mod toast;
 pub use header::ring_icon;
 pub use sidebar::icon as nav_icon;
 
+use std::path::PathBuf;
+
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
@@ -41,7 +43,7 @@ use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
 use crate::pages::huds::{EditInHudMaker, HudsPage};
 use crate::pages::logs::LogsPage;
-use crate::pages::logs_tf::LogsTfPage;
+use crate::pages::logs_tf::{LogsTfPage, ViewDemo};
 use crate::pages::maps::MapsPage;
 use crate::pages::profiles::ProfilesPage;
 use crate::pages::profiles::probe::Tf2Probe;
@@ -486,6 +488,16 @@ impl Shell {
         .detach();
     }
 
+    /// Shows the Demos.tf page with `path` in its viewer, its header Back returning to logs.tf.
+    pub fn view_demo(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        // Navigate first so a kept Demos.tf page is unhidden before its viewer opens.
+        self.navigate(Page::DemosTf, cx);
+        let page = self.demos_tf_entity(window, cx);
+        page.update(cx, |page, cx| {
+            page.open_from(path, Page::LogsTf, window, cx)
+        });
+    }
+
     // The kept Demos.tf page, built on first use with its ask to return to the page a demo
     // was opened from; the subscription dies with the page.
     fn demos_tf_entity(
@@ -667,9 +679,18 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| MapsPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
+            // The logs.tf View demo asks for the Demos.tf viewer by event; the handler needs
+            // the window to build that page and its viewer.
             Page::LogsTf => self
                 .logs_tf
-                .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
+                .get_or_insert_with(|| {
+                    let page = cx.new(|cx| LogsTfPage::new(window, cx));
+                    cx.subscribe_in(&page, window, |shell, _, view: &ViewDemo, window, cx| {
+                        shell.view_demo(view.0.clone(), window, cx)
+                    })
+                    .detach();
+                    page
+                })
                 .clone()
                 .into_any_element(),
             Page::DemosTf => self.demos_tf_entity(window, cx).into_any_element(),

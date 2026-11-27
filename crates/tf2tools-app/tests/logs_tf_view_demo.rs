@@ -14,7 +14,7 @@ use crate::support::demo_view_fixtures::demo_header;
 use crate::support::demo_viewer::{StubHandle, demo_file, install_map};
 use crate::support::demostf::{DemosTf, demos_tf_shell, mount_first};
 use crate::support::logstf::{
-    ARIE, DEMO_ID, DEMO_ROUTE, Gate, mount_held, open_log, open_page, scroll_to_in_log,
+    ARIE, DEMO_ID, DEMO_ROUTE, Gate, expanded, mount_held, open_log, open_page, scroll_to_in_log,
     serve_two_logs, shell_with_demo_viewer, sixes_list,
 };
 
@@ -183,4 +183,63 @@ fn a_failed_open_says_why_and_stays_on_the_log(cx: &mut TestAppContext) {
     support::wait_real(cx, "the open to end", |cx| view_progress(cx, &v).is_none());
     assert_eq!(cx.update(|cx| v.s.shell.read(cx).page()), Page::LogsTf);
     assert!(v.stubs.lock().unwrap().is_empty(), "no viewer was built");
+}
+
+// Clicks View demo on log 3 with the demo served and waits for the Demos.tf viewport.
+fn view(cx: &mut TestAppContext, v: &Viewing) {
+    v.server.mount_bytes(DEMO_ROUTE, file());
+    support::click_id(cx, v.s.win, ids::logstf_demo_view(3));
+    support::wait_real(cx, "the viewport", |cx| {
+        support::present(cx, v.s.win, ids::DEMO_VIEWER_VIEWPORT)
+    });
+}
+
+#[gpui_kit::test]
+fn view_demo_opens_it_on_the_demos_tf_page(cx: &mut TestAppContext) {
+    let v = viewing(cx);
+    view(cx, &v);
+    assert_eq!(cx.update(|cx| v.s.shell.read(cx).page()), Page::DemosTf);
+    assert_eq!(
+        support::label_of(cx, v.s.win, ids::DEMOS_TF_CRUMB).as_deref(),
+        Some("Back to the log")
+    );
+    assert_eq!(
+        support::label_of(cx, v.s.win, ids::DEMOS_TF_CRUMB_NAME).as_deref(),
+        Some("cp_synthetic")
+    );
+    assert_eq!(view_progress(cx, &v), None);
+}
+
+#[gpui_kit::test]
+fn back_returns_to_the_open_log(cx: &mut TestAppContext) {
+    let v = viewing(cx);
+    view(cx, &v);
+    support::click_id(cx, v.s.win, ids::DEMOS_TF_CRUMB);
+    support::wait_real(cx, "logs.tf again", |cx| {
+        cx.update(|cx| {
+            let p = v.page.read(cx);
+            v.s.shell.read(cx).page() == Page::LogsTf && p.is_loaded() && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(expanded(cx, &v.page), Some(3), "the log stays open");
+    let stubs = v.stubs.lock().unwrap();
+    assert_eq!(stubs.len(), 1);
+    assert!(!stubs[0].is_alive(), "the viewer's renderer is freed");
+}
+
+#[gpui_kit::test]
+fn a_demo_landing_after_leaving_logs_tf_only_caches(cx: &mut TestAppContext) {
+    let v = viewing(cx);
+    let gate = Gate::default();
+    mount_held(&v.server, &gate, DEMO_ROUTE, None, file());
+    support::click_id(cx, v.s.win, ids::logstf_demo_view(3));
+    support::wait_real(cx, "the demo request", |_| gate.arrived() == 1);
+    support::click_nav(cx, v.s.win, Page::Settings);
+    gate.open();
+    support::wait_real(cx, "the open to end", |cx| view_progress(cx, &v).is_none());
+    support::settle(cx, v.s.win);
+    assert_eq!(cx.update(|cx| v.s.shell.read(cx).page()), Page::Settings);
+    assert!(v.stubs.lock().unwrap().is_empty(), "no viewer was built");
+    let cached = DemoCache::new(v.env.data.demo_cache_dir()).path_for(DEMO_ID);
+    assert!(cached.exists(), "the demo stays cached");
 }
