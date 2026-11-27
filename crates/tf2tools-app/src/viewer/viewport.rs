@@ -50,6 +50,18 @@ impl HeldKeys {
     }
 }
 
+/// A press under way: it stays a click until its summed motion passes `CLICK_SLOP`.
+#[derive(Debug, Clone, Copy)]
+struct Drag {
+    last: Point<Pixels>,
+    button: MouseButton,
+    travel: Point<Pixels>,
+    turned: bool,
+}
+
+/// How far a press may travel, in logical pixels, and still be a click.
+const CLICK_SLOP: f32 = 4.;
+
 fn axis(plus: bool, minus: bool) -> f32 {
     f32::from(u8::from(plus)) - f32::from(u8::from(minus))
 }
@@ -132,7 +144,7 @@ pub struct DemoViewport {
     last_tick: Option<Instant>,
     /// A next-frame tick is scheduled; renders before it leave the camera be.
     tick_pending: bool,
-    drag: Option<Point<Pixels>>,
+    drag: Option<Drag>,
     focus: FocusHandle,
     failure: Option<RendererError>,
     clock: Clock,
@@ -317,6 +329,8 @@ impl DemoViewport {
             clock.seek(f64::from(tick));
         }
         self.playback = Some(Playback { tracks, clock });
+        // New tracks may share a tick with the old ones, so the boxes always rebuild.
+        self.boxes_for = None;
         self.camera.snap();
         self.moved_while_paused(cx);
     }
@@ -488,8 +502,29 @@ impl DemoViewport {
         // Before the first prepaint there is no measured centre, so the press point stands in.
         let centre = self.bounds.get().map_or(ev.position, |b| b.center());
         self.lock.lock(ev.position, centre, window);
-        self.drag = Some(ev.position);
+        self.drag = Some(Drag {
+            last: ev.position,
+            button: ev.button,
+            travel: Point::default(),
+            turned: false,
+        });
         cx.notify();
+    }
+
+    /// Ends the press on a button's release: one that never travelled past the slop is a
+    /// click, left for the next player and right for the previous.
+    fn release(&mut self, button: MouseButton, cx: &mut Context<Self>) {
+        if let Some(drag) = self.drag
+            && !drag.turned
+            && drag.button == button
+        {
+            match button {
+                MouseButton::Left => self.next_target(cx),
+                MouseButton::Right => self.prev_target(cx),
+                MouseButton::Middle | MouseButton::Navigate(_) => {}
+            }
+        }
+        self.end_drag(cx);
     }
 
     /// Ends a drag, whichever way it ended; does nothing when none is under way.
@@ -500,21 +535,34 @@ impl DemoViewport {
         }
     }
 
-    /// Turns the camera by the drag since the last move, as the lock measures it when it can;
-    /// a move with no button held ends it.
+    /// Turns the free-fly by the drag since the last move, as the lock measures it when it can;
+    /// the motion is held until it passes the click slop, then turns by all of it at once.
+    /// A move with no button held ends the press.
     fn drag_to(&mut self, ev: &MouseMoveEvent, window: &Window, cx: &mut Context<Self>) {
-        let Some(last) = self.drag else {
+        let Some(mut drag) = self.drag else {
             return;
         };
         if ev.pressed_button.is_none() {
             return self.end_drag(cx);
         }
-        self.drag = Some(ev.position);
-        let by = self
+        let mut by = self
             .lock
             .motion(window)
-            .unwrap_or_else(|| ev.position - last);
-        if by == Point::default() {
+            .unwrap_or_else(|| ev.position - drag.last);
+        drag.last = ev.position;
+        drag.travel += by;
+        if !drag.turned {
+            let (x, y) = (drag.travel.x.as_f32(), drag.travel.y.as_f32());
+            if x.hypot(y) <= CLICK_SLOP {
+                self.drag = Some(drag);
+                return;
+            }
+            drag.turned = true;
+            by = drag.travel;
+        }
+        self.drag = Some(drag);
+        // A follow mode ignores the look, so its drag draws nothing new.
+        if by == Point::default() || self.camera.mode() != CameraMode::FreeFly {
             return;
         }
         let (d_yaw, d_pitch) = math::drag_look(by.x.as_f32(), by.y.as_f32(), self.look_scale);
@@ -609,9 +657,9 @@ impl Render for DemoViewport {
                             let _ = moved.update(cx, |v, cx| v.drag_to(ev, window, cx));
                         }
                     });
-                    window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
+                    window.on_mouse_event(move |ev: &MouseUpEvent, phase, _, cx| {
                         if phase == DispatchPhase::Capture {
-                            let _ = view.update(cx, |v, cx| v.end_drag(cx));
+                            let _ = view.update(cx, |v, cx| v.release(ev.button, cx));
                         }
                     });
                 }
@@ -642,8 +690,10 @@ impl Render for DemoViewport {
             .child(watch)
             .children(frame)
             .on_key_down(cx.listener(|v, ev: &KeyDownEvent, _, cx| {
-                if ev.keystroke.key == "escape" {
-                    v.end_drag(cx);
+                match ev.keystroke.key.as_str() {
+                    "escape" => v.end_drag(cx),
+                    "space" if !ev.is_held => v.cycle_camera(cx),
+                    _ => {}
                 }
                 v.set_key(&ev.keystroke.key, true, cx);
             }))

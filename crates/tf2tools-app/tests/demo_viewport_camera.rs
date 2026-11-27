@@ -3,7 +3,11 @@
 
 use std::sync::{Arc, Mutex};
 
-use gpui_kit::{AnyWindowHandle, Entity, TestAppContext};
+use gpui_kit::test::TestEventExt as _;
+use gpui_kit::{
+    AnyWindowHandle, AppContext as _, Entity, MouseButton, Pixels, Point, TestAppContext, point, px,
+};
+use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraMoved, CameraState, DemoViewport};
 use tf2tools_core::{CameraMode, CameraView, DemoTracks, PlayerId, SnapshotPlayer, Team, TfClass};
 
@@ -339,4 +343,129 @@ fn playing_in_first_person_moves_the_view_with_the_eye(cx: &mut TestAppContext) 
         (f64::from(x) - (tick - 1000.)).abs() < 0.5,
         "eye x {x} at tick {tick}"
     );
+}
+
+// Presses `button` at the viewport's centre, moves by `by` if not zero, and releases there.
+fn click(cx: &mut TestAppContext, win: AnyWindowHandle, button: MouseButton, by: Point<Pixels>) {
+    let at = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
+        .expect("the viewport")
+        .center();
+    cx.update_window(win, |_, w, cx| w.pointer_down(at, button, cx))
+        .unwrap();
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, cx| {
+        if by != Point::default() {
+            w.pointer_move(at + by, Some(button), cx);
+        }
+        w.pointer_up(at + by, button, cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+}
+
+fn still() -> Point<Pixels> {
+    Point::default()
+}
+
+#[gpui_kit::test]
+fn a_left_click_from_free_fly_follows_the_first_player(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Left, still());
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+}
+
+#[gpui_kit::test]
+fn a_right_click_from_free_fly_follows_the_last_player(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Right, still());
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(2), false)
+    );
+}
+
+#[gpui_kit::test]
+fn clicks_step_next_and_prev_while_following(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Left, still());
+    click(cx, win, MouseButton::Left, still());
+    assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(2));
+    click(cx, win, MouseButton::Right, still());
+    assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(1));
+}
+
+#[gpui_kit::test]
+fn a_release_within_4_px_is_a_click_and_does_not_turn(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    let yaw = cx.update(|cx| viewport.read(cx).camera().yaw());
+    click(cx, win, MouseButton::Left, point(px(3.), px(0.)));
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+    assert_eq!(cx.update(|cx| viewport.read(cx).camera().yaw()), yaw);
+}
+
+#[gpui_kit::test]
+fn a_drag_past_4_px_turns_by_all_of_it_and_follows_nobody(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    let yaw = cx.update(|cx| viewport.read(cx).camera().yaw());
+    click(cx, win, MouseButton::Left, point(px(10.), px(0.)));
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FreeFly, None, false)
+    );
+    let turned = cx.update(|cx| viewport.read(cx).camera().yaw());
+    assert!((turned - (yaw - 2.2)).abs() < 1e-3, "{yaw} -> {turned}");
+}
+
+// A drag is never a click: read as one, it would have moved on to Bob.
+#[gpui_kit::test]
+fn a_drag_while_following_keeps_the_target(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Left, still());
+    click(cx, win, MouseButton::Left, point(px(40.), px(0.)));
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+}
+
+#[gpui_kit::test]
+fn a_middle_click_only_takes_focus(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Middle, still());
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FreeFly, None, false)
+    );
+}
+
+#[gpui_kit::test]
+fn space_cycles_the_camera_and_a_held_repeat_does_not(cx: &mut TestAppContext) {
+    let (win, viewport, _stub) = with_tracks(cx);
+    click(cx, win, MouseButton::Middle, still());
+    let tap = |cx: &mut TestAppContext| {
+        cx.update_window(win, |_, w, cx| {
+            w.key_down("space", false, cx);
+            w.key_up("space", cx);
+        })
+        .unwrap();
+        support::settle(cx, win);
+    };
+    tap(cx);
+    assert_eq!(state(cx, &viewport).mode, CameraMode::FirstPerson);
+    cx.update_window(win, |_, w, cx| w.key_down("space", true, cx))
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(state(cx, &viewport).mode, CameraMode::FirstPerson);
+    cx.update_window(win, |_, w, cx| w.key_up("space", cx))
+        .unwrap();
+    tap(cx);
+    assert_eq!(state(cx, &viewport).mode, CameraMode::Chase);
+    tap(cx);
+    assert_eq!(state(cx, &viewport).mode, CameraMode::FreeFly);
 }
