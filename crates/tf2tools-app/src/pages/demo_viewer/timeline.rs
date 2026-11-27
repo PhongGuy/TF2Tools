@@ -10,9 +10,9 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_fl
 use gpui_kit::{
     AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div, px, relative,
+    TestSupportExt as _, Window, canvas, div, fill, point, px, relative, size,
 };
-use tf2tools_core::{DemoTracks, TrackCut};
+use tf2tools_core::{DemoTracks, KillParty, Team, TrackCut};
 
 use super::DemoViewerPage;
 use super::killfeed::{FeedRow, feed_key, feed_rows};
@@ -42,6 +42,14 @@ fn shown(state: PlaybackState) -> (u64, bool, f32) {
     (second, state.playing, state.speed)
 }
 
+/// `tick`'s share of the timeline from `first` to `end`, clamped to 0..=1; 0 when the span is empty.
+pub fn timeline_fraction(tick: u32, first: u32, end: u32) -> f32 {
+    if end <= first {
+        return 0.;
+    }
+    (tick.saturating_sub(first) as f32 / (end - first) as f32).clamp(0., 1.)
+}
+
 /// The open demo's timeline once its tracks arrive.
 pub(super) struct Timeline {
     pub(super) slider: Entity<SliderState>,
@@ -49,6 +57,8 @@ pub(super) struct Timeline {
     /// The slider's top end; one past `first` when the tracks hold a single tick.
     end: u32,
     rounds: Vec<u32>,
+    /// Each kill's share of the timeline and its killer's team, painted under the round markers.
+    kill_marks: Vec<(f32, Option<Team>)>,
     cut_note: Option<SharedString>,
     shown: Option<(u64, bool, f32)>,
     /// The camera state the bar last drew.
@@ -134,6 +144,14 @@ impl DemoViewerPage {
             first,
             end,
             rounds: tracks.round_starts().to_vec(),
+            kill_marks: tracks
+                .kills()
+                .iter()
+                .map(|kill| {
+                    let team = kill.killer().and_then(KillParty::team);
+                    (timeline_fraction(kill.tick(), first, end), team)
+                })
+                .collect(),
             cut_note: cut_note(tracks),
             shown: state.map(shown),
             camera: viewport.read(cx).camera_state(),
@@ -220,13 +238,12 @@ impl DemoViewerPage {
             return Vec::new();
         };
         let colour = cx.theme().muted_foreground;
-        let span = (timeline.end - timeline.first) as f32;
         timeline
             .rounds
             .iter()
             .enumerate()
             .map(|(n, &tick)| {
-                let fraction = (tick.saturating_sub(timeline.first) as f32 / span).clamp(0., 1.);
+                let fraction = timeline_fraction(tick, timeline.first, timeline.end);
                 let words = tr!("demo_viewer.playback.round", n = n + 1);
                 let tip = words.clone();
                 div()
@@ -246,6 +263,55 @@ impl DemoViewerPage {
                     .into_any_element()
             })
             .collect()
+    }
+
+    // One painted strip with a 2 px line per kill in its killer's colour. It has no handlers,
+    // so the round markers drawn after it keep every click and tooltip.
+    fn kill_strip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let timeline = self
+            .timeline
+            .as_ref()
+            .filter(|t| !t.kill_marks.is_empty())?;
+        let theme = cx.theme();
+        let marks: Vec<_> = timeline
+            .kill_marks
+            .iter()
+            .map(|&(fraction, team)| {
+                let colour = match team {
+                    Some(Team::Red) => theme.red,
+                    Some(_) => theme.blue,
+                    None => theme.muted_foreground,
+                };
+                (fraction, colour)
+            })
+            .collect();
+        let count = marks.len();
+        let paint = canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                for &(fraction, colour) in &marks {
+                    let x = bounds.origin.x + bounds.size.width * fraction - px(1.);
+                    let at = point(x, bounds.origin.y);
+                    window.paint_quad(fill(
+                        gpui_kit::Bounds::new(at, size(px(2.), bounds.size.height)),
+                        colour,
+                    ));
+                }
+            },
+        )
+        .size_full();
+        Some(
+            div()
+                .id(ids::DEMO_VIEWER_KILL_MARKERS)
+                .aria_label(tr!("demo_viewer.killfeed.markers", count = count))
+                .test_support()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .child(paint)
+                .into_any_element(),
+        )
     }
 
     /// The bar's second row for `viewport`; every control waits, disabled, for the tracks.
@@ -320,6 +386,7 @@ impl DemoViewerPage {
                     .relative()
                     .w_full()
                     .h(px(6.))
+                    .children(self.kill_strip(cx))
                     .children(self.round_markers(cx)),
             )
             .child(slider);

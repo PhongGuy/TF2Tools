@@ -2,6 +2,7 @@
 //! beside the bar, and clicks passing through it to the map.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use gpui_kit::{
     ElementId, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
@@ -9,7 +10,9 @@ use gpui_kit::{
 };
 use tf2tools_app::ids;
 use tf2tools_app::kill_icons::KillIconImages;
-use tf2tools_app::pages::demo_viewer::{BarPlace, feed_key, feed_on_top, feed_rows, feed_words};
+use tf2tools_app::pages::demo_viewer::{
+    BarPlace, feed_key, feed_on_top, feed_rows, feed_words, timeline_fraction,
+};
 use tf2tools_core::{CameraMode, PlayerId};
 use tf2tools_core::{Team, TfClass, WeaponNames};
 
@@ -17,7 +20,7 @@ use crate::support;
 use crate::support::demo_viewer::killfeed_tracks;
 use crate::support::demo_viewer::{
     DemoViewerShell, LONG_KILLER, LockCall, assert_feed_fits, inside, open_with, open_with_icons,
-    open_with_locked, seek_to as seek, send,
+    open_with_locked, open_with_tracks, seek_to as seek, send, walking_tracks,
 };
 
 #[test]
@@ -275,4 +278,69 @@ fn a_click_on_the_feed_reaches_the_map(cx: &mut TestAppContext) {
     );
     assert_eq!(camera(cx, &w), (CameraMode::FirstPerson, Some(1)));
     assert!(lock.calls().contains(&LockCall::Lock), "{:?}", lock.calls());
+}
+
+#[test]
+fn a_tick_maps_to_its_share_of_the_timeline() {
+    assert_eq!(timeline_fraction(4000, 4000, 4200), 0.);
+    assert_eq!(timeline_fraction(4100, 4000, 4200), 0.5);
+    assert_eq!(timeline_fraction(4200, 4000, 4200), 1.);
+    assert_eq!(timeline_fraction(3990, 4000, 4200), 0.);
+    assert_eq!(timeline_fraction(4300, 4000, 4200), 1.);
+    assert_eq!(timeline_fraction(4000, 4000, 4000), 0.);
+}
+
+#[gpui_kit::test]
+fn the_kills_mark_the_timeline_in_one_named_strip(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_KILL_MARKERS).as_deref(),
+        Some("Kills on the timeline: 8")
+    );
+    let strip = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_KILL_MARKERS).expect("the strip");
+    let timeline =
+        support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_TIMELINE).expect("the timeline");
+    assert!(inside(strip, timeline), "{strip:?} leaves {timeline:?}");
+    assert!(strip.size.width > px(100.), "{strip:?}");
+}
+
+// `walking_tracks` starts rounds at 4050 and 4150; a kill on each round's tick puts the strip's
+// marks right under the dots, which must still take the click and seek.
+#[gpui_kit::test]
+fn round_markers_still_seek_over_the_kill_strip(cx: &mut TestAppContext) {
+    let alice = (1, "Alice", Team::Blue, TfClass::Scout);
+    let bob = (2, "Bob", Team::Red, TfClass::Soldier);
+    let tracks = Arc::into_inner(walking_tracks(None))
+        .expect("a fresh Arc")
+        .with_test_kills(&[
+            (4050, Some(alice), None, bob, "scattergun", false, false),
+            (
+                4150,
+                Some(bob),
+                None,
+                alice,
+                "shotgun_soldier",
+                false,
+                false,
+            ),
+        ]);
+    let env = support::env();
+    let w = open_with(cx, &env, Arc::new(tracks));
+    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_KILL_MARKERS));
+    support::click_id(cx, w.s.win, ids::demo_viewer_round_marker(1));
+    assert_eq!(support::demo_viewer::playback(cx, &w).unwrap().tick, 4150.);
+    support::click_id(cx, w.s.win, ids::demo_viewer_round_marker(0));
+    assert_eq!(support::demo_viewer::playback(cx, &w).unwrap().tick, 4050.);
+}
+
+#[gpui_kit::test]
+fn tracks_without_kills_draw_no_strip(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with_tracks(cx, &env, None);
+    assert!(!support::present(
+        cx,
+        w.s.win,
+        ids::DEMO_VIEWER_KILL_MARKERS
+    ));
 }

@@ -232,6 +232,7 @@ demo_viewer:
     assisted: "%{killer} and %{assister} killed %{victim} with %{weapon}"
     died: "%{victim} died"
     unknown_weapon: "an unknown weapon"
+    markers: "Kills on the timeline: %{count}"
   playback:
     play: "Play"
     pause: "Pause"

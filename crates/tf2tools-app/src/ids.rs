@@ -3698,6 +3698,8 @@ pub const DEMO_VIEWER_KILLFEED: &str = "demo-viewer-killfeed";
 pub fn demo_viewer_kill(n: usize) -> ElementId {
     ElementId::Name(format!("demo-viewer-kill-{n}").into())
 }
+/// The painted strip marking every kill above the timeline.
+pub const DEMO_VIEWER_KILL_MARKERS: &str = "demo-viewer-kill-markers";
 /// The kill icon in the feed's `n`th row.
 pub fn demo_viewer_kill_icon(n: usize) -> ElementId {
     ElementId::Name(format!("demo-viewer-kill-icon-{n}").into())
