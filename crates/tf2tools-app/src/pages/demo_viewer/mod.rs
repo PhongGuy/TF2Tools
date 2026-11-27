@@ -934,11 +934,15 @@ impl Render for DemoViewerPage {
             .named(tip)
             .on_click(cx.listener(|page, _, window, cx| page.toggle_bar(window, cx)));
         let options = (!collapsed).then(|| self.options(cx));
-        // The playback row and its notes show under a viewport until its tracks fail.
+        // The playback row, the camera row under it and their notes show under a viewport
+        // until its tracks fail.
         let failed = self.read_state == ReadState::Failed;
-        let row = match self.viewport().cloned() {
-            Some(viewport) if !collapsed && !failed => Some(self.playback_row(&viewport, cx)),
-            _ => None,
+        let (row, camera_row) = match self.viewport().cloned() {
+            Some(viewport) if !collapsed && !failed => (
+                Some(self.playback_row(&viewport, cx)),
+                Some(self.camera_chip(&viewport, cx)),
+            ),
+            _ => (None, None),
         };
         let reading = match self.read_state {
             ReadState::Reading { percent: Some(p) } => {
@@ -1073,7 +1077,8 @@ impl Render for DemoViewerPage {
             .shadow_md()
             .child(bar_watch)
             .child(first_row)
-            .children(row);
+            .children(row)
+            .children(camera_row);
         let frame = div()
             .absolute()
             .left(at.x)

@@ -1,21 +1,35 @@
 //! The Demo Viewer's bar, with a map loaded, in the languages with its longest hint, on the
 //! narrowest page (an 800x600 window) and the default 944 px one.
 
-use gpui_kit::{TestAppContext, px, size};
+use gpui_kit::{Bounds, Pixels, TestAppContext, px, size};
 use tf2tools_app::ids;
 use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
 use crate::support;
-use support::demo_viewer::{inside, open_with_tracks};
+use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks};
 
 const ENGLISH_HINT: &str =
     "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
 
-fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
+/// Whether `a` and `b` cover a shared area, beyond half a pixel of rounding.
+fn overlap(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
+    let slack = px(0.5);
+    a.left() + slack < b.right()
+        && b.left() + slack < a.right()
+        && a.top() + slack < b.bottom()
+        && b.top() + slack < a.bottom()
+}
+
+// Follows a player, or Bob through his death when `dead`, then checks that every part of the
+// bar lies inside it and the page, no two parts cover each other, and the name stays readable.
+fn bar_fits(lang: &str, width: f32, height: f32, dead: bool, cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch(lang);
     let env = support::env();
-    let w = open_with_tracks(cx, &env, None);
+    let w = match dead {
+        true => open_with(cx, &env, camera_tracks()),
+        false => open_with_tracks(cx, &env, None),
+    };
     cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
     support::settle(cx, w.s.win);
     // The hint must be the translated one, or the widths below prove nothing about it.
@@ -25,10 +39,7 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
         "{lang}: the hint is not translated"
     );
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
-    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
-    let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
-    assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
-    for id in [
+    let mut parts = vec![
         ids::DEMO_VIEWER_HINT,
         ids::DEMO_VIEWER_OPEN,
         ids::DEMO_VIEWER_BAR_COLLAPSE,
@@ -42,38 +53,99 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
         ids::DEMO_VIEWER_CAMERA_TARGET_PREV,
         ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
         ids::DEMO_VIEWER_CAMERA_TARGET,
-    ] {
-        let part = support::bounds_of(cx, w.s.win, id).unwrap();
+    ];
+    let width_of = |cx: &mut TestAppContext| {
+        support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET)
+            .unwrap()
+            .size
+            .width
+    };
+    // "Bob" is narrower than 48 px whole, so his dead pass proves the badge takes none of it.
+    let alive_width = dead.then(|| {
+        support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+        width_of(cx)
+    });
+    if dead {
+        let viewport = cx.update(|cx| {
+            let page = w.s.shell.read(cx).demo_viewer_page(cx).expect("the viewer");
+            page.read(cx).viewport().expect("a viewport").clone()
+        });
+        cx.update(|cx| viewport.update(cx, |v, cx| v.seek(4140., cx)));
+        support::settle(cx, w.s.win);
+        parts.push(ids::DEMO_VIEWER_CAMERA_DEAD);
+    }
+    let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
+    let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
+    assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
+    let mut seen = Vec::new();
+    for id in parts {
+        let part = support::bounds_of(cx, w.s.win, id)
+            .unwrap_or_else(|| panic!("{lang} {width}: {id} is missing"));
         assert!(
             inside(part, bar) && inside(part, page),
             "{lang} {width}: {id} at {part:?} leaves the bar {bar:?} or the page {page:?}"
         );
+        for (other, at) in &seen {
+            assert!(
+                !overlap(part, *at),
+                "{lang} {width}: {id} at {part:?} covers {other} at {at:?}"
+            );
+        }
+        seen.push((id, part));
+    }
+    let shown = width_of(cx);
+    match alive_width {
+        Some(alive) => assert!(
+            (shown - alive).abs() < px(0.5),
+            "{lang} {width}: the dead badge squeezes the name from {alive:?} to {shown:?}"
+        ),
+        None => assert!(
+            shown >= px(48.),
+            "{lang} {width}: the followed name has only {shown:?}"
+        ),
     }
 }
 
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_narrowest_page_in_german(cx: &mut TestAppContext) {
-    bar_fits("de", 800., 600., cx);
+    bar_fits("de", 800., 600., false, cx);
 }
 
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_narrowest_page_in_russian(cx: &mut TestAppContext) {
-    bar_fits("ru", 800., 600., cx);
+    bar_fits("ru", 800., 600., false, cx);
 }
 
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_narrowest_page_in_brazilian_portuguese(cx: &mut TestAppContext) {
-    bar_fits("pt-BR", 800., 600., cx);
+    bar_fits("pt-BR", 800., 600., false, cx);
+}
+
+#[gpui_kit::test]
+fn the_bar_fits_a_dead_target_on_the_narrowest_page_in_german(cx: &mut TestAppContext) {
+    bar_fits("de", 800., 600., true, cx);
+}
+
+#[gpui_kit::test]
+fn the_bar_fits_a_dead_target_on_the_narrowest_page_in_russian(cx: &mut TestAppContext) {
+    bar_fits("ru", 800., 600., true, cx);
+}
+
+#[gpui_kit::test]
+fn the_bar_fits_a_dead_target_on_the_narrowest_page_in_brazilian_portuguese(
+    cx: &mut TestAppContext,
+) {
+    bar_fits("pt-BR", 800., 600., true, cx);
 }
 
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_default_page_in_german(cx: &mut TestAppContext) {
-    bar_fits("de", 1200., 900., cx);
+    bar_fits("de", 1200., 900., false, cx);
 }
 
 #[gpui_kit::test]
 fn the_loaded_bar_fits_the_default_page_in_russian(cx: &mut TestAppContext) {
-    bar_fits("ru", 1200., 900., cx);
+    bar_fits("ru", 1200., 900., false, cx);
 }
 
 // The GameBanana fallback's lines exist in every language, keep their placeholders, and

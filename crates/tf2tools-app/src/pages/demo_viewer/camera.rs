@@ -16,8 +16,8 @@ use crate::ids;
 use crate::viewer::viewport::{CameraState, DemoViewport};
 use crate::widgets::{Named as _, labelled};
 
-/// The widest the target's name draws; a narrow bar shrinks it further, to an ellipsis.
-const TARGET_CAP: f32 = 128.;
+/// The widest the target's name draws before it ends in an ellipsis.
+const TARGET_CAP: f32 = 160.;
 
 fn mode_icon(mode: CameraMode) -> IconName {
     match mode {
@@ -48,7 +48,7 @@ fn target_words(target: Option<PlayerId>, tracks: Option<&DemoTracks>) -> Shared
 }
 
 impl DemoViewerPage {
-    /// The camera chip for `viewport`; its buttons wait, disabled, for the tracks.
+    /// The bar's camera row for `viewport`; its buttons wait, disabled, for the tracks.
     pub(super) fn camera_chip(
         &self,
         viewport: &Entity<DemoViewport>,
@@ -100,7 +100,6 @@ impl DemoViewerPage {
             .ghost()
             .small()
             .label(target)
-            .min_w_0()
             .max_w(px(TARGET_CAP))
             .tooltip(tr!("demo_viewer.camera.choose"))
             .accessibility_label(heard)
@@ -121,14 +120,14 @@ impl DemoViewerPage {
             )
         });
         h_flex()
-            .min_w_0()
+            .w_full()
             .gap_0p5()
             .items_center()
             .child(mode)
             .child(prev)
             .child(target_button)
-            .child(next)
             .children(dead)
+            .child(next)
             .into_any_element()
     }
 }

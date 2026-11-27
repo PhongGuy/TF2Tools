@@ -298,7 +298,6 @@ impl DemoViewerPage {
             .child(back)
             .child(play)
             .child(forward)
-            .child(self.camera_chip(viewport, cx))
             .child(timeline)
             .child(labelled(
                 div()
