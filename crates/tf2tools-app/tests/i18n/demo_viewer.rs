@@ -295,8 +295,8 @@ fn the_camera_words_speak_every_language() {
     }
 }
 
-// The feed's rows hold the translated fallback name, so switching language while the feed
-// stands still must still rename the unnamed pyro.
+// The feed's rows and their cached words hold translated text, so switching language while
+// the feed stands still must still rename the unnamed pyro and reword the row.
 #[gpui_kit::test]
 fn the_kill_feed_renames_an_unnamed_player_when_the_language_changes(cx: &mut TestAppContext) {
     let guard = LocaleGuard::hold();
@@ -311,7 +311,10 @@ fn the_kill_feed_renames_an_unnamed_player_when_the_language_changes(cx: &mut Te
     cx.update(|cx| cx.refresh_windows());
     support::settle(cx, w.s.win);
     let german = row(cx);
-    assert!(german.starts_with("Spieler 3 "), "{german}");
+    assert!(
+        german.starts_with("Spieler 3 ") && !german.contains(" killed "),
+        "{german}"
+    );
     drop(guard);
 }
 

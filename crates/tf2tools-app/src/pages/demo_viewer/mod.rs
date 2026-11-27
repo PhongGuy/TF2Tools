@@ -299,7 +299,12 @@ impl DemoViewerPage {
         let weapon_names = LoadedWeaponNames::global(cx);
         let feed_watch = [
             cx.observe(&kill_icons, |_, _, cx| cx.notify()),
-            cx.observe(&weapon_names, |_, _, cx| cx.notify()),
+            cx.observe(&weapon_names, |page: &mut Self, names, cx| {
+                if let Some(timeline) = page.timeline.as_mut() {
+                    timeline.reword_feed(names.read(cx).names());
+                }
+                cx.notify();
+            }),
         ];
         Self {
             view: View::Loading,
@@ -843,7 +848,7 @@ impl DemoViewerPage {
 
 impl Render for DemoViewerPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.refresh_feed_locale();
+        self.refresh_feed_locale(cx);
         let muted = cx.theme().muted_foreground;
         // A line of the bar's text column wraps; the status stays on one line.
         let line = |id: &'static str, words: SharedString, muted: Option<Hsla>, wraps: bool| {

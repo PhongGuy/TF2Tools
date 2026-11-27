@@ -166,7 +166,7 @@ impl DemoViewerPage {
             });
             h_flex()
                 .id(ids::demo_viewer_kill(n))
-                .aria_label(feed_words(row, names))
+                .aria_label(timeline.feed_words.get(n).cloned().unwrap_or_default())
                 .test_support()
                 .max_w_full()
                 .overflow_hidden()

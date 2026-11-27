@@ -8,14 +8,14 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     TestSupportExt as _, Window, canvas, div, fill, point, px, relative, size,
 };
-use tf2tools_core::{DemoTracks, KillParty, Team, TrackCut};
+use tf2tools_core::{DemoTracks, KillParty, Team, TrackCut, WeaponNames};
 
 use super::DemoViewerPage;
-use super::killfeed::{FeedRow, feed_key, feed_rows};
+use super::killfeed::{FeedRow, feed_key, feed_rows, feed_words};
 use crate::i18n;
 use crate::i18n::tr;
 use crate::ids;
@@ -66,6 +66,8 @@ pub(super) struct Timeline {
     tracks: Arc<DemoTracks>,
     /// The feed's rows at `feed_tick`, built in `feed_locale`, and the key they were built for.
     pub(super) feed: Vec<FeedRow>,
+    /// Each row's accessible name, built with the rows and again when the weapon names land.
+    pub(super) feed_words: Vec<SharedString>,
     feed_key: (usize, Option<u32>),
     feed_tick: f64,
     feed_locale: &'static str,
@@ -73,6 +75,16 @@ pub(super) struct Timeline {
 }
 
 impl Timeline {
+    // Rebuilds the rows at `feed_tick` and their words, so a render only reads them.
+    fn rebuild_feed(&mut self, names: &WeaponNames) {
+        self.feed = feed_rows(&self.tracks, self.feed_tick);
+        self.reword_feed(names);
+    }
+
+    pub(super) fn reword_feed(&mut self, names: &WeaponNames) {
+        self.feed_words = self.feed.iter().map(|row| feed_words(row, names)).collect();
+    }
+
     /// The note naming where playback stops early, if the tracks were cut.
     pub(super) fn cut_note(&self) -> Option<SharedString> {
         self.cut_note.clone()
@@ -156,12 +168,16 @@ impl DemoViewerPage {
             shown: state.map(shown),
             camera: viewport.read(cx).camera_state(),
             tracks: Arc::clone(tracks),
-            feed: feed_rows(tracks, tick),
+            feed: Vec::new(),
+            feed_words: Vec::new(),
             feed_key: feed_key(tracks, tick),
             feed_tick: tick,
             feed_locale: i18n::current(),
             _watch: watch,
         });
+        if let Some(timeline) = self.timeline.as_mut() {
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
+        }
         cx.notify();
     }
 
@@ -184,7 +200,7 @@ impl DemoViewerPage {
         let fed = timeline.feed_key != key;
         if fed {
             timeline.feed_key = key;
-            timeline.feed = feed_rows(&timeline.tracks, state.tick);
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
         }
         let now = Some(shown(state));
         if fed || timeline.shown != now {
@@ -194,12 +210,12 @@ impl DemoViewerPage {
     }
 
     // The rows hold translated fallback names, so a language switch rebuilds them as it draws.
-    pub(super) fn refresh_feed_locale(&mut self) {
+    pub(super) fn refresh_feed_locale(&mut self, cx: &App) {
         if let Some(timeline) = self.timeline.as_mut()
             && timeline.feed_locale != i18n::current()
         {
             timeline.feed_locale = i18n::current();
-            timeline.feed = feed_rows(&timeline.tracks, timeline.feed_tick);
+            timeline.rebuild_feed(self.weapon_names.read(cx).names());
         }
     }
 
