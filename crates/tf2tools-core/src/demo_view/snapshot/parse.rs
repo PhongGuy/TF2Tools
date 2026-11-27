@@ -16,10 +16,12 @@ use tf_demo_parser::demo::parser::gamestateanalyser::{
     Class, GameStateAnalyser, PlayerState, Team as ParserTeam,
 };
 use tf_demo_parser::demo::parser::handler::BorrowMessageHandler;
-use tf_demo_parser::demo::sendprop::SendPropIdentifier;
+use tf_demo_parser::demo::sendprop::{SendProp, SendPropIdentifier};
+use tf_demo_parser::demo::vector::Vector;
 use tf_demo_parser::{Demo, DemoParser, MessageType, ParserState};
 
 use super::pick::{SENTINEL_TICK, SnapshotPicker, Step, TickFrame, TickRow, into_snapshot};
+use super::shots::{ShotProp, Shots, is_projectile};
 use super::{DemoSnapshot, MAX_SNAPSHOT_BYTES};
 use crate::error::DemoSnapshotError;
 use crate::hud_maker::Team;
@@ -33,6 +35,15 @@ const ROUND_STATE: SendPropIdentifier =
     SendPropIdentifier::new("DT_TeamplayRoundBasedRules", "m_iRoundState");
 /// The `m_fFlags` bit Source sets while a player is crouched.
 const FL_DUCKING: i64 = 2;
+// Every projectile class sends its origin from one of these three tables.
+const ORIGINS: [SendPropIdentifier; 3] = [
+    SendPropIdentifier::new("DT_TFBaseRocket", "m_vecOrigin"),
+    SendPropIdentifier::new("DT_TFWeaponBaseGrenadeProj", "m_vecOrigin"),
+    SendPropIdentifier::new("DT_BaseEntity", "m_vecOrigin"),
+];
+const TEAM_NUM: SendPropIdentifier = SendPropIdentifier::new("DT_BaseEntity", "m_iTeamNum");
+const PIPE_TYPE: SendPropIdentifier =
+    SendPropIdentifier::new("DT_TFProjectile_Pipebomb", "m_iType");
 
 // What the game-state analyser does not keep, per player entity.
 #[derive(Default, Debug, Clone, Copy)]
@@ -54,6 +65,7 @@ struct Tracker {
     round_state: i64,
     names: BTreeMap<u32, String>,
     names_version: u64,
+    shots: Shots,
 }
 
 impl MessageHandler for Tracker {
@@ -72,6 +84,17 @@ impl MessageHandler for Tracker {
             let Some(class) = state.server_classes.get(usize::from(entity.server_class)) else {
                 continue;
             };
+            let props = if is_projectile(class.name.as_str()) {
+                shot_props(entity.props(state))
+            } else {
+                Vec::new()
+            };
+            self.shot_seen(
+                u32::from(entity.entity_index),
+                class.name.as_str(),
+                entity.update_type,
+                props,
+            );
             match class.name.as_str() {
                 "CTFPlayer" => {
                     let extra = self
@@ -120,6 +143,7 @@ impl MessageHandler for Tracker {
             }
         }
         for id in &packet.removed_entities {
+            self.removed(u32::from(*id));
             if let Some(extra) = self.extra.get_mut(&u32::from(*id)) {
                 extra.deleted = true;
             }
@@ -182,6 +206,37 @@ impl BorrowMessageHandler for Tracker {
     }
 }
 
+// The props of one projectile update that `Shots` reads; critical comes from whichever table
+// the class sends `m_bCritical` in.
+fn shot_props(props: impl Iterator<Item = SendProp>) -> Vec<ShotProp> {
+    props
+        .filter_map(|prop| {
+            if ORIGINS.contains(&prop.identifier) {
+                let v = Vector::try_from(&prop.value).ok()?;
+                Some(ShotProp::Origin([v.x, v.y, v.z]))
+            } else if prop.identifier == TEAM_NUM {
+                Some(ShotProp::Team(
+                    i64::try_from(&prop.value).unwrap_or_default(),
+                ))
+            } else if prop.identifier == PIPE_TYPE {
+                Some(ShotProp::PipeType(
+                    i64::try_from(&prop.value).unwrap_or_default(),
+                ))
+            } else if prop
+                .identifier
+                .prop_name()
+                .is_some_and(|name| name.as_str() == "m_bCritical")
+            {
+                Some(ShotProp::Critical(
+                    bool::try_from(&prop.value).unwrap_or_default(),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn team(team: ParserTeam) -> Option<Team> {
     match team {
         ParserTeam::Red => Some(Team::Red),
@@ -206,6 +261,29 @@ fn class(class: Class) -> Option<TfClass> {
 }
 
 impl Tracker {
+    /// One entity update of server class `class`: Leave or Delete on a projectile, or any
+    /// non-projectile class, ends the shot on that slot; any other projectile update feeds `Shots`.
+    fn shot_seen(&mut self, entity: u32, class: &str, update: UpdateType, props: Vec<ShotProp>) {
+        if !is_projectile(class) {
+            if !self.shots.is_empty() {
+                self.shots.end(entity);
+            }
+            return;
+        }
+        match update {
+            UpdateType::Leave | UpdateType::Delete => self.shots.end(entity),
+            UpdateType::Enter | UpdateType::Delta => {
+                self.shots
+                    .update(entity, class, update == UpdateType::Enter, props);
+            }
+        }
+    }
+
+    /// An id from `removed_entities`.
+    fn removed(&mut self, entity: u32) {
+        self.shots.end(entity);
+    }
+
     // Every player the analyser has seen, as picker rows.
     fn frame(&self, tick: u32) -> TickFrame {
         let rows = self
@@ -238,6 +316,7 @@ impl Tracker {
             tick,
             round_state: self.round_state,
             rows,
+            projectiles: self.shots.rows(),
         }
     }
 }
@@ -362,5 +441,26 @@ mod tests {
         std::fs::write(&path, vec![7u8; 4096]).unwrap();
         assert_eq!(read_prefix(&path, 1000).unwrap().len(), 1000);
         assert_eq!(read_prefix(&path, 10_000).unwrap().len(), 4096);
+    }
+
+    use super::super::shots::ShotProp;
+    use tf_demo_parser::demo::message::packetentities::UpdateType;
+
+    #[test]
+    fn leave_delete_removal_and_a_new_class_end_a_shot() {
+        let mut t = Tracker::default();
+        let o = ShotProp::Origin([1., 2., 3.]);
+        for entity in 1..=5 {
+            t.shot_seen(entity, "CTFProjectile_Rocket", UpdateType::Enter, vec![o]);
+        }
+        assert_eq!(t.frame(10).projectiles.len(), 5);
+        t.shot_seen(1, "CTFProjectile_Rocket", UpdateType::Leave, vec![]);
+        t.shot_seen(2, "CTFProjectile_Rocket", UpdateType::Delete, vec![]);
+        t.removed(3);
+        t.shot_seen(4, "CTFPlayer", UpdateType::Delta, vec![]);
+        t.shot_seen(5, "CTFProjectile_Rocket", UpdateType::Delta, vec![]);
+        let left = t.frame(11).projectiles;
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].origin, Some([1., 2., 3.]));
     }
 }

@@ -237,6 +237,7 @@ mod tests {
             tick,
             round_state: 4,
             rows,
+            ..Default::default()
         }
     }
 
@@ -404,6 +405,7 @@ mod tests {
                 tick: t,
                 round_state: state(t),
                 rows: vec![row(1, 0.)],
+                ..Default::default()
             })
             .collect();
         assert_eq!(build(&frames).round_starts(), [20, 40]);

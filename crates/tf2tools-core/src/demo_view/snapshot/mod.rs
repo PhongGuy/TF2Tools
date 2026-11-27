@@ -6,6 +6,7 @@ use crate::weapons::TfClass;
 
 mod parse;
 mod pick;
+mod shots;
 
 pub use parse::read_demo_snapshot;
 pub(crate) use parse::{Clocking, drive, read_prefix};

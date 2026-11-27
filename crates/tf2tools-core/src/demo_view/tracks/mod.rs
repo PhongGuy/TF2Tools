@@ -8,9 +8,11 @@ use crate::weapons::TfClass;
 
 mod build;
 mod hermite;
+mod projectiles;
 mod smooth;
 
 pub(crate) use build::TrackBuilder;
+pub(crate) use projectiles::ProjectileKind;
 
 /// The most of a demo read for its tracks; a longer demo plays up to where this prefix ends.
 pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
@@ -441,6 +443,7 @@ impl DemoTracks {
                 tick: *tick,
                 round_state: 4,
                 rows: rows.collect(),
+                ..Default::default()
             };
             builder.push(&frame, seconds_per_tick);
         }
@@ -654,6 +657,7 @@ mod tests {
                     tick,
                     round_state: 4,
                     rows,
+                    ..Default::default()
                 },
                 1. / 66.,
             );
