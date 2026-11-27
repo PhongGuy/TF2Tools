@@ -25,6 +25,6 @@ pub use mesh::{
 pub use playback::{PlaybackEvent, read_demo_playback, read_demo_tracks};
 pub use snapshot::{DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer, read_demo_snapshot};
 pub use tracks::{
-    DemoTracks, EyePose, FollowPose, MAX_DEMO_BYTES, MAX_TRACK_SAMPLES, PlayerId, TrackCut,
-    TrackedPlayer,
+    DemoTestShot, DemoTracks, EyePose, FollowPose, MAX_DEMO_BYTES, MAX_PROJECTILE_SAMPLES,
+    MAX_TRACK_SAMPLES, PlayerId, ProjectileKind, ProjectileView, TrackCut, TrackedPlayer,
 };

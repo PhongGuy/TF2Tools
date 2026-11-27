@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use super::hermite;
 use crate::demo_view::snapshot::ProjectileRow;
 use crate::hud_maker::Team;
 
@@ -44,6 +45,97 @@ pub(crate) struct ProjectileTrack {
     pub critical: bool,
     pub start: u32,
     pub len: u32,
+}
+
+/// One projectile drawn at one fractional tick.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct ProjectileView {
+    kind: ProjectileKind,
+    team: Team,
+    critical: bool,
+    position: [f32; 3],
+    heading: Option<[f32; 3]>,
+}
+
+impl ProjectileView {
+    /// What the projectile is.
+    pub fn kind(&self) -> ProjectileKind {
+        self.kind
+    }
+
+    /// The team that fired it.
+    pub fn team(&self) -> Team {
+        self.team
+    }
+
+    /// Whether it is a critical shot.
+    pub fn critical(&self) -> bool {
+        self.critical
+    }
+
+    /// Where it is, in map units.
+    pub fn position(&self) -> [f32; 3] {
+        self.position
+    }
+
+    /// The unit direction of travel; None when the track never moved.
+    pub fn heading(&self) -> Option<[f32; 3]> {
+        self.heading
+    }
+}
+
+/// The projectile of `track` at `tick`, or None when its samples do not cover the tick.
+/// Like a player: each axis through a monotone cubic, the last sample held for one tick.
+pub(crate) fn view_at(
+    track: &ProjectileTrack,
+    samples: &[ProjectileSample],
+    tick: f64,
+) -> Option<ProjectileView> {
+    let start = track.start as usize;
+    let s = samples.get(start..start + track.len as usize)?;
+    let (first, last) = (s.first()?, s.last()?);
+    if tick.is_nan() || tick < f64::from(first.tick) || tick >= f64::from(last.tick) + 1. {
+        return None;
+    }
+    let (position, segment) = if tick >= f64::from(last.tick) {
+        (last.origin, s.len().saturating_sub(2))
+    } else {
+        let i = s.partition_point(|x| f64::from(x.tick) <= tick) - 1;
+        let (lo, hi) = (i.saturating_sub(1), (i + 2).min(s.len() - 1));
+        let window = &s[lo..=hi];
+        let w = window.len();
+        let mut xs = [0f64; 4];
+        for (x, k) in xs.iter_mut().zip(window) {
+            *x = f64::from(k.tick);
+        }
+        let axis = |c: usize| {
+            let mut ys = [0f64; 4];
+            for (y, k) in ys.iter_mut().zip(window) {
+                *y = f64::from(k.origin[c]);
+            }
+            hermite::monotone(&xs[..w], &ys[..w], tick) as f32
+        };
+        ([0, 1, 2].map(axis), i)
+    };
+    Some(ProjectileView {
+        kind: track.kind,
+        team: track.team,
+        critical: track.critical,
+        position,
+        heading: heading(s, segment),
+    })
+}
+
+// The direction of the segment starting at sample `i`, or of the nearest earlier one that
+// moves, so a landed sticky keeps pointing the way it came in.
+fn heading(s: &[ProjectileSample], i: usize) -> Option<[f32; 3]> {
+    let pairs = s.windows(2).take(i + 1);
+    pairs.rev().find_map(|w| {
+        let d = [0, 1, 2].map(|c| f64::from(w[1].origin[c]) - f64::from(w[0].origin[c]));
+        let len = d.iter().map(|v| v * v).sum::<f64>().sqrt();
+        (len > 0. && len.is_finite()).then(|| d.map(|v| (v / len) as f32))
+    })
 }
 
 /// The team and origin a row samples at, or None when it makes no sample.

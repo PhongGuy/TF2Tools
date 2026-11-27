@@ -11,9 +11,10 @@ mod hermite;
 mod projectiles;
 mod smooth;
 
+use crate::demo_view::snapshot::ProjectileRow;
 pub(crate) use build::TrackBuilder;
-pub(crate) use projectiles::ProjectileKind;
-use projectiles::{ProjectileSample, ProjectileTrack};
+use projectiles::{ProjectileBuilder, ProjectileSample, ProjectileTrack};
+pub use projectiles::{ProjectileKind, ProjectileView};
 
 /// The most of a demo read for its tracks; a longer demo plays up to where this prefix ends.
 pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
@@ -21,6 +22,10 @@ pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_TRACK_SAMPLES: usize = 8_000_000;
 /// The most projectile samples one demo's tracks hold (64 MB at 16 B).
 pub const MAX_PROJECTILE_SAMPLES: usize = 4_000_000;
+
+/// `(tick, serial, kind, team, critical, origin)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestShot = (u32, u32, ProjectileKind, Team, bool, [f32; 3]);
 
 /// The sample flag bit for a crouched player.
 pub(crate) const DUCKED: u8 = 1;
@@ -393,6 +398,47 @@ impl DemoTracks {
             }
             _ => FollowPose::Dead(pose),
         }
+    }
+
+    /// Every projectile whose track covers the fractional `tick`, in first-tick order.
+    pub fn projectiles_at(&self, tick: f64) -> Vec<ProjectileView> {
+        if tick.is_nan() {
+            return Vec::new();
+        }
+        // Tracks are sorted by first tick, so none past this point has started yet.
+        let started = self.projectiles.partition_point(|t| {
+            self.projectile_samples
+                .get(t.start as usize)
+                .is_some_and(|s| f64::from(s.tick) <= tick)
+        });
+        self.projectiles[..started]
+            .iter()
+            .filter_map(|t| projectiles::view_at(t, &self.projectile_samples, tick))
+            .collect()
+    }
+
+    /// These tracks with their projectiles replaced by `rows`, built by the real builder, one
+    /// frame per distinct tick.
+    #[doc(hidden)]
+    pub fn with_test_projectiles(mut self, rows: &[DemoTestShot]) -> Self {
+        let mut rows = rows.to_vec();
+        rows.sort_by_key(|r| r.0);
+        let mut builder = ProjectileBuilder::default();
+        for frame in rows.chunk_by(|a, b| a.0 == b.0) {
+            let shots: Vec<ProjectileRow> = frame
+                .iter()
+                .map(|&(_, serial, kind, team, critical, origin)| ProjectileRow {
+                    serial,
+                    kind,
+                    team: Some(team),
+                    critical,
+                    origin: Some(origin),
+                })
+                .collect();
+            builder.push(frame[0].0, &shots);
+        }
+        (self.projectiles, self.projectile_samples) = builder.finish();
+        self
     }
 
     /// Tracks through `frames`, for tests outside the crate: player `i` of each frame is one
