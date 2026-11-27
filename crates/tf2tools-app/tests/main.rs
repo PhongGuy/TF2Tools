@@ -58,6 +58,7 @@ mod demo_viewer_download;
 mod demo_viewer_playback;
 mod demo_viewport;
 mod demo_viewport_camera;
+mod demo_viewport_projectiles;
 mod demos_tf;
 mod demos_tf_download;
 mod demos_tf_filters;

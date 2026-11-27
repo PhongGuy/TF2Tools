@@ -19,7 +19,9 @@ use tf2tools_core::{
 };
 
 use super::pointer::PointerLock;
-use super::{DrawRequest, PlayerBox, RenderEvent, RendererError, SceneRenderer, math};
+use super::{
+    DrawRequest, PlayerBox, ProjectileShot, RenderEvent, RendererError, SceneRenderer, math,
+};
 use crate::ids;
 
 /// The time source the viewport steps its camera by; read once per render.
@@ -125,6 +127,8 @@ pub struct DemoViewport {
     reported: CameraState,
     /// The boxes at the shown tick, shared by every draw so the worker uploads them once.
     boxes: Arc<[PlayerBox]>,
+    /// The projectiles at the shown tick, rebuilt and shared exactly like the boxes.
+    shots: Arc<[ProjectileShot]>,
     /// The tick and hidden player the boxes were built for, once tracks drive them.
     boxes_for: Option<(f64, Option<PlayerId>)>,
     /// The still snapshot's tick, where playback starts so the picture does not jump.
@@ -223,6 +227,7 @@ impl DemoViewport {
             view,
             settling: false,
             boxes: math::player_boxes(snapshot),
+            shots: Arc::from([]),
             boxes_for: None,
             snapshot_tick: snapshot.map(DemoSnapshot::tick),
             playback: None,
@@ -438,6 +443,9 @@ impl DemoViewport {
             let key = (tick, self.view.hidden());
             if self.boxes_for != Some(key) {
                 self.boxes = math::player_boxes_except(Some(&tracks.at(tick)), key.1);
+                // First person hides the shots at the eye, as it hides the followed box.
+                let hide = key.1.map(|_| self.view.origin());
+                self.shots = math::projectile_shots(&tracks.projectiles_at(tick), hide);
                 self.boxes_for = Some(key);
             }
         }
@@ -498,7 +506,7 @@ impl DemoViewport {
             view_proj,
             seq: self.last_seq,
             players: Arc::clone(&self.boxes),
-            projectiles: Arc::from([]),
+            projectiles: Arc::clone(&self.shots),
         });
         self.drawn_size = Some((width, height));
     }
