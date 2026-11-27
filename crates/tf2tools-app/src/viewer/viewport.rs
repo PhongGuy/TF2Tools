@@ -498,6 +498,7 @@ impl DemoViewport {
             view_proj,
             seq: self.last_seq,
             players: Arc::clone(&self.boxes),
+            projectiles: Arc::from([]),
         });
         self.drawn_size = Some((width, height));
     }

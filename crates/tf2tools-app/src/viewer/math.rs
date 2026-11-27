@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-use tf2tools_core::{DemoSnapshot, MapMesh, PlayerId, Team};
+use tf2tools_core::{DemoSnapshot, MapMesh, PlayerId, ProjectileKind, ProjectileView, Team};
 
-use super::PlayerBox;
+use super::{PlayerBox, ProjectileShot};
 
 /// Degrees of turn per pixel of mouse drag.
 pub const LOOK_DEG_PER_PX: f32 = 0.22;
@@ -28,6 +28,14 @@ pub const BOX_DUCKED_HEIGHT: f32 = 62.0;
 pub const RED: [f32; 3] = [184.0 / 255.0, 56.0 / 255.0, 59.0 / 255.0];
 /// BLU's box colour, sRGB `#5885A2`.
 pub const BLU: [f32; 3] = [88.0 / 255.0, 133.0 / 255.0, 162.0 / 255.0];
+/// A long shot's length along its heading.
+pub const SHOT_LONG: f32 = 24.0;
+/// A long shot's width across its heading.
+pub const SHOT_THIN: f32 = 6.0;
+/// A round shot's size on every axis.
+pub const SHOT_ROUND: f32 = 8.0;
+/// In first person, shots nearer the eye than this are hidden, like the followed box.
+pub const PROJECTILE_HIDE_NEAR: f32 = 32.0;
 /// The steepest pitch the camera starts at, as `FreeFly` allows.
 const MAX_PITCH: f32 = 89.0;
 
@@ -197,6 +205,97 @@ pub fn player_box_vertices(player: &PlayerBox) -> [BoxVertex; 36] {
                 position: corners[quad[corner]],
                 color,
             };
+        }
+    }
+    out
+}
+
+fn normalize(a: [f32; 3]) -> [f32; 3] {
+    let len = dot(a, a).sqrt();
+    a.map(|c| c / len)
+}
+
+fn team_color(team: Team) -> [f32; 3] {
+    match team {
+        Team::Red => RED,
+        Team::Blue | _ => BLU,
+    }
+}
+
+/// The views as shots, in order; with `hide_near` (the first-person eye), shots closer than
+/// `PROJECTILE_HIDE_NEAR` to it are left out.
+pub fn projectile_shots(
+    views: &[ProjectileView],
+    hide_near: Option<[f32; 3]>,
+) -> Arc<[ProjectileShot]> {
+    views
+        .iter()
+        .filter(|view| {
+            hide_near.is_none_or(|eye| {
+                let d = [0, 1, 2].map(|i| view.position()[i] - eye[i]);
+                dot(d, d) >= PROJECTILE_HIDE_NEAR * PROJECTILE_HIDE_NEAR
+            })
+        })
+        .map(|view| {
+            // Only kinds that fly nose first lie along their heading, and only once they moved.
+            let shaped_long = match view.kind() {
+                ProjectileKind::Rocket
+                | ProjectileKind::Arrow
+                | ProjectileKind::Flare
+                | ProjectileKind::EnergyBall
+                | ProjectileKind::EnergyRing => true,
+                ProjectileKind::Pipe
+                | ProjectileKind::Sticky
+                | ProjectileKind::Thrown
+                | ProjectileKind::Other
+                | _ => false,
+            };
+            ProjectileShot {
+                position: view.position(),
+                heading: view.heading(),
+                long: shaped_long && view.heading().is_some(),
+                team: view.team(),
+            }
+        })
+        .collect()
+}
+
+/// 8 triangles wound counter-clockwise seen from outside, in the team colour mixed halfway to white.
+pub fn projectile_vertices(shot: &ProjectileShot) -> [BoxVertex; 24] {
+    // A right-handed frame with u along the heading (else +X), so every face's tips can be
+    // ordered by the sign of its octant and still wind outward.
+    let u = shot
+        .heading
+        .filter(|_| shot.long)
+        .unwrap_or([1.0, 0.0, 0.0]);
+    let helper = if u[2].abs() > 0.9 {
+        [1.0, 0.0, 0.0]
+    } else {
+        [0.0, 0.0, 1.0]
+    };
+    let v = normalize(cross(helper, u));
+    let w = cross(u, v);
+    let (a, b) = if shot.long {
+        (SHOT_LONG / 2.0, SHOT_THIN / 2.0)
+    } else {
+        (SHOT_ROUND / 2.0, SHOT_ROUND / 2.0)
+    };
+    let color = team_color(shot.team).map(|c| c + (1.0 - c) * 0.5);
+    let tip = |axis: [f32; 3], scale: f32| [0, 1, 2].map(|i| shot.position[i] + axis[i] * scale);
+    let mut out = [BoxVertex {
+        position: shot.position,
+        color,
+    }; 24];
+    for octant in 0..8 {
+        let su = if octant & 1 == 0 { 1.0 } else { -1.0 };
+        let sv = if octant & 2 == 0 { 1.0 } else { -1.0 };
+        let sw = if octant & 4 == 0 { 1.0 } else { -1.0 };
+        let mut face = [tip(u, su * a), tip(v, sv * b), tip(w, sw * b)];
+        if su * sv * sw < 0.0 {
+            face.swap(1, 2);
+        }
+        for (slot, position) in face.into_iter().enumerate() {
+            out[octant * 3 + slot] = BoxVertex { position, color };
         }
     }
     out
