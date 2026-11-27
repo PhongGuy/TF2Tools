@@ -3705,6 +3705,8 @@ pub const DEMO_VIEWER_CAMERA_TARGET: &str = "demo-viewer-camera-target";
 pub const DEMO_VIEWER_CAMERA_DEAD: &str = "demo-viewer-camera-dead";
 /// The players list the camera chip's target button opens.
 pub const DEMO_VIEWER_PLAYERS: &str = "demo-viewer-players";
+/// The popover that holds the players list, around the camera chip's target button.
+pub const DEMO_VIEWER_PLAYERS_POPOVER: &str = "demo-viewer-players-popover";
 
 /// A players-list row by the player's entity index: "demo-viewer-player-<entity>".
 pub fn demo_viewer_player(entity: u32) -> ElementId {

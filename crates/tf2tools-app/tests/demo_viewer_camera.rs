@@ -8,7 +8,8 @@ use tf2tools_core::{CameraMode, PlaybackEvent};
 
 use crate::support;
 use crate::support::demo_viewer::{
-    DemoViewerShell, camera_tracks, gated_playback, open_scripted, open_with, walking,
+    DemoViewerShell, LockCall, camera_tracks, gated_playback, open_scripted, open_with,
+    open_with_locked, walking,
 };
 
 fn viewport(cx: &mut TestAppContext, w: &DemoViewerShell) -> Entity<DemoViewport> {
@@ -207,4 +208,18 @@ fn the_players_list_marks_the_dead(cx: &mut TestAppContext) {
         label(cx, &w, ids::demo_viewer_player(1)).as_deref(),
         Some("Alice")
     );
+}
+
+#[gpui_kit::test]
+fn a_players_list_pick_never_reaches_the_map(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (w, lock) = open_with_locked(cx, &env, camera_tracks());
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
+    support::click_id(cx, w.s.win, ids::demo_viewer_player(3));
+    assert!(
+        !lock.calls().contains(&LockCall::Lock),
+        "a pick in the players list reached the map"
+    );
+    // A click on the map would step from Alice to Bob, so entity 3 means only the pick landed.
+    assert_eq!(state(cx, &w).target.map(PlayerId::entity), Some(3));
 }

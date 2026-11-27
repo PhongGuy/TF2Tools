@@ -339,15 +339,8 @@ pub fn demo_viewer_shell_with(
     demo_viewer_shell_in(cx, env, state, picks, answer, playback, None, None, None)
 }
 
-/// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
-/// with `stored` saved as the look sensitivity before the page opens.
-pub fn demo_viewer_shell_locked(
-    cx: &mut TestAppContext,
-    env: &super::Env,
-    state: Tf2State,
-    picks: Vec<PathBuf>,
-    stored: Option<LookSensitivity>,
-) -> (DemoViewerShell, FakeLockHandle) {
+/// A lock factory whose fake locks grab and share the one handle returned beside it.
+fn fake_locks() -> (PointerLockFactory, FakeLockHandle) {
     let handle = FakeLockHandle {
         calls: Arc::default(),
         motions: Arc::default(),
@@ -360,6 +353,19 @@ pub fn demo_viewer_shell_locked(
             locked: false,
         })
     });
+    (locks, handle)
+}
+
+/// `demo_viewer_shell` whose viewports all take fake locks that grab and share one handle,
+/// with `stored` saved as the look sensitivity before the page opens.
+pub fn demo_viewer_shell_locked(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    state: Tf2State,
+    picks: Vec<PathBuf>,
+    stored: Option<LookSensitivity>,
+) -> (DemoViewerShell, FakeLockHandle) {
+    let (locks, handle) = fake_locks();
     let w = demo_viewer_shell_in(
         cx,
         env,
@@ -651,6 +657,34 @@ pub fn open_with(
     super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
     super::settle(cx, w.s.win);
     w
+}
+
+/// `open_with` whose viewport takes fake locks that share the returned handle.
+pub fn open_with_locked(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    tracks: Arc<DemoTracks>,
+) -> (DemoViewerShell, FakeLockHandle) {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(Arc::clone(&tracks))]);
+    gate.open();
+    install_map(env, "cp_synthetic");
+    let demo = demo_file(env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let (locks, handle) = fake_locks();
+    let w = demo_viewer_shell_in(
+        cx,
+        env,
+        found(env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+        None,
+        Some(locks),
+        None,
+    );
+    super::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    super::settle(cx, w.s.win);
+    (w, handle)
 }
 
 /// Puts the synthetic map at `tf/maps/<name>.bsp` in `env`'s game.

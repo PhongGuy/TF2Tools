@@ -223,7 +223,7 @@ impl DemoViewerPage {
             }
         }
         let page = cx.entity().downgrade();
-        Popover::new("demo-viewer-players-popover")
+        Popover::new(ids::DEMO_VIEWER_PLAYERS_POPOVER)
             .anchor(Anchor::BottomLeft)
             .open(self.players_open)
             .on_open_change(move |&open, _, cx| {
