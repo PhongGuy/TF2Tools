@@ -118,9 +118,12 @@ fn the_cycle_goes_chase_then_free_fly_at_the_drawn_pose(cx: &mut TestAppContext)
     let chase = view(cx, &viewport);
     assert_eq!(chase.hidden(), None);
     let o = chase.origin();
-    // Behind Alice's eye at x 0, never farther than the 96-unit chase.
-    assert!(o[0] <= 1e-3 && o[0] >= -96.001, "{o:?}");
-    assert!(o[1].abs() < 1e-3 && (o[2] - 129.).abs() < 1e-3, "{o:?}");
+    // On the arm from Alice's eye at x 0, never past 150 back and 24 up.
+    assert!(o[0] <= 1e-3 && o[0] >= -150.001, "{o:?}");
+    assert!(
+        o[1].abs() < 1e-3 && (o[2] - (129. - o[0] * 24. / 150.)).abs() < 1e-3,
+        "{o:?}"
+    );
     assert_eq!(boxes(&stub), 2);
     on(cx, &viewport, |v, cx| v.cycle_camera(cx));
     support::settle(cx, win);
@@ -183,8 +186,9 @@ fn a_dead_target_shows_its_chase_and_comes_back_at_respawn(cx: &mut TestAppConte
 }
 
 // Carol (entity 1) looks 70 degrees up from feet at (60, 32, 0) until tick 1099, so her chase
-// ray runs down and back into the synthetic map's 64x64 floor at z 0, about 69 units out.
-// From 1100 she stands at x 1000, off the floor, where nothing stops the 96-unit chase.
+// ray runs down and back into the synthetic map's 64x64 floor at z 0, about 71 units out (65
+// after the wall offset). From 1100 she stands at x 1000, off the floor, where nothing stops
+// the 127.71-unit chase.
 fn over_the_floor_then_off_it() -> Arc<DemoTracks> {
     let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (1000..=1200u32)
         .map(|t| {
@@ -231,7 +235,7 @@ fn the_chase_stops_short_of_the_floor_and_a_seek_snaps_it_back_out(cx: &mut Test
     // Without the snap the distance would still read about 63 here and only grow later.
     on(cx, &viewport, |v, cx| v.seek(1150., cx));
     let off_floor = chase_distance(cx, &viewport, 1000.);
-    assert!((off_floor - 96.).abs() < 0.01, "{off_floor}");
+    assert!((off_floor - 127.71).abs() < 0.01, "{off_floor}");
 }
 
 #[gpui_kit::test]
@@ -262,7 +266,7 @@ fn a_paused_chase_keeps_growing_back_then_stops_drawing(cx: &mut TestAppContext)
     for _ in 0..60 {
         support::settle(cx, win);
     }
-    assert!((chase_distance(cx, &viewport, 1000.) - 96.).abs() < 0.01);
+    assert!((chase_distance(cx, &viewport, 1000.) - 127.71).abs() < 0.01);
     let drawn = stub.draws().len();
     for _ in 0..5 {
         support::settle(cx, win);
