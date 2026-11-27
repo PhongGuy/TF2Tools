@@ -6,7 +6,9 @@ use std::ops::ControlFlow;
 use std::path::Path;
 
 use tf_demo_parser::demo::data::{DemoTick, UserInfo};
+use tf_demo_parser::demo::gameevent_gen::GameEvent;
 use tf_demo_parser::demo::message::Message;
+use tf_demo_parser::demo::message::gameevent::GameEventMessage;
 use tf_demo_parser::demo::message::packetentities::UpdateType;
 use tf_demo_parser::demo::packet::datatable::{ParseSendTable, ServerClass};
 use tf_demo_parser::demo::packet::message::MessagePacketMeta;
@@ -20,9 +22,11 @@ use tf_demo_parser::demo::sendprop::{SendProp, SendPropIdentifier};
 use tf_demo_parser::demo::vector::Vector;
 use tf_demo_parser::{Demo, DemoParser, MessageType, ParserState};
 
+use super::kills::{Death, KillRow, PartyRow, kill_row};
 use super::pick::{SENTINEL_TICK, SnapshotPicker, Step, TickFrame, TickRow, into_snapshot};
 use super::shots::{ShotProp, Shots, is_projectile};
 use super::{DemoSnapshot, MAX_SNAPSHOT_BYTES};
+use crate::demo_view::tracks::MAX_KILLS;
 use crate::error::DemoSnapshotError;
 use crate::hud_maker::Team;
 use crate::panic_mark::catching;
@@ -56,8 +60,8 @@ struct Extra {
     deleted: bool,
 }
 
-// Forwards everything to the game-state analyser and also tracks the round state, the
-// player resource's connected and alive arrays, flags, the view offset and deletions.
+// Forwards everything but game events to the game-state analyser and also tracks the round
+// state, the player resource's arrays, flags, the view offset, deletions and every kill.
 #[derive(Default)]
 struct Tracker {
     game: GameStateAnalyser,
@@ -66,6 +70,8 @@ struct Tracker {
     names: BTreeMap<u32, String>,
     names_version: u64,
     shots: Shots,
+    users: HashMap<u16, u32>,
+    kills: Vec<KillRow>,
 }
 
 impl MessageHandler for Tracker {
@@ -75,7 +81,23 @@ impl MessageHandler for Tracker {
         GameStateAnalyser::does_handle(message_type)
     }
 
+    // The analyser would keep every game event on unbounded lists, so deaths are read here.
     fn handle_message(&mut self, message: &Message, tick: DemoTick, state: &ParserState) {
+        if let Message::GameEvent(GameEventMessage { event, .. }) = message {
+            if let GameEvent::PlayerDeath(death) = event {
+                let death = Death {
+                    user_id: death.user_id,
+                    victim_entity: death.victim_ent_index,
+                    attacker: death.attacker,
+                    assister: death.assister,
+                    weapon: death.weapon.to_string(),
+                    crit_type: death.crit_type,
+                    death_flags: death.death_flags,
+                };
+                self.death(u32::from(tick), &death);
+            }
+            return;
+        }
         self.game.handle_message(message, tick, state);
         let Message::PacketEntities(packet) = message else {
             return;
@@ -167,12 +189,9 @@ impl MessageHandler for Tracker {
             );
             let entity = u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1);
             self.extra.entry(entity).or_default().userinfo = matches!(parsed, Ok(Some(_)));
-            // A cleared entry keeps the old name, so a player who left is still named.
-            if let Ok(Some(info)) = parsed
-                && !info.player_info.name.is_empty()
-            {
-                self.names.insert(entity, info.player_info.name);
-                self.names_version += 1;
+            if let Ok(Some(info)) = parsed {
+                let user_id = u16::from(info.player_info.user_id);
+                self.user_seen(index, user_id, &info.player_info.name);
             }
         }
     }
@@ -279,6 +298,45 @@ impl Tracker {
         }
     }
 
+    /// A parsed userinfo entry at string-table `index` (entity `index + 1`): maps the user id
+    /// and keeps a non-empty name, so a player who left is still named.
+    fn user_seen(&mut self, index: usize, user_id: u16, name: &str) {
+        let entity = u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1);
+        self.users.insert(user_id, entity);
+        if !name.is_empty() {
+            self.names.insert(entity, name.to_owned());
+            self.names_version += 1;
+        }
+    }
+
+    /// One PlayerDeath at `tick`; pushes its row while `kills.len() <= MAX_KILLS`, so one past
+    /// the cap is enough for the builder to see the overflow without the list growing further.
+    fn death(&mut self, tick: u32, death: &Death) {
+        if self.kills.len() > MAX_KILLS {
+            return;
+        }
+        let row = kill_row(tick, death, &self.users, |entity| self.party(entity));
+        if let Some(row) = row {
+            self.kills.push(row);
+        }
+    }
+
+    // A kill party as known at this moment: its name, and team and class from its player entity.
+    fn party(&self, entity: u32) -> PartyRow {
+        let player = self
+            .game
+            .state
+            .players
+            .iter()
+            .find(|p| u32::from(p.entity) == entity);
+        PartyRow {
+            entity,
+            name: self.names.get(&entity).cloned(),
+            team: player.and_then(|p| team(p.team)),
+            class: player.and_then(|p| class(p.class)),
+        }
+    }
+
     /// An id from `removed_entities`.
     fn removed(&mut self, entity: u32) {
         self.shots.end(entity);
@@ -322,6 +380,13 @@ impl Tracker {
     }
 }
 
+/// The kill rows past `*seen`, moving `*seen` to the end.
+fn kills_since(all: &[KillRow], seen: &mut usize) -> Vec<KillRow> {
+    let new = all.get(*seen..).unwrap_or_default().to_vec();
+    *seen = all.len();
+    new
+}
+
 /// What a parse knows about tick length: the header's totals and the server's interval.
 pub(crate) struct Clocking {
     pub header_ticks: u32,
@@ -348,6 +413,8 @@ pub(crate) fn drive(
     };
     // Names are copied only when the parser saw a new one, so frames never carry strings.
     let mut names_version = 0;
+    // Signon ticks are skipped before this, so their kills ride on the next real frame.
+    let mut kills_seen = 0;
     loop {
         match ticker.next() {
             Ok(Some(tick)) => {
@@ -360,7 +427,9 @@ pub(crate) fn drive(
                     names_version = tick.state.names_version;
                     clocking.names.clone_from(&tick.state.names);
                 }
-                if on_frame(tick.state.frame(at), &clocking).is_break() {
+                let mut frame = tick.state.frame(at);
+                frame.kills = kills_since(&tick.state.kills, &mut kills_seen);
+                if on_frame(frame, &clocking).is_break() {
                     break;
                 }
             }
@@ -463,5 +532,78 @@ mod tests {
         let left = t.frame(11).projectiles;
         assert_eq!(left.len(), 1);
         assert_eq!(left[0].origin, Some([1., 2., 3.]));
+    }
+    use super::super::kills::Death;
+    use crate::demo_view::tracks::MAX_KILLS;
+
+    fn death(user_id: u16, attacker: u16) -> Death {
+        Death {
+            user_id,
+            victim_entity: 0,
+            attacker,
+            assister: 0,
+            weapon: "knife".into(),
+            crit_type: 0,
+            death_flags: 0,
+        }
+    }
+
+    #[test]
+    fn deaths_become_kill_rows_with_the_names_of_the_moment() {
+        let mut t = Tracker::default();
+        t.user_seen(0, 10, "Alice");
+        t.user_seen(1, 11, "Bob");
+        t.death(500, &death(10, 11));
+        t.user_seen(0, 10, "Renamed");
+        t.death(600, &death(99, 11));
+        assert_eq!(t.kills.len(), 1, "an unknown victim is dropped");
+        let k = &t.kills[0];
+        assert_eq!(
+            (k.tick, k.victim.entity, k.victim.name.as_deref()),
+            (500, 1, Some("Alice"))
+        );
+        assert_eq!(
+            k.killer.as_ref().map(|p| (p.entity, p.name.as_deref())),
+            Some((2, Some("Bob")))
+        );
+        assert_eq!(
+            (k.victim.team, k.victim.class),
+            (None, None),
+            "no player entity was seen"
+        );
+    }
+
+    #[test]
+    fn an_empty_name_keeps_the_old_one_and_the_new_user_id_still_maps() {
+        let mut t = Tracker::default();
+        t.user_seen(4, 20, "Old");
+        t.user_seen(4, 21, "");
+        t.death(1, &death(21, 0));
+        assert_eq!(t.kills[0].victim.entity, 5);
+        assert_eq!(t.kills[0].victim.name.as_deref(), Some("Old"));
+    }
+
+    #[test]
+    fn the_kill_list_stops_one_past_the_cap() {
+        let mut t = Tracker::default();
+        t.user_seen(0, 10, "Alice");
+        for tick in 0..(MAX_KILLS as u32 + 5) {
+            t.death(tick, &death(10, 0));
+        }
+        assert_eq!(t.kills.len(), MAX_KILLS + 1);
+    }
+
+    #[test]
+    fn each_frame_gets_only_the_kills_since_the_last() {
+        let mut t = Tracker::default();
+        t.user_seen(0, 10, "Alice");
+        let mut seen = 0;
+        t.death(1, &death(10, 0));
+        t.death(1, &death(10, 0));
+        assert_eq!(kills_since(&t.kills, &mut seen).len(), 2);
+        assert!(kills_since(&t.kills, &mut seen).is_empty());
+        t.death(2, &death(10, 0));
+        let next = kills_since(&t.kills, &mut seen);
+        assert_eq!((next.len(), next[0].tick), (1, 2));
     }
 }
