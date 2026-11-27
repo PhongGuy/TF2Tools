@@ -27,8 +27,8 @@ pub struct DemosTfCrumb {
 }
 
 impl DemosTfCrumb {
-    /// A crumb for `viewer`, whose link sends `page` back to its list, or to `origin` when the
-    /// demo was opened from logs.tf.
+    /// A crumb for `viewer`, whose link sends `page` back to its list, or to `origin` when one
+    /// is set.
     pub fn new(
         page: WeakEntity<DemosTfPage>,
         viewer: &gpui_kit::Entity<DemoViewerPage>,
