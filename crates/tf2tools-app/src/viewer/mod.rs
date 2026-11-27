@@ -82,6 +82,8 @@ pub struct ProjectileShot {
     pub heading: Option<[f32; 3]>,
     pub long: bool,
     pub team: Team,
+    /// Multiplies the base size, so a far shot still covers `MIN_SHOT_PX`; 1 up close.
+    pub scale: f32,
 }
 
 /// A map renderer the viewport drives; the real one runs wgpu on its own thread.

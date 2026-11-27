@@ -305,6 +305,7 @@ fn a_shot_draws_lighter_than_its_box_and_moves_under_unchanged_boxes() {
             heading: Some([1., 0., 0.]),
             long: true,
             team: Team::Red,
+            scale: 1.0,
         };
         renderer.draw(DrawRequest {
             width: 64,

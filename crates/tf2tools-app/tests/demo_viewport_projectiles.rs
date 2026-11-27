@@ -3,7 +3,8 @@
 
 use std::sync::Arc;
 
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::test::TestEventExt as _;
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::viewer::ProjectileShot;
 use tf2tools_app::viewer::viewport::DemoViewport;
 use tf2tools_core::{DemoTracks, ProjectileKind, SnapshotPlayer, Team, TfClass};
@@ -146,4 +147,59 @@ fn first_person_hides_the_shot_at_the_eye_and_chase_shows_it(cx: &mut TestAppCon
     on(cx, &viewport, |v, cx| v.cycle_camera(cx));
     support::settle(cx, win);
     assert_eq!(shots(&stub).len(), 3, "chase hides nothing");
+}
+
+fn sticky_scale(shots: &[ProjectileShot]) -> f32 {
+    shots
+        .iter()
+        .find(|s| s.team == Team::Blue)
+        .expect("the sticky")
+        .scale
+}
+
+// A paused seek to the shown tick: one more draw with the tick and the camera unchanged.
+fn redraw(cx: &mut TestAppContext, viewport: &Entity<DemoViewport>, stub: &StubHandle) {
+    let (tick, drawn) = (
+        cx.update(|cx| viewport.read(cx).playback()).unwrap().tick,
+        stub.draws().len(),
+    );
+    on(cx, viewport, |v, cx| v.seek(tick, cx));
+    assert!(stub.draws().len() > drawn, "the seek drew nothing");
+}
+
+#[gpui_kit::test]
+fn backing_away_grows_the_shots_and_a_still_camera_reuses_them(cx: &mut TestAppContext) {
+    let (win, viewport, stub) = viewport_window(cx, StubAnswer::Frames);
+    on(cx, &viewport, |v, cx| v.set_tracks(shot_tracks(), cx));
+    support::settle(cx, win);
+    let near = shots(&stub);
+    redraw(cx, &viewport, &stub);
+    assert!(
+        Arc::ptr_eq(&near, &shots(&stub)),
+        "a still camera rebuilt the shots"
+    );
+    // Hold S to fly back thousands of units, then let the camera coast to rest. A click would
+    // follow a player, so the viewport takes the keyboard directly.
+    cx.update_window(win, |_, w, cx| {
+        viewport.update(cx, |v, cx| v.focus(w, cx));
+        w.key_down("s", false, cx);
+    })
+    .unwrap();
+    for _ in 0..120 {
+        support::settle(cx, win);
+    }
+    cx.update_window(win, |_, w, cx| w.key_up("s", cx)).unwrap();
+    for _ in 0..60 {
+        support::settle(cx, win);
+    }
+    let far = shots(&stub);
+    assert!(
+        sticky_scale(&far) > 1. && sticky_scale(&far) > sticky_scale(&near),
+        "{near:?} then {far:?}"
+    );
+    redraw(cx, &viewport, &stub);
+    assert!(
+        Arc::ptr_eq(&far, &shots(&stub)),
+        "a still camera rebuilt the far shots"
+    );
 }

@@ -34,6 +34,8 @@ pub const SHOT_LONG: f32 = 24.0;
 pub const SHOT_THIN: f32 = 6.0;
 /// A round shot's size on every axis.
 pub const SHOT_ROUND: f32 = 8.0;
+/// The fewest pixels a shot's narrower side covers on screen, however far it is.
+pub const MIN_SHOT_PX: f32 = 6.0;
 /// In first person, shots nearer the eye than this are hidden, like the followed box.
 pub const PROJECTILE_HIDE_NEAR: f32 = 32.0;
 /// The steepest pitch the camera starts at, as `FreeFly` allows.
@@ -222,11 +224,20 @@ fn team_color(team: Team) -> [f32; 3] {
     }
 }
 
+/// Where shots are seen from: the eye and the viewport's height in device pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ShotSight {
+    pub eye: [f32; 3],
+    pub height_px: u32,
+}
+
 /// The views as shots, in order; with `hide_near` (the first-person eye), shots closer than
-/// `PROJECTILE_HIDE_NEAR` to it are left out.
+/// `PROJECTILE_HIDE_NEAR` to it are left out. With a `sight`, each shot grows with its distance
+/// so it covers at least `MIN_SHOT_PX`; without one (no measured viewport) it keeps its base size.
 pub fn projectile_shots(
     views: &[ProjectileView],
     hide_near: Option<[f32; 3]>,
+    sight: Option<ShotSight>,
 ) -> Arc<[ProjectileShot]> {
     views
         .iter()
@@ -250,14 +261,28 @@ pub fn projectile_shots(
                 | ProjectileKind::Other
                 | _ => false,
             };
+            let long = shaped_long && view.heading().is_some();
+            let narrow = if long { SHOT_THIN } else { SHOT_ROUND };
             ProjectileShot {
                 position: view.position(),
                 heading: view.heading(),
-                long: shaped_long && view.heading().is_some(),
+                long,
                 team: view.team(),
+                scale: sight.map_or(1.0, |sight| shot_scale(view.position(), narrow, sight)),
             }
         })
         .collect()
+}
+
+// How much a shot whose narrower side is `narrow` units must grow at `at` to cover
+// `MIN_SHOT_PX`: one unit at distance d spans `height / (2 d tan(vfov / 2))` pixels.
+fn shot_scale(at: [f32; 3], narrow: f32, sight: ShotSight) -> f32 {
+    if sight.height_px == 0 {
+        return 1.0;
+    }
+    let d = [0, 1, 2].map(|i| at[i] - sight.eye[i]);
+    let units_per_px = 2.0 * dot(d, d).sqrt() * TAN_HALF_VFOV / sight.height_px as f32;
+    (MIN_SHOT_PX * units_per_px / narrow).max(1.0)
 }
 
 /// 8 triangles wound counter-clockwise seen from outside, in the team colour mixed halfway to white.
@@ -280,6 +305,7 @@ pub fn projectile_vertices(shot: &ProjectileShot) -> [BoxVertex; 24] {
     } else {
         (SHOT_ROUND / 2.0, SHOT_ROUND / 2.0)
     };
+    let (a, b) = (a * shot.scale, b * shot.scale);
     let color = team_color(shot.team).map(|c| c + (1.0 - c) * 0.5);
     let tip = |axis: [f32; 3], scale: f32| [0, 1, 2].map(|i| shot.position[i] + axis[i] * scale);
     let mut out = [BoxVertex {
