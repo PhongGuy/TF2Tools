@@ -251,6 +251,13 @@ demo_viewer:
     dead: "Mort"
     target_dead: "%{name}, mort"
     players: "Joueurs"
+  killfeed:
+    title: "Killfeed"
+    kill: "%{killer} a éliminé %{victim} avec %{weapon}"
+    assisted: "%{killer} et %{assister} ont éliminé %{victim} avec %{weapon}"
+    died: "Mort de %{victim}"
+    unknown_weapon: "une arme inconnue"
+    markers: "Éliminations sur la frise\u00A0: %{count}"
   playback:
     play: "Lire"
     pause: "Mettre en pause"

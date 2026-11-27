@@ -249,6 +249,13 @@ demo_viewer:
     dead: "Muerto"
     target_dead: "%{name}, muerto"
     players: "Jugadores"
+  killfeed:
+    title: "Registro de muertes"
+    kill: "%{killer} mató a %{victim} con %{weapon}"
+    assisted: "%{killer} y %{assister} mataron a %{victim} con %{weapon}"
+    died: "%{victim} murió"
+    unknown_weapon: "un arma desconocida"
+    markers: "Muertes en la línea de tiempo: %{count}"
   playback:
     play: "Reproducir"
     pause: "Pausa"

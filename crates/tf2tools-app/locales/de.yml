@@ -249,6 +249,13 @@ demo_viewer:
     dead: "Tot"
     target_dead: "%{name}, tot"
     players: "Spieler"
+  killfeed:
+    title: "Killfeed"
+    kill: "%{killer} hat %{victim} getötet. Waffe: %{weapon}"
+    assisted: "%{killer} und %{assister} haben %{victim} getötet. Waffe: %{weapon}"
+    died: "%{victim} ist gestorben"
+    unknown_weapon: "unbekannt"
+    markers: "Kills auf der Zeitleiste: %{count}"
   playback:
     play: "Abspielen"
     pause: "Anhalten"

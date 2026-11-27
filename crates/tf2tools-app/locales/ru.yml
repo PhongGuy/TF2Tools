@@ -224,6 +224,13 @@ demo_viewer:
     dead: "Мёртв"
     target_dead: "%{name}, мёртв"
     players: "Игроки"
+  killfeed:
+    title: "Лента убийств"
+    kill: "%{killer} убивает игрока %{victim}. Оружие: %{weapon}"
+    assisted: "%{killer} и %{assister} убивают игрока %{victim}. Оружие: %{weapon}"
+    died: "Игрок %{victim} погиб"
+    unknown_weapon: "неизвестно"
+    markers: "Убийства на шкале времени: %{count}"
   playback:
     play: "Воспроизвести"
     pause: "Пауза"
