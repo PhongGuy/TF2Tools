@@ -1,0 +1,156 @@
+//! The Demo Viewer bar's camera chip and players list, on tracks with names and a death.
+
+use gpui_kit::{ElementId, Entity, TestAppContext};
+use tf2tools_app::ids;
+use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
+use tf2tools_core::{CameraMode, PlaybackEvent};
+
+use crate::support;
+use crate::support::demo_viewer::{
+    DemoViewerShell, camera_tracks, gated_playback, open_scripted, open_with, walking,
+};
+
+fn viewport(cx: &mut TestAppContext, w: &DemoViewerShell) -> Entity<DemoViewport> {
+    cx.update(|cx| {
+        let page = w.s.shell.read(cx).demo_viewer_page(cx).expect("the viewer");
+        page.read(cx).viewport().expect("a viewport").clone()
+    })
+}
+
+fn state(cx: &mut TestAppContext, w: &DemoViewerShell) -> CameraState {
+    let v = viewport(cx, w);
+    cx.update(|cx| v.read(cx).camera_state())
+}
+
+fn seek(cx: &mut TestAppContext, w: &DemoViewerShell, tick: f64) {
+    let v = viewport(cx, w);
+    cx.update(|cx| v.update(cx, |v, cx| v.seek(tick, cx)));
+    support::settle(cx, w.s.win);
+}
+
+fn label(cx: &mut TestAppContext, w: &DemoViewerShell, id: impl Into<ElementId>) -> Option<String> {
+    support::label_of(cx, w.s.win, id)
+}
+
+#[gpui_kit::test]
+fn the_camera_chip_names_its_controls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_MODE).as_deref(),
+        Some("Camera: Free camera")
+    );
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET_PREV).as_deref(),
+        Some("Previous player")
+    );
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT).as_deref(),
+        Some("Next player")
+    );
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET).as_deref(),
+        Some("No player")
+    );
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_DEAD));
+}
+
+#[gpui_kit::test]
+fn the_mode_button_cycles_and_names_the_target(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_MODE);
+        seen.push((
+            label(cx, &w, ids::DEMO_VIEWER_CAMERA_MODE).unwrap(),
+            label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET).unwrap(),
+        ));
+    }
+    let pair = |a: &str, b: &str| (a.to_owned(), b.to_owned());
+    assert_eq!(
+        seen,
+        vec![
+            pair("Camera: First person", "Alice"),
+            pair("Camera: Chase camera", "Alice"),
+            pair("Camera: Free camera", "Alice"),
+        ]
+    );
+}
+
+#[gpui_kit::test]
+fn the_arrows_step_through_the_players_and_wrap(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    let mut seen = Vec::new();
+    for id in [
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET_PREV,
+    ] {
+        support::click_id(cx, w.s.win, id);
+        seen.push(label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET).unwrap());
+    }
+    assert_eq!(seen, ["Alice", "Bob", "Player 3", "Alice", "Player 3"]);
+    assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
+}
+
+#[gpui_kit::test]
+fn a_dead_target_shows_the_dead_badge_until_respawn(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_DEAD));
+    seek(cx, &w, 4140.);
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_DEAD).as_deref(),
+        Some("Dead")
+    );
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET).as_deref(),
+        Some("Bob, dead")
+    );
+    seek(cx, &w, 4180.);
+    assert!(!support::present(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_DEAD));
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_CAMERA_TARGET).as_deref(),
+        Some("Bob")
+    );
+}
+
+#[gpui_kit::test]
+fn the_chip_waits_for_the_tracks(cx: &mut TestAppContext) {
+    let env = support::env();
+    // The still picture and some progress arrive; the tracks wait behind the gate.
+    let (reader, gate) = gated_playback(
+        || {
+            vec![
+                PlaybackEvent::Snapshot(Ok(walking(4100, 100.))),
+                PlaybackEvent::Progress(0.4),
+            ]
+        },
+        || vec![PlaybackEvent::Tracks(camera_tracks())],
+    );
+    let w = open_scripted(cx, &env, reader);
+    support::wait_real(cx, "the reading note", |cx| {
+        support::present(cx, w.s.win, ids::DEMO_VIEWER_READING)
+    });
+    for id in [
+        ids::DEMO_VIEWER_CAMERA_MODE,
+        ids::DEMO_VIEWER_CAMERA_TARGET_PREV,
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET,
+    ] {
+        assert!(
+            support::disabled_of(cx, w.s.win, id),
+            "{id} is live before the tracks"
+        );
+    }
+    gate.open();
+    support::wait_real(cx, "the tracks", |cx| {
+        !support::disabled_of(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_MODE)
+    });
+}

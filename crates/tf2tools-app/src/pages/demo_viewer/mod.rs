@@ -42,6 +42,7 @@ use crate::viewer::viewport::DemoViewport;
 use crate::widgets::{Named as _, labelled};
 
 mod bar;
+mod camera;
 mod timeline;
 
 pub use bar::BarPlace;

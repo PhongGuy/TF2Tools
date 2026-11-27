@@ -18,7 +18,9 @@ use super::DemoViewerPage;
 use crate::i18n::tr;
 use crate::ids;
 use crate::viewer::load::{snapshot_time, timeline_time};
-use crate::viewer::viewport::{DemoViewport, PlaybackMoved, PlaybackState};
+use crate::viewer::viewport::{
+    CameraMoved, CameraState, DemoViewport, PlaybackMoved, PlaybackState,
+};
 use crate::widgets::tip::tip_box;
 use crate::widgets::{Named as _, labelled};
 
@@ -47,7 +49,9 @@ pub(super) struct Timeline {
     rounds: Vec<u32>,
     cut_note: Option<SharedString>,
     shown: Option<(u64, bool, f32)>,
-    _watch: [Subscription; 2],
+    /// The camera state the bar last drew.
+    camera: CameraState,
+    _watch: [Subscription; 3],
 }
 
 impl Timeline {
@@ -112,6 +116,9 @@ impl DemoViewerPage {
                     page.playback_moved(ev.0, window, cx);
                 },
             ),
+            cx.subscribe(viewport, |page, _, ev: &CameraMoved, cx| {
+                page.camera_moved(ev.0, cx);
+            }),
         ];
         self.timeline = Some(Timeline {
             slider,
@@ -120,6 +127,7 @@ impl DemoViewerPage {
             rounds: tracks.round_starts().to_vec(),
             cut_note: cut_note(tracks),
             shown: state.map(shown),
+            camera: viewport.read(cx).camera_state(),
             _watch: watch,
         });
         cx.notify();
@@ -145,13 +153,22 @@ impl DemoViewerPage {
         }
     }
 
+    fn camera_moved(&mut self, state: CameraState, cx: &mut Context<Self>) {
+        if let Some(timeline) = self.timeline.as_mut()
+            && timeline.camera != state
+        {
+            timeline.camera = state;
+            cx.notify();
+        }
+    }
+
     fn seek(&mut self, tick: f64, cx: &mut Context<Self>) {
         if let Some(viewport) = self.viewport().cloned() {
             viewport.update(cx, |v, cx| v.seek(tick, cx));
         }
     }
 
-    fn on_viewport(
+    pub(super) fn on_viewport(
         &self,
         cx: &mut Context<Self>,
         f: impl FnOnce(&mut DemoViewport, &mut Context<DemoViewport>),
@@ -281,6 +298,7 @@ impl DemoViewerPage {
             .child(back)
             .child(play)
             .child(forward)
+            .child(self.camera_chip(viewport, cx))
             .child(timeline)
             .child(labelled(
                 div()

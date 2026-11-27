@@ -53,6 +53,7 @@ mod crosshairs_perf;
 mod curated_model;
 mod demo_viewer;
 mod demo_viewer_bar;
+mod demo_viewer_camera;
 mod demo_viewer_download;
 mod demo_viewer_playback;
 mod demo_viewport;

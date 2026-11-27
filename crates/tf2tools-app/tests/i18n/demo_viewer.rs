@@ -24,6 +24,7 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
         hint.is_some_and(|h| h != ENGLISH_HINT),
         "{lang}: the hint is not translated"
     );
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
     let page = support::bounds_of(cx, w.s.win, ids::page(Page::DemosTf)).unwrap();
     let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).unwrap();
     assert!(inside(bar, page), "{lang} {width}: {bar:?} leaves {page:?}");
@@ -37,6 +38,10 @@ fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
         ids::DEMO_VIEWER_TIMELINE,
         ids::DEMO_VIEWER_TIME,
         ids::DEMO_VIEWER_SPEED,
+        ids::DEMO_VIEWER_CAMERA_MODE,
+        ids::DEMO_VIEWER_CAMERA_TARGET_PREV,
+        ids::DEMO_VIEWER_CAMERA_TARGET_NEXT,
+        ids::DEMO_VIEWER_CAMERA_TARGET,
     ] {
         let part = support::bounds_of(cx, w.s.win, id).unwrap();
         assert!(

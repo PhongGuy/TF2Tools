@@ -561,6 +561,25 @@ pub fn walking_tracks(cut: Option<TrackCut>) -> Arc<DemoTracks> {
     )
 }
 
+/// Alice (entity 1, BLU) walks +x over ticks 4000..=4200 at the fixture's tick; Bob (2, RED)
+/// stands and is dead from 4120 to 4169 (0.76 s); entity 3 (RED) has no name.
+pub fn camera_tracks() -> Arc<DemoTracks> {
+    let soldier =
+        |team, x| SnapshotPlayer::new(team, TfClass::Soldier, [x, 32., 0.], 0., 0., 68., false);
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (4000..=4200u32)
+        .map(|t| {
+            let mut rows = vec![(1, soldier(Team::Blue, (t - 4000) as f32))];
+            if !(4120..4170).contains(&t) {
+                rows.push((2, soldier(Team::Red, 20.)));
+            }
+            rows.push((3, soldier(Team::Red, 40.)));
+            (t, rows)
+        })
+        .collect();
+    let names = [(1, "Alice"), (2, "Bob")];
+    Arc::new(DemoTracks::from_entity_frames(60. / 3960., &frames, &names).expect("tracks"))
+}
+
 /// Opens the fixture demo with `reader` and waits for the viewport.
 pub fn open_scripted(
     cx: &mut TestAppContext,
@@ -617,7 +636,16 @@ pub fn open_with_tracks(
     env: &super::Env,
     cut: Option<TrackCut>,
 ) -> DemoViewerShell {
-    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(walking_tracks(cut))]);
+    open_with(cx, env, walking_tracks(cut))
+}
+
+/// Opens the fixture demo with `tracks` already read, and waits for them.
+pub fn open_with(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    tracks: Arc<DemoTracks>,
+) -> DemoViewerShell {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(Arc::clone(&tracks))]);
     gate.open();
     let w = open_scripted(cx, env, reader);
     super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
