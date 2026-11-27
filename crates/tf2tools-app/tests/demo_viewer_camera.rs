@@ -1,5 +1,7 @@
 //! The Demo Viewer bar's camera chip and players list, on tracks with names and a death.
 
+use std::sync::Arc;
+
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     AppContext as _, ElementId, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
@@ -8,7 +10,7 @@ use gpui_kit::{
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
 use tf2tools_core::PlayerId;
-use tf2tools_core::{CameraMode, PlaybackEvent};
+use tf2tools_core::{CameraMode, DemoTracks, PlaybackEvent, SnapshotPlayer, Team, TfClass};
 
 use crate::support;
 use crate::support::demo_viewer::{
@@ -387,6 +389,34 @@ fn the_hint_follows_the_camera(cx: &mut TestAppContext) {
         Some(follow)
     );
     support::press(cx, w.s.win, "space");
+    assert_eq!(state(cx, &w).mode, CameraMode::FreeFly);
+    assert_eq!(label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(), Some(free));
+}
+
+#[gpui_kit::test]
+fn the_hint_goes_back_to_flying_when_the_target_leaves_the_tracks(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, camera_tracks());
+    let free = "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
+    support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET_NEXT);
+    assert_ne!(state(cx, &w).mode, CameraMode::FreeFly);
+    // Tracks holding only entity 99 leave the followed player absent, so the camera drops itself.
+    let stranger = SnapshotPlayer::new(
+        Team::Red,
+        TfClass::Scout,
+        [60., 32., 64.],
+        0.,
+        0.,
+        68.,
+        false,
+    );
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (4000..=4200u32)
+        .map(|t| (t, vec![(99, stranger.clone())]))
+        .collect();
+    let tracks = DemoTracks::from_entity_frames(60. / 3960., &frames, &[]).expect("tracks");
+    let v = viewport(cx, &w);
+    cx.update(|cx| v.update(cx, |v, cx| v.set_tracks(Arc::new(tracks), cx)));
+    support::settle(cx, w.s.win);
     assert_eq!(state(cx, &w).mode, CameraMode::FreeFly);
     assert_eq!(label(cx, &w, ids::DEMO_VIEWER_HINT).as_deref(), Some(free));
 }
