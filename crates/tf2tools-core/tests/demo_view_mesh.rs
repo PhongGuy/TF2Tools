@@ -175,3 +175,24 @@ fn the_caps_are_the_specs() {
     assert_eq!(MAX_MAP_TRIANGLES, 1_000_000);
     assert_eq!(MAX_MAP_BYTES, 512 * 1024 * 1024);
 }
+
+#[test]
+fn a_ray_hits_the_drawn_floor() {
+    let mesh = mesh(BspOptions::default());
+    let hit = mesh
+        .ray_hit([32., 32., 50.], [0., 0., -1.], 96.)
+        .expect("hit");
+    assert!((hit - 50.).abs() < 1e-3, "{hit}");
+    assert_eq!(mesh.ray_hit([32., 32., 50.], [0., 0., 1.], 96.), None);
+    assert!(mesh.grid_bytes() > 0);
+}
+
+#[test]
+fn a_bad_ray_never_hits() {
+    let mesh = mesh(BspOptions::default());
+    assert_eq!(mesh.ray_hit([32., 32., 50.], [0., 0., -2.], 96.), None);
+    assert_eq!(mesh.ray_hit([32., 32., 50.], [0., 0., 0.], 96.), None);
+    assert_eq!(mesh.ray_hit([f32::NAN, 32., 50.], [0., 0., -1.], 96.), None);
+    assert_eq!(mesh.ray_hit([32., 32., 50.], [0., 0., -1.], f32::NAN), None);
+    assert_eq!(mesh.ray_hit([32., 32., 50.], [0., 0., -1.], -5.), None);
+}

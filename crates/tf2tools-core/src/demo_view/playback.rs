@@ -120,7 +120,9 @@ impl<'a, E: FnMut(PlaybackEvent) -> ControlFlow<()>> PlaybackRun<'a, E> {
                 if let Some(picker) = self.picker.take() {
                     self.send(PlaybackEvent::Snapshot(snapshot(picker)));
                 }
-                let tracks = std::mem::replace(&mut self.builder, TrackBuilder::new(0)).finish(
+                let mut builder = std::mem::replace(&mut self.builder, TrackBuilder::new(0));
+                builder.set_names(clocking.names.clone());
+                let tracks = builder.finish(
                     clocking.seconds_per_tick(),
                     clocking.header_ticks,
                     file_capped,
@@ -232,6 +234,7 @@ mod tests {
     use crate::demo_view::tracks::{MAX_TRACK_SAMPLES, TrackCut};
     use crate::hud_maker::Team;
     use crate::weapons::TfClass;
+    use std::collections::BTreeMap;
     use std::sync::atomic::Ordering;
 
     fn row(entity: u32, team: Team) -> TickRow {
@@ -258,6 +261,7 @@ mod tests {
             header_ticks,
             header_duration: header_ticks as f32 / 66.,
             server_interval: 1. / 66.,
+            names: BTreeMap::new(),
         }
     }
 
@@ -517,5 +521,21 @@ mod tests {
             "{events:?}"
         );
         assert!(!crate::panic_mark::is_marked());
+    }
+
+    #[test]
+    fn the_tracks_carry_the_names_the_parse_saw() {
+        let mut parsed = clocking(3000);
+        parsed.names = BTreeMap::from([(1, "Red One".to_owned()), (101, "Blu\u{7}".to_owned())]);
+        let (events, _) = run((0..60).map(settling), Ok(parsed), MAX_TRACK_SAMPLES, 3000);
+        let tracks = events
+            .iter()
+            .find_map(|e| match e {
+                PlaybackEvent::Tracks(t) => Some(Arc::clone(t)),
+                _ => None,
+            })
+            .expect("tracks");
+        let names: Vec<Option<&str>> = tracks.players().iter().map(|p| p.name()).collect();
+        assert_eq!(names, [Some("Red One"), Some("Blu")]);
     }
 }

@@ -1,6 +1,6 @@
 //! Feeds a demo's packets through tf-demo-parser, turning each tick into picker rows.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Read as _;
 use std::ops::ControlFlow;
 use std::path::Path;
@@ -52,6 +52,8 @@ struct Tracker {
     game: GameStateAnalyser,
     extra: HashMap<u32, Extra>,
     round_state: i64,
+    names: BTreeMap<u32, String>,
+    names_version: u64,
 }
 
 impl MessageHandler for Tracker {
@@ -141,6 +143,13 @@ impl MessageHandler for Tracker {
             );
             let entity = u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1);
             self.extra.entry(entity).or_default().userinfo = matches!(parsed, Ok(Some(_)));
+            // A cleared entry keeps the old name, so a player who left is still named.
+            if let Ok(Some(info)) = parsed
+                && !info.player_info.name.is_empty()
+            {
+                self.names.insert(entity, info.player_info.name);
+                self.names_version += 1;
+            }
         }
     }
 
@@ -238,6 +247,8 @@ pub(crate) struct Clocking {
     pub header_ticks: u32,
     pub header_duration: f32,
     pub server_interval: f32,
+    /// The last non-empty name each player entity was given.
+    pub names: BTreeMap<u32, String>,
 }
 
 // Steps packets, handing each real tick's frame to `on_frame` until it breaks or the input
@@ -253,7 +264,10 @@ pub(crate) fn drive(
         header_ticks: header.ticks,
         header_duration: header.duration,
         server_interval: 0.,
+        names: BTreeMap::new(),
     };
+    // Names are copied only when the parser saw a new one, so frames never carry strings.
+    let mut names_version = 0;
     loop {
         match ticker.next() {
             Ok(Some(tick)) => {
@@ -262,6 +276,10 @@ pub(crate) fn drive(
                     continue;
                 }
                 clocking.server_interval = tick.state.game.state.interval_per_tick;
+                if tick.state.names_version != names_version {
+                    names_version = tick.state.names_version;
+                    clocking.names.clone_from(&tick.state.names);
+                }
                 if on_frame(tick.state.frame(at), &clocking).is_break() {
                     break;
                 }
