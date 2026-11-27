@@ -282,6 +282,16 @@ mod tests {
     }
 
     #[test]
+    fn a_new_class_on_a_live_slot_is_a_new_life() {
+        let mut shots = Shots::default();
+        shots.update(5, "CTFProjectile_Rocket", true, [ShotProp::Origin(O)]);
+        shots.update(5, "CTFProjectile_Flare", false, [ShotProp::Origin(O)]);
+        let rows = shots.rows();
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].serial, rows[0].kind), (2, ProjectileKind::Flare));
+    }
+
+    #[test]
     fn end_removes_and_rows_come_in_entity_order() {
         let mut shots = Shots::default();
         for entity in [30, 10, 20] {

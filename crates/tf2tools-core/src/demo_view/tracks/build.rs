@@ -2,9 +2,10 @@
 
 use std::collections::BTreeMap;
 
+use super::projectiles::{ProjectileBuilder, sample_of};
 use super::{
-    DemoTracks, PlayerId, PlayerTrack, TrackCut, TrackRun, TrackSample, TrackedPlayer, clean_name,
-    pack_sample,
+    DemoTracks, MAX_PROJECTILE_SAMPLES, MAX_TRACK_SAMPLES, PlayerId, PlayerTrack, TrackCut,
+    TrackRun, TrackSample, TrackedPlayer, clean_name, pack_sample,
 };
 use crate::demo_view::snapshot::{SENTINEL_TICK, Step, TickFrame, TickRow, drawable, eye_height};
 use crate::weapons::TfClass;
@@ -24,10 +25,27 @@ struct Building {
     seen_in: u64,
 }
 
+/// The sample limits a builder stops at, each refusing the whole frame that would pass it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Caps {
+    pub samples: usize,
+    pub projectile_samples: usize,
+}
+
+impl Default for Caps {
+    fn default() -> Self {
+        Self {
+            samples: MAX_TRACK_SAMPLES,
+            projectile_samples: MAX_PROJECTILE_SAMPLES,
+        }
+    }
+}
+
 /// Turns tick frames into per-player runs, breaking a run wherever blending would lie.
 pub(crate) struct TrackBuilder {
-    sample_cap: usize,
+    caps: Caps,
     players: BTreeMap<u32, Building>,
+    shots: ProjectileBuilder,
     samples: usize,
     frames: u64,
     first_tick: Option<u32>,
@@ -41,9 +59,18 @@ pub(crate) struct TrackBuilder {
 impl TrackBuilder {
     /// A builder that stops before holding more than `sample_cap` samples.
     pub fn new(sample_cap: usize) -> Self {
+        Self::with_caps(Caps {
+            samples: sample_cap,
+            ..Caps::default()
+        })
+    }
+
+    /// A builder that stops before passing any of `caps`.
+    pub fn with_caps(caps: Caps) -> Self {
         Self {
-            sample_cap,
+            caps,
             players: BTreeMap::new(),
+            shots: ProjectileBuilder::default(),
             samples: 0,
             frames: 0,
             first_tick: None,
@@ -74,13 +101,20 @@ impl TrackBuilder {
             && frame.tick <= last
         {
             if frame.tick < last && self.frames == 1 {
-                *self = Self::new(self.sample_cap);
+                *self = Self::with_caps(self.caps);
             } else {
                 return Step::Continue;
             }
         }
         let rows: Vec<&TickRow> = frame.rows.iter().filter(|r| drawable(r)).collect();
-        if self.samples + rows.len() > self.sample_cap {
+        let sampled = frame
+            .projectiles
+            .iter()
+            .filter(|r| sample_of(r).is_some())
+            .count();
+        if self.samples + rows.len() > self.caps.samples
+            || self.shots.sample_count() + sampled > self.caps.projectile_samples
+        {
             self.capped = Some(self.last_tick.unwrap_or(frame.tick));
             return Step::Done;
         }
@@ -95,6 +129,7 @@ impl TrackBuilder {
         for row in rows {
             self.add(row, frame.tick, seconds_per_tick);
         }
+        self.shots.push(frame.tick, &frame.projectiles);
         Step::Continue
     }
 
@@ -174,6 +209,7 @@ impl TrackBuilder {
             .collect();
         let mut round_starts = self.round_starts;
         round_starts.shrink_to_fit();
+        let (projectiles, projectile_samples) = self.shots.finish();
         Some(DemoTracks {
             players,
             names,
@@ -182,6 +218,8 @@ impl TrackBuilder {
             seconds_per_tick,
             round_starts,
             cut,
+            projectiles,
+            projectile_samples,
         })
     }
 }

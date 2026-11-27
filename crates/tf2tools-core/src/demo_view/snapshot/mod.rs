@@ -13,6 +13,7 @@ pub(crate) use parse::{Clocking, drive, read_prefix};
 pub(crate) use pick::{
     SENTINEL_TICK, SnapshotPicker, Step, TickFrame, TickRow, drawable, into_snapshot,
 };
+pub(crate) use shots::ProjectileRow;
 
 /// The most of a demo read when looking for players; the early-match tick sits well inside it.
 pub const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;

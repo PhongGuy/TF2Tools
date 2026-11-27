@@ -13,11 +13,14 @@ mod smooth;
 
 pub(crate) use build::TrackBuilder;
 pub(crate) use projectiles::ProjectileKind;
+use projectiles::{ProjectileSample, ProjectileTrack};
 
 /// The most of a demo read for its tracks; a longer demo plays up to where this prefix ends.
 pub const MAX_DEMO_BYTES: u64 = 512 * 1024 * 1024;
 /// The most samples the tracks hold; the timeline ends at the last frame kept under it.
 pub const MAX_TRACK_SAMPLES: usize = 8_000_000;
+/// The most projectile samples one demo's tracks hold (64 MB at 16 B).
+pub const MAX_PROJECTILE_SAMPLES: usize = 4_000_000;
 
 /// The sample flag bit for a crouched player.
 pub(crate) const DUCKED: u8 = 1;
@@ -221,6 +224,8 @@ pub struct DemoTracks {
     pub(crate) seconds_per_tick: f32,
     pub(crate) round_starts: Vec<u32>,
     pub(crate) cut: Option<TrackCut>,
+    pub(crate) projectiles: Vec<ProjectileTrack>,
+    pub(crate) projectile_samples: Vec<ProjectileSample>,
 }
 
 impl DemoTracks {
@@ -269,6 +274,16 @@ impl DemoTracks {
         self.runs().map(|r| r.samples.len()).sum()
     }
 
+    /// How many projectile tracks the demo holds.
+    pub fn projectile_count(&self) -> usize {
+        self.projectiles.len()
+    }
+
+    /// How many samples all projectile tracks hold together.
+    pub fn projectile_sample_count(&self) -> usize {
+        self.projectile_samples.len()
+    }
+
     /// The heap the tracks hold: every vector's capacity times its element size.
     pub fn heap_bytes(&self) -> usize {
         let players = self.players.capacity() * size_of::<PlayerTrack>();
@@ -287,7 +302,14 @@ impl DemoTracks {
                 .iter()
                 .map(|p| p.name.as_ref().map_or(0, String::capacity))
                 .sum::<usize>();
-        players + runs + samples + names + self.round_starts.capacity() * size_of::<u32>()
+        let projectiles = self.projectiles.capacity() * size_of::<ProjectileTrack>()
+            + self.projectile_samples.capacity() * size_of::<ProjectileSample>();
+        players
+            + runs
+            + samples
+            + names
+            + projectiles
+            + self.round_starts.capacity() * size_of::<u32>()
     }
 
     /// How many samples repeat the previous one of their run in feet, yaw and pitch.
@@ -424,6 +446,8 @@ impl DemoTracks {
             seconds_per_tick,
             round_starts,
             cut,
+            projectiles: Vec::new(),
+            projectile_samples: Vec::new(),
         })
     }
 
