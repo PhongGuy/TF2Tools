@@ -15,6 +15,8 @@ use gpui_kit::{
 use tf2tools_core::{DemoTracks, TrackCut};
 
 use super::DemoViewerPage;
+use super::killfeed::{FeedRow, feed_key, feed_rows};
+use crate::i18n;
 use crate::i18n::tr;
 use crate::ids;
 use crate::viewer::load::{snapshot_time, timeline_time};
@@ -51,6 +53,12 @@ pub(super) struct Timeline {
     shown: Option<(u64, bool, f32)>,
     /// The camera state the bar last drew.
     camera: CameraState,
+    tracks: Arc<DemoTracks>,
+    /// The feed's rows at `feed_tick`, built in `feed_locale`, and the key they were built for.
+    pub(super) feed: Vec<FeedRow>,
+    feed_key: (usize, Option<u32>),
+    feed_tick: f64,
+    feed_locale: &'static str,
     _watch: [Subscription; 3],
 }
 
@@ -120,6 +128,7 @@ impl DemoViewerPage {
                 page.camera_moved(ev.0, cx);
             }),
         ];
+        let tick = state.map_or(f64::from(first), |s| s.tick);
         self.timeline = Some(Timeline {
             slider,
             first,
@@ -128,6 +137,11 @@ impl DemoViewerPage {
             cut_note: cut_note(tracks),
             shown: state.map(shown),
             camera: viewport.read(cx).camera_state(),
+            tracks: Arc::clone(tracks),
+            feed: feed_rows(tracks, tick),
+            feed_key: feed_key(tracks, tick),
+            feed_tick: tick,
+            feed_locale: i18n::current(),
             _watch: watch,
         });
         cx.notify();
@@ -146,10 +160,28 @@ impl DemoViewerPage {
         timeline
             .slider
             .update(cx, |st, cx| st.set_value(state.tick as f32, window, cx));
+        // The key is two searches and no allocation, so only a changed feed builds rows.
+        timeline.feed_tick = state.tick;
+        let key = feed_key(&timeline.tracks, state.tick);
+        let fed = timeline.feed_key != key;
+        if fed {
+            timeline.feed_key = key;
+            timeline.feed = feed_rows(&timeline.tracks, state.tick);
+        }
         let now = Some(shown(state));
-        if timeline.shown != now {
+        if fed || timeline.shown != now {
             timeline.shown = now;
             cx.notify();
+        }
+    }
+
+    // The rows hold translated fallback names, so a language switch rebuilds them as it draws.
+    pub(super) fn refresh_feed_locale(&mut self) {
+        if let Some(timeline) = self.timeline.as_mut()
+            && timeline.feed_locale != i18n::current()
+        {
+            timeline.feed_locale = i18n::current();
+            timeline.feed = feed_rows(&timeline.tracks, timeline.feed_tick);
         }
     }
 

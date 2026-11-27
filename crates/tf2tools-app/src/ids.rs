@@ -3692,6 +3692,16 @@ pub const DEMO_VIEWER_PLAYBACK_NOTE: &str = "demo-viewer-playback-note";
 pub fn demo_viewer_round_marker(n: usize) -> ElementId {
     ElementId::Name(format!("demo-viewer-round-marker-{n}").into())
 }
+/// The Demo Viewer's kill feed overlay.
+pub const DEMO_VIEWER_KILLFEED: &str = "demo-viewer-killfeed";
+/// The kill feed's `n`th shown row, oldest first, from 0.
+pub fn demo_viewer_kill(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-{n}").into())
+}
+/// The kill icon in the feed's `n`th row.
+pub fn demo_viewer_kill_icon(n: usize) -> ElementId {
+    ElementId::Name(format!("demo-viewer-kill-icon-{n}").into())
+}
 
 /// The camera chip's mode button, which cycles free, first person and chase.
 pub const DEMO_VIEWER_CAMERA_MODE: &str = "demo-viewer-camera-mode";

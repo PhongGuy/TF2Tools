@@ -3,12 +3,22 @@
 
 use std::collections::HashMap;
 
-use gpui_kit::{px, size};
+use gpui_kit::{
+    ElementId, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    TestAppContext, px, size,
+};
+use tf2tools_app::ids;
 use tf2tools_app::kill_icons::KillIconImages;
 use tf2tools_app::pages::demo_viewer::{BarPlace, feed_key, feed_on_top, feed_rows, feed_words};
+use tf2tools_core::{CameraMode, PlayerId};
 use tf2tools_core::{Team, TfClass, WeaponNames};
 
+use crate::support;
 use crate::support::demo_viewer::killfeed_tracks;
+use crate::support::demo_viewer::{
+    DemoViewerShell, LONG_KILLER, LockCall, assert_feed_fits, inside, open_with, open_with_icons,
+    open_with_locked, seek_to as seek, send,
+};
 
 #[test]
 fn the_feed_holds_the_last_five_kills_with_both_sides() {
@@ -48,7 +58,8 @@ fn the_feed_holds_the_last_five_kills_with_both_sides() {
 fn the_feed_key_changes_exactly_when_the_rows_do() {
     let tracks = killfeed_tracks();
     let ticks = [
-        4000., 4019., 4020., 4025., 4030., 4069.5, 4070., 4100., 4150., 4155., 4160., 4200.,
+        4000., 4019., 4020., 4025., 4030., 4069.5, 4070., 4100., 4150., 4155., 4160., 4200., 4420.,
+        4470., 4600.,
     ];
     for pair in ticks.windows(2) {
         let same_key = feed_key(&tracks, pair[0]) == feed_key(&tracks, pair[1]);
@@ -57,6 +68,11 @@ fn the_feed_key_changes_exactly_when_the_rows_do() {
     }
     assert_eq!(feed_key(&tracks, 4100.), (5, Some(4070)));
     assert_eq!(feed_key(&tracks, 4000.), (0, None));
+    // The 6 s hold is about 396 ticks: by 4470 only the two kills after 4074 remain.
+    assert_eq!(feed_key(&tracks, 4420.), (5, Some(4160)));
+    assert_eq!(feed_key(&tracks, 4470.), (2, Some(4160)));
+    assert_eq!(feed_rows(&tracks, 4470.).len(), 2);
+    assert_eq!(feed_key(&tracks, 4600.), (0, None));
 }
 
 #[test]
@@ -106,4 +122,157 @@ fn the_feed_moves_to_the_bottom_only_under_a_bar_at_the_top() {
     assert!(!feed_on_top(middle_high, area, bar));
     // A bar that fills the page has no room either side; the feed keeps its usual corner.
     assert!(feed_on_top(top, bar, bar));
+}
+
+fn label(cx: &mut TestAppContext, w: &DemoViewerShell, id: impl Into<ElementId>) -> Option<String> {
+    support::label_of(cx, w.s.win, id)
+}
+
+fn camera(cx: &mut TestAppContext, w: &DemoViewerShell) -> (CameraMode, Option<u32>) {
+    cx.update(|cx| {
+        let page = w.s.shell.read(cx).demo_viewer_page(cx).expect("the viewer");
+        let state = page
+            .read(cx)
+            .viewport()
+            .expect("a viewport")
+            .read(cx)
+            .camera_state();
+        (state.mode, state.target.map(PlayerId::entity))
+    })
+}
+
+#[gpui_kit::test]
+fn the_feed_names_its_rows_follows_seeks_and_reads_the_same_after_seeking_back(
+    cx: &mut TestAppContext,
+) {
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    seek(cx, &w, 4100.);
+    assert_eq!(
+        label(cx, &w, ids::DEMO_VIEWER_KILLFEED).as_deref(),
+        Some("Kill feed")
+    );
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_kill(0)).as_deref(),
+        Some("Alice killed Bob with scattergun")
+    );
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_kill(4)).as_deref(),
+        Some("Bob died")
+    );
+    assert!(!support::present(cx, w.s.win, ids::demo_viewer_kill(5)));
+    let rows = |cx: &mut TestAppContext| -> Vec<Option<String>> {
+        (0..5)
+            .map(|n| label(cx, &w, ids::demo_viewer_kill(n)))
+            .collect()
+    };
+    let before = rows(cx);
+    seek(cx, &w, 4160.);
+    assert_eq!(
+        label(cx, &w, ids::demo_viewer_kill(3)).as_deref(),
+        Some("Player 3 and Bob killed Alice with tf_projectile_rocket")
+    );
+    seek(cx, &w, 4045.);
+    assert!(support::present(cx, w.s.win, ids::demo_viewer_kill(2)));
+    assert!(!support::present(cx, w.s.win, ids::demo_viewer_kill(3)));
+    seek(cx, &w, 4100.);
+    assert_eq!(rows(cx), before);
+}
+
+// At `width` x `height`, with the bar at the bottom and then the top, the feed fits and its
+// long row still names the 32-character killer.
+fn feed_fits(cx: &mut TestAppContext, width: f32, height: f32) {
+    for top in [false, true] {
+        let env = support::env();
+        let w = open_with(cx, &env, killfeed_tracks());
+        cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
+        support::settle(cx, w.s.win);
+        assert_feed_fits(cx, &w, top, &format!("{width}x{height} top={top}"));
+        let long = label(cx, &w, ids::demo_viewer_kill(4)).unwrap_or_default();
+        assert!(long.contains(LONG_KILLER), "the long row reads {long:?}");
+    }
+}
+
+#[gpui_kit::test]
+fn the_feed_fits_at_800_beside_a_bar_at_the_bottom_or_the_top(cx: &mut TestAppContext) {
+    feed_fits(cx, 800., 600.);
+}
+
+#[gpui_kit::test]
+fn the_feed_fits_at_1280_beside_a_bar_at_the_bottom_or_the_top(cx: &mut TestAppContext) {
+    feed_fits(cx, 1280., 800.);
+}
+
+// The widest icon the game has (128 x 32) between two 32-character names, at 800x600: the row
+// shows its icon and still fits the feed.
+#[gpui_kit::test]
+fn a_row_with_the_widest_icon_and_long_names_fits_the_feed(cx: &mut TestAppContext) {
+    let image = || tf2tools_app::previews::to_render_image(128, 32, vec![255; 128 * 32 * 4]);
+    let icons = KillIconImages::from_map(HashMap::from([
+        ("knife".to_owned(), image().unwrap()),
+        ("scattergun".to_owned(), image().unwrap()),
+    ]));
+    let env = support::env();
+    let w = open_with_icons(cx, &env, killfeed_tracks(), icons);
+    cx.simulate_window_resize(w.s.win, size(px(800.), px(600.)));
+    support::settle(cx, w.s.win);
+    assert_feed_fits(cx, &w, false, "icons at 800x600");
+    let row = support::bounds_of(cx, w.s.win, ids::demo_viewer_kill(4)).expect("the long row");
+    let icon = support::bounds_of(cx, w.s.win, ids::demo_viewer_kill_icon(4)).expect("its icon");
+    assert!(
+        inside(icon, row),
+        "the icon {icon:?} leaves its row {row:?}"
+    );
+    assert!(
+        icon.size.height > px(8.) && icon.size.width > px(8.),
+        "{icon:?}"
+    );
+    assert!(
+        !support::present(cx, w.s.win, ids::demo_viewer_kill_icon(2)),
+        "Bob's fall has none"
+    );
+}
+
+// A KWin click under the pointer lock: a buttonless move lands between the press and the
+// release. Over a kill row it must still reach the map, which follows the first player.
+#[gpui_kit::test]
+fn a_click_on_the_feed_reaches_the_map(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (w, lock) = open_with_locked(cx, &env, killfeed_tracks());
+    seek(cx, &w, 4100.);
+    let at = support::bounds_of(cx, w.s.win, ids::demo_viewer_kill(0))
+        .expect("a kill row")
+        .center();
+    let modifiers = Modifiers::default();
+    let moved = |pressed_button| MouseMoveEvent {
+        position: at,
+        pressed_button,
+        modifiers,
+    };
+    let button = MouseButton::Left;
+    send(cx, &w, moved(None));
+    send(
+        cx,
+        &w,
+        MouseDownEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count: 1,
+            first_mouse: false,
+        },
+    );
+    send(cx, &w, moved(None));
+    send(
+        cx,
+        &w,
+        MouseUpEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count: 1,
+        },
+    );
+    assert_eq!(camera(cx, &w), (CameraMode::FirstPerson, Some(1)));
+    assert!(lock.calls().contains(&LockCall::Lock), "{:?}", lock.calls());
 }

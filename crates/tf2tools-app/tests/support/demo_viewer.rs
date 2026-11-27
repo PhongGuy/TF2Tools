@@ -1,7 +1,7 @@
 //! A scripted `SceneRenderer` and a viewport-only window for the demo viewer's headless tests.
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -9,13 +9,16 @@ use std::time::{Duration, Instant};
 use gpui_kit::prelude::*;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
-    AnyWindowHandle, Bounds, Context, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, Pixels, Point, RenderImage, TestAppContext, Window, div, point,
-    px, relative,
+    AnyWindowHandle, Bounds, Context, ElementId, Entity, InputEvent, Modifiers, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, RenderImage, TestAppContext,
+    Window, div, point, px, relative,
 };
+use tf2tools_app::folder_load::FolderLoader;
 use tf2tools_app::ids;
+use tf2tools_app::kill_icons::{KillIconImages, LoadedKillIcons};
 use tf2tools_app::pages::demo_viewer::ReadState;
 use tf2tools_app::picker::ScriptedPicker;
+use tf2tools_app::services::Services;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::viewer::pointer::{FallbackLock, LockMode, PointerLock, PointerLockFactory};
@@ -817,4 +820,90 @@ pub fn killfeed_tracks() -> Arc<DemoTracks> {
     kills.push((4160, Some(spy), None, heavy, "knife", false, false));
     let tracks = Arc::into_inner(camera_tracks()).expect("a fresh Arc");
     Arc::new(tracks.with_test_kills(&kills))
+}
+
+/// Seeks the open viewer to `tick` and lets the page draw it.
+pub fn seek_to(cx: &mut TestAppContext, w: &DemoViewerShell, tick: f64) {
+    let viewport = cx.update(|cx| {
+        let page = w.s.shell.read(cx).demo_viewer_page(cx).expect("the viewer");
+        page.read(cx).viewport().expect("a viewport").clone()
+    });
+    cx.update(|cx| viewport.update(cx, |v, cx| v.seek(tick, cx)));
+    super::settle(cx, w.s.win);
+}
+
+/// On `killfeed_tracks` at 4160 (five rows, the long names last), with the bar pinned to the
+/// top when `top`: the feed and its rows stay in the page, off the bar and in their corner.
+pub fn assert_feed_fits(cx: &mut TestAppContext, w: &DemoViewerShell, top: bool, at: &str) {
+    seek_to(cx, w, 4160.);
+    if top {
+        bar_to_top(cx, w);
+    }
+    let bounds = |cx: &mut TestAppContext, id: ElementId| {
+        super::bounds_of(cx, w.s.win, id.clone()).unwrap_or_else(|| panic!("{at}: no {id:?}"))
+    };
+    let page = bounds(cx, ids::DEMO_VIEWER.into());
+    let bar = bounds(cx, ids::DEMO_VIEWER_BAR.into());
+    let feed = bounds(cx, ids::DEMO_VIEWER_KILLFEED.into());
+    assert!(
+        inside(feed, page),
+        "{at}: the feed {feed:?} leaves {page:?}"
+    );
+    assert!(
+        !overlap(feed, bar),
+        "{at}: the feed {feed:?} covers the bar {bar:?}"
+    );
+    assert!(
+        page.right() - feed.right() <= px(24.),
+        "{at}: {feed:?} is not at the right"
+    );
+    let corner = match top {
+        false => feed.top() - page.top(),
+        true => page.bottom() - feed.bottom(),
+    };
+    assert!(
+        corner <= px(24.),
+        "{at}: {feed:?} is {corner:?} from its corner of {page:?}"
+    );
+    for n in 0..5 {
+        let row = bounds(cx, ids::demo_viewer_kill(n));
+        assert!(
+            inside(row, feed),
+            "{at}: row {n} at {row:?} leaves the feed {feed:?}"
+        );
+    }
+}
+
+/// `open_with`, with the session's kill icons set to `icons` before the page first opens.
+pub fn open_with_icons(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    tracks: Arc<DemoTracks>,
+    icons: KillIconImages,
+) -> DemoViewerShell {
+    let (reader, gate) = still_then(move || vec![PlaybackEvent::Tracks(Arc::clone(&tracks))]);
+    gate.open();
+    install_map(env, "cp_synthetic");
+    let demo = demo_file(env, "match.dem", &demo_header("cp_synthetic", 60.0));
+    let w = demo_viewer_shell_with(
+        cx,
+        env,
+        found(env),
+        vec![demo],
+        StubAnswer::Frames,
+        Some(reader),
+    );
+    // The page takes the global load when it opens, so the fake one must be in place first.
+    // A Mutex makes the loader Sync whatever the images are; the load runs on the pool.
+    let icons = Mutex::new(icons);
+    let loader: FolderLoader<KillIconImages> =
+        Arc::new(move |_: &Services, _: &Path| icons.lock().unwrap().clone());
+    let loaded = cx.update(|cx| LoadedKillIcons::install_with(cx, loader));
+    super::wait_real(cx, "the kill icons", |cx| {
+        cx.update(|cx| !loaded.read(cx).icons().is_empty())
+    });
+    super::click_id(cx, w.s.win, ids::DEMOS_TF_OPEN);
+    super::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    super::settle(cx, w.s.win);
+    w
 }

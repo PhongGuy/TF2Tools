@@ -7,7 +7,9 @@ use tf2tools_app::shell::route::Page;
 
 use crate::LocaleGuard;
 use crate::support;
-use support::demo_viewer::{camera_tracks, inside, open_with, open_with_tracks, overlap};
+use support::demo_viewer::{
+    camera_tracks, inside, killfeed_tracks, open_with, open_with_tracks, overlap, seek_to,
+};
 
 const ENGLISH_HINT: &str =
     "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
@@ -290,4 +292,24 @@ fn the_camera_words_speak_every_language() {
             assert_ne!(follow, en_follow, "{lang} hint_follow is untranslated");
         }
     }
+}
+
+// The feed's rows hold the translated fallback name, so switching language while the feed
+// stands still must still rename the unnamed pyro.
+#[gpui_kit::test]
+fn the_kill_feed_renames_an_unnamed_player_when_the_language_changes(cx: &mut TestAppContext) {
+    let guard = LocaleGuard::hold();
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    seek_to(cx, &w, 4160.);
+    let row = |cx: &mut TestAppContext| {
+        support::label_of(cx, w.s.win, ids::demo_viewer_kill(3)).unwrap_or_default()
+    };
+    assert!(row(cx).starts_with("Player 3 "), "{}", row(cx));
+    tf2tools_app::i18n::apply("de");
+    cx.update(|cx| cx.refresh_windows());
+    support::settle(cx, w.s.win);
+    let german = row(cx);
+    assert!(german.starts_with("Spieler 3 "), "{german}");
+    drop(guard);
 }
