@@ -3,17 +3,20 @@
 
 use std::sync::{Arc, Mutex};
 
-use gpui_kit::test::TestEventExt as _;
+use gpui_kit::test::{TestEventExt as _, TestWindowExt as _};
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Entity, InputEvent as _, Modifiers, MouseButton,
-    MouseDownEvent, MouseUpEvent, Pixels, Point, TestAppContext, point, px,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, TestAppContext, point, px,
 };
 use tf2tools_app::ids;
+use tf2tools_app::viewer::pointer::LockMode;
 use tf2tools_app::viewer::viewport::{CameraMoved, CameraState, DemoViewport};
 use tf2tools_core::{CameraMode, CameraView, DemoTracks, PlayerId, SnapshotPlayer, Team, TfClass};
 
 use crate::support;
-use crate::support::demo_viewer::{StubAnswer, StubHandle, viewport_window};
+use crate::support::demo_viewer::{
+    StubAnswer, StubHandle, viewport_window, viewport_window_locked,
+};
 
 // Alice (entity 1, BLU) walks +x from x 0 at tick 1000, looking along +x, eye 65 over feet at
 // z 64. Bob (entity 2, RED) stands at x 500 and is dead from 1080 to 1139 (0.9 s at 66 tick).
@@ -506,6 +509,63 @@ fn a_press_and_release_in_one_frame_is_a_click(cx: &mut TestAppContext) {
     );
     click(cx, win, MouseButton::Left, still());
     assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(2));
+}
+
+// The Linux client ends a pointer lock on any release, and ending it sends a buttonless move at
+// the lock's start before the MouseUp (gpui-pre-linux `end_pointer_lock`, Wayland and X11 alike).
+// Each event comes in its own frame, as a compositor delivers them.
+#[gpui_kit::test]
+fn a_click_under_the_linux_lock_still_clicks(cx: &mut TestAppContext) {
+    let (win, viewport, _stub, lock) = viewport_window_locked(cx, LockMode::Locked);
+    on(cx, &viewport, |v, cx| v.set_tracks(two_players(), cx));
+    support::settle(cx, win);
+    let at = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
+        .expect("the viewport")
+        .center();
+    let linux_click = |cx: &mut TestAppContext, button: MouseButton| {
+        let modifiers = Modifiers::default();
+        let moved = |pressed_button| MouseMoveEvent {
+            position: at,
+            pressed_button,
+            modifiers,
+        };
+        let down = MouseDownEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count: 1,
+            first_mouse: false,
+        };
+        let up = MouseUpEvent {
+            button,
+            position: at,
+            modifiers,
+            click_count: 1,
+        };
+        for event in [
+            moved(None).to_platform_input(),
+            down.to_platform_input(),
+            moved(None).to_platform_input(),
+            up.to_platform_input(),
+        ] {
+            cx.update_window(win, |_, w, cx| {
+                let _ = w.dispatch_event(event, cx);
+                w.render_frame(cx);
+            })
+            .unwrap();
+            support::settle(cx, win);
+        }
+    };
+    linux_click(cx, MouseButton::Left);
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FirstPerson, Some(1), false)
+    );
+    linux_click(cx, MouseButton::Left);
+    assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(2));
+    linux_click(cx, MouseButton::Right);
+    assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(1));
+    assert_eq!(lock.calls().len(), 6, "{:?}", lock.calls());
 }
 
 #[gpui_kit::test]

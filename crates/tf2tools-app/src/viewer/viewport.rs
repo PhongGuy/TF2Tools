@@ -145,6 +145,8 @@ pub struct DemoViewport {
     /// A next-frame tick is scheduled; renders before it leave the camera be.
     tick_pending: bool,
     drag: Option<Drag>,
+    /// The button and spot of a still press a buttonless move ended; its release there is still a click.
+    loose: Option<(MouseButton, Point<Pixels>)>,
     focus: FocusHandle,
     failure: Option<RendererError>,
     clock: Clock,
@@ -233,6 +235,7 @@ impl DemoViewport {
             last_tick: None,
             tick_pending: false,
             drag: None,
+            loose: None,
             focus: cx.focus_handle(),
             failure: None,
             clock,
@@ -501,6 +504,7 @@ impl DemoViewport {
         }
         // Before the first prepaint there is no measured centre, so the press point stands in.
         let centre = self.bounds.get().map_or(ev.position, |b| b.center());
+        self.loose = None;
         self.lock.lock(ev.position, centre, window);
         self.drag = Some(Drag {
             last: ev.position,
@@ -513,11 +517,13 @@ impl DemoViewport {
 
     /// Ends the press on a button's release: one that never travelled past the slop is a
     /// click, left for the next player and right for the previous.
-    fn release(&mut self, button: MouseButton, cx: &mut Context<Self>) {
-        if let Some(drag) = self.drag
-            && !drag.turned
-            && drag.button == button
-        {
+    fn release(&mut self, button: MouseButton, at: Point<Pixels>, cx: &mut Context<Self>) {
+        let loose = self.loose.take();
+        let click = match self.drag {
+            Some(drag) => !drag.turned && drag.button == button,
+            None => loose == Some((button, at)),
+        };
+        if click {
             match button {
                 MouseButton::Left => self.next_target(cx),
                 MouseButton::Right => self.prev_target(cx),
@@ -539,10 +545,18 @@ impl DemoViewport {
     /// the motion is held until it passes the click slop, then turns by all of it at once.
     /// A move with no button held ends the press.
     fn drag_to(&mut self, ev: &MouseMoveEvent, window: &Window, cx: &mut Context<Self>) {
+        if self.loose.is_some_and(|(_, at)| at != ev.position) {
+            self.loose = None;
+        }
         let Some(mut drag) = self.drag else {
             return;
         };
         if ev.pressed_button.is_none() {
+            // The Linux client ends its lock on a release with a buttonless move before the
+            // MouseUp, so a still press stays a click for a release at the same spot.
+            if !drag.turned {
+                self.loose = Some((drag.button, ev.position));
+            }
             return self.end_drag(cx);
         }
         let mut by = self
@@ -659,7 +673,7 @@ impl Render for DemoViewport {
                 });
                 window.on_mouse_event(move |ev: &MouseUpEvent, phase, _, cx| {
                     if phase == DispatchPhase::Capture {
-                        let _ = this.update(cx, |v, cx| v.release(ev.button, cx));
+                        let _ = this.update(cx, |v, cx| v.release(ev.button, ev.position, cx));
                     }
                 });
                 if let Some((taken, seq)) = paint_taken.take() {
