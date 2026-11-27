@@ -291,6 +291,16 @@ mod tests {
         (0..3).all(|i| (a[i] - b[i]).abs() < 1e-3)
     }
 
+    // Where the chase sits `distance` along its back-and-up arm from `eye` on a level look.
+    fn chased(eye: [f32; 3], distance: f32) -> [f32; 3] {
+        let l = 150f32.hypot(24.);
+        [
+            eye[0] - 150. * distance / l,
+            eye[1],
+            eye[2] + 24. * distance / l,
+        ]
+    }
+
     fn draw(c: &mut SpectatorCamera, t: &DemoTracks, tick: f64) -> CameraView {
         c.view(Some(t), None, tick, 0.016, FlyInput::default())
     }
@@ -358,7 +368,7 @@ mod tests {
         c.next(&t, 10.);
         c.cycle(&t, 10.);
         let v = draw(&mut c, &t, 10.);
-        assert!(close(v.origin(), [4., 0., 132.]), "{:?}", v.origin());
+        assert!(close(v.origin(), [-50., 0., 156.]), "{:?}", v.origin());
         assert_eq!(v.hidden(), None);
     }
 
@@ -372,7 +382,7 @@ mod tests {
         let v = draw(&mut c, &t, 60.);
         assert_eq!(v.target(), Some((two, TargetLife::Dead)));
         assert_eq!(v.hidden(), None);
-        assert!(close(v.origin(), [104., 0., 132.]), "{:?}", v.origin());
+        assert!(close(v.origin(), [50., 0., 156.]), "{:?}", v.origin());
         let v = draw(&mut c, &t, 95.);
         assert_eq!(v.target(), Some((two, TargetLife::Alive)));
         assert!(close(v.origin(), [200., 0., 132.]), "{:?}", v.origin());
@@ -434,16 +444,26 @@ mod tests {
             [50., -1000., 1000.],
         );
         let mesh = MapMesh::from_positions(vec![a, b, cc, a, cc, d]);
+        let l = 150f32.hypot(24.);
+        let w = 50. * l / 150. - 6.;
         let mut c = camera();
         c.next(&t, 10.);
         c.cycle(&t, 10.);
         let v = c.view(Some(&t), Some(&mesh), 10., 0.016, FlyInput::default());
-        assert!(close(v.origin(), [56., 0., 132.]), "{:?}", v.origin());
+        assert!(
+            close(v.origin(), chased([100., 0., 132.], w)),
+            "{:?}",
+            v.origin()
+        );
         let v = c.view(Some(&t), None, 10., 0.5, FlyInput::default());
-        assert!(close(v.origin(), [32., 0., 132.]), "{:?}", v.origin());
+        assert!(
+            close(v.origin(), chased([100., 0., 132.], w + 38.)),
+            "{:?}",
+            v.origin()
+        );
         c.snap();
         let v = c.view(Some(&t), None, 10., 0., FlyInput::default());
-        assert!(close(v.origin(), [4., 0., 132.]), "{:?}", v.origin());
+        assert!(close(v.origin(), [-50., 0., 156.]), "{:?}", v.origin());
     }
 
     #[test]
@@ -469,12 +489,18 @@ mod tests {
             [50., -1000., 1000.],
         );
         let mesh = MapMesh::from_positions(vec![a, b, cc, a, cc, d]);
+        let l = 150f32.hypot(24.);
+        let w = 50. * l / 150. - 6.;
         let mut c = camera();
         c.next(&t, 5.);
         let v = c.view(Some(&t), Some(&mesh), 30., 0.016, FlyInput::default());
-        assert!(close(v.origin(), [56., 0., 132.]), "{:?}", v.origin());
+        assert!(
+            close(v.origin(), chased([100., 0., 132.], w)),
+            "{:?}",
+            v.origin()
+        );
         c.view(Some(&t), None, 65., 0.016, FlyInput::default());
         let v = c.view(Some(&t), None, 100., 0.016, FlyInput::default());
-        assert!(close(v.origin(), [4., 0., 132.]), "{:?}", v.origin());
+        assert!(close(v.origin(), [-50., 0., 156.]), "{:?}", v.origin());
     }
 }
