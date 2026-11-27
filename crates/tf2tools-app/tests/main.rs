@@ -199,6 +199,7 @@ mod logs_tf_rows;
 mod logs_tf_sort;
 mod logs_tf_sync;
 mod logs_tf_text;
+mod logs_tf_view_demo;
 mod logs_tf_weapons;
 mod logs_trim;
 mod maps;

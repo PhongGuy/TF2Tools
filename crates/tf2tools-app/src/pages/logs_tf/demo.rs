@@ -1,11 +1,14 @@
 //! An open log's demo on demos.tf: one lookup per log id, kept while the page lives, and the
-//! download its footer button starts.
+//! download and View demo its footer buttons start.
 
-use gpui_kit::{Context, Window};
+use std::path::PathBuf;
+
+use gpui_kit::{Context, EventEmitter, Window};
 use tf2tools_core::{DemoQuery, DemoSummary};
 
 use super::LogsTfPage;
 use crate::pages::demo_save::save_demo;
+use crate::pages::demo_watch::watch_demo;
 use crate::services::Services;
 use crate::tokio_bridge;
 
@@ -17,12 +20,19 @@ pub enum DemoLookup {
     Missing,
 }
 
+/// Asks the shell to show the demo at this path in the Demos.tf viewer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewDemo(pub PathBuf);
+
+impl EventEmitter<ViewDemo> for LogsTfPage {}
+
 /// What the open log's footer shows of its found demo: which one, and `Some` while it
-/// downloads, with the whole percent once its size is known.
+/// downloads or opens for View demo, with the whole percent once its size is known.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct DemoButton {
     pub(super) demo_id: u64,
     pub(super) downloading: Option<Option<u8>>,
+    pub(super) viewing: Option<Option<u8>>,
 }
 
 impl LogsTfPage {
@@ -32,6 +42,7 @@ impl LogsTfPage {
             DemoLookup::Found(demo) => Some(DemoButton {
                 demo_id: demo.id(),
                 downloading: self.demo_progress(log_id),
+                viewing: self.view_progress(log_id),
             }),
             DemoLookup::Looking | DemoLookup::Missing => None,
         }
@@ -40,6 +51,11 @@ impl LogsTfPage {
     /// `Some` while log `log_id`'s demo downloads, holding its whole percent once known.
     pub fn demo_progress(&self, log_id: u64) -> Option<Option<u8>> {
         self.demo_downloads.get(&log_id).copied()
+    }
+
+    /// `Some` while log `log_id`'s demo opens for View demo, holding its whole percent once known.
+    pub fn view_progress(&self, log_id: u64) -> Option<Option<u8>> {
+        self.demo_views.get(&log_id).copied()
     }
 
     /// Log `log_id`'s demo lookup, if one has started.
@@ -112,6 +128,31 @@ impl LogsTfPage {
             demo,
             log_id,
             |p: &mut LogsTfPage| &mut p.demo_downloads,
+            window,
+            cx,
+        );
+    }
+
+    // Opens log `log_id`'s found demo into the cache through the shared watch flow, then asks
+    // the shell to show it, unless the player has left logs.tf meanwhile.
+    pub(super) fn view_demo(&mut self, log_id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        if self.demo_views.contains_key(&log_id) {
+            return;
+        }
+        let Some(DemoLookup::Found(demo)) = self.demos.get(&log_id) else {
+            return;
+        };
+        let demo = demo.clone();
+        watch_demo(
+            self,
+            demo,
+            log_id,
+            |p: &mut LogsTfPage| &mut p.demo_views,
+            |page: &mut LogsTfPage, path: PathBuf, _: &mut Window, cx: &mut Context<LogsTfPage>| {
+                if !page.hidden {
+                    cx.emit(ViewDemo(path));
+                }
+            },
             window,
             cx,
         );

@@ -181,6 +181,7 @@ updater:
 demos_tf:
   open: "打开录像"
   back: "返回录像列表"
+  back_logs: "返回日志"
   loading: "正在加载录像…"
   empty: "此时间范围内没有录像"
   watch: "观看"
@@ -658,6 +659,9 @@ logs_tf:
     demo_download: "下载录像"
     demo_downloading: "正在下载录像"
     demo_downloading_percent: "正在下载录像 %{percent}"
+    demo_view: "观看录像"
+    demo_opening: "正在打开录像"
+    demo_opening_percent: "正在打开录像 %{percent}"
   event:
     point_capture: "占领控制点"
     captured: " 占领了控制点 %{point}"

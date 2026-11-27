@@ -3389,6 +3389,11 @@ pub fn logstf_download(id: u64) -> ElementId {
     keyed("logstf-download", &id.to_string())
 }
 
+/// The open log's View demo button: "logstf-demo-view:<log id>".
+pub fn logstf_demo_view(log_id: u64) -> ElementId {
+    keyed("logstf-demo-view", &log_id.to_string())
+}
+
 /// The open log's Download demo button: "logstf-demo-download:<log id>".
 pub fn logstf_demo_download(log_id: u64) -> ElementId {
     keyed("logstf-demo-download", &log_id.to_string())

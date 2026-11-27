@@ -184,6 +184,7 @@ updater:
 demos_tf:
   open: "Ouvrir la démo"
   back: "Retour à la liste des démos"
+  back_logs: "Retour au log"
   loading: "Chargement des démos..."
   empty: "Aucune démo sur cette période"
   watch: "Regarder"
@@ -661,6 +662,9 @@ logs_tf:
     demo_download: "Télécharger la démo"
     demo_downloading: "Téléchargement de la démo"
     demo_downloading_percent: "Téléchargement de la démo %{percent}"
+    demo_view: "Voir la démo"
+    demo_opening: "Ouverture de la démo"
+    demo_opening_percent: "Ouverture de la démo %{percent}"
   event:
     point_capture: "Capture de point"
     captured: " a capturé le point %{point}"

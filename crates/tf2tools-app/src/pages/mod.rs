@@ -8,6 +8,7 @@ pub mod crosshair_store;
 pub mod crosshairs;
 pub(crate) mod demo_save;
 pub mod demo_viewer;
+pub(crate) mod demo_watch;
 pub mod demos_tf;
 pub mod graphics;
 pub mod hud_maker;

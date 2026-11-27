@@ -215,6 +215,19 @@ pub fn demo_button_label(downloading: Option<Option<u8>>) -> SharedString {
     }
 }
 
+/// The View demo button: idle with `None`, opening with `Some`, and the whole percent once the
+/// size is known.
+pub fn demo_view_label(opening: Option<Option<u8>>) -> SharedString {
+    match opening {
+        None => tr!("logs_tf.detail.demo_view"),
+        Some(None) => tr!("logs_tf.detail.demo_opening"),
+        Some(Some(done)) => tr!(
+            "logs_tf.detail.demo_opening_percent",
+            percent = format::percent(u64::from(done))
+        ),
+    }
+}
+
 /// How much of a demo has arrived, as a whole percent rounded down and capped at 100; None
 /// without a size. Computed in u128 so no byte count can overflow it.
 pub fn demo_percent(done: u64, total: Option<u64>) -> Option<u8> {

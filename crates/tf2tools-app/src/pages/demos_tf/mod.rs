@@ -31,7 +31,7 @@ use crate::picker::PickKind;
 use crate::services::{Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::header_slot::HeaderSlot;
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::store_grid::SEARCH_DEBOUNCE;
 use crate::store_grid::feed::{Feed, FeedItem};
 use crate::tokio_bridge;
@@ -119,6 +119,8 @@ enum Mode {
 pub struct DemosTfPage {
     mode: Mode,
     hidden: bool,
+    // The page header Back returns to while a demo opened from elsewhere shows.
+    origin: Option<Page>,
     feed: Feed<DemoRow>,
     // Item 0 is the toolbar, then one item per row, then the footer.
     list: ListState,
@@ -192,6 +194,7 @@ impl DemosTfPage {
         let mut page = Self {
             mode: Mode::List,
             hidden: false,
+            origin: None,
             feed: Feed::new(),
             list: ListState::new(2, ListAlignment::Top, px(200.)),
             query: DemoListQuery::new(DemosRange::default(), 0),
@@ -479,19 +482,47 @@ impl DemosTfPage {
     }
 
     /// Hiding drops the viewer, freeing its renderer and pointer lock, so a return starts on
-    /// the list.
+    /// the list. It forgets the origin without navigating, since the player already chose a page.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
         self.hidden = hidden;
-        if hidden && self.viewer().is_some() {
-            self.back(cx);
+        if hidden {
+            self.origin = None;
+            if self.viewer().is_some() {
+                self.close_viewer(cx);
+            }
         }
         if !hidden {
             self.read_players(cx);
         }
     }
 
-    /// Closes the viewer back to the list, taking its header crumb along.
+    /// Closes the viewer back to the list, or returns to the page that opened the demo.
     pub fn back(&mut self, cx: &mut Context<Self>) {
+        self.close_viewer(cx);
+        if let Some(origin) = self.origin.take() {
+            cx.emit(NavigateTo(origin));
+        }
+    }
+
+    /// Shows `path` in the viewer; header Back then returns to `origin`.
+    pub fn open_from(
+        &mut self,
+        path: PathBuf,
+        origin: Page,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.origin = Some(origin);
+        self.show_viewer(path, window, cx);
+    }
+
+    /// The page header Back returns to, while a demo opened from another page shows.
+    pub fn origin(&self) -> Option<Page> {
+        self.origin
+    }
+
+    // Swaps the viewer for the list, taking its header crumb along.
+    fn close_viewer(&mut self, cx: &mut Context<Self>) {
         HeaderSlot::global(cx).update(cx, |slot, cx| slot.clear(Page::DemosTf, cx));
         self.mode = Mode::List;
         cx.notify();
@@ -516,7 +547,8 @@ impl DemosTfPage {
     fn show_viewer(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let viewer = cx.new(|cx| DemoViewerPage::open_path(path, window, cx));
         let this = cx.entity().downgrade();
-        let crumb = cx.new(|cx| DemosTfCrumb::new(this, &viewer, cx));
+        let origin = self.origin;
+        let crumb = cx.new(|cx| DemosTfCrumb::new(this, &viewer, origin, cx));
         HeaderSlot::global(cx).update(cx, |slot, cx| slot.set(Page::DemosTf, crumb.into(), cx));
         self.mode = Mode::Viewer(viewer);
         cx.notify();
@@ -545,6 +577,8 @@ impl DemosTfPage {
             .child(list::page_list(self, cx).flex_1().min_h_0())
     }
 }
+
+impl gpui_kit::EventEmitter<NavigateTo> for DemosTfPage {}
 
 impl Render for DemosTfPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
