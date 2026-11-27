@@ -159,6 +159,7 @@ updater:
 demos_tf:
   open: "Open demo"
   back: "Back to the demo list"
+  back_logs: "Back to the log"
   loading: "Loading demos..."
   empty: "No demos in this range"
   watch: "Watch"

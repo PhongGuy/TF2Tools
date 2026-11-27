@@ -181,6 +181,7 @@ updater:
 demos_tf:
   open: "打开录像"
   back: "返回录像列表"
+  back_logs: "返回日志"
   loading: "正在加载录像…"
   empty: "此时间范围内没有录像"
   watch: "观看"

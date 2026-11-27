@@ -485,6 +485,25 @@ impl Shell {
         })
         .detach();
     }
+
+    // The kept Demos.tf page, built on first use with its ask to return to the page a demo
+    // was opened from; the subscription dies with the page.
+    fn demos_tf_entity(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<DemosTfPage> {
+        self.demos_tf
+            .get_or_insert_with(|| {
+                let page = cx.new(|cx| DemosTfPage::new(window, cx));
+                cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                    shell.navigate(nav.0, cx)
+                })
+                .detach();
+                page
+            })
+            .clone()
+    }
 }
 
 impl Render for Shell {
@@ -653,11 +672,7 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
-            Page::DemosTf => self
-                .demos_tf
-                .get_or_insert_with(|| cx.new(|cx| DemosTfPage::new(window, cx)))
-                .clone()
-                .into_any_element(),
+            Page::DemosTf => self.demos_tf_entity(window, cx).into_any_element(),
             // The page asks to show another page by event; the subscription dies with the page.
             Page::Addons => self
                 .addons

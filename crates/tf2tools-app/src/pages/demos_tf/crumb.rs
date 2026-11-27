@@ -1,5 +1,5 @@
-//! The Demos.tf header crumb while a demo shows: a "Demos.tf" link back to the list and the
-//! demo's name.
+//! The Demos.tf header crumb while a demo shows: a link back to the list (or to logs.tf, for a
+//! demo opened there) and the demo's name.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
@@ -21,19 +21,24 @@ use super::DemosTfPage;
 pub struct DemosTfCrumb {
     page: WeakEntity<DemosTfPage>,
     viewer: WeakEntity<DemoViewerPage>,
+    // The page Back returns to, when the demo was opened from another page.
+    origin: Option<Page>,
     _observe: Subscription,
 }
 
 impl DemosTfCrumb {
-    /// A crumb for `viewer`, whose link sends `page` back to its list.
+    /// A crumb for `viewer`, whose link sends `page` back to its list, or to `origin` when the
+    /// demo was opened from logs.tf.
     pub fn new(
         page: WeakEntity<DemosTfPage>,
         viewer: &gpui_kit::Entity<DemoViewerPage>,
+        origin: Option<Page>,
         cx: &mut Context<Self>,
     ) -> Self {
         Self {
             page,
             viewer: viewer.downgrade(),
+            origin,
             _observe: cx.observe(viewer, |_, _, cx| cx.notify()),
         }
     }
@@ -47,11 +52,16 @@ impl Render for DemosTfCrumb {
         let title = viewer.read(cx).title();
         let muted = cx.theme().muted_foreground;
         let page = self.page.clone();
+        let (label, a11y) = if self.origin == Some(Page::LogsTf) {
+            (Page::LogsTf.label(), tr!("demos_tf.back_logs"))
+        } else {
+            (Page::DemosTf.label(), tr!("demos_tf.back"))
+        };
         let back = Button::new(ids::DEMOS_TF_CRUMB)
             .ghost()
             .small()
-            .label(Page::DemosTf.label())
-            .accessibility_label(tr!("demos_tf.back"))
+            .label(label)
+            .accessibility_label(a11y)
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.back(cx));
             });
