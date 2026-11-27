@@ -232,7 +232,7 @@ fn the_chase_stops_short_of_the_floor_and_a_seek_snaps_it_back_out(cx: &mut Test
     support::settle(cx, win);
     let near_floor = chase_distance(cx, &viewport, 60.);
     assert!((50. ..80.).contains(&near_floor), "{near_floor}");
-    // Without the snap the distance would still read about 63 here and only grow later.
+    // Without the snap the distance would still read about 65 here and only grow later.
     on(cx, &viewport, |v, cx| v.seek(1150., cx));
     let off_floor = chase_distance(cx, &viewport, 1000.);
     assert!((off_floor - 127.71).abs() < 0.01, "{off_floor}");
