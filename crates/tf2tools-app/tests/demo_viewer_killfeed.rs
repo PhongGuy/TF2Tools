@@ -4,9 +4,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
-    ElementId, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    TestAppContext, px, size,
+    AppContext as _, ElementId, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, Role, TestAppContext, px, size,
 };
 use tf2tools_app::ids;
 use tf2tools_app::kill_icons::KillIconImages;
@@ -450,4 +451,30 @@ fn tracks_without_kills_draw_no_strip(cx: &mut TestAppContext) {
         w.s.win,
         ids::DEMO_VIEWER_KILL_MARKERS
     ));
+}
+
+fn role(cx: &mut TestAppContext, w: &DemoViewerShell, id: impl Into<ElementId>) -> Option<Role> {
+    let id = id.into();
+    support::settle(cx, w.s.win);
+    cx.update_window(w.s.win, |_, win, _| win.try_find(id).and_then(|e| e.role()))
+        .unwrap()
+}
+
+// A screen reader finds the feed as a list of named rows and the kill strip as a named picture.
+#[gpui_kit::test]
+fn the_feed_and_the_strip_reach_the_accessibility_tree(cx: &mut TestAppContext) {
+    let env = support::env();
+    let w = open_with(cx, &env, killfeed_tracks());
+    seek(cx, &w, 4100.);
+    assert_eq!(role(cx, &w, ids::DEMO_VIEWER_KILLFEED), Some(Role::List));
+    assert_eq!(role(cx, &w, ids::demo_viewer_kill(0)), Some(Role::ListItem));
+    assert_eq!(
+        role(cx, &w, ids::DEMO_VIEWER_KILL_MARKERS),
+        Some(Role::Image)
+    );
+    let rounds = open_with(cx, &env, walking_tracks(None));
+    assert_eq!(
+        role(cx, &rounds, ids::demo_viewer_round_marker(0)),
+        Some(Role::Button)
+    );
 }

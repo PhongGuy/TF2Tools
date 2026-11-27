@@ -4,8 +4,8 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, ElementId, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
-    TestSupportExt as _, div, hsla, px,
+    ParentElement as _, Pixels, Role, SharedString, Size, StatefulInteractiveElement as _,
+    Styled as _, TestSupportExt as _, div, hsla, px,
 };
 use tf2tools_core::{DemoKill, DemoTracks, KillParty, Team, TfClass, WeaponNames};
 
@@ -188,6 +188,7 @@ impl DemoViewerPage {
             });
             h_flex()
                 .id(ids::demo_viewer_kill(n))
+                .role(Role::ListItem)
                 .aria_label(timeline.feed_words.get(n).cloned().unwrap_or_default())
                 .test_support()
                 .max_w_full()
@@ -205,6 +206,7 @@ impl DemoViewerPage {
         });
         let feed = v_flex()
             .id(ids::DEMO_VIEWER_KILLFEED)
+            .role(Role::List)
             .aria_label(tr!("demo_viewer.killfeed.title"))
             .test_support()
             .absolute()

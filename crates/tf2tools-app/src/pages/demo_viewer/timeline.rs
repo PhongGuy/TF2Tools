@@ -9,8 +9,8 @@ use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, canvas, div, fill, point, px, relative, size,
+    ParentElement as _, Role, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, canvas, div, fill, point, px, relative, size,
 };
 use tf2tools_core::{DemoTracks, KillParty, Team, TrackCut, WeaponNames};
 
@@ -264,6 +264,7 @@ impl DemoViewerPage {
                 let tip = words.clone();
                 div()
                     .id(ids::demo_viewer_round_marker(n))
+                    .role(Role::Button)
                     .aria_label(words)
                     .test_support()
                     // Taller than the strip and ringed in the bar's colour, so a dot stays
@@ -329,6 +330,7 @@ impl DemoViewerPage {
         Some(
             div()
                 .id(ids::DEMO_VIEWER_KILL_MARKERS)
+                .role(Role::Image)
                 .aria_label(tr!("demo_viewer.killfeed.markers", count = count))
                 .test_support()
                 .absolute()
