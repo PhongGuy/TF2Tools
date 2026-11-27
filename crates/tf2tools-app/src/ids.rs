@@ -3693,6 +3693,24 @@ pub fn demo_viewer_round_marker(n: usize) -> ElementId {
     ElementId::Name(format!("demo-viewer-round-marker-{n}").into())
 }
 
+/// The camera chip's mode button, which cycles free, first person and chase.
+pub const DEMO_VIEWER_CAMERA_MODE: &str = "demo-viewer-camera-mode";
+/// The camera chip's button that follows the previous player.
+pub const DEMO_VIEWER_CAMERA_TARGET_PREV: &str = "demo-viewer-camera-target-prev";
+/// The camera chip's button that follows the next player.
+pub const DEMO_VIEWER_CAMERA_TARGET_NEXT: &str = "demo-viewer-camera-target-next";
+/// The camera chip's target button, naming the followed player and opening the players list.
+pub const DEMO_VIEWER_CAMERA_TARGET: &str = "demo-viewer-camera-target";
+/// The badge on the camera chip while the followed player is dead.
+pub const DEMO_VIEWER_CAMERA_DEAD: &str = "demo-viewer-camera-dead";
+/// The players list the camera chip's target button opens.
+pub const DEMO_VIEWER_PLAYERS: &str = "demo-viewer-players";
+
+/// A players-list row by the player's entity index: "demo-viewer-player-<entity>".
+pub fn demo_viewer_player(entity: u32) -> ElementId {
+    ElementId::Name(format!("demo-viewer-player-{entity}").into())
+}
+
 /// The demo viewer's 3D view, which takes the keyboard when clicked.
 pub const DEMO_VIEWER_VIEWPORT: &str = "demo-viewer-viewport";
 

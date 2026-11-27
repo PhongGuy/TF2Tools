@@ -9,7 +9,8 @@ use crate::LocaleGuard;
 use crate::support;
 use support::demo_viewer::{inside, open_with_tracks};
 
-const ENGLISH_HINT: &str = "Drag to look, WASD to move, Shift to slow down.";
+const ENGLISH_HINT: &str =
+    "Drag to look, WASD to move, Shift to slow down, Space to follow a player.";
 
 fn bar_fits(lang: &str, width: f32, height: f32, cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch(lang);
@@ -141,5 +142,48 @@ fn the_playback_words_speak_every_language() {
                 assert_ne!(theirs, en, "{lang} {key} is untranslated");
             }
         }
+    }
+}
+
+// The camera chip's words exist in every language, keep their placeholders, and are translated.
+#[test]
+fn the_camera_words_speak_every_language() {
+    let text = |lang: &str, key: &str| {
+        tf2tools_app::_rust_i18n_try_translate(lang, key).map(|t| t.into_owned())
+    };
+    let langs = ["en", "de", "es", "fr", "pt-BR", "ru", "zh-CN"];
+    let keys = [
+        ("free", None),
+        ("first_person", None),
+        ("chase", None),
+        ("mode", Some("%{mode}")),
+        ("prev", None),
+        ("next", None),
+        ("choose", None),
+        ("none", None),
+        ("unnamed", Some("%{entity}")),
+        ("dead", None),
+        ("target_dead", Some("%{name}")),
+        ("players", None),
+    ];
+    for (key, placeholder) in keys {
+        let key = format!("demo_viewer.camera.{key}");
+        let en = text("en", &key).unwrap_or_else(|| panic!("en lacks {key}"));
+        for lang in langs {
+            let theirs = text(lang, &key).unwrap_or_else(|| panic!("{lang} lacks {key}"));
+            if let Some(p) = placeholder {
+                assert!(theirs.contains(p), "{lang} {key}: {theirs}");
+            }
+            if lang != "en" {
+                assert_ne!(theirs, en, "{lang} {key} is untranslated");
+            }
+        }
+    }
+    // The new hint names Space, and every language translates it.
+    let en_hint = text("en", "demo_viewer.hint").unwrap();
+    assert!(en_hint.contains("Space"), "{en_hint}");
+    for lang in langs.iter().filter(|l| **l != "en") {
+        let hint = text(lang, "demo_viewer.hint").unwrap();
+        assert_ne!(hint, en_hint, "{lang} hint is untranslated");
     }
 }
