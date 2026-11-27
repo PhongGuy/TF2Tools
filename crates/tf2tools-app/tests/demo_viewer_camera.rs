@@ -1,7 +1,9 @@
 //! The Demo Viewer bar's camera chip and players list, on tracks with names and a death.
 
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
-    AppContext as _, ElementId, Entity, Modifiers, ScrollDelta, TestAppContext, point, px, size,
+    AppContext as _, ElementId, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ScrollDelta, TestAppContext, point, px, size,
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::viewport::{CameraState, DemoViewport};
@@ -245,13 +247,63 @@ fn space_still_cycles_after_a_click_on_play(cx: &mut TestAppContext) {
     assert_eq!(state(cx, &w).mode, CameraMode::FirstPerson);
 }
 
-// Opens the players list of a full server at `width` x `height` and checks it stays inside the
-// page and above the bar, then wheels its last BLU row into view and follows that player.
-fn full_list_fits(cx: &mut TestAppContext, width: f32, height: f32) {
+fn send(cx: &mut TestAppContext, w: &DemoViewerShell, event: impl InputEvent) {
+    cx.update_window(w.s.win, |_, win, cx| {
+        let _ = win.dispatch_event(event.to_platform_input(), cx);
+        win.render_frame(cx);
+    })
+    .unwrap();
+    support::settle(cx, w.s.win);
+}
+
+// Drags the bar's grip far past the page's top, so the bar pins there.
+fn bar_to_top(cx: &mut TestAppContext, w: &DemoViewerShell) {
+    let from = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR_GRIP)
+        .expect("the grip")
+        .center();
+    let to = from + point(px(0.), px(-2000.));
+    let modifiers = Modifiers::default();
+    let moved = |position, pressed_button| MouseMoveEvent {
+        position,
+        pressed_button,
+        modifiers,
+    };
+    send(cx, w, moved(from, None));
+    let down = MouseDownEvent {
+        button: MouseButton::Left,
+        position: from,
+        modifiers,
+        click_count: 1,
+        first_mouse: false,
+    };
+    send(cx, w, down);
+    send(cx, w, moved(to, Some(MouseButton::Left)));
+    let up = MouseUpEvent {
+        button: MouseButton::Left,
+        position: to,
+        modifiers,
+        click_count: 1,
+    };
+    send(cx, w, up);
+}
+
+// Opens the players list of a full server at `width` x `height`, with the bar at the page's top
+// when `top`, and checks it stays inside the page and off the bar, then wheels its last BLU row
+// into view and follows that player.
+fn full_list_fits(cx: &mut TestAppContext, width: f32, height: f32, top: bool) {
     let env = support::env();
     let w = open_with(cx, &env, full_server_tracks());
     cx.simulate_window_resize(w.s.win, size(px(width), px(height)));
     support::settle(cx, w.s.win);
+    if top {
+        bar_to_top(cx, &w);
+        let page = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER).expect("the page");
+        let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).expect("the bar");
+        assert!(
+            bar.top() <= page.top() + px(1.),
+            "the bar {bar:?} never reached the top of {page:?}"
+        );
+    }
     support::click_id(cx, w.s.win, ids::DEMO_VIEWER_CAMERA_TARGET);
     let page = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER).expect("the page");
     let bar = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_BAR).expect("the bar");
@@ -261,7 +313,11 @@ fn full_list_fits(cx: &mut TestAppContext, width: f32, height: f32) {
         "{width}: the list {list:?} leaves the page {page:?}"
     );
     assert!(
-        list.bottom() <= bar.top() + px(0.5),
+        list.size.height >= px(100.),
+        "{width}: the list {list:?} has no room"
+    );
+    assert!(
+        list.bottom() <= bar.top() + px(0.5) || list.top() >= bar.bottom() - px(0.5),
         "{width}: the list {list:?} runs into the bar {bar:?}"
     );
     let last = ids::demo_viewer_player(18);
@@ -298,12 +354,17 @@ fn full_list_fits(cx: &mut TestAppContext, width: f32, height: f32) {
 
 #[gpui_kit::test]
 fn a_full_players_list_fits_above_the_bar_and_scrolls_at_1280(cx: &mut TestAppContext) {
-    full_list_fits(cx, 1280., 800.);
+    full_list_fits(cx, 1280., 800., false);
 }
 
 #[gpui_kit::test]
 fn a_full_players_list_fits_above_the_bar_and_scrolls_at_800(cx: &mut TestAppContext) {
-    full_list_fits(cx, 800., 600.);
+    full_list_fits(cx, 800., 600., false);
+}
+
+#[gpui_kit::test]
+fn a_full_players_list_opens_below_a_bar_at_the_top(cx: &mut TestAppContext) {
+    full_list_fits(cx, 1280., 800., true);
 }
 
 #[gpui_kit::test]

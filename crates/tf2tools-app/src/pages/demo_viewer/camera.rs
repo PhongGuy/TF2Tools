@@ -25,11 +25,11 @@ use crate::widgets::{Named as _, labelled};
 const TARGET_CAP: f32 = 160.;
 /// The tallest the players list grows before it scrolls.
 const PLAYERS_CAP: f32 = 320.;
-/// The gap between the players list's surface and the bar's top.
+/// The gap between the players list's surface and the bar's edge.
 const POPOVER_GAP: Pixels = px(4.);
 /// The popover surface's own padding around the list, the kit's `p_3`.
 const SURFACE_PAD: Pixels = px(12.);
-/// The room the list's surface keeps from the page's top.
+/// The room the list's surface keeps from the page's edge.
 const PAGE_MARGIN: Pixels = px(8.);
 
 /// One players-list row: who, their team at the shown tick and whether they are dead there.
@@ -163,11 +163,11 @@ impl DemoViewerPage {
                 tr!("demo_viewer.camera.dead"),
             )
         });
-        let chip_top = Rc::clone(&self.chip_top);
+        let chip_row = Rc::clone(&self.chip_row);
         let row_watch = canvas(
             move |row, window, _| {
-                if chip_top.get() != row.top() {
-                    chip_top.set(row.top());
+                if chip_row.get() != row {
+                    chip_row.set(row);
                     window.request_animation_frame();
                 }
             },
@@ -189,7 +189,8 @@ impl DemoViewerPage {
             .into_any_element()
     }
 
-    /// The target button as the trigger of the players list, opening upward from the bar.
+    /// The target button as the trigger of the players list, opening from the bar toward the
+    /// page's larger side.
     fn players_list(
         &self,
         viewport: &Entity<DemoViewport>,
@@ -204,11 +205,22 @@ impl DemoViewerPage {
         let tracks = v.tracks().cloned();
         let muted = cx.theme().muted_foreground;
         let header = |text: &'static str| div().pt_1().text_xs().text_color(muted).child(text);
-        // The list opens from the bar's top rather than the chip's, and takes only the room
-        // between the page's top and the bar, so a full server scrolls instead of covering it.
-        let lift = (self.chip_top.get() - self.bar_top.get()).max(px(0.));
-        let bar_at = self.bar.clamp(self.area.get(), self.bar_size.get()).y;
-        let room = bar_at - POPOVER_GAP - SURFACE_PAD * 2. - PAGE_MARGIN;
+        // The list opens from the bar's edge rather than the chip's, upward unless the bar sits
+        // nearer the page's top, and takes only that side's room so a full server scrolls.
+        let (area, bar_size) = (self.area.get(), self.bar_size.get());
+        let bar_at = self.bar.clamp(area, bar_size).y;
+        let spare = POPOVER_GAP + SURFACE_PAD * 2. + PAGE_MARGIN;
+        let above = bar_at - spare;
+        let below = area.height - bar_at - bar_size.height - spare;
+        let up = above >= below;
+        let chip = self.chip_row.get();
+        let (anchor, gap, room) = match up {
+            true => (Anchor::BottomLeft, chip.top() - self.bar_top.get(), above),
+            false => {
+                let bar_bottom = self.bar_top.get() + bar_size.height;
+                (Anchor::TopLeft, bar_bottom - chip.bottom(), below)
+            }
+        };
         let mut list = v_flex()
             .id(ids::DEMO_VIEWER_PLAYERS)
             .test_support()
@@ -252,8 +264,8 @@ impl DemoViewerPage {
         }
         let page = cx.entity().downgrade();
         Popover::new(ids::DEMO_VIEWER_PLAYERS_POPOVER)
-            .anchor(Anchor::BottomLeft)
-            .offset(lift + POPOVER_GAP)
+            .anchor(anchor)
+            .offset(gap.max(px(0.)) + POPOVER_GAP)
             .open(self.players_open)
             .on_open_change(move |&open, _, cx| {
                 let _ = page.update(cx, |page, cx| {

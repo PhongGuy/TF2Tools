@@ -16,8 +16,8 @@ use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Anchor, AnyElement, AppContext as _, AsyncWindowContext, Context, CursorStyle, DispatchPhase,
-    Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
+    Anchor, AnyElement, AppContext as _, AsyncWindowContext, Bounds, Context, CursorStyle,
+    DispatchPhase, Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, SharedString, Size,
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _,
     WeakEntity, Window, canvas, div, px,
@@ -204,10 +204,10 @@ pub struct DemoViewerPage {
     area: Rc<Cell<Size<Pixels>>>,
     /// The bar's own size from the last frame, which the clamp keeps inside the page.
     bar_size: Rc<Cell<Size<Pixels>>>,
-    /// The bar's and the camera row's window tops from the last frame, which lift the players
-    /// list clear of the bar.
+    /// The bar's window top and the camera row's window bounds from the last frame, which move
+    /// the players list clear of the bar.
     bar_top: Rc<Cell<Pixels>>,
-    chip_top: Rc<Cell<Pixels>>,
+    chip_row: Rc<Cell<Bounds<Pixels>>>,
     /// The player's place for the bar, as stored; drawing clamps it but never writes back.
     bar: BarPlace,
     /// Set once the player moves or minimises the bar, so a slow stored place cannot undo it.
@@ -291,7 +291,7 @@ impl DemoViewerPage {
             area: Rc::default(),
             bar_size: Rc::default(),
             bar_top: Rc::default(),
-            chip_top: Rc::default(),
+            chip_row: Rc::default(),
             bar: BarPlace::DEFAULT,
             bar_touched: false,
             bar_drag: None,
