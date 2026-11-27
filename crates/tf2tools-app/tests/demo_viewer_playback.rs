@@ -44,6 +44,41 @@ fn the_still_picture_shows_before_the_tracks_and_they_start_at_its_tick(cx: &mut
 }
 
 #[gpui_kit::test]
+fn the_caption_drops_the_still_pictures_time_once_the_tracks_play(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, gate) = still_then(|| vec![PlaybackEvent::Tracks(walking_tracks(None))]);
+    let w = open_scripted(cx, &env, reader);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic, 3 players at 1:02")
+    );
+    gate.open();
+    support::wait_real(cx, "the tracks", |cx| playback(cx, &w).is_some());
+    support::settle(cx, w.s.win);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic, 3 players")
+    );
+}
+
+#[gpui_kit::test]
+fn failed_tracks_keep_the_still_pictures_time_in_the_caption(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (reader, gate) =
+        still_then(|| vec![PlaybackEvent::TracksFailed(DemoTracksError::NoPlayers)]);
+    let w = open_scripted(cx, &env, reader);
+    gate.open();
+    support::wait_real(cx, "failed", |cx| {
+        read_state(cx, &w) == Some(ReadState::Failed)
+    });
+    support::settle(cx, w.s.win);
+    assert_eq!(
+        support::label_of(cx, w.s.win, ids::DEMO_VIEWER_CAPTION).as_deref(),
+        Some("cp_synthetic, 3 players at 1:02")
+    );
+}
+
+#[gpui_kit::test]
 fn progress_reads_as_a_whole_percent_until_the_tracks_arrive(cx: &mut TestAppContext) {
     let env = support::env();
     let (reader, gate) = gated_playback(

@@ -226,6 +226,7 @@ demo_viewer:
   searching_candidate: "Buscando %{map} en GameBanana (%{n} de %{of})..."
   caption: "%{map}"
   caption_players: "%{map}, %{count} jugadores en %{time}"
+  caption_players_playing: "%{map}, %{count} jugadores"
   players_note: "No se pudieron leer los jugadores de esta demo."
   hint: "Arrastra para mirar, WASD para moverte, Shift para ir más despacio, Espacio para seguir a un jugador."
   bar_collapse: "Minimizar controles"
