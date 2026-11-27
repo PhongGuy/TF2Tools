@@ -15,11 +15,11 @@ use crate::ids;
 use crate::kill_icons::{ICON_SLOT, SLOT_GAP, weapon_icon};
 
 /// The feed's widest; a narrower page takes its width less the bar's margins.
-const FEED_WIDTH: Pixels = px(600.);
+const FEED_WIDTH: Pixels = px(640.);
 /// A row's room besides its three names: padding, two gaps, the icon slot and the "+".
 const ROW_CHROME: Pixels = px(112.);
 /// The widest a name grows before it ends in an ellipsis.
-pub const NAME_CAP: Pixels = px(160.);
+pub const NAME_CAP: Pixels = px(176.);
 /// The narrowest a name's cap shrinks to on a small page, so it never reads as a bare ellipsis.
 pub const NAME_MIN: Pixels = px(48.);
 

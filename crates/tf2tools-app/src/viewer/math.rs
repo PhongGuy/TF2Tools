@@ -34,7 +34,7 @@ pub const SHOT_LONG: f32 = 24.0;
 pub const SHOT_THIN: f32 = 6.0;
 /// A round shot's size on every axis.
 pub const SHOT_ROUND: f32 = 8.0;
-/// The fewest pixels a shot's narrower side covers on screen, however far it is.
+/// The fewest logical pixels a shot's narrower side covers on screen, however far it is.
 pub const MIN_SHOT_PX: f32 = 6.0;
 /// In first person, shots nearer the eye than this are hidden, like the followed box.
 pub const PROJECTILE_HIDE_NEAR: f32 = 32.0;
@@ -224,7 +224,8 @@ fn team_color(team: Team) -> [f32; 3] {
     }
 }
 
-/// Where shots are seen from: the eye and the viewport's height in device pixels.
+/// Where shots are seen from: the eye and the viewport's height in logical pixels, so a shot
+/// covers the same size on a 2x display.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShotSight {
     pub eye: [f32; 3],

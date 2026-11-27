@@ -112,7 +112,7 @@ struct Playback {
     clock: PlaybackClock,
 }
 
-// The tick, hidden player, eye and viewport height one shot list was built for.
+// The tick, hidden player, eye and logical viewport height one shot list was built for.
 type ShotsKey = (f64, Option<PlayerId>, [f32; 3], u32);
 
 /// A spectator view of one map, drawn by a `SceneRenderer` and shown as its latest frame.
@@ -134,7 +134,7 @@ pub struct DemoViewport {
     shots: Arc<[ProjectileShot]>,
     /// The tick and hidden player the boxes were built for, once tracks drive them.
     boxes_for: Option<(f64, Option<PlayerId>)>,
-    /// The tick, hidden player, eye and viewport height the shots were built for.
+    /// The tick, hidden player, eye and logical viewport height the shots were built for.
     shots_for: Option<ShotsKey>,
     /// The still snapshot's tick, where playback starts so the picture does not jump.
     snapshot_tick: Option<u32>,
@@ -490,8 +490,8 @@ impl DemoViewport {
         }
     }
 
-    /// Rebuilds the shots only when the tick, the hidden player, the eye or the viewport height
-    /// moved, so an unchanged frame shares the last list and the worker skips its upload.
+    /// Rebuilds the shots only when the tick, the hidden player, the eye or the logical viewport
+    /// height moved, so an unchanged frame shares the last list and the worker skips its upload.
     fn refresh_shots(&mut self, height: u32) {
         let Some(p) = self.playback.as_ref() else {
             return;
@@ -518,7 +518,12 @@ impl DemoViewport {
             return;
         }
         self.last_seq += 1;
-        self.refresh_shots(height);
+        // Shots size in logical pixels, so a 2x display draws them as large as a 1x one.
+        let logical = self
+            .bounds
+            .get()
+            .map_or(0, |b| b.size.height.as_f32().round() as u32);
+        self.refresh_shots(logical);
         let aspect = width as f32 / height as f32;
         let view_proj = math::view_proj(
             self.view.origin(),

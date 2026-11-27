@@ -209,10 +209,10 @@ fn the_feed_fits_at_1280_beside_a_bar_at_the_bottom_or_the_top(cx: &mut TestAppC
 }
 
 #[test]
-fn the_feed_grows_to_600_and_caps_each_name_on_its_own() {
+fn the_feed_grows_to_640_and_caps_each_name_on_its_own() {
     // 1023 is the page beside the sidebar in a 1280 window.
     let wide = feed_layout(px(1023.));
-    assert_eq!((wide.width, wide.name), (px(600.), NAME_CAP));
+    assert_eq!((wide.width, wide.name), (px(640.), NAME_CAP));
     // An 800 window leaves a page of about 543: the caps shrink but three names still fit.
     let narrow = feed_layout(px(543.));
     assert_eq!(narrow.width, px(543.) - px(16.));
@@ -220,7 +220,8 @@ fn the_feed_grows_to_600_and_caps_each_name_on_its_own() {
         narrow.name < NAME_CAP && narrow.name >= NAME_MIN,
         "{narrow:?}"
     );
-    assert!(narrow.name * 3. + px(64.) < narrow.width, "{narrow:?}");
+    // Three names and the row's 112 px of padding, gaps, icon slot and "+" still fit.
+    assert!(narrow.name * 3. + px(112.) <= narrow.width, "{narrow:?}");
     // However narrow the page, a name keeps room for a few letters.
     assert_eq!(feed_layout(px(150.)).name, NAME_MIN);
     assert_eq!(feed_layout(px(0.)).width, px(0.));
@@ -291,13 +292,12 @@ fn typical_names_fit(cx: &mut TestAppContext, width: f32, height: f32) -> [f32; 
 
 #[gpui_kit::test]
 fn typical_names_show_in_full_at_1280(cx: &mut TestAppContext) {
-    let [killer, assister, victim] = typical_names_fit(cx, 1280., 800.);
-    // ".forgotten" is short enough to show whole anywhere; it gives one letter's width. Widths
-    // round to whole pixels, so a whole name may read up to 2 px short; a cut one loses a letter.
-    let letter = assister / FORGOTTEN.chars().count() as f32;
-    let whole = |name: &str| name.chars().count() as f32 * letter - 2.;
-    assert!(killer >= whole(MASTER), "{MASTER} is cut to {killer}");
-    assert!(victim >= whole(IMPACT), "{IMPACT} is cut to {victim}");
+    // A clamped name renders exactly at the cap, so one well below it was shown whole.
+    let room = f32::from(NAME_CAP) - 12.;
+    let widths = typical_names_fit(cx, 1280., 800.);
+    for (name, width) in [MASTER, FORGOTTEN, IMPACT].into_iter().zip(widths) {
+        assert!(width <= room, "{name} is clamped at {width}");
+    }
 }
 
 #[gpui_kit::test]
