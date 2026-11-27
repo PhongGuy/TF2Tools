@@ -157,3 +157,37 @@ fn keyframes_with_nobody_build_no_tracks() {
         DemoTracks::from_keyframes(0.015, &[DemoSnapshot::new(5, vec![])], vec![], None).is_none()
     );
 }
+
+// Entity 3 is gone from tick 40 to 89 (0.76 s, a death); entity 7 stands throughout, off the
+// origin, since feet at exactly [0, 0, 0] read as not yet spawned.
+#[test]
+fn entity_frames_keep_ids_names_and_a_death() {
+    use tf2tools_core::{DemoTracks, FollowPose, SnapshotPlayer, Team, TfClass};
+    let p = |x| SnapshotPlayer::new(Team::Red, TfClass::Medic, [x, 0., 0.], 0., 0., 75., false);
+    let frames: Vec<(u32, Vec<(u32, SnapshotPlayer)>)> = (0..=100u32)
+        .map(|t| {
+            let mut rows = vec![(7, p(10.))];
+            if !(40..90).contains(&t) {
+                rows.push((3, p(50.)));
+            }
+            (t, rows)
+        })
+        .collect();
+    let tracks =
+        DemoTracks::from_entity_frames(1. / 66., &frames, &[(7, "Seven")]).expect("tracks");
+    let players: Vec<(u32, Option<&str>)> = tracks
+        .players()
+        .iter()
+        .map(|p| (p.id().entity(), p.name()))
+        .collect();
+    assert_eq!(players, vec![(3, None), (7, Some("Seven"))]);
+    let three = tracks.players()[0].id();
+    assert!(matches!(tracks.eye_at(three, 20.), FollowPose::Alive(_)));
+    assert!(matches!(tracks.eye_at(three, 60.), FollowPose::Dead(_)));
+    assert!(matches!(tracks.eye_at(three, 95.), FollowPose::Alive(_)));
+    match tracks.eye_at(tracks.players()[1].id(), 50.) {
+        FollowPose::Alive(pose) => assert!((pose.eye()[2] - 75.).abs() < 1e-3, "{:?}", pose.eye()),
+        other => panic!("{other:?}"),
+    }
+    assert!(DemoTracks::from_entity_frames(1. / 66., &[], &[]).is_none());
+}

@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use tf2tools_core::{DemoSnapshot, MapMesh, Team};
+use tf2tools_core::{DemoSnapshot, MapMesh, PlayerId, Team};
 
 use super::PlayerBox;
 
@@ -132,9 +132,18 @@ pub fn start_camera(mesh: &MapMesh, snapshot: Option<&DemoSnapshot>) -> ([f32; 3
 
 /// The snapshot's players as boxes, in its order; none for `None`.
 pub fn player_boxes(snapshot: Option<&DemoSnapshot>) -> Arc<[PlayerBox]> {
+    player_boxes_except(snapshot, None)
+}
+
+/// The snapshot's players as boxes, in its order, leaving out `hidden` (the followed eye).
+pub fn player_boxes_except(
+    snapshot: Option<&DemoSnapshot>,
+    hidden: Option<PlayerId>,
+) -> Arc<[PlayerBox]> {
     snapshot
         .map_or(&[][..], DemoSnapshot::players)
         .iter()
+        .filter(|p| Some(p.id()) != hidden)
         .map(|p| PlayerBox {
             feet: p.feet(),
             yaw_deg: p.yaw(),

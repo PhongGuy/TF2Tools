@@ -105,6 +105,11 @@ impl SpectatorCamera {
         self.target
     }
 
+    /// The free-fly this camera steers while flying free; its pose is stale in a follow mode.
+    pub fn fly(&self) -> &FreeFly {
+        &self.fly
+    }
+
     // Every mode or target change snaps the next chase distance instead of growing into it.
     fn set(&mut self, mode: CameraMode, target: Option<PlayerId>) {
         if (mode, target) != (self.mode, self.target) {
