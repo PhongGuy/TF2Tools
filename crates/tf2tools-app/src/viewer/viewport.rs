@@ -195,6 +195,7 @@ impl DemoViewport {
         cx.observe_window_activation(window, |v, window, cx| {
             if !window.is_window_active() {
                 v.keys = HeldKeys::default();
+                v.loose = None;
                 v.end_drag(cx);
                 cx.notify();
             }

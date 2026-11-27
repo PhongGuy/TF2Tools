@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use gpui_kit::test::{TestEventExt as _, TestWindowExt as _};
 use gpui_kit::{
-    AnyWindowHandle, AppContext as _, Entity, InputEvent as _, Modifiers, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, TestAppContext, point, px,
+    AnyWindowHandle, AppContext as _, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, Pixels, Point, TestAppContext, VisualTestContext, point, px,
 };
 use tf2tools_app::ids;
 use tf2tools_app::viewer::pointer::LockMode;
@@ -566,6 +566,79 @@ fn a_click_under_the_linux_lock_still_clicks(cx: &mut TestAppContext) {
     linux_click(cx, MouseButton::Right);
     assert_eq!(state(cx, &viewport).target.map(PlayerId::entity), Some(1));
     assert_eq!(lock.calls().len(), 6, "{:?}", lock.calls());
+}
+
+// Sends one platform event in a frame of its own.
+fn frame(cx: &mut TestAppContext, win: AnyWindowHandle, event: impl InputEvent) {
+    cx.update_window(win, |_, w, cx| {
+        let _ = w.dispatch_event(event.to_platform_input(), cx);
+        w.render_frame(cx);
+    })
+    .unwrap();
+    support::settle(cx, win);
+}
+
+// Presses the left button at `at` under the locked fake, then sends the buttonless move the
+// Linux client sends when its lock ends, leaving only the MouseUp to come.
+fn lock_ended_press(
+    cx: &mut TestAppContext,
+) -> (AnyWindowHandle, Entity<DemoViewport>, Point<Pixels>) {
+    let (win, viewport, _stub, _lock) = viewport_window_locked(cx, LockMode::Locked);
+    on(cx, &viewport, |v, cx| v.set_tracks(two_players(), cx));
+    cx.update_window(win, |_, w, _| w.activate_window())
+        .unwrap();
+    support::settle(cx, win);
+    let at = support::bounds_of(cx, win, ids::DEMO_VIEWER_VIEWPORT)
+        .expect("the viewport")
+        .center();
+    let modifiers = Modifiers::default();
+    let down = MouseDownEvent {
+        button: MouseButton::Left,
+        position: at,
+        modifiers,
+        click_count: 1,
+        first_mouse: false,
+    };
+    frame(cx, win, down);
+    let moved = MouseMoveEvent {
+        position: at,
+        pressed_button: None,
+        modifiers,
+    };
+    frame(cx, win, moved);
+    (win, viewport, at)
+}
+
+fn left_up(at: Point<Pixels>) -> MouseUpEvent {
+    MouseUpEvent {
+        button: MouseButton::Left,
+        position: at,
+        modifiers: Modifiers::default(),
+        click_count: 1,
+    }
+}
+
+// Wayland keyboard Leave and X11 FocusOut end the lock before the window reports it lost focus.
+#[gpui_kit::test]
+fn a_lock_ended_press_is_forgotten_on_leaving_the_window(cx: &mut TestAppContext) {
+    let (win, viewport, at) = lock_ended_press(cx);
+    VisualTestContext::from_window(win, cx).deactivate_window();
+    support::settle(cx, win);
+    frame(cx, win, left_up(at));
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FreeFly, None, false)
+    );
+}
+
+#[gpui_kit::test]
+fn a_lock_ended_press_released_elsewhere_does_not_click(cx: &mut TestAppContext) {
+    let (win, viewport, at) = lock_ended_press(cx);
+    frame(cx, win, left_up(at + point(px(10.), px(0.))));
+    assert_eq!(
+        followed(state(cx, &viewport)),
+        (CameraMode::FreeFly, None, false)
+    );
 }
 
 #[gpui_kit::test]
