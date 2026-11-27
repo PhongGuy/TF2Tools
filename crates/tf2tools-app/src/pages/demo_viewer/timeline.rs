@@ -58,7 +58,7 @@ pub(super) struct Timeline {
     end: u32,
     rounds: Vec<u32>,
     /// Each kill's share of the timeline and its killer's team, painted under the round markers.
-    kill_marks: Vec<(f32, Option<Team>)>,
+    kill_marks: Arc<[(f32, Option<Team>)]>,
     cut_note: Option<SharedString>,
     shown: Option<(u64, bool, f32)>,
     /// The camera state the bar last drew.
@@ -289,24 +289,30 @@ impl DemoViewerPage {
             .as_ref()
             .filter(|t| !t.kill_marks.is_empty())?;
         let theme = cx.theme();
-        let marks: Vec<_> = timeline
-            .kill_marks
-            .iter()
-            .map(|&(fraction, team)| {
-                let colour = match team {
-                    Some(Team::Red) => theme.red,
-                    Some(_) => theme.blue,
-                    None => theme.muted_foreground,
-                };
-                (fraction, colour)
-            })
-            .collect();
+        let (red, blue, muted) = (theme.red, theme.blue, theme.muted_foreground);
+        let marks = Arc::clone(&timeline.kill_marks);
         let count = marks.len();
         let paint = canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
-                for &(fraction, colour) in &marks {
-                    let x = bounds.origin.x + bounds.size.width * fraction - px(1.);
+                // Each 2 px line centres on its kill but stays inside the strip at either end.
+                let (left, right) = (
+                    bounds.origin.x,
+                    bounds.origin.x + bounds.size.width - px(2.),
+                );
+                for &(fraction, team) in marks.iter() {
+                    let colour = match team {
+                        Some(Team::Red) => red,
+                        Some(_) => blue,
+                        None => muted,
+                    };
+                    let mut x = left + bounds.size.width * fraction - px(1.);
+                    if x > right {
+                        x = right;
+                    }
+                    if x < left {
+                        x = left;
+                    }
                     let at = point(x, bounds.origin.y);
                     window.paint_quad(fill(
                         gpui_kit::Bounds::new(at, size(px(2.), bounds.size.height)),
