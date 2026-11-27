@@ -153,3 +153,11 @@ fn demos_types_are_send_sync_debug() {
     assert_send_sync::<tf2tools_core::DemoSummary>();
     assert_send_sync::<tf2tools_core::DemoDetail>();
 }
+
+#[test]
+fn demo_projectile_and_kill_types_are_send_sync_debug() {
+    assert_send_sync::<tf2tools_core::ProjectileKind>();
+    assert_send_sync::<tf2tools_core::ProjectileView>();
+    assert_send_sync::<tf2tools_core::DemoKill>();
+    assert_send_sync::<tf2tools_core::KillParty>();
+}

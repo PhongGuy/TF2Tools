@@ -12,7 +12,7 @@ mod kills;
 mod projectiles;
 mod smooth;
 
-use crate::demo_view::snapshot::ProjectileRow;
+use crate::demo_view::snapshot::{KillRow, PartyRow, ProjectileRow};
 pub(crate) use build::TrackBuilder;
 pub use kills::{DemoKill, KillParty};
 use projectiles::{ProjectileBuilder, ProjectileSample, ProjectileTrack};
@@ -30,6 +30,20 @@ pub const MAX_KILLS: usize = 20_000;
 /// `(tick, serial, kind, team, critical, origin)`, for tests outside the crate.
 #[doc(hidden)]
 pub type DemoTestShot = (u32, u32, ProjectileKind, Team, bool, [f32; 3]);
+/// `(entity, raw name, team, class)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestParty<'a> = (u32, &'a str, Team, TfClass);
+/// `(tick, killer, assister, victim, raw weapon, critical, feigned)`, for tests outside the crate.
+#[doc(hidden)]
+pub type DemoTestKill<'a> = (
+    u32,
+    Option<DemoTestParty<'a>>,
+    Option<DemoTestParty<'a>>,
+    DemoTestParty<'a>,
+    &'a str,
+    bool,
+    bool,
+);
 
 /// The sample flag bit for a crouched player.
 pub(crate) const DUCKED: u8 = 1;
@@ -433,6 +447,49 @@ impl DemoTracks {
             .iter()
             .filter_map(|t| projectiles::view_at(t, &self.projectile_samples, tick))
             .collect()
+    }
+
+    /// The kills from `hold_s` seconds before `tick` up to it, at most the last `max`.
+    pub fn killfeed_at(&self, tick: f64, hold_s: f32, max: usize) -> &[DemoKill] {
+        let hold = f64::from(hold_s) / f64::from(self.seconds_per_tick);
+        if tick.is_nan() || max == 0 || !hold.is_finite() || hold <= 0. {
+            return &[];
+        }
+        // Kills are kept by tick, so the window is two binary searches, newest `max` kept.
+        let end = self.kills.partition_point(|k| f64::from(k.tick()) <= tick);
+        let start = self
+            .kills
+            .partition_point(|k| f64::from(k.tick()) < tick - hold);
+        &self.kills[start.max(end.saturating_sub(max))..end]
+    }
+
+    /// These tracks with their kills replaced by `kills`, cleaned as a parse cleans them.
+    #[doc(hidden)]
+    pub fn with_test_kills(mut self, kills: &[DemoTestKill<'_>]) -> Self {
+        let party = |&(entity, name, team, class): &DemoTestParty<'_>| PartyRow {
+            entity,
+            name: Some(name.to_owned()),
+            team: Some(team),
+            class: Some(class),
+        };
+        self.kills = kills
+            .iter()
+            .map(
+                |(tick, killer, assister, victim, weapon, critical, feigned)| {
+                    DemoKill::from(&KillRow {
+                        tick: *tick,
+                        killer: killer.as_ref().map(party),
+                        assister: assister.as_ref().map(party),
+                        victim: party(victim),
+                        weapon: (*weapon).to_owned(),
+                        critical: *critical,
+                        feigned: *feigned,
+                    })
+                },
+            )
+            .collect();
+        self.kills.sort_by_key(DemoKill::tick);
+        self
     }
 
     /// These tracks with their projectiles replaced by `rows`, built by the real builder, one
