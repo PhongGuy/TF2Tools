@@ -660,6 +660,9 @@ logs_tf:
     demo_download: "Descargar demo"
     demo_downloading: "Descargando demo"
     demo_downloading_percent: "Descargando demo %{percent}"
+    demo_view: "Ver demo"
+    demo_opening: "Abriendo demo"
+    demo_opening_percent: "Abriendo demo %{percent}"
   event:
     point_capture: "Captura de punto"
     captured: " capturó el punto %{point}"

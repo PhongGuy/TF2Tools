@@ -894,4 +894,5 @@ fn profile_card_ids_are_keyed_by_profile_id_and_slot() {
 fn logstf_demo_ids_are_keyed_by_log_id() {
     assert_eq!(name(ids::logstf_demo_download(3)), "logstf-demo-download:3");
     assert_eq!(name(ids::logstf_demo_link(3)), "logstf-demo-link:3");
+    assert_eq!(name(ids::logstf_demo_view(3)), "logstf-demo-view:3");
 }

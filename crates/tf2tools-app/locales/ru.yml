@@ -635,6 +635,9 @@ logs_tf:
     demo_download: "Скачать демо"
     demo_downloading: "Скачивание демо"
     demo_downloading_percent: "Скачивание демо %{percent}"
+    demo_view: "Смотреть демо"
+    demo_opening: "Открытие демо"
+    demo_opening_percent: "Открытие демо %{percent}"
   event:
     point_capture: "Захват точки"
     captured: " захватил точку %{point}"

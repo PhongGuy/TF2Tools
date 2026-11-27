@@ -637,6 +637,9 @@ logs_tf:
     demo_download: "Download demo"
     demo_downloading: "Downloading demo"
     demo_downloading_percent: "Downloading demo %{percent}"
+    demo_view: "View demo"
+    demo_opening: "Opening demo"
+    demo_opening_percent: "Opening demo %{percent}"
   event:
     point_capture: "Point Capture"
     captured: " captured point %{point}"

@@ -6,11 +6,12 @@ use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     DEMOS_TF, accuracy_text, charge_text, count_text, date_time_text, demo_button_label, demo_down,
     demo_download_failed, demo_downloaded, demo_file_name, demo_percent, demo_reason,
-    download_failed, download_reason, duration_text, empty_text, event_parts, event_text,
-    fetch_message, finding_text, floored, floored_share_text, healing_text, kapd_text, known_text,
-    medigun_name, no_logs_text, one_decimal, per_min_text, progress_line, progress_text,
-    range_label, reads_zero, resolve_message, ring_label, round_length_text, seconds_text,
-    share_text, streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
+    demo_view_label, download_failed, download_reason, duration_text, empty_text, event_parts,
+    event_text, fetch_message, finding_text, floored, floored_share_text, healing_text, kapd_text,
+    known_text, medigun_name, no_logs_text, one_decimal, per_min_text, progress_line,
+    progress_text, range_label, reads_zero, resolve_message, ring_label, round_length_text,
+    seconds_text, share_text, streaks_label, summary_text, sync_message, tenths_text,
+    time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -932,4 +933,11 @@ fn demo_failures_read_in_player_words() {
             "demos.tf isn't responding right now. Try again later."
         );
     }
+}
+
+#[test]
+fn the_view_demo_button_says_what_it_is_doing() {
+    assert_eq!(demo_view_label(None), "View demo");
+    assert_eq!(demo_view_label(Some(None)), "Opening demo");
+    assert_eq!(demo_view_label(Some(Some(42))), "Opening demo 42%");
 }
