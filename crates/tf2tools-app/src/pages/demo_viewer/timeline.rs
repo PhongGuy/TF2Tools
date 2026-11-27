@@ -253,7 +253,7 @@ impl DemoViewerPage {
         let Some(timeline) = &self.timeline else {
             return Vec::new();
         };
-        let colour = cx.theme().muted_foreground;
+        let (colour, ring) = (cx.theme().foreground, cx.theme().background);
         timeline
             .rounds
             .iter()
@@ -266,12 +266,16 @@ impl DemoViewerPage {
                     .id(ids::demo_viewer_round_marker(n))
                     .aria_label(words)
                     .test_support()
+                    // Taller than the strip and ringed in the bar's colour, so a dot stays
+                    // distinct over the kill lines it is drawn after.
                     .absolute()
-                    .top_0()
+                    .top(px(-2.))
                     .left(relative(fraction))
-                    .ml(px(-3.))
-                    .size(px(6.))
+                    .ml(px(-5.))
+                    .size(px(10.))
                     .rounded_full()
+                    .border_2()
+                    .border_color(ring)
                     .bg(colour)
                     .cursor_pointer()
                     .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))

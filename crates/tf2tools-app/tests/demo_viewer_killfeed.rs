@@ -425,7 +425,16 @@ fn round_markers_still_seek_over_the_kill_strip(cx: &mut TestAppContext) {
         ]);
     let env = support::env();
     let w = open_with(cx, &env, Arc::new(tracks));
-    assert!(support::present(cx, w.s.win, ids::DEMO_VIEWER_KILL_MARKERS));
+    let strip = support::bounds_of(cx, w.s.win, ids::DEMO_VIEWER_KILL_MARKERS).expect("the strip");
+    // Each dot stands out past the strip's top and bottom, so the kill lines cannot hide it.
+    for n in 0..2 {
+        let dot = support::bounds_of(cx, w.s.win, ids::demo_viewer_round_marker(n)).expect("a dot");
+        assert!(
+            dot.top() < strip.top() && dot.bottom() > strip.bottom(),
+            "round {n} at {dot:?} hides in the strip {strip:?}"
+        );
+        assert!(dot.size.width > strip.size.height, "{dot:?} {strip:?}");
+    }
     support::click_id(cx, w.s.win, ids::demo_viewer_round_marker(1));
     assert_eq!(support::demo_viewer::playback(cx, &w).unwrap().tick, 4150.);
     support::click_id(cx, w.s.win, ids::demo_viewer_round_marker(0));
