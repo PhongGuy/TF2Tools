@@ -43,6 +43,8 @@ vbsp = "=0.9.2"
 tf-demo-parser = "=0.7.2"
 rars = { version = "=0.12.4", default-features = false }
 vtf = "0.4.1"
+# Decodes the half floats in studio Vector48 animation values.
+half = "2.7.1"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -68,6 +70,8 @@ winreg = "=0.56.0"
 windows-sys = { version = "=0.61.2", features = ["Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "ansi", "env-filter", "std"] }
 wiremock = "0.6.5"
+# Test oracle for the studio model decoder; dev-dependency only.
+vmdl = "=0.2.0"
 # Windows resources for the exe icon; the version gpui-pre already resolves.
 embed-resource = "=3.0.12"
 # UI: the kit trio is pinned exactly at 0.11.0, so a kit bump is a deliberate change.
@@ -104,6 +108,10 @@ opt-level = 2
 opt-level = 3
 [profile.dev.package.texpresso]
 opt-level = 3
+# vmdl, the studio test oracle, adds 1 to a u8 run length of 255 when it decodes frames past
+# that run; wrapping only garbles frames the oracle never compares.
+[profile.dev.package.vmdl]
+overflow-checks = false
 
 # Release builds trade build time for size; never set `panic` here (see tests/release_profile.rs).
 [profile.release]

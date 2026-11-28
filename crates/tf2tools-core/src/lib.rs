@@ -50,13 +50,14 @@ pub use cleanup::{CleanupRoots, Freed, sweep_game_leftovers, sweep_leftovers};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use demo_view::{
-    CameraMode, CameraView, DemoHeader, DemoKill, DemoSnapshot, DemoTestKill, DemoTestParty,
-    DemoTestShot, DemoTracks, EyePose, FlyInput, FollowPose, FreeFly, KillParty, MAX_DEMO_BYTES,
-    MAX_KILLS, MAX_MAP_BYTES, MAX_MAP_TRIANGLES, MAX_PROJECTILE_SAMPLES, MAX_SNAPSHOT_BYTES,
-    MAX_TRACK_SAMPLES, MapMesh, PlaybackClock, PlaybackEvent, PlayerId, ProjectileKind,
-    ProjectileView, SnapshotPlayer, SpectatorCamera, TargetLife, TrackCut, load_map_file,
-    load_map_file_capped, load_map_mesh, read_demo_header, read_demo_playback, read_demo_snapshot,
-    read_demo_tracks,
+    Animation, AutoLayer, BonePose, CameraMode, CameraView, ClassRig, DemoHeader, DemoKill,
+    DemoSnapshot, DemoTestKill, DemoTestParty, DemoTestShot, DemoTracks, EyePose, FlyInput,
+    FollowPose, FreeFly, KillParty, MAX_DEMO_BYTES, MAX_KILLS, MAX_MAP_BYTES, MAX_MAP_TRIANGLES,
+    MAX_PROJECTILE_SAMPLES, MAX_SNAPSHOT_BYTES, MAX_TRACK_SAMPLES, MapMesh, MeshGroup, Movement,
+    PlaybackClock, PlaybackEvent, PlayerId, PoseParam, ProjectileKind, ProjectileView, RigBone,
+    RigMesh, Sequence, Skeleton, SnapshotPlayer, SpectatorCamera, TargetLife, TrackCut,
+    load_map_file, load_map_file_capped, load_map_mesh, read_demo_header, read_demo_playback,
+    read_demo_snapshot, read_demo_tracks,
 };
 // The logs page already owns `TrackedPlayer` at the root, so the demo one is renamed here.
 pub use demo_view::TrackedPlayer as DemoTrackedPlayer;
@@ -76,10 +77,10 @@ pub use error::{
     LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
     MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
-    SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError, UpdateApplyError,
-    UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
-    WeaponIconsError, WeaponNamesError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, RigLoadError,
+    SchemaError, SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError,
+    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
+    WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,

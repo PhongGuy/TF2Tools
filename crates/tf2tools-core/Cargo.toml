@@ -26,6 +26,7 @@ vbsp.workspace = true
 tf-demo-parser.workspace = true
 rars.workspace = true
 vtf.workspace = true
+half.workspace = true
 image = { workspace = true, features = ["jpeg"] }
 serde.workspace = true
 serde_json.workspace = true
@@ -54,6 +55,7 @@ windows-sys.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 wiremock.workspace = true
+vmdl.workspace = true
 minisign.workspace = true
 rars = { workspace = true, features = ["write", "encryption"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }

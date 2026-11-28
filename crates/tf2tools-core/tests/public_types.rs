@@ -161,3 +161,13 @@ fn demo_projectile_and_kill_types_are_send_sync_debug() {
     assert_send_sync::<tf2tools_core::DemoKill>();
     assert_send_sync::<tf2tools_core::KillParty>();
 }
+
+#[test]
+fn rig_types_are_send_sync_debug() {
+    assert_send_sync::<tf2tools_core::ClassRig>();
+    assert_send_sync::<tf2tools_core::RigLoadError>();
+    assert_send_sync::<tf2tools_core::RigMesh>();
+    assert_send_sync::<tf2tools_core::Sequence>();
+    assert_send_sync::<tf2tools_core::Animation>();
+    assert_send_sync::<tf2tools_core::Skeleton>();
+}

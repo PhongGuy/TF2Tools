@@ -31,6 +31,7 @@ mod demo_view_killfeed;
 mod demo_view_map_lookup;
 mod demo_view_mesh;
 mod demo_view_projectiles;
+mod demo_view_rig;
 mod demo_view_snapshot;
 mod demo_view_tracks;
 mod font_check;
