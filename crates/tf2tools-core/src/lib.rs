@@ -76,10 +76,10 @@ pub use error::{
     LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapMeshError, MapRemoveError,
     MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
-    SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError, UpdateApplyError,
-    UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
-    WeaponIconsError, WeaponNamesError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, RigLoadError,
+    SchemaError, SettingPicturesError, SettingsError, StorageError, SyncError, TakeOverError,
+    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
+    WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,

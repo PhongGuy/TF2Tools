@@ -2794,3 +2794,32 @@ pub enum DemoTracksError {
     #[error("reading the demo was cancelled")]
     Cancelled,
 }
+
+/// Why a class model could not be read from the game files.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RigLoadError {
+    /// No TF2 install with game files was found.
+    #[error("no TF2 game files were found")]
+    NoInstall,
+    /// A file the model needs is not in the game files.
+    #[error("the game files have no {path}")]
+    Missing {
+        /// The game path that was looked up.
+        path: String,
+    },
+    /// A file is cut short or holds values the reader rejects.
+    #[error("{file} cannot be read: {what}")]
+    Malformed {
+        /// The file being read.
+        file: String,
+        /// What was wrong with it.
+        what: String,
+    },
+    /// A file or one of its counts is over the reader's caps.
+    #[error("{file} is too large to read")]
+    TooLarge {
+        /// The file being read.
+        file: String,
+    },
+}

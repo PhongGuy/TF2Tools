@@ -11,6 +11,7 @@ mod mesh;
 mod playback;
 mod ray_grid;
 mod snapshot;
+mod studio;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod tracks;
