@@ -21,3 +21,4 @@ pub(crate) const MAX_TABLE: usize = 8_192;
 mod bytes;
 #[cfg(test)]
 mod fixture;
+mod values;

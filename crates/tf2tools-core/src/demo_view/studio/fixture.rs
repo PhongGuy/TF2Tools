@@ -37,3 +37,28 @@ impl Blob {
         self.set_i32(field, target as i32 - base as i32);
     }
 }
+
+/// RLE animation values: each run is (values, frames it covers); a run's last value repeats.
+pub(crate) fn rle(runs: &[(&[i16], u8)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for &(values, total) in runs {
+        out.push(u8::try_from(values.len()).unwrap());
+        out.push(total);
+        for v in values {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    out
+}
+
+pub(crate) fn q64_bytes(x: u64, y: u64, z: u64, w_neg: bool) -> [u8; 8] {
+    (x | y << 21 | z << 42 | u64::from(w_neg) << 63).to_le_bytes()
+}
+
+pub(crate) fn half_bytes(h: [u16; 3]) -> [u8; 6] {
+    let mut out = [0u8; 6];
+    for (i, v) in h.iter().enumerate() {
+        out[2 * i..2 * i + 2].copy_from_slice(&v.to_le_bytes());
+    }
+    out
+}

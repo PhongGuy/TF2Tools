@@ -8317,6 +8317,7 @@ dependencies = [
  "chrono",
  "dirs 7.0.0",
  "flate2",
+ "half",
  "image",
  "libc",
  "md-5 0.11.0",
