@@ -149,3 +149,23 @@ pub(crate) fn write_anims(blob: &mut Blob, anims: &[AnimSpec]) -> usize {
     }
     array
 }
+
+/// The body of an ANIMROT and/or ANIMPOS track: the value pointers (rotation first), then each
+/// channel's RLE bytes; a None channel gets offset 0. Offsets count from their own pointer.
+pub(crate) fn anim_body(
+    rot: Option<[Option<Vec<u8>>; 3]>,
+    pos: Option<[Option<Vec<u8>>; 3]>,
+) -> Vec<u8> {
+    let ptrs: Vec<[Option<Vec<u8>>; 3]> = rot.into_iter().chain(pos).collect();
+    let mut body = vec![0u8; 6 * ptrs.len()];
+    for (p, chans) in ptrs.iter().enumerate() {
+        for (j, chan) in chans.iter().enumerate() {
+            if let Some(bytes) = chan {
+                let off = u16::try_from(body.len() - 6 * p).unwrap();
+                body[6 * p + 2 * j..6 * p + 2 * j + 2].copy_from_slice(&off.to_le_bytes());
+                body.extend_from_slice(bytes);
+            }
+        }
+    }
+    body
+}

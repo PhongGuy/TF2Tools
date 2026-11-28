@@ -109,6 +109,7 @@ pub(crate) fn mul34(a: &[[f32; 4]; 3], b: &[[f32; 4]; 3]) -> [[f32; 4]; 3] {
 }
 
 /// One animation value channel: the RLE words copied from the file, as many as `frames` need.
+#[derive(Debug, Clone)]
 pub(crate) struct Channel {
     words: Box<[u16]>,
 }
