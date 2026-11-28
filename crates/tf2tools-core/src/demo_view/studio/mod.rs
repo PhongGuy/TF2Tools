@@ -18,6 +18,7 @@ pub(crate) const MAX_INCLUDES: usize = 8;
 /// Most entries in any other table of a studio file.
 pub(crate) const MAX_TABLE: usize = 8_192;
 
+mod anim;
 mod bytes;
 #[cfg(test)]
 mod fixture;
