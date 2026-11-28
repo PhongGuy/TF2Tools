@@ -308,6 +308,24 @@ mod tests {
     }
 
     #[test]
+    fn frames_past_a_full_255_value_run_decode() {
+        let values: Vec<i16> = (0..255).collect();
+        let d = rle(&[(values.as_slice(), 255), (&[-9], 2)]);
+        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 257).unwrap();
+        assert_eq!(c.heap_bytes(), 2 * (1 + 255 + 1 + 1), "both runs copied");
+        assert_eq!(
+            (
+                c.value(0),
+                c.value(254),
+                c.value(255),
+                c.value(256),
+                c.value(257)
+            ),
+            (0, 254, -9, -9, 0)
+        );
+    }
+
+    #[test]
     fn a_cut_short_run_is_malformed() {
         let d = rle(&[(&[1, 2, 3], 3)]);
         let cut = &d[..5];
