@@ -4,7 +4,7 @@
 use super::anim::BonePose;
 
 /// `STUDIO_LOOPING`: the sequence wraps instead of holding its last frame.
-const STUDIO_LOOPING: i32 = 0x1;
+pub(super) const STUDIO_LOOPING: i32 = 0x1;
 
 /// A rig's bones in parent-first order.
 #[derive(Debug, Clone, PartialEq)]
@@ -91,7 +91,7 @@ impl PoseParam {
     }
 }
 
-/// A sequence a sequence plays on top of itself, with its fade window.
+/// Another sequence this one plays on top of itself, with its fade window.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct AutoLayer {

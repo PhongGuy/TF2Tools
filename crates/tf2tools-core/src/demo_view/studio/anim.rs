@@ -3,12 +3,13 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-#[cfg(test)]
-use crate::demo_view::studio::MAX_CHANNEL_WORDS;
 use crate::demo_view::studio::bytes::Bytes;
+use crate::demo_view::studio::types::STUDIO_LOOPING;
 use crate::demo_view::studio::values::{
     blend, channel_value, euler_quat, quat48, quat64, read_channel, vec48,
 };
+#[cfg(test)]
+use crate::demo_view::studio::{MAX_CHANNEL_WORDS, MAX_TRACKS};
 use crate::demo_view::studio::{MAX_FRAMES, MAX_TABLE};
 use crate::error::RigLoadError;
 
@@ -28,6 +29,8 @@ const RAW_ROT2: u8 = 0x20;
 const CHAIN_END: u8 = 255;
 /// Most track headers one chain may link.
 const MAX_LINKS: usize = 256;
+/// `STUDIO_DELTA`: the animation layers on another pose instead of replacing it.
+const STUDIO_DELTA: i32 = 0x4;
 /// Size of one movement entry.
 const MOVEMENT_BYTES: usize = 44;
 
@@ -176,11 +179,12 @@ fn fixed_at<const N: usize>(fixed: &[f32], at: u32) -> Option<[f32; N]> {
 }
 
 /// What every animation of one class load shares: the bones of the file being read, the
-/// channel words the whole load may still copy, and scratch pools each animation is copied out
-/// of at its exact size.
+/// channel words and tracks the whole load may still copy, and scratch pools each animation is
+/// copied out of at its exact size.
 pub(crate) struct AnimLoad {
     pub(crate) bones: Arc<[FileBone]>,
     words_left: usize,
+    tracks_left: usize,
     sections: Vec<Range<u32>>,
     tracks: Vec<Track>,
     words: Vec<u16>,
@@ -188,11 +192,13 @@ pub(crate) struct AnimLoad {
 }
 
 impl AnimLoad {
-    /// A load reading `bones`' file that may copy `word_cap` channel words in all.
-    pub(crate) fn new(bones: Arc<[FileBone]>, word_cap: usize) -> AnimLoad {
+    /// A load reading `bones`' file that may copy `word_cap` channel words and `track_cap`
+    /// tracks in all.
+    pub(crate) fn new(bones: Arc<[FileBone]>, word_cap: usize, track_cap: usize) -> AnimLoad {
         AnimLoad {
             bones,
             words_left: word_cap,
+            tracks_left: track_cap,
             sections: Vec::new(),
             tracks: Vec::new(),
             words: Vec::new(),
@@ -256,14 +262,15 @@ pub struct Animation {
 }
 
 impl Animation {
-    /// Reads the descriptor at `at` with a load of its own, capped at `MAX_CHANNEL_WORDS`.
+    /// Reads the descriptor at `at` with a load of its own, capped at `MAX_CHANNEL_WORDS` and
+    /// `MAX_TRACKS`.
     #[cfg(test)]
     pub(crate) fn read(
         bytes: &Bytes<'_>,
         at: usize,
         ctx: &AnimContext<'_>,
     ) -> Result<Animation, RigLoadError> {
-        let mut load = AnimLoad::new(Arc::from(ctx.bones), MAX_CHANNEL_WORDS);
+        let mut load = AnimLoad::new(Arc::from(ctx.bones), MAX_CHANNEL_WORDS, MAX_TRACKS);
         Animation::read_in(bytes, at, ctx, &mut load)
     }
 
@@ -344,12 +351,12 @@ impl Animation {
 
     /// Whether it loops (STUDIO_LOOPING).
     pub fn is_looping(&self) -> bool {
-        self.flags & 0x1 != 0
+        self.flags & STUDIO_LOOPING != 0
     }
 
     /// Whether it is a delta layered on another pose (STUDIO_DELTA).
     pub fn is_delta(&self) -> bool {
-        self.flags & 0x4 != 0
+        self.flags & STUDIO_DELTA != 0
     }
 
     /// The root motion pieces it carries, in frame order.
@@ -499,6 +506,12 @@ impl Animation {
         self.words.len()
     }
 
+    /// How many tracks it copied, across all its sections.
+    #[cfg(test)]
+    pub(crate) fn track_count(&self) -> usize {
+        self.tracks.len()
+    }
+
     /// Bytes it holds on the heap; the file's bones and rest pose are shared, so not counted.
     pub(crate) fn heap_bytes(&self) -> usize {
         self.name.capacity()
@@ -604,6 +617,11 @@ fn read_chain(
         }
         // A track on a bone the base model lacks plays no part.
         if let Some(base) = ctx.to_base.get(usize::from(bone)).copied().flatten() {
+            // A track adds at most seven fixed floats, so this cap bounds the fixed pool too.
+            load.tracks_left = load
+                .tracks_left
+                .checked_sub(1)
+                .ok_or_else(|| bytes.too_large())?;
             let track = read_track(bytes, at + 4, flags, bone, base, frames, load)?;
             load.tracks.push(track);
         }
@@ -1114,9 +1132,43 @@ mod tests {
             to_base: &to_base,
             rest: rest(&bones),
         };
-        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 6);
+        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 6, MAX_TRACKS);
         let a = Animation::read_in(&bytes, at, &ctx, &mut load).unwrap();
         assert_eq!(sample(&a, 2., 1)[0].pos()[0], 3.);
+        assert!(matches!(
+            Animation::read_in(&bytes, at + 100, &ctx, &mut load),
+            Err(RigLoadError::TooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn fixed_only_tracks_aliased_across_descriptors_spend_the_shared_track_budget() {
+        let bones = [bone([0.; 3], [0.; 3])];
+        let mut body = q64_bytes(0, 0, 0, false).to_vec();
+        body.extend_from_slice(&half_bytes([0; 3]));
+        // A fixed rotation and position copy no channel words, so only the track cap stops them.
+        let track = || TrackBytes {
+            bone: 0,
+            flags: RAW_ROT2 | RAW_POS,
+            body: body.clone(),
+        };
+        let mut blob = Blob::new();
+        let specs = [
+            AnimSpec::plain("a", 3, vec![track(), track()]),
+            AnimSpec::plain("b", 3, Vec::new()),
+        ];
+        let at = write_anims(&mut blob, &specs);
+        let rel = i32::from_le_bytes(blob.0[at + 56..at + 60].try_into().unwrap());
+        blob.set_rel(at + 156, at + 100, at + rel as usize);
+        let bytes = Bytes::new("a.mdl", &blob.0);
+        let to_base = [Some(0)];
+        let ctx = AnimContext {
+            bones: &bones,
+            to_base: &to_base,
+            rest: rest(&bones),
+        };
+        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 0, 3);
+        assert!(Animation::read_in(&bytes, at, &ctx, &mut load).is_ok());
         assert!(matches!(
             Animation::read_in(&bytes, at + 100, &ctx, &mut load),
             Err(RigLoadError::TooLarge { .. })

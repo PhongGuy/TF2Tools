@@ -16,6 +16,9 @@ pub(crate) const MAX_TABLE: usize = 8_192;
 /// Most RLE channel words one class load may copy across its include chain, about 2.6 times
 /// the largest real class.
 pub(crate) const MAX_CHANNEL_WORDS: usize = 1 << 23;
+/// Most animation tracks one class load may copy across its include chain, about 2.1 times
+/// the largest real class.
+pub(crate) const MAX_TRACKS: usize = 150_000;
 
 mod anim;
 mod bytes;

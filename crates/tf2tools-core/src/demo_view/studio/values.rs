@@ -1,5 +1,5 @@
 //! Source's compressed animation values: packed quaternions, half-float vectors and the
-//! run-length encoded value channels, plus the quaternion and matrix math the rig needs.
+//! run-length encoded value channels, plus the quaternion math posing needs.
 
 use crate::demo_view::studio::bytes::Bytes;
 use crate::error::RigLoadError;
