@@ -411,3 +411,65 @@ impl SeqSpec {
         }
     }
 }
+
+/// One VVD vertex.
+pub(crate) struct VertSpec {
+    pub(crate) pos: [f32; 3],
+    pub(crate) normal: [f32; 3],
+    pub(crate) uv: [f32; 2],
+    pub(crate) bones: [u8; 3],
+    pub(crate) weights: [f32; 3],
+    pub(crate) count: u8,
+}
+
+impl VertSpec {
+    /// At (x, 0, 0), facing +z, uv (x, 0), fully on bone 0.
+    pub(crate) fn at(x: f32) -> VertSpec {
+        VertSpec {
+            pos: [x, 0., 0.],
+            normal: [0., 0., 1.],
+            uv: [x, 0.],
+            bones: [0; 3],
+            weights: [1., 0., 0.],
+            count: 1,
+        }
+    }
+}
+
+/// A version-4 VVD: `lod0` vertices at LOD 0, all `verts` in its vertex block, `fixups` as (lod, source, count).
+pub(crate) fn vvd_bytes(
+    checksum: i32,
+    lod0: i32,
+    verts: &[VertSpec],
+    fixups: &[(i32, i32, i32)],
+) -> Vec<u8> {
+    let mut b = Blob::new();
+    b.zeros(64);
+    b.0[0..4].copy_from_slice(b"IDSV");
+    b.set_i32(4, 4);
+    b.set_i32(8, checksum);
+    b.set_i32(12, 1);
+    b.set_i32(16, lod0);
+    b.set_i32(48, fixups.len() as i32);
+    let table = b.zeros(12 * fixups.len());
+    for (i, (lod, source, count)) in fixups.iter().enumerate() {
+        b.set_i32(table + 12 * i, *lod);
+        b.set_i32(table + 12 * i + 4, *source);
+        b.set_i32(table + 12 * i + 8, *count);
+    }
+    b.set_i32(52, table as i32);
+    let data = b.zeros(48 * verts.len());
+    b.set_i32(56, data as i32);
+    for (i, v) in verts.iter().enumerate() {
+        let at = data + 48 * i;
+        b.set_f32s(at, &v.weights);
+        b.0[at + 12..at + 15].copy_from_slice(&v.bones);
+        b.0[at + 15] = v.count;
+        b.set_f32s(at + 16, &v.pos);
+        b.set_f32s(at + 28, &v.normal);
+        b.set_f32s(at + 40, &v.uv);
+    }
+    let tangents = b.zeros(16 * verts.len());
+    b.set_i32(60, tangents as i32);
+    b.0
+}
