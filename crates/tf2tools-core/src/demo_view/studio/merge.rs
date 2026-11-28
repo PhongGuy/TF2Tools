@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use super::anim::{AnimContext, AnimLoad, Animation, BonePose, FileBone};
+use super::MAX_TABLE;
+use super::anim::{AnimCaps, AnimContext, AnimLoad, Animation, BonePose, FileBone};
 use super::mdl::MdlFile;
 use super::types::{AutoLayer, PoseParam, RigBone, Sequence, Skeleton};
-use super::{MAX_CHANNEL_WORDS, MAX_TABLE, MAX_TRACKS};
 use crate::error::RigLoadError;
 
 /// The parts of a class rig taken from the base model and its includes.
@@ -25,16 +25,12 @@ const STUDIO_OVERRIDE: i32 = 0x800;
 /// of its label only when that one is a forward declaration. Every index is remapped into the
 /// merged tables; an index or grid that does not fit its file is `Malformed`.
 pub(crate) fn merge(files: &[MdlFile]) -> Result<Merged, RigLoadError> {
-    merge_within(files, MAX_CHANNEL_WORDS, MAX_TRACKS)
+    merge_within(files, AnimCaps::FULL)
 }
 
-/// [`merge`], copying at most `word_cap` channel words and `track_cap` tracks across the whole
-/// chain; more is `TooLarge`, however the descriptors alias their track data.
-pub(crate) fn merge_within(
-    files: &[MdlFile],
-    word_cap: usize,
-    track_cap: usize,
-) -> Result<Merged, RigLoadError> {
+/// [`merge`], copying at most `caps` across the whole chain; more is `TooLarge`, however the
+/// descriptors alias their data.
+pub(crate) fn merge_within(files: &[MdlFile], caps: AnimCaps) -> Result<Merged, RigLoadError> {
     let Some(base) = files.first() else {
         return Ok(Merged {
             skeleton: Skeleton { bones: Vec::new() },
@@ -61,7 +57,7 @@ pub(crate) fn merge_within(
         sequences: Vec::new(),
         animations: Vec::new(),
     };
-    let mut load = AnimLoad::new(Arc::from([]), word_cap, track_cap);
+    let mut load = AnimLoad::new(Arc::from([]), caps);
     for (f, file) in files.iter().enumerate() {
         append_file(&mut merged, file, f == 0, &mut load)?;
     }
@@ -493,11 +489,24 @@ mod tests {
             MdlFile::parse("anims.mdl", bytes).unwrap(),
         ];
         assert!(
-            merge_within(&files, 12, MAX_TRACKS).is_ok(),
+            merge_within(
+                &files,
+                AnimCaps {
+                    words: 12,
+                    ..AnimCaps::FULL
+                }
+            )
+            .is_ok(),
             "three four-word channels"
         );
         assert!(matches!(
-            merge_within(&files, 11, MAX_TRACKS),
+            merge_within(
+                &files,
+                AnimCaps {
+                    words: 11,
+                    ..AnimCaps::FULL
+                }
+            ),
             Err(RigLoadError::TooLarge { .. })
         ));
     }

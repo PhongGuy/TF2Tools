@@ -6,7 +6,7 @@ use std::sync::Arc;
 use super::anim::{AnimContext, Animation, BonePose, RawPos, RawRot, RawSample};
 use super::mdl::MdlFile;
 use super::values::{mul34, pose_matrix};
-use super::{ClassRig, MAX_CHANNEL_WORDS, MAX_TRACKS};
+use super::{ClassRig, MAX_CHANNEL_WORDS, MAX_MOVEMENTS, MAX_SECTIONS, MAX_TRACKS};
 use crate::pak::{open_vpk, read_entry};
 use crate::weapons::TfClass;
 
@@ -209,17 +209,30 @@ fn standing_with_a_melee_weapon_stands_upright() {
 
 #[test]
 #[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
-fn every_class_copies_under_half_the_word_and_track_caps() {
+fn every_class_copies_under_half_its_load_caps() {
     let tf = misc_vpk().parent().unwrap().to_path_buf();
     for class in TfClass::ALL {
         let rig = ClassRig::load(&tf, class).unwrap();
         let words: usize = rig.animations().iter().map(Animation::channel_words).sum();
         let tracks: usize = rig.animations().iter().map(Animation::track_count).sum();
-        println!("{class:?}: {words} channel words, {tracks} tracks");
+        let sections: usize = rig.animations().iter().map(Animation::section_count).sum();
+        let movements: usize = rig.animations().iter().map(Animation::movement_count).sum();
+        println!(
+            "{class:?}: {words} channel words, {tracks} tracks, {sections} sections, \
+             {movements} movements"
+        );
         assert!(
             2 * words <= MAX_CHANNEL_WORDS,
             "{class:?}: {words} channel words"
         );
         assert!(2 * tracks <= MAX_TRACKS, "{class:?}: {tracks} tracks");
+        assert!(
+            2 * sections <= MAX_SECTIONS,
+            "{class:?}: {sections} sections"
+        );
+        assert!(
+            2 * movements <= MAX_MOVEMENTS,
+            "{class:?}: {movements} movements"
+        );
     }
 }

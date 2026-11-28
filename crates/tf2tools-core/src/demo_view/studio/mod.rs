@@ -19,6 +19,12 @@ pub(crate) const MAX_CHANNEL_WORDS: usize = 1 << 23;
 /// Most animation tracks one class load may copy across its include chain, about 2.1 times
 /// the largest real class.
 pub(crate) const MAX_TRACKS: usize = 150_000;
+/// Most animation sections one class load may copy across its include chain, about 2.1 times
+/// the largest real class; an empty section spends no track, so it needs a cap of its own.
+pub(crate) const MAX_SECTIONS: usize = 4_096;
+/// Most root-motion movements one class load may copy across its include chain, about 2.1
+/// times the largest real class.
+pub(crate) const MAX_MOVEMENTS: usize = 700;
 
 mod anim;
 mod bytes;

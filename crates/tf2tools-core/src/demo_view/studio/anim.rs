@@ -8,9 +8,9 @@ use crate::demo_view::studio::types::STUDIO_LOOPING;
 use crate::demo_view::studio::values::{
     blend, channel_value, euler_quat, quat48, quat64, read_channel, vec48,
 };
-#[cfg(test)]
-use crate::demo_view::studio::{MAX_CHANNEL_WORDS, MAX_TRACKS};
-use crate::demo_view::studio::{MAX_FRAMES, MAX_TABLE};
+use crate::demo_view::studio::{
+    MAX_CHANNEL_WORDS, MAX_FRAMES, MAX_MOVEMENTS, MAX_SECTIONS, MAX_TABLE, MAX_TRACKS,
+};
 use crate::error::RigLoadError;
 
 /// Track flag: a Vector48 position follows the rotation.
@@ -178,13 +178,31 @@ fn fixed_at<const N: usize>(fixed: &[f32], at: u32) -> Option<[f32; N]> {
     fixed.get(at..at.checked_add(N)?)?.try_into().ok()
 }
 
-/// What every animation of one class load shares: the bones of the file being read, the
-/// channel words and tracks the whole load may still copy, and scratch pools each animation is
-/// copied out of at its exact size.
+/// How much one class load may copy in all, per pool; going past any of them is `TooLarge`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AnimCaps {
+    pub(crate) words: usize,
+    pub(crate) tracks: usize,
+    pub(crate) sections: usize,
+    pub(crate) movements: usize,
+}
+
+impl AnimCaps {
+    /// The caps a real class load runs under.
+    pub(crate) const FULL: AnimCaps = AnimCaps {
+        words: MAX_CHANNEL_WORDS,
+        tracks: MAX_TRACKS,
+        sections: MAX_SECTIONS,
+        movements: MAX_MOVEMENTS,
+    };
+}
+
+/// What every animation of one class load shares: the bones of the file being read, what the
+/// whole load may still copy, and scratch pools each animation is copied out of at its exact
+/// size.
 pub(crate) struct AnimLoad {
     pub(crate) bones: Arc<[FileBone]>,
-    words_left: usize,
-    tracks_left: usize,
+    left: AnimCaps,
     sections: Vec<Range<u32>>,
     tracks: Vec<Track>,
     words: Vec<u16>,
@@ -192,19 +210,34 @@ pub(crate) struct AnimLoad {
 }
 
 impl AnimLoad {
-    /// A load reading `bones`' file that may copy `word_cap` channel words and `track_cap`
-    /// tracks in all.
-    pub(crate) fn new(bones: Arc<[FileBone]>, word_cap: usize, track_cap: usize) -> AnimLoad {
+    /// A load reading `bones`' file that may copy at most `caps` in all.
+    pub(crate) fn new(bones: Arc<[FileBone]>, caps: AnimCaps) -> AnimLoad {
         AnimLoad {
             bones,
-            words_left: word_cap,
-            tracks_left: track_cap,
+            left: caps,
             sections: Vec::new(),
             tracks: Vec::new(),
             words: Vec::new(),
             fixed: Vec::new(),
         }
     }
+}
+
+/// Takes `n` from the budget `left`; a budget too small is `TooLarge`.
+fn spend(bytes: &Bytes<'_>, left: &mut usize, n: usize) -> Result<(), RigLoadError> {
+    *left = left.checked_sub(n).ok_or_else(|| bytes.too_large())?;
+    Ok(())
+}
+
+/// Ends a section of `load`'s tracks, spending one from its section budget.
+fn push_section(
+    bytes: &Bytes<'_>,
+    load: &mut AnimLoad,
+    section: Range<u32>,
+) -> Result<(), RigLoadError> {
+    spend(bytes, &mut load.left.sections, 1)?;
+    load.sections.push(section);
+    Ok(())
 }
 
 /// A pool length as a slot index; a pool past `u32` is `TooLarge`.
@@ -262,15 +295,14 @@ pub struct Animation {
 }
 
 impl Animation {
-    /// Reads the descriptor at `at` with a load of its own, capped at `MAX_CHANNEL_WORDS` and
-    /// `MAX_TRACKS`.
+    /// Reads the descriptor at `at` with a load of its own, under [`AnimCaps::FULL`].
     #[cfg(test)]
     pub(crate) fn read(
         bytes: &Bytes<'_>,
         at: usize,
         ctx: &AnimContext<'_>,
     ) -> Result<Animation, RigLoadError> {
-        let mut load = AnimLoad::new(Arc::from(ctx.bones), MAX_CHANNEL_WORDS, MAX_TRACKS);
+        let mut load = AnimLoad::new(Arc::from(ctx.bones), AnimCaps::FULL);
         Animation::read_in(bytes, at, ctx, &mut load)
     }
 
@@ -296,7 +328,7 @@ impl Animation {
         if bytes.i32(at + 52)? != 0 {
             return Err(bytes.malformed(format!("animation {name} lives in animation blocks")));
         }
-        let movements = read_movements(bytes, at)?;
+        let movements = read_movements(bytes, at, load)?;
         let section_frames = bytes.i32(at + 84)?;
         let section_frames = usize::try_from(section_frames).map_err(|_| {
             bytes.malformed(format!(
@@ -512,6 +544,18 @@ impl Animation {
         self.tracks.len()
     }
 
+    /// How many sections it copied.
+    #[cfg(test)]
+    pub(crate) fn section_count(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// How many root-motion movements it copied.
+    #[cfg(test)]
+    pub(crate) fn movement_count(&self) -> usize {
+        self.movements.len()
+    }
+
     /// Bytes it holds on the heap; the file's bones and rest pose are shared, so not counted.
     pub(crate) fn heap_bytes(&self) -> usize {
         self.name.capacity()
@@ -524,7 +568,11 @@ impl Animation {
 }
 
 /// The descriptor's root-motion blocks.
-fn read_movements(bytes: &Bytes<'_>, at: usize) -> Result<Vec<Movement>, RigLoadError> {
+fn read_movements(
+    bytes: &Bytes<'_>,
+    at: usize,
+    load: &mut AnimLoad,
+) -> Result<Vec<Movement>, RigLoadError> {
     let table = bytes.table(
         at,
         bytes.i32(at + 24)?,
@@ -532,6 +580,8 @@ fn read_movements(bytes: &Bytes<'_>, at: usize) -> Result<Vec<Movement>, RigLoad
         MOVEMENT_BYTES,
         MAX_TABLE,
     )?;
+    // Descriptors may alias one table, so the count comes out of the load's shared budget.
+    spend(bytes, &mut load.left.movements, table.count)?;
     (0..table.count)
         .map(|i| {
             let m = table.at(i);
@@ -572,7 +622,7 @@ fn read_sections(
         // Sections no frame reads hold nothing worth trusting, so they stay unread.
         if covers == 0 {
             let end = slot(bytes, load.tracks.len())?;
-            load.sections.push(end..end);
+            push_section(bytes, load, end..end)?;
             continue;
         }
         let entry = table.at(k);
@@ -618,10 +668,7 @@ fn read_chain(
         // A track on a bone the base model lacks plays no part.
         if let Some(base) = ctx.to_base.get(usize::from(bone)).copied().flatten() {
             // A track adds at most seven fixed floats, so this cap bounds the fixed pool too.
-            load.tracks_left = load
-                .tracks_left
-                .checked_sub(1)
-                .ok_or_else(|| bytes.too_large())?;
+            spend(bytes, &mut load.left.tracks, 1)?;
             let track = read_track(bytes, at + 4, flags, bone, base, frames, load)?;
             load.tracks.push(track);
         }
@@ -631,8 +678,7 @@ fn read_chain(
         at = bytes.rel(at, i32::from(next))?;
     }
     let end = slot(bytes, load.tracks.len())?;
-    load.sections.push(start..end);
-    Ok(())
+    push_section(bytes, load, start..end)
 }
 
 /// The track data at `data`: fixed values decode into `load.fixed` now, channels are copied
@@ -705,7 +751,7 @@ fn read_channels(
                 ptr + usize::from(rel),
                 frames,
                 &mut load.words,
-                &mut load.words_left,
+                &mut load.left.words,
             )?;
         }
     }
@@ -1132,7 +1178,13 @@ mod tests {
             to_base: &to_base,
             rest: rest(&bones),
         };
-        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 6, MAX_TRACKS);
+        let mut load = AnimLoad::new(
+            Arc::from(bones.as_slice()),
+            AnimCaps {
+                words: 6,
+                ..AnimCaps::FULL
+            },
+        );
         let a = Animation::read_in(&bytes, at, &ctx, &mut load).unwrap();
         assert_eq!(sample(&a, 2., 1)[0].pos()[0], 3.);
         assert!(matches!(
@@ -1167,8 +1219,97 @@ mod tests {
             to_base: &to_base,
             rest: rest(&bones),
         };
-        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 0, 3);
+        let mut load = AnimLoad::new(
+            Arc::from(bones.as_slice()),
+            AnimCaps {
+                words: 0,
+                tracks: 3,
+                ..AnimCaps::FULL
+            },
+        );
         assert!(Animation::read_in(&bytes, at, &ctx, &mut load).is_ok());
+        assert!(matches!(
+            Animation::read_in(&bytes, at + 100, &ctx, &mut load),
+            Err(RigLoadError::TooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn empty_sections_aliased_across_descriptors_spend_the_shared_section_budget() {
+        let bones = [bone([0.; 3], [0.; 3])];
+        // Three frames in one-frame sections make five sections, each an empty chain.
+        let spec = |name| AnimSpec {
+            section_frames: 1,
+            blocks: (0..5).map(|_| Vec::new()).collect(),
+            ..AnimSpec::plain(name, 3, Vec::new())
+        };
+        let mut blob = Blob::new();
+        let at = write_anims(&mut blob, &[spec("a"), spec("b")]);
+        // Every entry of a's table names one end marker; b reuses a's table, and its entries,
+        // read from b's descriptor 100 bytes on, land on a second marker 100 bytes on.
+        let marker = blob.push(&[255, 0, 0, 0]);
+        blob.zeros(96);
+        blob.push(&[255, 0, 0, 0]);
+        let table = at + i32::from_le_bytes(blob.0[at + 80..at + 84].try_into().unwrap()) as usize;
+        for k in 0..5 {
+            blob.set_rel(table + 8 * k + 4, at, marker);
+        }
+        blob.set_rel(at + 180, at + 100, table);
+        let bytes = Bytes::new("a.mdl", &blob.0);
+        let to_base = [Some(0)];
+        let ctx = AnimContext {
+            bones: &bones,
+            to_base: &to_base,
+            rest: rest(&bones),
+        };
+        let mut load = AnimLoad::new(
+            Arc::from(bones.as_slice()),
+            AnimCaps {
+                sections: 5,
+                ..AnimCaps::FULL
+            },
+        );
+        let a = Animation::read_in(&bytes, at, &ctx, &mut load).unwrap();
+        assert_eq!(a.section_count(), 5);
+        assert!(matches!(
+            Animation::read_in(&bytes, at + 100, &ctx, &mut load),
+            Err(RigLoadError::TooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn movements_aliased_across_descriptors_spend_the_shared_movement_budget() {
+        let bones = [bone([0.; 3], [0.; 3])];
+        let step = (9, 1, [0.; 9]);
+        let specs = [
+            AnimSpec {
+                movements: vec![step, step],
+                ..AnimSpec::plain("a", 10, Vec::new())
+            },
+            AnimSpec::plain("b", 10, Vec::new()),
+        ];
+        let mut blob = Blob::new();
+        let at = write_anims(&mut blob, &specs);
+        // b claims a's two movements by pointing its table at a's.
+        let moves = at + i32::from_le_bytes(blob.0[at + 24..at + 28].try_into().unwrap()) as usize;
+        blob.set_i32(at + 120, 2);
+        blob.set_rel(at + 124, at + 100, moves);
+        let bytes = Bytes::new("a.mdl", &blob.0);
+        let to_base = [Some(0)];
+        let ctx = AnimContext {
+            bones: &bones,
+            to_base: &to_base,
+            rest: rest(&bones),
+        };
+        let mut load = AnimLoad::new(
+            Arc::from(bones.as_slice()),
+            AnimCaps {
+                movements: 2,
+                ..AnimCaps::FULL
+            },
+        );
+        let a = Animation::read_in(&bytes, at, &ctx, &mut load).unwrap();
+        assert_eq!(a.movement_count(), 2);
         assert!(matches!(
             Animation::read_in(&bytes, at + 100, &ctx, &mut load),
             Err(RigLoadError::TooLarge { .. })
