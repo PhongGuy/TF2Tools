@@ -25,4 +25,5 @@ mod fixture;
 mod mdl;
 #[cfg(test)]
 mod real_install;
+mod types;
 mod values;
