@@ -8341,6 +8341,7 @@ dependencies = [
  "ttf-parser",
  "uuid",
  "vbsp",
+ "vmdl",
  "vpk",
  "vtf",
  "walkdir",
@@ -9045,6 +9046,24 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vmdl"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da2f6b8c22da8937403a5da864e7ea390f30cd40b7a077079e40279aa6a4f553"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.13.2",
+ "bytemuck",
+ "cgmath",
+ "half",
+ "itertools 0.13.0",
+ "num_enum",
+ "static_assertions",
+ "thiserror 1.0.69",
+ "tracing",
+]
 
 [[package]]
 name = "vpk"

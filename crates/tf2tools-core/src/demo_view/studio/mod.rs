@@ -23,4 +23,6 @@ mod bytes;
 #[cfg(test)]
 mod fixture;
 mod mdl;
+#[cfg(test)]
+mod real_install;
 mod values;

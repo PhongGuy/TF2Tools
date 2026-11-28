@@ -55,6 +55,7 @@ windows-sys.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 wiremock.workspace = true
+vmdl.workspace = true
 minisign.workspace = true
 rars = { workspace = true, features = ["write", "encryption"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
