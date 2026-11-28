@@ -13,6 +13,9 @@ pub(crate) const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 pub(crate) const MAX_INCLUDES: usize = 8;
 /// Most entries in any other table of a studio file.
 pub(crate) const MAX_TABLE: usize = 8_192;
+/// Most RLE channel words one class load may copy across its include chain, about 2.6 times
+/// the largest real class.
+pub(crate) const MAX_CHANNEL_WORDS: usize = 1 << 23;
 
 mod anim;
 mod bytes;

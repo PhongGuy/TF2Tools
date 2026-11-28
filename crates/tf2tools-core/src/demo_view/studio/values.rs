@@ -110,66 +110,64 @@ pub(crate) fn mul34(a: &[[f32; 4]; 3], b: &[[f32; 4]; 3]) -> [[f32; 4]; 3] {
     })
 }
 
-/// One animation value channel: the RLE words copied from the file, as many as `frames` need.
-#[derive(Debug, Clone)]
-pub(crate) struct Channel {
-    words: Box<[u16]>,
+/// Appends the RLE channel at `at` to `words`: whole runs until their frame totals cover
+/// `frames` or a zero-frame run ends the data. Each word copied spends one of `words_left`, and
+/// running out is `TooLarge`; a run cut short by the file's end or holding more values than
+/// frames is `Malformed`.
+pub(crate) fn read_channel(
+    bytes: &Bytes<'_>,
+    at: usize,
+    frames: usize,
+    words: &mut Vec<u16>,
+    words_left: &mut usize,
+) -> Result<(), RigLoadError> {
+    let mut covered = 0usize;
+    let mut pos = at;
+    while covered < frames {
+        let header = bytes.u16(pos)?;
+        let [valid, total] = header.to_le_bytes();
+        if valid > total {
+            return Err(bytes.malformed(format!(
+                "a run at {pos} holds {valid} values for {total} frames"
+            )));
+        }
+        let run = 1 + usize::from(valid);
+        *words_left = words_left
+            .checked_sub(run)
+            .ok_or_else(|| bytes.too_large())?;
+        words.push(header);
+        for i in 0..usize::from(valid) {
+            words.push(bytes.u16(pos + 2 + 2 * i)?);
+        }
+        if total == 0 {
+            break;
+        }
+        covered += usize::from(total);
+        pos += 2 * run;
+    }
+    Ok(())
 }
 
-impl Channel {
-    /// Copies whole runs from `at` until their frame totals cover `frames` or a zero-frame run
-    /// ends the data; a run cut short by the end of the file is `Malformed`.
-    pub(crate) fn read(
-        bytes: &Bytes<'_>,
-        at: usize,
-        frames: usize,
-    ) -> Result<Channel, RigLoadError> {
-        let mut words = Vec::new();
-        let mut covered = 0usize;
-        let mut pos = at;
-        while covered < frames {
-            let header = bytes.u16(pos)?;
-            let [valid, total] = header.to_le_bytes();
-            words.push(header);
-            for i in 0..usize::from(valid) {
-                words.push(bytes.u16(pos + 2 + 2 * i)?);
-            }
-            if total == 0 {
-                break;
-            }
-            covered += usize::from(total);
-            pos += 2 + 2 * usize::from(valid);
+/// The value at `frame` of the channel starting at `words[0]`: a run's values in order, then
+/// its last value repeated; a frame past the data, or behind a zero-frame run, reads 0.
+pub(crate) fn channel_value(words: &[u16], frame: usize) -> i16 {
+    let mut k = frame;
+    let mut i = 0usize;
+    while let Some(&header) = words.get(i) {
+        let [valid, total] = header.to_le_bytes();
+        let (valid, total) = (usize::from(valid), usize::from(total));
+        if total == 0 {
+            return 0;
         }
-        Ok(Channel {
-            words: words.into_boxed_slice(),
-        })
-    }
-
-    /// The value at `frame`: a run's values in order, then its last value repeated; a frame
-    /// past the data, or behind a zero-frame run, reads 0.
-    pub(crate) fn value(&self, frame: usize) -> i16 {
-        let mut k = frame;
-        let mut i = 0usize;
-        while let Some(&header) = self.words.get(i) {
-            let [valid, total] = header.to_le_bytes();
-            let (valid, total) = (usize::from(valid), usize::from(total));
-            if total == 0 {
-                return 0;
-            }
-            if k < total {
-                // An empty run's "last value" is its own header word, as the engine reads it.
-                let at = if k < valid { i + 1 + k } else { i + valid };
-                return self.words.get(at).map_or(0, |&w| w as i16);
-            }
-            k -= total;
-            i += 1 + valid;
+        if k < total {
+            // An empty run's "last value" is its own header word, as the engine reads it.
+            let at = if k < valid { i + 1 + k } else { i + valid };
+            return words.get(at).map_or(0, |&w| w as i16);
         }
-        0
+        k -= total;
+        i += 1 + valid;
     }
-
-    pub(crate) fn heap_bytes(&self) -> usize {
-        self.words.len() * size_of::<u16>()
-    }
+    0
 }
 
 #[cfg(test)]
@@ -278,11 +276,18 @@ mod tests {
         ));
     }
 
+    /// The channel at the start of `d` copied into a fresh pool, with no word cap.
+    fn channel(d: &[u8], frames: usize) -> Result<Vec<u16>, RigLoadError> {
+        let (mut words, mut left) = (Vec::new(), usize::MAX);
+        read_channel(&Bytes::new("a.mdl", d), 0, frames, &mut words, &mut left)?;
+        Ok(words)
+    }
+
     #[test]
     fn rle_runs_repeat_their_last_value() {
         let d = rle(&[(&[10, 20], 3), (&[-5], 2)]);
-        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 5).unwrap();
-        let got: Vec<i16> = (0..6).map(|f| c.value(f)).collect();
+        let c = channel(&d, 5).unwrap();
+        let got: Vec<i16> = (0..6).map(|f| channel_value(&c, f)).collect();
         assert_eq!(got, [10, 20, 20, -5, -5, 0]);
     }
 
@@ -290,39 +295,38 @@ mod tests {
     fn rle_copy_stops_once_the_frames_are_covered() {
         let mut d = rle(&[(&[1, 2, 3], 3)]);
         d.extend_from_slice(&[0xff; 4]); // the next track's bytes, never a run
-        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 3).unwrap();
-        assert_eq!(c.heap_bytes(), 8, "one header and three values");
-        assert_eq!((c.value(2), c.value(3)), (3, 0));
+        let c = channel(&d, 3).unwrap();
+        assert_eq!(c.len(), 4, "one header and three values");
+        assert_eq!((channel_value(&c, 2), channel_value(&c, 3)), (3, 0));
     }
 
     #[test]
     fn rle_edge_runs_follow_the_engine() {
         let d = rle(&[(&[7], 1), (&[], 0)]);
-        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 4).unwrap();
+        let c = channel(&d, 4).unwrap();
         assert_eq!(
-            (c.value(0), c.value(2)),
+            (channel_value(&c, 0), channel_value(&c, 2)),
             (7, 0),
             "a zero-frame run ends the data"
         );
         let d = rle(&[(&[], 4)]);
-        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 4).unwrap();
-        assert_eq!(c.value(1), 0x0400, "an empty run reads its own header word");
+        let c = channel(&d, 4).unwrap();
+        assert_eq!(
+            channel_value(&c, 1),
+            0x0400,
+            "an empty run reads its own header word"
+        );
     }
 
     #[test]
     fn frames_past_a_full_255_value_run_decode() {
         let values: Vec<i16> = (0..255).collect();
         let d = rle(&[(values.as_slice(), 255), (&[-9], 2)]);
-        let c = Channel::read(&Bytes::new("a.mdl", &d), 0, 257).unwrap();
-        assert_eq!(c.heap_bytes(), 2 * (1 + 255 + 1 + 1), "both runs copied");
+        let c = channel(&d, 257).unwrap();
+        assert_eq!(c.len(), 1 + 255 + 1 + 1, "both runs copied");
+        let at = |f| channel_value(&c, f);
         assert_eq!(
-            (
-                c.value(0),
-                c.value(254),
-                c.value(255),
-                c.value(256),
-                c.value(257)
-            ),
+            (at(0), at(254), at(255), at(256), at(257)),
             (0, 254, -9, -9, 0)
         );
     }
@@ -330,10 +334,31 @@ mod tests {
     #[test]
     fn a_cut_short_run_is_malformed() {
         let d = rle(&[(&[1, 2, 3], 3)]);
-        let cut = &d[..5];
         assert!(matches!(
-            Channel::read(&Bytes::new("a.mdl", cut), 0, 3),
+            channel(&d[..5], 3),
             Err(RigLoadError::Malformed { .. })
+        ));
+    }
+
+    #[test]
+    fn a_run_with_more_values_than_frames_is_malformed() {
+        let d = rle(&[(&[1, 2, 3], 2)]);
+        assert!(matches!(
+            channel(&d, 2),
+            Err(RigLoadError::Malformed { .. })
+        ));
+    }
+
+    #[test]
+    fn copying_spends_the_word_budget_and_refuses_past_it() {
+        let d = rle(&[(&[1, 2, 3], 3)]);
+        let bytes = Bytes::new("a.mdl", &d);
+        let (mut words, mut left) = (Vec::new(), 6);
+        read_channel(&bytes, 0, 3, &mut words, &mut left).unwrap();
+        assert_eq!((words.len(), left), (4, 2));
+        assert!(matches!(
+            read_channel(&bytes, 0, 3, &mut words, &mut left),
+            Err(RigLoadError::TooLarge { .. })
         ));
     }
 }

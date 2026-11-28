@@ -1,9 +1,14 @@
 //! One studio animation: its descriptor and its per-bone tracks, sampled into bone poses.
 
+use std::ops::Range;
 use std::sync::Arc;
 
+#[cfg(test)]
+use crate::demo_view::studio::MAX_CHANNEL_WORDS;
 use crate::demo_view::studio::bytes::Bytes;
-use crate::demo_view::studio::values::{Channel, blend, euler_quat, quat48, quat64, vec48};
+use crate::demo_view::studio::values::{
+    blend, channel_value, euler_quat, quat48, quat64, read_channel, vec48,
+};
 use crate::demo_view::studio::{MAX_FRAMES, MAX_TABLE};
 use crate::error::RigLoadError;
 
@@ -126,98 +131,82 @@ pub(crate) struct AnimContext<'a> {
     pub(crate) rest: Arc<[BonePose]>,
 }
 
-/// A track's rotation: one fixed value, three Euler channels, or none.
-#[derive(Debug, Clone)]
-enum Rot {
-    Fixed([f32; 4]),
-    Euler([Option<Channel>; 3]),
-    Absent,
-}
+/// Track bit: the rotation is four floats in `fixed` at `rot[0]`.
+const FIXED_ROT: u8 = 0x01;
+/// Track bit: the rotation is three Euler channels in `words`.
+const EULER_ROT: u8 = 0x02;
+/// Track bit: the position is three floats in `fixed` at `pos[0]`.
+const FIXED_POS: u8 = 0x04;
+/// Track bit: the position is three channels in `words`.
+const CHANNEL_POS: u8 = 0x08;
+/// Track bit: values are deltas, so the file bone is never added and absent parts are identity.
+const DELTA_TRACK: u8 = 0x10;
+/// A pool slot a track leaves empty; as a channel it reads 0.
+const NONE: u32 = u32::MAX;
 
-/// A track's position: one fixed value, three channels, or none.
-#[derive(Debug, Clone)]
-enum Pos {
-    Fixed([f32; 3]),
-    Channels([Option<Channel>; 3]),
-    Absent,
-}
-
-/// One bone's track for one section, already moved onto its base bone.
-#[derive(Debug, Clone)]
+/// One bone's track for one section, already moved onto its base bone. Its slots index the
+/// animation's pools, so the many tracks of a class stay small.
+#[derive(Debug, Clone, Copy)]
 struct Track {
-    base: usize,
-    bone: FileBone,
-    delta: bool,
-    rot: Rot,
-    pos: Pos,
+    base: u8,
+    /// The file bone, an index into the animation's `bones`.
+    bone: u8,
+    flags: u8,
+    rot: [u32; 3],
+    pos: [u32; 3],
 }
 
-/// A missing channel reads 0, as the engine's null value pointer does.
-fn channel_values(chans: &[Option<Channel>; 3], frame: usize) -> [i16; 3] {
-    std::array::from_fn(|j| chans[j].as_ref().map_or(0, |c| c.value(frame)))
+/// The value at `frame` of the channel at `off` in `words`; `NONE` or an offset past the pool
+/// reads 0, as the engine's null value pointer does.
+fn channel_at(words: &[u16], off: u32, frame: usize) -> i16 {
+    usize::try_from(off)
+        .ok()
+        .and_then(|o| words.get(o..))
+        .map_or(0, |w| channel_value(w, frame))
 }
 
-impl Track {
-    /// The pose at section-local `frame`, `s` of the way to the next frame.
-    fn pose(&self, frame: usize, s: f32) -> BonePose {
-        let quat = match &self.rot {
-            Rot::Fixed(q) => *q,
-            Rot::Absent if self.delta => BonePose::IDENTITY.quat,
-            Rot::Absent => self.bone.quat,
-            Rot::Euler(chans) => {
-                let angles = |f| {
-                    let v = channel_values(chans, f);
-                    std::array::from_fn(|j| {
-                        f32::from(v[j]) * self.bone.rot_scale[j] + self.rot_base(j)
-                    })
-                };
-                // Like the engine, blend two whole quaternions rather than lerp the angles.
-                let a1: [f32; 3] = angles(frame);
-                let a2 = if s > 0. { angles(frame + 1) } else { a1 };
-                if a1 == a2 {
-                    euler_quat(a1)
-                } else {
-                    blend(euler_quat(a1), euler_quat(a2), s)
-                }
-            }
-        };
-        let pos = match &self.pos {
-            Pos::Fixed(p) => *p,
-            Pos::Absent if self.delta => BonePose::IDENTITY.pos,
-            Pos::Absent => self.bone.pos,
-            Pos::Channels(chans) => {
-                let (v1, v2) = (
-                    channel_values(chans, frame),
-                    channel_values(chans, frame + 1),
-                );
-                std::array::from_fn(|j| {
-                    let v = f32::from(v1[j]) * (1. - s) + f32::from(v2[j]) * s;
-                    v * self.bone.pos_scale[j] + if self.delta { 0. } else { self.bone.pos[j] }
-                })
-            }
-        };
-        BonePose::new(pos, quat)
-    }
+fn channels_at(words: &[u16], offs: [u32; 3], frame: usize) -> [i16; 3] {
+    offs.map(|off| channel_at(words, off, frame))
+}
 
-    fn rot_base(&self, axis: usize) -> f32 {
-        if self.delta { 0. } else { self.bone.rot[axis] }
-    }
+/// The `N` floats at `at` in `fixed`, or `None` past the pool.
+fn fixed_at<const N: usize>(fixed: &[f32], at: u32) -> Option<[f32; N]> {
+    let at = usize::try_from(at).ok()?;
+    fixed.get(at..at.checked_add(N)?)?.try_into().ok()
+}
 
-    fn heap_bytes(&self) -> usize {
-        let rot: &[Option<Channel>] = match &self.rot {
-            Rot::Euler(c) => c,
-            Rot::Fixed(_) | Rot::Absent => &[],
-        };
-        let pos: &[Option<Channel>] = match &self.pos {
-            Pos::Channels(c) => c,
-            Pos::Fixed(_) | Pos::Absent => &[],
-        };
-        rot.iter()
-            .chain(pos)
-            .flatten()
-            .map(Channel::heap_bytes)
-            .sum()
+/// What every animation of one class load shares: the bones of the file being read, the
+/// channel words the whole load may still copy, and scratch pools each animation is copied out
+/// of at its exact size.
+pub(crate) struct AnimLoad {
+    pub(crate) bones: Arc<[FileBone]>,
+    words_left: usize,
+    sections: Vec<Range<u32>>,
+    tracks: Vec<Track>,
+    words: Vec<u16>,
+    fixed: Vec<f32>,
+}
+
+impl AnimLoad {
+    /// A load reading `bones`' file that may copy `word_cap` channel words in all.
+    pub(crate) fn new(bones: Arc<[FileBone]>, word_cap: usize) -> AnimLoad {
+        AnimLoad {
+            bones,
+            words_left: word_cap,
+            sections: Vec::new(),
+            tracks: Vec::new(),
+            words: Vec::new(),
+            fixed: Vec::new(),
+        }
     }
+}
+
+/// A pool length as a slot index; a pool past `u32` is `TooLarge`.
+fn slot(bytes: &Bytes<'_>, len: usize) -> Result<u32, RigLoadError> {
+    u32::try_from(len)
+        .ok()
+        .filter(|&n| n != NONE)
+        .ok_or_else(|| bytes.too_large())
 }
 
 /// The undecoded track of one bone at one frame, for the vmdl oracle.
@@ -244,7 +233,7 @@ pub(crate) enum RawPos {
     Default,
 }
 
-/// One animation, its tracks kept compressed per section.
+/// One animation, its tracks kept compressed per section in flat pools.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Animation {
@@ -253,17 +242,38 @@ pub struct Animation {
     flags: i32,
     frames: usize,
     section_frames: usize,
-    sections: Vec<Vec<Track>>,
+    /// Per section, its range of `tracks`.
+    sections: Box<[Range<u32>]>,
+    tracks: Box<[Track]>,
+    /// Every channel's RLE words, each track holding offsets into it.
+    words: Box<[u16]>,
+    /// Fixed rotations and positions.
+    fixed: Box<[f32]>,
+    /// The file's bones, shared by every animation of the file.
+    bones: Arc<[FileBone]>,
     movements: Vec<Movement>,
     rest: Arc<[BonePose]>,
 }
 
 impl Animation {
-    /// Reads the 100-byte descriptor at `at`, its movements and every section's track block.
+    /// Reads the descriptor at `at` with a load of its own, capped at `MAX_CHANNEL_WORDS`.
+    #[cfg(test)]
     pub(crate) fn read(
         bytes: &Bytes<'_>,
         at: usize,
         ctx: &AnimContext<'_>,
+    ) -> Result<Animation, RigLoadError> {
+        let mut load = AnimLoad::new(Arc::from(ctx.bones), MAX_CHANNEL_WORDS);
+        Animation::read_in(bytes, at, ctx, &mut load)
+    }
+
+    /// Reads the 100-byte descriptor at `at`, its movements and every section's track block
+    /// through `load`'s pools; `load.bones` must be the bones `ctx` names.
+    pub(crate) fn read_in(
+        bytes: &Bytes<'_>,
+        at: usize,
+        ctx: &AnimContext<'_>,
+        load: &mut AnimLoad,
     ) -> Result<Animation, RigLoadError> {
         let name = bytes.cstr(at, bytes.i32(at + 4)?)?;
         let fps = bytes.f32(at + 8)?;
@@ -286,19 +296,27 @@ impl Animation {
                 "animation {name} has {section_frames} section frames"
             ))
         })?;
-        let sections = if section_frames == 0 {
+        load.sections.clear();
+        load.tracks.clear();
+        load.words.clear();
+        load.fixed.clear();
+        if section_frames == 0 {
             let block = bytes.rel(at, bytes.i32(at + 56)?)?;
-            vec![read_chain(bytes, block, frames, ctx)?]
+            read_chain(bytes, block, frames, ctx, load)?;
         } else {
-            read_sections(bytes, at, frames, section_frames, ctx)?
-        };
+            read_sections(bytes, at, frames, section_frames, ctx, load)?;
+        }
         Ok(Animation {
             name,
             fps,
             flags,
             frames,
             section_frames,
-            sections,
+            sections: load.sections.as_slice().into(),
+            tracks: load.tracks.as_slice().into(),
+            words: load.words.as_slice().into(),
+            fixed: load.fixed.as_slice().into(),
+            bones: Arc::clone(&load.bones),
             movements,
             rest: Arc::clone(&ctx.rest),
         })
@@ -363,11 +381,68 @@ impl Animation {
             frame - lower as f32
         };
         let (section, local) = self.locate(lower);
-        for track in self.sections.get(section).into_iter().flatten() {
-            if track.base < reach {
-                out[track.base] = track.pose(local, s);
+        for track in self.section_tracks(section) {
+            let base = usize::from(track.base);
+            if let Some(bone) = self.bones.get(usize::from(track.bone))
+                && base < reach
+            {
+                out[base] = self.pose(track, bone, local, s);
             }
         }
+    }
+
+    /// The tracks of `section`, none for a section past the table.
+    fn section_tracks(&self, section: usize) -> &[Track] {
+        self.sections
+            .get(section)
+            .and_then(|r| self.tracks.get(r.start as usize..r.end as usize))
+            .unwrap_or(&[])
+    }
+
+    /// `track`'s pose at section-local `frame`, `s` of the way to the next frame.
+    fn pose(&self, track: &Track, bone: &FileBone, frame: usize, s: f32) -> BonePose {
+        let delta = track.flags & DELTA_TRACK != 0;
+        let quat = if track.flags & FIXED_ROT != 0 {
+            fixed_at(&self.fixed, track.rot[0]).unwrap_or(BonePose::IDENTITY.quat)
+        } else if track.flags & EULER_ROT != 0 {
+            let base = if delta { [0.; 3] } else { bone.rot };
+            let angles = |f| {
+                let v = channels_at(&self.words, track.rot, f);
+                std::array::from_fn(|j| f32::from(v[j]) * bone.rot_scale[j] + base[j])
+            };
+            // Like the engine, blend two whole quaternions rather than lerp the angles.
+            let a1: [f32; 3] = angles(frame);
+            let a2 = if s > 0. { angles(frame + 1) } else { a1 };
+            if a1 == a2 {
+                euler_quat(a1)
+            } else {
+                blend(euler_quat(a1), euler_quat(a2), s)
+            }
+        } else if delta {
+            BonePose::IDENTITY.quat
+        } else {
+            bone.quat
+        };
+        let pos = if track.flags & FIXED_POS != 0 {
+            fixed_at(&self.fixed, track.pos[0]).unwrap_or(BonePose::IDENTITY.pos)
+        } else if track.flags & CHANNEL_POS != 0 {
+            let v1 = channels_at(&self.words, track.pos, frame);
+            // The next frame only matters with a weight, and may lie past the channel.
+            let v2 = if s > 0. {
+                channels_at(&self.words, track.pos, frame + 1)
+            } else {
+                v1
+            };
+            std::array::from_fn(|j| {
+                let v = f32::from(v1[j]) * (1. - s) + f32::from(v2[j]) * s;
+                v * bone.pos_scale[j] + if delta { 0. } else { bone.pos[j] }
+            })
+        } else if delta {
+            BonePose::IDENTITY.pos
+        } else {
+            bone.pos
+        };
+        BonePose::new(pos, quat)
     }
 
     /// The section holding integer `frame` and the frame's index within it. A long animation's
@@ -391,41 +466,47 @@ impl Animation {
         }
         let (section, local) = self.locate(frame);
         let track = self
-            .sections
-            .get(section)?
+            .section_tracks(section)
             .iter()
-            .find(|t| t.base == base_bone)?;
-        let rot = match &track.rot {
-            Rot::Fixed(q) => RawRot::Fixed(*q),
-            Rot::Euler(chans) => RawRot::Euler {
-                values: channel_values(chans, local),
-                scale: track.bone.rot_scale,
-            },
-            Rot::Absent => RawRot::Default,
+            .find(|t| usize::from(t.base) == base_bone)?;
+        let bone = self.bones.get(usize::from(track.bone))?;
+        let rot = if track.flags & FIXED_ROT != 0 {
+            RawRot::Fixed(fixed_at(&self.fixed, track.rot[0])?)
+        } else if track.flags & EULER_ROT != 0 {
+            RawRot::Euler {
+                values: channels_at(&self.words, track.rot, local),
+                scale: bone.rot_scale,
+            }
+        } else {
+            RawRot::Default
         };
-        let pos = match &track.pos {
-            Pos::Fixed(p) => RawPos::Fixed(*p),
-            Pos::Channels(chans) => RawPos::Channels {
-                values: channel_values(chans, local),
-                scale: track.bone.pos_scale,
-            },
-            Pos::Absent => RawPos::Default,
+        let pos = if track.flags & FIXED_POS != 0 {
+            RawPos::Fixed(fixed_at(&self.fixed, track.pos[0])?)
+        } else if track.flags & CHANNEL_POS != 0 {
+            RawPos::Channels {
+                values: channels_at(&self.words, track.pos, local),
+                scale: bone.pos_scale,
+            }
+        } else {
+            RawPos::Default
         };
         Some(RawSample { rot, pos })
     }
 
+    /// How many RLE channel words it copied.
+    #[cfg(test)]
+    pub(crate) fn channel_words(&self) -> usize {
+        self.words.len()
+    }
+
+    /// Bytes it holds on the heap; the file's bones and rest pose are shared, so not counted.
     pub(crate) fn heap_bytes(&self) -> usize {
         self.name.capacity()
             + self.movements.capacity() * size_of::<Movement>()
-            + self.sections.capacity() * size_of::<Vec<Track>>()
-            + self
-                .sections
-                .iter()
-                .map(|s| {
-                    s.capacity() * size_of::<Track>()
-                        + s.iter().map(Track::heap_bytes).sum::<usize>()
-                })
-                .sum::<usize>()
+            + self.sections.len() * size_of::<Range<u32>>()
+            + self.tracks.len() * size_of::<Track>()
+            + self.words.len() * size_of::<u16>()
+            + self.fixed.len() * size_of::<f32>()
     }
 }
 
@@ -462,121 +543,155 @@ fn read_sections(
     frames: usize,
     sf: usize,
     ctx: &AnimContext<'_>,
-) -> Result<Vec<Vec<Track>>, RigLoadError> {
+    load: &mut AnimLoad,
+) -> Result<(), RigLoadError> {
     let count = frames / sf + 2;
     let table = bytes.table(at, bytes.i32(at + 80)?, count as i32, 8, MAX_TABLE)?;
     let last = frames - 1;
-    (0..count)
-        .map(|k| {
-            let covers = if k + 1 == count {
-                usize::from(frames > sf)
-            } else if k * sf > last {
-                0
-            } else {
-                sf.min(last - k * sf) + 1
-            };
-            // Sections no frame reads hold nothing worth trusting, so they stay unread.
-            if covers == 0 {
-                return Ok(Vec::new());
-            }
-            let entry = table.at(k);
-            if bytes.i32(entry)? != 0 {
-                return Err(bytes.malformed(format!("section {k} lives in an animation block")));
-            }
-            let block = bytes.rel(at, bytes.i32(entry + 4)?)?;
-            read_chain(bytes, block, covers, ctx)
-        })
-        .collect()
+    for k in 0..count {
+        let covers = if k + 1 == count {
+            usize::from(frames > sf)
+        } else if k * sf > last {
+            0
+        } else {
+            sf.min(last - k * sf) + 1
+        };
+        // Sections no frame reads hold nothing worth trusting, so they stay unread.
+        if covers == 0 {
+            let end = slot(bytes, load.tracks.len())?;
+            load.sections.push(end..end);
+            continue;
+        }
+        let entry = table.at(k);
+        if bytes.i32(entry)? != 0 {
+            return Err(bytes.malformed(format!("section {k} lives in an animation block")));
+        }
+        let block = bytes.rel(at, bytes.i32(entry + 4)?)?;
+        read_chain(bytes, block, covers, ctx, load)?;
+    }
+    Ok(())
 }
 
-/// Follows one block's chain of track headers from `at` until bone 255 or a zero link; each
-/// channel copies the `frames` the block covers.
+/// Follows one block's chain of track headers from `at` until bone 255 or a zero link, adding
+/// one section of tracks; each channel copies the `frames` the block covers.
 fn read_chain(
     bytes: &Bytes<'_>,
     mut at: usize,
     frames: usize,
     ctx: &AnimContext<'_>,
-) -> Result<Vec<Track>, RigLoadError> {
-    let mut tracks = Vec::new();
-    for _ in 0..MAX_LINKS {
+    load: &mut AnimLoad,
+) -> Result<(), RigLoadError> {
+    let start = slot(bytes, load.tracks.len())?;
+    let mut links = 0;
+    loop {
+        if links == MAX_LINKS {
+            return Err(bytes.malformed(format!("a track chain links more than {MAX_LINKS} times")));
+        }
+        links += 1;
         let bone = bytes.u8(at)?;
         if bone == CHAIN_END {
-            return Ok(tracks);
+            break;
         }
         let flags = bytes.u8(at + 1)?;
         let next = bytes.i16(at + 2)?;
         if next < 0 {
             return Err(bytes.malformed(format!("a track at {at} links backwards")));
         }
-        let file_bone = ctx.bones.get(usize::from(bone)).ok_or_else(|| {
-            bytes.malformed(format!(
+        if ctx.bones.get(usize::from(bone)).is_none() {
+            return Err(bytes.malformed(format!(
                 "the track at {at} is on bone {bone}, past the file's bones"
-            ))
-        })?;
+            )));
+        }
         // A track on a bone the base model lacks plays no part.
         if let Some(base) = ctx.to_base.get(usize::from(bone)).copied().flatten() {
-            tracks.push(read_track(bytes, at + 4, flags, file_bone, base, frames)?);
+            let track = read_track(bytes, at + 4, flags, bone, base, frames, load)?;
+            load.tracks.push(track);
         }
         if next == 0 {
-            return Ok(tracks);
+            break;
         }
         at = bytes.rel(at, i32::from(next))?;
     }
-    Err(bytes.malformed(format!("a track chain links more than {MAX_LINKS} times")))
+    let end = slot(bytes, load.tracks.len())?;
+    load.sections.push(start..end);
+    Ok(())
 }
 
-/// The track data at `data`: fixed values decode now, channels stay compressed.
+/// The track data at `data`: fixed values decode into `load.fixed` now, channels are copied
+/// compressed into `load.words`.
 fn read_track(
     bytes: &Bytes<'_>,
     data: usize,
     flags: u8,
-    bone: &FileBone,
+    bone: u8,
     base: usize,
     frames: usize,
+    load: &mut AnimLoad,
 ) -> Result<Track, RigLoadError> {
-    let rot = if flags & RAW_ROT != 0 {
-        Rot::Fixed(quat48(bytes.array(data)?))
-    } else if flags & RAW_ROT2 != 0 {
-        Rot::Fixed(quat64(bytes.array(data)?))
-    } else if flags & ANIM_ROT != 0 {
-        Rot::Euler(read_channels(bytes, data, frames)?)
-    } else {
-        Rot::Absent
+    let mut track = Track {
+        base: u8::try_from(base).map_err(|_| bytes.too_large())?,
+        bone,
+        flags: if flags & DELTA != 0 { DELTA_TRACK } else { 0 },
+        rot: [NONE; 3],
+        pos: [NONE; 3],
     };
+    let fixed_rot = if flags & RAW_ROT != 0 {
+        Some(quat48(bytes.array(data)?))
+    } else if flags & RAW_ROT2 != 0 {
+        Some(quat64(bytes.array(data)?))
+    } else {
+        None
+    };
+    if let Some(q) = fixed_rot {
+        track.rot[0] = push_fixed(bytes, load, &q)?;
+        track.flags |= FIXED_ROT;
+    } else if flags & ANIM_ROT != 0 {
+        track.rot = read_channels(bytes, data, frames, load)?;
+        track.flags |= EULER_ROT;
+    }
     // The position sits past both rotation slots the flags name, as the engine lays it out.
     let skip = 6 * usize::from(flags & RAW_ROT != 0) + 8 * usize::from(flags & RAW_ROT2 != 0);
-    let pos = if flags & RAW_POS != 0 {
-        Pos::Fixed(vec48(bytes.array(data + skip)?))
+    if flags & RAW_POS != 0 {
+        track.pos[0] = push_fixed(bytes, load, &vec48(bytes.array(data + skip)?))?;
+        track.flags |= FIXED_POS;
     } else if flags & ANIM_POS != 0 {
         let ptr = data + 6 * usize::from(flags & ANIM_ROT != 0);
-        Pos::Channels(read_channels(bytes, ptr, frames)?)
-    } else {
-        Pos::Absent
-    };
-    Ok(Track {
-        base,
-        bone: *bone,
-        delta: flags & DELTA != 0,
-        rot,
-        pos,
-    })
+        track.pos = read_channels(bytes, ptr, frames, load)?;
+        track.flags |= CHANNEL_POS;
+    }
+    Ok(track)
 }
 
-/// The three channels of the value pointer at `ptr`; each u16 offset counts from the pointer
-/// and 0 means the channel reads 0.
+/// Appends `values` to the fixed pool and returns where they start.
+fn push_fixed(bytes: &Bytes<'_>, load: &mut AnimLoad, values: &[f32]) -> Result<u32, RigLoadError> {
+    let at = slot(bytes, load.fixed.len())?;
+    load.fixed.extend_from_slice(values);
+    Ok(at)
+}
+
+/// Copies the three channels of the value pointer at `ptr` into the word pool and returns their
+/// offsets there; each u16 offset counts from the pointer and 0 means the channel reads 0.
 fn read_channels(
     bytes: &Bytes<'_>,
     ptr: usize,
     frames: usize,
-) -> Result<[Option<Channel>; 3], RigLoadError> {
-    let mut chans = [None, None, None];
-    for (j, chan) in chans.iter_mut().enumerate() {
-        let off = bytes.u16(ptr + 2 * j)?;
-        if off != 0 {
-            *chan = Some(Channel::read(bytes, ptr + usize::from(off), frames)?);
+    load: &mut AnimLoad,
+) -> Result<[u32; 3], RigLoadError> {
+    let mut offs = [NONE; 3];
+    for (j, off) in offs.iter_mut().enumerate() {
+        let rel = bytes.u16(ptr + 2 * j)?;
+        if rel != 0 {
+            *off = slot(bytes, load.words.len())?;
+            read_channel(
+                bytes,
+                ptr + usize::from(rel),
+                frames,
+                &mut load.words,
+                &mut load.words_left,
+            )?;
         }
     }
-    Ok(chans)
+    Ok(offs)
 }
 
 #[cfg(test)]
@@ -956,5 +1071,55 @@ mod tests {
             (9, 1, 100., 120.)
         );
         assert_eq!((m.vector(), m.position()), ([40., 0., 0.], [40., 0., 0.]));
+    }
+
+    #[test]
+    fn a_track_fits_in_32_bytes() {
+        assert!(size_of::<Track>() <= 32, "{}", size_of::<Track>());
+    }
+
+    #[test]
+    fn a_channel_offset_outside_the_pool_reads_zero() {
+        let words = [0x0101, 7];
+        assert_eq!(channel_at(&words, 0, 0), 7);
+        assert_eq!(channel_at(&words, 5, 0), 0, "past the pool");
+        assert_eq!(channel_at(&words, NONE, 0), 0, "no channel");
+    }
+
+    #[test]
+    fn descriptors_aliasing_one_block_spend_the_shared_word_budget() {
+        let bones = [FileBone {
+            pos_scale: [1.; 3],
+            ..bone([0.; 3], [0.; 3])
+        }];
+        let body = anim_body(None, Some([Some(rle(&[(&[1, 2, 3], 3)])), None, None]));
+        let track = TrackBytes {
+            bone: 0,
+            flags: 0x04,
+            body,
+        };
+        let mut blob = Blob::new();
+        let specs = [
+            AnimSpec::plain("a", 3, vec![track]),
+            AnimSpec::plain("b", 3, Vec::new()),
+        ];
+        let at = write_anims(&mut blob, &specs);
+        // Point b's block at a's track data, as a hostile file may.
+        let rel = i32::from_le_bytes(blob.0[at + 56..at + 60].try_into().unwrap());
+        blob.set_rel(at + 156, at + 100, at + rel as usize);
+        let bytes = Bytes::new("a.mdl", &blob.0);
+        let to_base = [Some(0)];
+        let ctx = AnimContext {
+            bones: &bones,
+            to_base: &to_base,
+            rest: rest(&bones),
+        };
+        let mut load = AnimLoad::new(Arc::from(bones.as_slice()), 6);
+        let a = Animation::read_in(&bytes, at, &ctx, &mut load).unwrap();
+        assert_eq!(sample(&a, 2., 1)[0].pos()[0], 3.);
+        assert!(matches!(
+            Animation::read_in(&bytes, at + 100, &ctx, &mut load),
+            Err(RigLoadError::TooLarge { .. })
+        ));
     }
 }

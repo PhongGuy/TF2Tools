@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use super::MAX_TABLE;
-use super::anim::{AnimContext, Animation, BonePose};
+use super::anim::{AnimContext, AnimLoad, Animation, BonePose, FileBone};
 use super::mdl::MdlFile;
 use super::types::{AutoLayer, PoseParam, RigBone, Sequence, Skeleton};
+use super::{MAX_CHANNEL_WORDS, MAX_TABLE};
 use crate::error::RigLoadError;
 
 /// The parts of a class rig taken from the base model and its includes.
@@ -25,6 +25,12 @@ const STUDIO_OVERRIDE: i32 = 0x800;
 /// of its label only when that one is a forward declaration. Every index is remapped into the
 /// merged tables; an index or grid that does not fit its file is `Malformed`.
 pub(crate) fn merge(files: &[MdlFile]) -> Result<Merged, RigLoadError> {
+    merge_within(files, MAX_CHANNEL_WORDS)
+}
+
+/// [`merge`], copying at most `word_cap` channel words across the whole chain; more is
+/// `TooLarge`, however the descriptors alias their track data.
+pub(crate) fn merge_within(files: &[MdlFile], word_cap: usize) -> Result<Merged, RigLoadError> {
     let Some(base) = files.first() else {
         return Ok(Merged {
             skeleton: Skeleton { bones: Vec::new() },
@@ -51,15 +57,21 @@ pub(crate) fn merge(files: &[MdlFile]) -> Result<Merged, RigLoadError> {
         sequences: Vec::new(),
         animations: Vec::new(),
     };
+    let mut load = AnimLoad::new(Arc::from([]), word_cap);
     for (f, file) in files.iter().enumerate() {
-        append_file(&mut merged, file, f == 0)?;
+        append_file(&mut merged, file, f == 0, &mut load)?;
     }
     Ok(merged)
 }
 
 /// Appends one file's pose parameters, animations and sequences. Like the engine's `numCheck`,
 /// a file is compared only against entries that existed before it.
-fn append_file(m: &mut Merged, file: &MdlFile, is_base: bool) -> Result<(), RigLoadError> {
+fn append_file(
+    m: &mut Merged,
+    file: &MdlFile,
+    is_base: bool,
+    load: &mut AnimLoad,
+) -> Result<(), RigLoadError> {
     let b = file.bytes();
     let base_bones = &m.skeleton.bones;
 
@@ -119,7 +131,8 @@ fn append_file(m: &mut Merged, file: &MdlFile, is_base: bool) -> Result<(), RigL
     }
 
     let anims_before = m.animations.len();
-    let bones = file.file_bones();
+    let bones: Arc<[FileBone]> = file.file_bones().into();
+    load.bones = Arc::clone(&bones);
     let ctx = AnimContext {
         bones: &bones,
         to_base: &to_base,
@@ -133,7 +146,7 @@ fn append_file(m: &mut Merged, file: &MdlFile, is_base: bool) -> Result<(), RigL
         anim_map.push(match found {
             Some(k) => k,
             None => {
-                m.animations.push(Animation::read(&b, *at, &ctx)?);
+                m.animations.push(Animation::read_in(&b, *at, &ctx, load)?);
                 m.animations.len() - 1
             }
         });
@@ -229,7 +242,7 @@ mod tests {
     use super::*;
     use crate::demo_view::studio::anim::BonePose;
     use crate::demo_view::studio::fixture::{
-        AnimSpec, BoneSpec, MdlSpec, SeqSpec, TrackBytes, half_bytes,
+        AnimSpec, BoneSpec, MdlSpec, SeqSpec, TrackBytes, anim_body, half_bytes, rle,
     };
     use crate::demo_view::studio::mdl::MdlFile;
 
@@ -443,5 +456,42 @@ mod tests {
             matches!(r, Err(RigLoadError::Malformed { .. })),
             "an overflowing grid: {r:?}"
         );
+    }
+
+    #[test]
+    fn channel_words_are_budgeted_across_the_chain_and_aliased_descriptors() {
+        let chan = || TrackBytes {
+            bone: 0,
+            flags: 0x04,
+            body: anim_body(None, Some([Some(rle(&[(&[1, 2, 3], 3)])), None, None])),
+        };
+        let base = MdlSpec {
+            anims: vec![AnimSpec::plain("@ref", 3, vec![chan()])],
+            ..base()
+        };
+        let include = MdlSpec {
+            bones: vec![BoneSpec::new("root", -1, [0.; 3])],
+            anims: vec![
+                AnimSpec::plain("b", 3, vec![chan()]),
+                AnimSpec::plain("c", 3, Vec::new()),
+            ],
+            ..MdlSpec::new()
+        };
+        // Point c's block at b's track data, so one copy in the file decodes twice.
+        let mut bytes = include.bytes();
+        let parsed = MdlFile::parse("anims.mdl", bytes.clone()).unwrap();
+        let (b, c) = (parsed.anims[0].1, parsed.anims[1].1);
+        let rel = i32::from_le_bytes(bytes[b + 56..b + 60].try_into().unwrap());
+        let aliased = (b + rel as usize - c) as i32;
+        bytes[c + 56..c + 60].copy_from_slice(&aliased.to_le_bytes());
+        let files = [
+            file("base.mdl", base),
+            MdlFile::parse("anims.mdl", bytes).unwrap(),
+        ];
+        assert!(merge_within(&files, 12).is_ok(), "three four-word channels");
+        assert!(matches!(
+            merge_within(&files, 11),
+            Err(RigLoadError::TooLarge { .. })
+        ));
     }
 }

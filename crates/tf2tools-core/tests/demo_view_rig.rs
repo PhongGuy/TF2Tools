@@ -106,6 +106,7 @@ fn every_class_loads_with_the_counts_vmdl_reads() {
         heap += rig.heap_bytes();
     }
     println!("all nine rigs: {heap} heap bytes");
+    assert!(heap <= 96 << 20, "{heap} heap bytes over the 96 MiB budget");
 }
 
 #[test]

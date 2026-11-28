@@ -3,10 +3,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::ClassRig;
 use super::anim::{AnimContext, Animation, BonePose, RawPos, RawRot, RawSample};
 use super::mdl::MdlFile;
 use super::values::{mul34, pose_matrix};
+use super::{ClassRig, MAX_CHANNEL_WORDS};
 use crate::pak::{open_vpk, read_entry};
 use crate::weapons::TfClass;
 
@@ -203,6 +203,21 @@ fn standing_with_a_melee_weapon_stands_upright() {
         assert!(
             (0. ..=12.).contains(&left) && (0. ..=12.).contains(&right),
             "{class:?}: feet {left} {right}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
+fn every_class_copies_under_half_the_channel_word_cap() {
+    let tf = misc_vpk().parent().unwrap().to_path_buf();
+    for class in TfClass::ALL {
+        let rig = ClassRig::load(&tf, class).unwrap();
+        let words: usize = rig.animations().iter().map(Animation::channel_words).sum();
+        println!("{class:?}: {words} channel words");
+        assert!(
+            2 * words <= MAX_CHANNEL_WORDS,
+            "{class:?}: {words} channel words"
         );
     }
 }
