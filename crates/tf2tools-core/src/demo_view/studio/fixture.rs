@@ -473,3 +473,80 @@ pub(crate) fn vvd_bytes(
     b.set_i32(60, tangents as i32);
     b.0
 }
+
+/// One VTX strip group: its vertices (each an index into its mesh), its indices and its strips
+/// as (index offset, index count, flags).
+pub(crate) struct GroupSpec {
+    pub(crate) verts: Vec<u16>,
+    pub(crate) indices: Vec<u16>,
+    pub(crate) strips: Vec<(i32, i32, u8)>,
+}
+
+impl GroupSpec {
+    /// One triangle-list strip over all `indices`.
+    pub(crate) fn list(verts: Vec<u16>, indices: Vec<u16>) -> GroupSpec {
+        let n = indices.len() as i32;
+        GroupSpec {
+            verts,
+            indices,
+            strips: vec![(0, n, 1)],
+        }
+    }
+}
+
+/// A version-7 VTX: per body part, None for a part without models, else model 0's LOD 0
+/// meshes, each a list of strip groups.
+pub(crate) fn vtx_bytes(checksum: i32, parts: &[Option<Vec<Vec<GroupSpec>>>]) -> Vec<u8> {
+    let mut b = Blob::new();
+    b.zeros(36);
+    b.set_i32(0, 7);
+    b.set_i32(16, checksum);
+    b.set_i32(20, 1);
+    let part0 = b.zeros(8 * parts.len());
+    b.set_i32(28, parts.len() as i32);
+    b.set_i32(32, part0 as i32);
+    for (p, part) in parts.iter().enumerate() {
+        let ph = part0 + 8 * p;
+        let Some(meshes) = part else { continue };
+        let model = b.zeros(8);
+        b.set_i32(ph, 1);
+        b.set_rel(ph + 4, ph, model);
+        let lod = b.zeros(12);
+        b.set_i32(model, 1);
+        b.set_rel(model + 4, model, lod);
+        let mesh0 = b.zeros(9 * meshes.len());
+        b.set_i32(lod, meshes.len() as i32);
+        b.set_rel(lod + 4, lod, mesh0);
+        for (m, groups) in meshes.iter().enumerate() {
+            let mh = mesh0 + 9 * m;
+            let g0 = b.zeros(25 * groups.len());
+            b.set_i32(mh, groups.len() as i32);
+            b.set_rel(mh + 4, mh, g0);
+            for (g, group) in groups.iter().enumerate() {
+                let gh = g0 + 25 * g;
+                let verts = b.zeros(9 * group.verts.len());
+                for (i, v) in group.verts.iter().enumerate() {
+                    b.0[verts + 9 * i + 4..verts + 9 * i + 6].copy_from_slice(&v.to_le_bytes());
+                }
+                let indices = b.zeros(2 * group.indices.len());
+                for (i, v) in group.indices.iter().enumerate() {
+                    b.0[indices + 2 * i..indices + 2 * i + 2].copy_from_slice(&v.to_le_bytes());
+                }
+                let strips = b.zeros(27 * group.strips.len());
+                for (s, (offset, count, flags)) in group.strips.iter().enumerate() {
+                    let sh = strips + 27 * s;
+                    b.set_i32(sh, *count);
+                    b.set_i32(sh + 4, *offset);
+                    b.0[sh + 18] = *flags;
+                }
+                b.set_i32(gh, group.verts.len() as i32);
+                b.set_rel(gh + 4, gh, verts);
+                b.set_i32(gh + 8, group.indices.len() as i32);
+                b.set_rel(gh + 12, gh, indices);
+                b.set_i32(gh + 16, group.strips.len() as i32);
+                b.set_rel(gh + 20, gh, strips);
+            }
+        }
+    }
+    b.0
+}

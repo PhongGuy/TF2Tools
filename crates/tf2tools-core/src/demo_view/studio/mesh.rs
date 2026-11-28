@@ -1,4 +1,4 @@
-//! A class model's LOD 0 mesh, read from its VVD vertices.
+//! A class model's LOD 0 mesh: vertices from its VVD, triangles from its VTX.
 
 use crate::demo_view::studio::bytes::Bytes;
 use crate::demo_view::studio::mdl::MdlFile;
@@ -159,10 +159,357 @@ fn vvd_path(mdl: &str) -> String {
     format!("{}.vvd", mdl.strip_suffix(".mdl").unwrap_or(mdl))
 }
 
+/// The only VTX version read; every TF2 class model is this one.
+const VTX_VERSION: i32 = 7;
+const VTX_HEADER_BYTES: usize = 36;
+const VTX_PART_BYTES: usize = 8;
+const VTX_MODEL_BYTES: usize = 8;
+const VTX_LOD_BYTES: usize = 12;
+const VTX_MESH_BYTES: usize = 9;
+const VTX_GROUP_BYTES: usize = 25;
+const VTX_STRIP_BYTES: usize = 27;
+const VTX_VERTEX_BYTES: usize = 9;
+/// `STRIP_IS_TRILIST`, the only strip kind read.
+const STRIP_IS_TRILIST: u8 = 0x1;
+/// Most triangle indices one model may yield; strips and groups may alias one index table.
+const MAX_INDICES: usize = 8 * MAX_VERTICES;
+
+/// LOD 0 of the default body group: every LOD 0 vertex, and triangles grouped by material.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RigMesh {
+    positions: Vec<[f32; 3]>,
+    normals: Vec<[f32; 3]>,
+    uvs: Vec<[f32; 2]>,
+    bone_indices: Vec<[u8; 3]>,
+    bone_weights: Vec<[f32; 3]>,
+    indices: Vec<u16>,
+    groups: Vec<MeshGroup>,
+    materials: Vec<String>,
+}
+
+impl RigMesh {
+    /// Every vertex position, in model space.
+    pub fn positions(&self) -> &[[f32; 3]] {
+        &self.positions
+    }
+
+    /// Every vertex normal, in model space.
+    pub fn normals(&self) -> &[[f32; 3]] {
+        &self.normals
+    }
+
+    /// Every vertex texture coordinate.
+    pub fn uvs(&self) -> &[[f32; 2]] {
+        &self.uvs
+    }
+
+    /// Each vertex's skeleton bones; unused slots are 0.
+    pub fn bone_indices(&self) -> &[[u8; 3]] {
+        &self.bone_indices
+    }
+
+    /// Each vertex's bone weights; unused slots are 0.
+    pub fn bone_weights(&self) -> &[[f32; 3]] {
+        &self.bone_weights
+    }
+
+    /// The triangle list, three vertex indices per triangle in stored winding.
+    pub fn indices(&self) -> &[u16] {
+        &self.indices
+    }
+
+    /// Runs of `indices()` that share a material.
+    pub fn groups(&self) -> &[MeshGroup] {
+        &self.groups
+    }
+
+    /// The model's texture names, which `MeshGroup::material` indexes.
+    pub fn materials(&self) -> &[String] {
+        &self.materials
+    }
+
+    /// How many vertices the mesh has.
+    pub fn vertex_count(&self) -> usize {
+        self.positions.len()
+    }
+
+    /// How many triangles the mesh has.
+    pub fn triangle_count(&self) -> usize {
+        self.indices.len() / 3
+    }
+
+    /// Heap bytes the mesh holds.
+    pub(crate) fn heap_bytes(&self) -> usize {
+        size_of_val(self.positions.as_slice())
+            + size_of_val(self.normals.as_slice())
+            + size_of_val(self.uvs.as_slice())
+            + size_of_val(self.bone_indices.as_slice())
+            + size_of_val(self.bone_weights.as_slice())
+            + size_of_val(self.indices.as_slice())
+            + size_of_val(self.groups.as_slice())
+            + self.materials.iter().map(String::capacity).sum::<usize>()
+            + size_of_val(self.materials.as_slice())
+    }
+}
+
+/// A run of a mesh's triangles drawn with one material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MeshGroup {
+    material: usize,
+    first: usize,
+    count: usize,
+    eyeball: bool,
+}
+
+impl MeshGroup {
+    /// The index of its texture in `RigMesh::materials`.
+    pub fn material(&self) -> usize {
+        self.material
+    }
+
+    /// Where its run starts in `RigMesh::indices`, a multiple of 3.
+    pub fn first(&self) -> usize {
+        self.first
+    }
+
+    /// How many indices its run holds, a multiple of 3.
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Whether it draws an eyeball, which needs the eye shader.
+    pub fn eyeball(&self) -> bool {
+        self.eyeball
+    }
+}
+
+/// Builds LOD 0 of the default body group from `mdl`, its VVD and its VTX. The VTX must be
+/// version 7 with the MDL's checksum, body part and mesh counts, and only triangle-list strips;
+/// every index must reach a vertex of its mesh within LOD 0. Otherwise `Malformed`, or
+/// `TooLarge` over the caps.
+pub(crate) fn read_mesh(mdl: &MdlFile, vvd: &[u8], vtx: &[u8]) -> Result<RigMesh, RigLoadError> {
+    let lod0 = read_lod0(mdl, vvd)?;
+    let name = vtx_path(&mdl.path);
+    let b = Bytes::new(&name, vtx);
+    if b.len() < VTX_HEADER_BYTES {
+        return Err(b.malformed("not a strip file header"));
+    }
+    let version = b.i32(0)?;
+    if version != VTX_VERSION {
+        return Err(b.malformed(format!("version {version} is not {VTX_VERSION}")));
+    }
+    let checksum = b.i32(16)?;
+    if checksum != mdl.checksum {
+        return Err(b.malformed(format!(
+            "checksum {checksum} does not match the model's {}",
+            mdl.checksum
+        )));
+    }
+    let parts = b.table(0, b.i32(32)?, b.i32(28)?, VTX_PART_BYTES, MAX_TABLE)?;
+    if parts.count != mdl.parts.len() {
+        return Err(b.malformed(format!(
+            "{} body parts where the model has {}",
+            parts.count,
+            mdl.parts.len()
+        )));
+    }
+
+    // Triangles collect per (texture, eyeball) in first-seen order, then concatenate.
+    let mut walk = Walk {
+        b: &b,
+        vertex_count: lod0.positions.len(),
+        groups: 0,
+        strips: 0,
+        indices: 0,
+    };
+    let mut keyed: Vec<((usize, bool), Vec<u16>)> = Vec::new();
+    for (p, part) in mdl.parts.iter().enumerate() {
+        let Some(part) = part else { continue };
+        let at = parts.at(p);
+        let models = b.table(at, b.i32(at + 4)?, b.i32(at)?, VTX_MODEL_BYTES, MAX_TABLE)?;
+        if models.count == 0 {
+            return Err(b.malformed(format!("body part {p} has no models")));
+        }
+        let model = models.at(0);
+        let lods = b.table(
+            model,
+            b.i32(model + 4)?,
+            b.i32(model)?,
+            VTX_LOD_BYTES,
+            MAX_TABLE,
+        )?;
+        if lods.count == 0 {
+            return Err(b.malformed(format!("body part {p} has no LODs")));
+        }
+        let lod = lods.at(0);
+        let meshes = b.table(lod, b.i32(lod + 4)?, b.i32(lod)?, VTX_MESH_BYTES, MAX_TABLE)?;
+        if meshes.count != part.meshes.len() {
+            return Err(b.malformed(format!(
+                "body part {p} has {} meshes where the model has {}",
+                meshes.count,
+                part.meshes.len()
+            )));
+        }
+        for (k, desc) in part.meshes.iter().enumerate() {
+            let texture = mdl
+                .skin0
+                .get(desc.material)
+                .copied()
+                .unwrap_or(desc.material);
+            if texture >= mdl.materials.len() {
+                return Err(b.malformed(format!("body part {p} mesh {k} names texture {texture}")));
+            }
+            let key = (texture, desc.eyeball);
+            let slot = match keyed.iter().position(|(k, _)| *k == key) {
+                Some(slot) => slot,
+                None => {
+                    keyed.push((key, Vec::new()));
+                    keyed.len() - 1
+                }
+            };
+            let base = part
+                .model_vertex
+                .checked_add(desc.vertex_offset)
+                .ok_or_else(|| b.malformed(format!("body part {p} mesh {k} starts past LOD 0")))?;
+            walk.mesh(meshes.at(k), base, desc.vertex_count, &mut keyed[slot].1)?;
+        }
+    }
+
+    let mut indices = Vec::with_capacity(walk.indices);
+    let mut groups = Vec::with_capacity(keyed.len());
+    for ((material, eyeball), list) in keyed {
+        groups.push(MeshGroup {
+            material,
+            first: indices.len(),
+            count: list.len(),
+            eyeball,
+        });
+        indices.extend_from_slice(&list);
+    }
+    Ok(RigMesh {
+        positions: lod0.positions,
+        normals: lod0.normals,
+        uvs: lod0.uvs,
+        bone_indices: lod0.bone_indices,
+        bone_weights: lod0.bone_weights,
+        indices,
+        groups,
+        materials: mdl.materials.clone(),
+    })
+}
+
+/// Running totals across the whole VTX, capped because meshes, groups and strips may all
+/// point at one table and so multiply the work a small file asks for.
+struct Walk<'a, 'b> {
+    b: &'a Bytes<'b>,
+    vertex_count: usize,
+    groups: usize,
+    strips: usize,
+    indices: usize,
+}
+
+impl Walk<'_, '_> {
+    /// Appends the triangles of the VTX mesh at `at`, whose MDL mesh starts at LOD 0 vertex
+    /// `base` and holds `len` vertices. Each index is checked at every hop: into the group's
+    /// vertices, into the mesh, then into LOD 0.
+    fn mesh(
+        &mut self,
+        at: usize,
+        base: usize,
+        len: usize,
+        out: &mut Vec<u16>,
+    ) -> Result<(), RigLoadError> {
+        let b = self.b;
+        let groups = b.table(at, b.i32(at + 4)?, b.i32(at)?, VTX_GROUP_BYTES, MAX_TABLE)?;
+        self.groups = self.groups.saturating_add(groups.count);
+        if self.groups > MAX_TABLE {
+            return Err(b.too_large());
+        }
+        for g in 0..groups.count {
+            let gh = groups.at(g);
+            let verts = b.table(
+                gh,
+                b.i32(gh + 4)?,
+                b.i32(gh)?,
+                VTX_VERTEX_BYTES,
+                MAX_VERTICES,
+            )?;
+            let idx = b.table(gh, b.i32(gh + 12)?, b.i32(gh + 8)?, 2, MAX_INDICES)?;
+            let strips = b.table(
+                gh,
+                b.i32(gh + 20)?,
+                b.i32(gh + 16)?,
+                VTX_STRIP_BYTES,
+                MAX_TABLE,
+            )?;
+            self.strips = self.strips.saturating_add(strips.count);
+            if self.strips > MAX_TABLE {
+                return Err(b.too_large());
+            }
+            for s in 0..strips.count {
+                let sh = strips.at(s);
+                if b.u8(sh + 18)? & STRIP_IS_TRILIST == 0 {
+                    return Err(
+                        b.malformed(format!("strip {s} of group {g} is not a triangle list"))
+                    );
+                }
+                let (count, offset) = (b.i32(sh)?, b.i32(sh + 4)?);
+                let (Ok(count), Ok(offset)) = (usize::try_from(count), usize::try_from(offset))
+                else {
+                    return Err(b.malformed(format!("strip {s} of group {g} has a negative field")));
+                };
+                if count % 3 != 0 {
+                    return Err(b.malformed(format!("strip {s} of group {g} has {count} indices")));
+                }
+                offset
+                    .checked_add(count)
+                    .filter(|&end| end <= idx.count)
+                    .ok_or_else(|| {
+                        b.malformed(format!("strip {s} of group {g} runs past its indices"))
+                    })?;
+                self.indices = self.indices.saturating_add(count);
+                if self.indices > MAX_INDICES {
+                    return Err(b.too_large());
+                }
+                for i in offset..offset + count {
+                    let v = usize::from(b.u16(idx.at(i))?);
+                    if v >= verts.count {
+                        return Err(b.malformed(format!("index {i} of group {g} names vertex {v}")));
+                    }
+                    let orig = usize::from(b.u16(verts.at(v) + 4)?);
+                    if orig >= len {
+                        return Err(b.malformed(format!(
+                            "vertex {v} of group {g} names mesh vertex {orig} of {len}"
+                        )));
+                    }
+                    let vertex = base
+                        .checked_add(orig)
+                        .filter(|&x| x < self.vertex_count)
+                        .and_then(|x| u16::try_from(x).ok())
+                        .ok_or_else(|| {
+                            b.malformed(format!("vertex {v} of group {g} is past LOD 0"))
+                        })?;
+                    out.push(vertex);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The DX9 strip file beside an MDL path.
+fn vtx_path(mdl: &str) -> String {
+    format!("{}.dx90.vtx", mdl.strip_suffix(".mdl").unwrap_or(mdl))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::demo_view::studio::fixture::{BoneSpec, MdlSpec, MeshSpec, VertSpec, vvd_bytes};
+    use crate::demo_view::studio::fixture::{
+        BoneSpec, GroupSpec, MdlSpec, MeshSpec, VertSpec, vtx_bytes, vvd_bytes,
+    };
 
     fn mesh(material: i32, vertex_offset: i32, vertex_count: i32, material_type: i32) -> MeshSpec {
         MeshSpec {
@@ -281,5 +628,124 @@ mod tests {
         );
         let huge = model(vec![mesh(0, i32::MAX, i32::MAX, 0)]);
         assert!(read_lod0(&huge, &vvd_bytes(7, 6, &six(), &[])).is_err());
+    }
+
+    fn list(verts: Vec<u16>, indices: Vec<u16>) -> Vec<GroupSpec> {
+        vec![GroupSpec::list(verts, indices)]
+    }
+
+    fn vtx_two(checksum: i32) -> Vec<u8> {
+        vtx_bytes(
+            checksum,
+            &[
+                Some(vec![
+                    list(vec![0, 1, 2], vec![0, 1, 2]),
+                    list(vec![2, 1, 0], vec![0, 1, 2]),
+                ]),
+                None,
+            ],
+        )
+    }
+
+    #[test]
+    fn lod0_triangles_index_the_default_body_group_by_material() {
+        let mesh = read_mesh(&two_meshes(), &vvd_bytes(7, 6, &six(), &[]), &vtx_two(7)).unwrap();
+        assert_eq!((mesh.vertex_count(), mesh.triangle_count()), (6, 2));
+        assert_eq!(mesh.indices(), [0, 1, 2, 5, 4, 3]);
+        let groups: Vec<_> = mesh
+            .groups()
+            .iter()
+            .map(|g| {
+                (
+                    mesh.materials()[g.material()].as_str(),
+                    g.first(),
+                    g.count(),
+                    g.eyeball(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            groups,
+            [("scout_red", 0, 3, false), ("eyeball_l", 3, 3, true)]
+        );
+        assert_eq!(
+            (mesh.positions()[4], mesh.bone_weights()[4]),
+            ([4., 0., 0.], [1., 0., 0.]),
+            "vertices come from LOD 0"
+        );
+    }
+
+    #[test]
+    fn bad_strip_files_are_refused() {
+        let file = two_meshes();
+        let vvd = vvd_bytes(7, 6, &six(), &[]);
+        let malformed = |vtx: &[u8]| {
+            matches!(
+                read_mesh(&file, &vvd, vtx),
+                Err(RigLoadError::Malformed { .. })
+            )
+        };
+        assert!(malformed(&vtx_two(8)), "vtx checksum");
+        let strip = GroupSpec {
+            strips: vec![(0, 3, 2)],
+            ..GroupSpec::list(vec![0, 1, 2], vec![0, 1, 2])
+        };
+        assert!(
+            malformed(&vtx_bytes(
+                7,
+                &[
+                    Some(vec![vec![strip], list(vec![0, 1, 2], vec![0, 1, 2])]),
+                    None
+                ]
+            )),
+            "triangle strips"
+        );
+        let far_index = vtx_bytes(
+            7,
+            &[
+                Some(vec![
+                    list(vec![0, 1, 2], vec![0, 1, 3]),
+                    list(vec![0, 1, 2], vec![0, 1, 2]),
+                ]),
+                None,
+            ],
+        );
+        assert!(malformed(&far_index), "an index past the group's vertices");
+        let far_vertex = vtx_bytes(
+            7,
+            &[
+                Some(vec![
+                    list(vec![0, 1, 3], vec![0, 1, 2]),
+                    list(vec![0, 1, 2], vec![0, 1, 2]),
+                ]),
+                None,
+            ],
+        );
+        assert!(malformed(&far_vertex), "a vertex past its mesh");
+        assert!(malformed(&vtx_bytes(7, &[None])), "body part counts differ");
+    }
+
+    #[test]
+    fn strips_repeating_one_index_run_are_too_large() {
+        // Every strip names the same 30,000 indices, so the file stays small while the
+        // triangles it asks for pass the cap.
+        let run = vec![0u16; 30_000];
+        let aliased = GroupSpec {
+            strips: vec![(0, 30_000, 1); 20],
+            ..GroupSpec::list(vec![0, 1, 2], run)
+        };
+        let vtx = vtx_bytes(
+            7,
+            &[
+                Some(vec![vec![aliased], list(vec![0, 1, 2], vec![0, 1, 2])]),
+                None,
+            ],
+        );
+        let r = read_mesh(&two_meshes(), &vvd_bytes(7, 6, &six(), &[]), &vtx);
+        assert!(
+            matches!(r, Err(RigLoadError::TooLarge { .. })),
+            "{:?}",
+            r.err()
+        );
     }
 }
