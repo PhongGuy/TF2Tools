@@ -206,6 +206,10 @@ pub(crate) struct MdlSpec {
     pub(crate) poses: Vec<(&'static str, f32, f32, f32)>,
     pub(crate) includes: Vec<&'static str>,
     pub(crate) anims: Vec<AnimSpec>,
+    pub(crate) textures: Vec<&'static str>,
+    pub(crate) skin0: Vec<i16>,
+    /// Body parts; each holds its models as (vertexindex in bytes, meshes).
+    pub(crate) parts: Vec<Vec<(i32, Vec<MeshSpec>)>>,
 }
 
 impl MdlSpec {
@@ -217,6 +221,9 @@ impl MdlSpec {
             poses: Vec::new(),
             includes: Vec::new(),
             anims: Vec::new(),
+            textures: Vec::new(),
+            skin0: Vec::new(),
+            parts: Vec::new(),
         }
     }
 
@@ -261,8 +268,56 @@ impl MdlSpec {
             let n = b.cstr(path);
             b.set_rel(at + 4, at, n);
         }
+        let textures = b.zeros(64 * self.textures.len());
+        b.set_i32(204, self.textures.len() as i32);
+        b.set_i32(208, textures as i32);
+        for (i, name) in self.textures.iter().enumerate() {
+            let at = textures + 64 * i;
+            let n = b.cstr(name);
+            b.set_rel(at, at, n);
+        }
+        let skins = b.zeros(2 * self.skin0.len());
+        for (i, s) in self.skin0.iter().enumerate() {
+            b.set_i16(skins + 2 * i, *s);
+        }
+        b.set_i32(220, self.skin0.len() as i32);
+        b.set_i32(224, i32::from(!self.skin0.is_empty()));
+        b.set_i32(228, skins as i32);
+        let parts = b.zeros(16 * self.parts.len());
+        b.set_i32(232, self.parts.len() as i32);
+        b.set_i32(236, parts as i32);
+        for (p, models) in self.parts.iter().enumerate() {
+            let part = parts + 16 * p;
+            let name = b.cstr("body");
+            b.set_rel(part, part, name);
+            b.set_i32(part + 4, models.len() as i32);
+            let first = b.zeros(148 * models.len());
+            b.set_rel(part + 12, part, first);
+            for (m, (vertex_index, meshes)) in models.iter().enumerate() {
+                let model = first + 148 * m;
+                b.set_i32(model + 72, meshes.len() as i32);
+                b.set_i32(model + 84, *vertex_index);
+                let mesh0 = b.zeros(116 * meshes.len());
+                b.set_rel(model + 76, model, mesh0);
+                for (k, mesh) in meshes.iter().enumerate() {
+                    let at = mesh0 + 116 * k;
+                    b.set_i32(at, mesh.material);
+                    b.set_i32(at + 8, mesh.vertex_count);
+                    b.set_i32(at + 12, mesh.vertex_offset);
+                    b.set_i32(at + 24, mesh.material_type);
+                }
+            }
+        }
         let len = b.0.len() as i32;
         b.set_i32(76, len);
         b.0
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct MeshSpec {
+    pub(crate) material: i32,
+    pub(crate) vertex_offset: i32,
+    pub(crate) vertex_count: i32,
+    pub(crate) material_type: i32,
 }

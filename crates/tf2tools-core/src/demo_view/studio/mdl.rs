@@ -13,6 +13,14 @@ const BONE_BYTES: usize = 216;
 const POSE_BYTES: usize = 20;
 const INCLUDE_BYTES: usize = 8;
 const ANIM_BYTES: usize = 100;
+const TEXTURE_BYTES: usize = 64;
+const PART_BYTES: usize = 16;
+const MODEL_BYTES: usize = 148;
+const MESH_BYTES: usize = 116;
+/// Size of one VVD vertex, the unit of a model's `vertexindex`.
+const VERTEX_BYTES: usize = 48;
+/// A mesh `materialtype` that marks an eyeball.
+const EYEBALL: i32 = 1;
 
 /// One bone: its name, parent, the values its tracks are relative to and its inverse bind matrix.
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +40,23 @@ pub(crate) struct PoseDesc {
     pub(crate) loop_range: f32,
 }
 
+/// One mesh of a model: its material slot, its vertex range within the model and whether it
+/// is an eyeball.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct MeshDesc {
+    pub(crate) material: usize,
+    pub(crate) vertex_offset: usize,
+    pub(crate) vertex_count: usize,
+    pub(crate) eyeball: bool,
+}
+
+/// Model 0 of a body part, the default body group; `model_vertex` is its first vertex.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PartDesc {
+    pub(crate) model_vertex: usize,
+    pub(crate) meshes: Vec<MeshDesc>,
+}
+
 /// One parsed MDL file, which keeps its bytes so animations decode from them later.
 #[derive(Debug, Clone)]
 pub(crate) struct MdlFile {
@@ -44,10 +69,17 @@ pub(crate) struct MdlFile {
     pub(crate) includes: Vec<String>,
     /// Each local animation's name and descriptor offset.
     pub(crate) anims: Vec<(String, usize)>,
+    /// Each body part's default model; None for a part with no models.
+    pub(crate) parts: Vec<Option<PartDesc>>,
+    /// Texture names in file order.
+    pub(crate) materials: Vec<String>,
+    /// Skin family 0: material slot to texture index.
+    pub(crate) skin0: Vec<usize>,
 }
 
 impl MdlFile {
-    /// Parses a v48 MDL's header, bones, pose parameters, includes and animation names.
+    /// Parses a v48 MDL's header, bones, pose parameters, includes, animation names, textures,
+    /// skin family 0 and each body part's default model.
     /// Errors are `Malformed` for a bad header, table or parent and `TooLarge` over a cap.
     pub(crate) fn parse(path: &str, data: Vec<u8>) -> Result<MdlFile, RigLoadError> {
         let b = Bytes::new(path, &data);
@@ -97,6 +129,9 @@ impl MdlFile {
             })
             .collect::<Result<_, RigLoadError>>()?;
 
+        let (materials, skin0) = read_skins(&b)?;
+        let parts = read_parts(&b)?;
+
         Ok(MdlFile {
             path: path.to_owned(),
             checksum,
@@ -104,6 +139,9 @@ impl MdlFile {
             pose_params,
             includes,
             anims,
+            parts,
+            materials,
+            skin0,
             data,
         })
     }
@@ -113,10 +151,102 @@ impl MdlFile {
         Bytes::new(&self.path, &self.data)
     }
 
+    /// The texture of `material` through skin family 0, or the texture of that index.
+    pub(crate) fn material_name(&self, material: usize) -> Option<&str> {
+        let texture = self.skin0.get(material).copied().unwrap_or(material);
+        self.materials.get(texture).map(String::as_str)
+    }
+
     /// The bones' track bases, in bone order.
     pub(crate) fn file_bones(&self) -> Vec<FileBone> {
         self.bones.iter().map(|bone| bone.file).collect()
     }
+}
+
+/// Reads the texture names and skin family 0, whose entries must name an existing texture.
+fn read_skins(b: &Bytes<'_>) -> Result<(Vec<String>, Vec<usize>), RigLoadError> {
+    let textures = b.table(0, b.i32(208)?, b.i32(204)?, TEXTURE_BYTES, MAX_TABLE)?;
+    let materials: Vec<String> = (0..textures.count)
+        .map(|i| {
+            let at = textures.at(i);
+            b.cstr(at, b.i32(at)?)
+        })
+        .collect::<Result<_, _>>()?;
+
+    // Family 0 is the first row of a families-by-refs i16 grid; no family means no remap.
+    let families = b.i32(224)?;
+    if families < 0 {
+        return Err(b.malformed(format!("a negative skin family count {families}")));
+    }
+    let refs = if families == 0 { 0 } else { b.i32(220)? };
+    let row = b.table(0, b.i32(228)?, refs, 2, MAX_TABLE)?;
+    let skin0 = (0..row.count)
+        .map(|i| {
+            let s = b.i16(row.at(i))?;
+            usize::try_from(s)
+                .ok()
+                .filter(|&t| t < materials.len())
+                .ok_or_else(|| b.malformed(format!("skin entry {i} names texture {s}")))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok((materials, skin0))
+}
+
+/// Reads model 0 of every body part with its meshes.
+fn read_parts(b: &Bytes<'_>) -> Result<Vec<Option<PartDesc>>, RigLoadError> {
+    let parts = b.table(0, b.i32(236)?, b.i32(232)?, PART_BYTES, MAX_TABLE)?;
+    (0..parts.count)
+        .map(|p| {
+            let part = parts.at(p);
+            let models = b.table(
+                part,
+                b.i32(part + 12)?,
+                b.i32(part + 4)?,
+                MODEL_BYTES,
+                MAX_TABLE,
+            )?;
+            if models.count == 0 {
+                return Ok(None);
+            }
+            let model = models.at(0);
+            let vertex_index = b.i32(model + 84)?;
+            let model_vertex = usize::try_from(vertex_index)
+                .ok()
+                .filter(|v| v % VERTEX_BYTES == 0)
+                .ok_or_else(|| {
+                    b.malformed(format!("body part {p} has vertexindex {vertex_index}"))
+                })?
+                / VERTEX_BYTES;
+            let meshes = b.table(
+                model,
+                b.i32(model + 76)?,
+                b.i32(model + 72)?,
+                MESH_BYTES,
+                MAX_TABLE,
+            )?;
+            let meshes = (0..meshes.count)
+                .map(|k| {
+                    let at = meshes.at(k);
+                    let field = |off: usize, what: &str| -> Result<usize, RigLoadError> {
+                        let v = b.i32(at + off)?;
+                        usize::try_from(v).map_err(|_| {
+                            b.malformed(format!("body part {p} mesh {k} has {what} {v}"))
+                        })
+                    };
+                    Ok(MeshDesc {
+                        material: field(0, "material")?,
+                        vertex_count: field(8, "vertex count")?,
+                        vertex_offset: field(12, "vertex offset")?,
+                        eyeball: b.i32(at + 24)? == EYEBALL,
+                    })
+                })
+                .collect::<Result<_, RigLoadError>>()?;
+            Ok(Some(PartDesc {
+                model_vertex,
+                meshes,
+            }))
+        })
+        .collect()
 }
 
 /// Reads the bone table; a parent must come before its child, which also rules out cycles.
@@ -163,7 +293,9 @@ mod tests {
 
     use super::*;
     use crate::demo_view::studio::anim::{AnimContext, Animation, BonePose};
-    use crate::demo_view::studio::fixture::{AnimSpec, BoneSpec, MdlSpec, TrackBytes, half_bytes};
+    use crate::demo_view::studio::fixture::{
+        AnimSpec, BoneSpec, MdlSpec, MeshSpec, TrackBytes, half_bytes,
+    };
 
     fn spec() -> MdlSpec {
         let track = TrackBytes {
@@ -284,6 +416,72 @@ mod tests {
         assert!(
             is_malformed(parse(patched(spec().bytes(), 180, -1))),
             "a negative count"
+        );
+    }
+
+    fn mesh(material: i32, vertex_offset: i32, vertex_count: i32, material_type: i32) -> MeshSpec {
+        MeshSpec {
+            material,
+            vertex_offset,
+            vertex_count,
+            material_type,
+        }
+    }
+    fn parts_spec() -> MdlSpec {
+        MdlSpec {
+            textures: vec!["scout_red", "eyeball_l"],
+            skin0: vec![1, 0],
+            parts: vec![
+                vec![(96, vec![mesh(1, 0, 4, 0), mesh(0, 4, 2, 1)])],
+                Vec::new(),
+            ],
+            ..spec()
+        }
+    }
+
+    #[test]
+    fn a_model_reads_its_default_body_group_and_skin() {
+        let file = parse(parts_spec().bytes()).unwrap();
+        let Some(Some(part)) = file.parts.first() else {
+            panic!("part 0 has a model")
+        };
+        assert_eq!(
+            part.model_vertex, 2,
+            "vertexindex counts bytes of 48-byte vertices"
+        );
+        let meshes: Vec<_> = part
+            .meshes
+            .iter()
+            .map(|m| (m.material, m.vertex_offset, m.vertex_count, m.eyeball))
+            .collect();
+        assert_eq!(meshes, [(1, 0, 4, false), (0, 4, 2, true)]);
+        assert!(
+            file.parts[1].is_none(),
+            "a part with no models draws nothing"
+        );
+        assert_eq!(
+            (
+                file.material_name(0),
+                file.material_name(1),
+                file.material_name(5)
+            ),
+            (Some("eyeball_l"), Some("scout_red"), None)
+        );
+    }
+
+    #[test]
+    fn bad_parts_and_skins_are_refused() {
+        let mut odd = parts_spec();
+        odd.parts[0][0].0 = 50;
+        assert!(
+            is_malformed(parse(odd.bytes())),
+            "vertexindex not a whole vertex"
+        );
+        let mut skin = parts_spec();
+        skin.skin0 = vec![2, 0];
+        assert!(
+            is_malformed(parse(skin.bytes())),
+            "a skin names a missing texture"
         );
     }
 }
