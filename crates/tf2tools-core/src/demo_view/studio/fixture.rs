@@ -169,3 +169,100 @@ pub(crate) fn anim_body(
     }
     body
 }
+
+#[derive(Clone)]
+pub(crate) struct BoneSpec {
+    pub(crate) name: String,
+    pub(crate) parent: i32,
+    pub(crate) pos: [f32; 3],
+    pub(crate) quat: [f32; 4],
+    pub(crate) rot: [f32; 3],
+    pub(crate) pos_scale: [f32; 3],
+    pub(crate) rot_scale: [f32; 3],
+    pub(crate) pose_to_bone: [[f32; 4]; 3],
+}
+
+impl BoneSpec {
+    /// A bone at `pos`, unrotated, scales 1, `poseToBone` identity.
+    pub(crate) fn new(name: &str, parent: i32, pos: [f32; 3]) -> BoneSpec {
+        BoneSpec {
+            name: name.to_owned(),
+            parent,
+            pos,
+            quat: [0., 0., 0., 1.],
+            rot: [0.; 3],
+            pos_scale: [1.; 3],
+            rot_scale: [1.; 3],
+            pose_to_bone: [[1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 1., 0.]],
+        }
+    }
+}
+
+/// A v48 MDL as `bytes` lays it out.
+pub(crate) struct MdlSpec {
+    pub(crate) version: i32,
+    pub(crate) checksum: i32,
+    pub(crate) bones: Vec<BoneSpec>,
+    pub(crate) poses: Vec<(&'static str, f32, f32, f32)>,
+    pub(crate) includes: Vec<&'static str>,
+    pub(crate) anims: Vec<AnimSpec>,
+}
+
+impl MdlSpec {
+    pub(crate) fn new() -> MdlSpec {
+        MdlSpec {
+            version: 48,
+            checksum: 7,
+            bones: Vec::new(),
+            poses: Vec::new(),
+            includes: Vec::new(),
+            anims: Vec::new(),
+        }
+    }
+
+    pub(crate) fn bytes(&self) -> Vec<u8> {
+        let mut b = Blob::new();
+        b.zeros(408);
+        b.0[0..4].copy_from_slice(b"IDST");
+        b.set_i32(4, self.version);
+        b.set_i32(8, self.checksum);
+        let bones = b.zeros(216 * self.bones.len());
+        b.set_i32(156, self.bones.len() as i32);
+        b.set_i32(160, bones as i32);
+        for (i, bone) in self.bones.iter().enumerate() {
+            let at = bones + 216 * i;
+            let name = b.cstr(&bone.name);
+            b.set_rel(at, at, name);
+            b.set_i32(at + 4, bone.parent);
+            b.set_f32s(at + 32, &bone.pos);
+            b.set_f32s(at + 44, &bone.quat);
+            b.set_f32s(at + 60, &bone.rot);
+            b.set_f32s(at + 72, &bone.pos_scale);
+            b.set_f32s(at + 84, &bone.rot_scale);
+            b.set_f32s(at + 96, bone.pose_to_bone.as_flattened());
+        }
+        let anims = write_anims(&mut b, &self.anims);
+        b.set_i32(180, self.anims.len() as i32);
+        b.set_i32(184, anims as i32);
+        let poses = b.zeros(20 * self.poses.len());
+        b.set_i32(300, self.poses.len() as i32);
+        b.set_i32(304, poses as i32);
+        for (i, (name, start, end, looping)) in self.poses.iter().enumerate() {
+            let at = poses + 20 * i;
+            let n = b.cstr(name);
+            b.set_rel(at, at, n);
+            b.set_f32s(at + 8, &[*start, *end, *looping]);
+        }
+        let includes = b.zeros(8 * self.includes.len());
+        b.set_i32(336, self.includes.len() as i32);
+        b.set_i32(340, includes as i32);
+        for (i, path) in self.includes.iter().enumerate() {
+            let at = includes + 8 * i;
+            let n = b.cstr(path);
+            b.set_rel(at + 4, at, n);
+        }
+        let len = b.0.len() as i32;
+        b.set_i32(76, len);
+        b.0
+    }
+}

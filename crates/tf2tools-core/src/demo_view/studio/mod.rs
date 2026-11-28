@@ -22,4 +22,5 @@ mod anim;
 mod bytes;
 #[cfg(test)]
 mod fixture;
+mod mdl;
 mod values;
