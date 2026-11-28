@@ -23,6 +23,7 @@ mod bytes;
 #[cfg(test)]
 mod fixture;
 mod mdl;
+mod merge;
 #[cfg(test)]
 mod real_install;
 mod types;
