@@ -304,30 +304,37 @@ impl Animation {
         })
     }
 
+    /// The animation's name in its file.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Frames per second.
     pub fn fps(&self) -> f32 {
         self.fps
     }
 
+    /// How many frames it holds.
     pub fn frames(&self) -> usize {
         self.frames
     }
 
+    /// The raw studio animation flags.
     pub fn flags(&self) -> i32 {
         self.flags
     }
 
+    /// Whether it loops (STUDIO_LOOPING).
     pub fn is_looping(&self) -> bool {
         self.flags & 0x1 != 0
     }
 
+    /// Whether it is a delta layered on another pose (STUDIO_DELTA).
     pub fn is_delta(&self) -> bool {
         self.flags & 0x4 != 0
     }
 
+    /// The root motion pieces it carries, in frame order.
     pub fn movements(&self) -> &[Movement] {
         &self.movements
     }

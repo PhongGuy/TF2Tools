@@ -74,6 +74,7 @@ pub(crate) fn blend(p: [f32; 4], q: [f32; 4], t: f32) -> [f32; 4] {
 }
 
 /// The 3x4 bone matrix for a rotation `quat` ([x, y, z, w]) followed by a move to `pos`.
+#[cfg(test)]
 pub(crate) fn pose_matrix(pos: [f32; 3], quat: [f32; 4]) -> [[f32; 4]; 3] {
     let [x, y, z, w] = quat;
     [
@@ -99,6 +100,7 @@ pub(crate) fn pose_matrix(pos: [f32; 3], quat: [f32; 4]) -> [[f32; 4]; 3] {
 }
 
 /// a * b, both with an implied [0, 0, 0, 1] last row.
+#[cfg(test)]
 pub(crate) fn mul34(a: &[[f32; 4]; 3], b: &[[f32; 4]; 3]) -> [[f32; 4]; 3] {
     std::array::from_fn(|r| {
         std::array::from_fn(|c| {

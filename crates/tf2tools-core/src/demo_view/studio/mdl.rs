@@ -194,12 +194,6 @@ impl MdlFile {
         Bytes::new(&self.path, &self.data)
     }
 
-    /// The texture of `material` through skin family 0, or the texture of that index.
-    pub(crate) fn material_name(&self, material: usize) -> Option<&str> {
-        let texture = self.skin0.get(material).copied().unwrap_or(material);
-        self.materials.get(texture).map(String::as_str)
-    }
-
     /// The bones' track bases, in bone order.
     pub(crate) fn file_bones(&self) -> Vec<FileBone> {
         self.bones.iter().map(|bone| bone.file).collect()
@@ -641,14 +635,12 @@ mod tests {
             file.parts[1].is_none(),
             "a part with no models draws nothing"
         );
-        assert_eq!(
-            (
-                file.material_name(0),
-                file.material_name(1),
-                file.material_name(5)
-            ),
-            (Some("eyeball_l"), Some("scout_red"), None)
-        );
+        let skin: Vec<&str> = file
+            .skin0
+            .iter()
+            .map(|&t| file.materials[t].as_str())
+            .collect();
+        assert_eq!(skin, ["eyeball_l", "scout_red"]);
     }
 
     #[test]

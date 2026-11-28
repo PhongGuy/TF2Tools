@@ -1,9 +1,5 @@
 //! Readers for Source studio model files (MDL, VVD, VTX) and their animations, bounded by
 //! caps so a hostile file fails with an error instead of a huge allocation or a panic.
-#![allow(
-    dead_code,
-    reason = "wired to ClassRig::load in the load plan, which removes this allow"
-)]
 
 /// Most bones one model may declare.
 pub(crate) const MAX_BONES: usize = 128;
@@ -33,13 +29,14 @@ mod values;
 
 use std::path::Path;
 
-use anim::Animation;
 use files::PakFiles;
 use mdl::MdlFile;
 use merge::merge;
-use mesh::RigMesh;
 use mesh::read_mesh;
-use types::{PoseParam, Sequence, Skeleton};
+
+pub use anim::{Animation, BonePose, Movement};
+pub use mesh::{MeshGroup, RigMesh};
+pub use types::{AutoLayer, PoseParam, RigBone, Sequence, Skeleton};
 
 use crate::error::RigLoadError;
 use crate::panic_mark::catching;

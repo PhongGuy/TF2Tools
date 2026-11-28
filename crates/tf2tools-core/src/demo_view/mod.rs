@@ -25,7 +25,10 @@ pub use mesh::{
 };
 pub use playback::{PlaybackEvent, read_demo_playback, read_demo_tracks};
 pub use snapshot::{DemoSnapshot, MAX_SNAPSHOT_BYTES, SnapshotPlayer, read_demo_snapshot};
-pub use studio::ClassRig;
+pub use studio::{
+    Animation, AutoLayer, BonePose, ClassRig, MeshGroup, Movement, PoseParam, RigBone, RigMesh,
+    Sequence, Skeleton,
+};
 pub use tracks::{
     DemoKill, DemoTestKill, DemoTestParty, DemoTestShot, DemoTracks, EyePose, FollowPose,
     KillParty, MAX_DEMO_BYTES, MAX_KILLS, MAX_PROJECTILE_SAMPLES, MAX_TRACK_SAMPLES, PlayerId,

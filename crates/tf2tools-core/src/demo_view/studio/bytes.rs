@@ -20,10 +20,6 @@ impl<'a> Bytes<'a> {
         self.data.len()
     }
 
-    pub(crate) fn file(&self) -> &'a str {
-        self.file
-    }
-
     pub(crate) fn malformed(&self, what: impl Into<String>) -> RigLoadError {
         RigLoadError::Malformed {
             file: self.file.to_owned(),
