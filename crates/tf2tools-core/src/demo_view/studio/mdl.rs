@@ -192,9 +192,11 @@ fn read_skins(b: &Bytes<'_>) -> Result<(Vec<String>, Vec<usize>), RigLoadError> 
     Ok((materials, skin0))
 }
 
-/// Reads model 0 of every body part with its meshes.
+/// Reads model 0 of every body part with its meshes; more than `MAX_TABLE` meshes in all is
+/// `TooLarge`, since parts may alias one mesh table.
 fn read_parts(b: &Bytes<'_>) -> Result<Vec<Option<PartDesc>>, RigLoadError> {
     let parts = b.table(0, b.i32(236)?, b.i32(232)?, PART_BYTES, MAX_TABLE)?;
+    let mut total_meshes = 0usize;
     (0..parts.count)
         .map(|p| {
             let part = parts.at(p);
@@ -224,6 +226,10 @@ fn read_parts(b: &Bytes<'_>) -> Result<Vec<Option<PartDesc>>, RigLoadError> {
                 MESH_BYTES,
                 MAX_TABLE,
             )?;
+            total_meshes += meshes.count;
+            if total_meshes > MAX_TABLE {
+                return Err(b.too_large());
+            }
             let meshes = (0..meshes.count)
                 .map(|k| {
                     let at = meshes.at(k);
@@ -483,5 +489,25 @@ mod tests {
             is_malformed(parse(skin.bytes())),
             "a skin names a missing texture"
         );
+    }
+
+    #[test]
+    fn mesh_tables_aliased_across_parts_are_too_large() {
+        // Two parts each hold 4097 meshes, within the per-table cap; part 1's table is then
+        // pointed at part 0's, so the file stays small while the total passes MAX_TABLE.
+        let meshes = vec![mesh(0, 0, 1, 0); MAX_TABLE / 2 + 1];
+        let aliased = MdlSpec {
+            textures: vec!["scout_red"],
+            parts: vec![vec![(0, meshes.clone())], vec![(0, meshes)]],
+            ..spec()
+        };
+        let bytes = aliased.bytes();
+        let i32_at = |at: usize| i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        let parts = i32_at(236) as usize;
+        let model_of = |p: usize| (parts + 16 * p) as i32 + i32_at(parts + 16 * p + 12);
+        let (model0, model1) = (model_of(0), model_of(1));
+        let mesh0 = model0 + i32_at(model0 as usize + 76);
+        let bytes = patched(bytes.clone(), model1 as usize + 76, mesh0 - model1);
+        assert!(matches!(parse(bytes), Err(RigLoadError::TooLarge { .. })));
     }
 }
