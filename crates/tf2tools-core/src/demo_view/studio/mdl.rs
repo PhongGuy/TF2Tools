@@ -21,6 +21,11 @@ const MESH_BYTES: usize = 116;
 const VERTEX_BYTES: usize = 48;
 /// A mesh `materialtype` that marks an eyeball.
 const EYEBALL: i32 = 1;
+const SEQ_BYTES: usize = 212;
+const LAYER_BYTES: usize = 24;
+/// Most grid cells, pose keys and layers across all of a file's sequences, so sequences that
+/// alias one large table cannot multiply its size in memory.
+const MAX_SEQ_ENTRIES: usize = 16 * MAX_TABLE;
 
 /// One bone: its name, parent, the values its tracks are relative to and its inverse bind matrix.
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +62,41 @@ pub(crate) struct PartDesc {
     pub(crate) meshes: Vec<MeshDesc>,
 }
 
+/// One auto layer of a sequence; `seq` and `pose` are local to the file.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LayerDesc {
+    pub(crate) seq: usize,
+    pub(crate) pose: Option<usize>,
+    pub(crate) flags: i32,
+    pub(crate) start: f32,
+    pub(crate) peak: f32,
+    pub(crate) tail: f32,
+    pub(crate) end: f32,
+}
+
+/// One sequence: its blend grid over up to two pose parameters, its auto layers and its
+/// per-bone weights. Indices are local to the file.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SeqDesc {
+    pub(crate) label: String,
+    pub(crate) activity: String,
+    pub(crate) flags: i32,
+    pub(crate) actweight: i32,
+    pub(crate) fade_in: f32,
+    pub(crate) fade_out: f32,
+    pub(crate) grid: [usize; 2],
+    pub(crate) params: [Option<usize>; 2],
+    pub(crate) param_start: [f32; 2],
+    pub(crate) param_end: [f32; 2],
+    /// The keys of `grid[0]` then of `grid[1]`, in pose units.
+    pub(crate) pose_keys: Option<[Vec<f32>; 2]>,
+    /// Local animation per cell, index `y * grid[0] + x`.
+    pub(crate) anims: Vec<usize>,
+    pub(crate) layers: Vec<LayerDesc>,
+    /// One weight per file bone.
+    pub(crate) weights: Vec<f32>,
+}
+
 /// One parsed MDL file, which keeps its bytes so animations decode from them later.
 #[derive(Debug, Clone)]
 pub(crate) struct MdlFile {
@@ -75,11 +115,12 @@ pub(crate) struct MdlFile {
     pub(crate) materials: Vec<String>,
     /// Skin family 0: material slot to texture index.
     pub(crate) skin0: Vec<usize>,
+    pub(crate) seqs: Vec<SeqDesc>,
 }
 
 impl MdlFile {
     /// Parses a v48 MDL's header, bones, pose parameters, includes, animation names, textures,
-    /// skin family 0 and each body part's default model.
+    /// skin family 0, each body part's default model and the sequences.
     /// Errors are `Malformed` for a bad header, table or parent and `TooLarge` over a cap.
     pub(crate) fn parse(path: &str, data: Vec<u8>) -> Result<MdlFile, RigLoadError> {
         let b = Bytes::new(path, &data);
@@ -108,7 +149,7 @@ impl MdlFile {
                     loop_range: b.f32(at + 16)?,
                 })
             })
-            .collect::<Result<_, RigLoadError>>()?;
+            .collect::<Result<Vec<_>, RigLoadError>>()?;
 
         // Include paths are matched against pak paths, which are lower case with '/' separators.
         let incs = b.table(0, b.i32(340)?, b.i32(336)?, INCLUDE_BYTES, MAX_INCLUDES)?;
@@ -127,10 +168,11 @@ impl MdlFile {
                 let at = table.at(i);
                 Ok((b.cstr(at, b.i32(at + 4)?)?, at))
             })
-            .collect::<Result<_, RigLoadError>>()?;
+            .collect::<Result<Vec<_>, RigLoadError>>()?;
 
         let (materials, skin0) = read_skins(&b)?;
         let parts = read_parts(&b)?;
+        let seqs = read_seqs(&b, bones.len(), pose_params.len(), anims.len())?;
 
         Ok(MdlFile {
             path: path.to_owned(),
@@ -142,6 +184,7 @@ impl MdlFile {
             parts,
             materials,
             skin0,
+            seqs,
             data,
         })
     }
@@ -255,6 +298,139 @@ fn read_parts(b: &Bytes<'_>) -> Result<Vec<Option<PartDesc>>, RigLoadError> {
         .collect()
 }
 
+/// Reads the sequence table, checking every animation, pose and layer index against the file.
+/// A grid axis or the running total of cells, keys and layers over its cap is `TooLarge`.
+fn read_seqs(
+    b: &Bytes<'_>,
+    bones: usize,
+    poses: usize,
+    anims: usize,
+) -> Result<Vec<SeqDesc>, RigLoadError> {
+    let table = b.table(0, b.i32(192)?, b.i32(188)?, SEQ_BYTES, MAX_TABLE)?;
+    let mut total = 0usize;
+    let mut charge = |n: usize| {
+        total += n;
+        if total > MAX_SEQ_ENTRIES {
+            Err(b.too_large())
+        } else {
+            Ok(())
+        }
+    };
+    // An index must lie within `0..count`; an optional one may also be -1 for none.
+    let index = |v: i32, count: usize, what: &str, seq: usize| -> Result<usize, RigLoadError> {
+        usize::try_from(v)
+            .ok()
+            .filter(|&i| i < count)
+            .ok_or_else(|| b.malformed(format!("sequence {seq} names {what} {v}")))
+    };
+    let optional = |v: i32, count: usize, what: &str, seq: usize| {
+        if v == -1 {
+            Ok(None)
+        } else {
+            index(v, count, what, seq).map(Some)
+        }
+    };
+    (0..table.count)
+        .map(|i| {
+            let at = table.at(i);
+            let label = b.cstr(at, b.i32(at + 4)?)?;
+            let activity = b.cstr(at, b.i32(at + 8)?)?;
+
+            // The grid is sized before any cell or key is read, so a huge one fails first.
+            let mut grid = [0usize; 2];
+            for (axis, g) in grid.iter_mut().enumerate() {
+                let v = b.i32(at + 68 + 4 * axis)?;
+                *g = usize::try_from(v)
+                    .map_err(|_| b.malformed(format!("sequence {i} has group size {v}")))?;
+                if *g > MAX_TABLE {
+                    return Err(b.too_large());
+                }
+            }
+            let cells_count = grid[0] * grid[1];
+            if cells_count > MAX_TABLE {
+                return Err(b.too_large());
+            }
+            charge(cells_count)?;
+            let cells = b.table(at, b.i32(at + 60)?, cells_count as i32, 2, MAX_TABLE)?;
+            let anims = (0..cells.count)
+                .map(|k| index(i32::from(b.i16(cells.at(k))?), anims, "animation", i))
+                .collect::<Result<_, _>>()?;
+
+            let params = [
+                optional(b.i32(at + 76)?, poses, "pose parameter", i)?,
+                optional(b.i32(at + 80)?, poses, "pose parameter", i)?,
+            ];
+
+            // Both axes stride by grid[0], so axis 1's keys follow axis 0's.
+            let keys_at = b.i32(at + 160)?;
+            let pose_keys = if keys_at == 0 {
+                None
+            } else {
+                let n = grid[0] + grid[1];
+                charge(n)?;
+                let keys = b.table(at, keys_at, n as i32, 4, 2 * MAX_TABLE)?;
+                let axis = |from: usize, count: usize| {
+                    (from..from + count)
+                        .map(|k| b.f32(keys.at(k)))
+                        .collect::<Result<Vec<_>, _>>()
+                };
+                Some([axis(0, grid[0])?, axis(grid[0], grid[1])?])
+            };
+
+            let layer_table = b.table(
+                at,
+                b.i32(at + 152)?,
+                b.i32(at + 148)?,
+                LAYER_BYTES,
+                MAX_TABLE,
+            )?;
+            charge(layer_table.count)?;
+            let layers = (0..layer_table.count)
+                .map(|k| {
+                    let l = layer_table.at(k);
+                    Ok(LayerDesc {
+                        seq: index(i32::from(b.i16(l)?), table.count, "layer sequence", i)?,
+                        pose: optional(i32::from(b.i16(l + 2)?), poses, "layer pose", i)?,
+                        flags: b.i32(l + 4)?,
+                        start: b.f32(l + 8)?,
+                        peak: b.f32(l + 12)?,
+                        tail: b.f32(l + 16)?,
+                        end: b.f32(l + 20)?,
+                    })
+                })
+                .collect::<Result<_, RigLoadError>>()?;
+
+            // No weight list weighs every bone fully.
+            let weights_at = b.i32(at + 156)?;
+            let weights = if weights_at == 0 {
+                vec![1.; bones]
+            } else {
+                let w = b.table(at, weights_at, bones as i32, 4, MAX_BONES)?;
+                (0..w.count)
+                    .map(|k| b.f32(w.at(k)))
+                    .collect::<Result<_, _>>()?
+            };
+
+            Ok(SeqDesc {
+                label,
+                activity,
+                flags: b.i32(at + 12)?,
+                actweight: b.i32(at + 20)?,
+                fade_in: b.f32(at + 104)?,
+                fade_out: b.f32(at + 108)?,
+                grid,
+                params,
+                param_start: [b.f32(at + 84)?, b.f32(at + 88)?],
+                param_end: [b.f32(at + 92)?, b.f32(at + 96)?],
+                pose_keys,
+                anims,
+                layers,
+                weights,
+            })
+        })
+        .collect()
+}
+
 /// Reads the bone table; a parent must come before its child, which also rules out cycles.
 fn read_bones(b: &Bytes<'_>) -> Result<Vec<MdlBone>, RigLoadError> {
     let table = b.table(0, b.i32(160)?, b.i32(156)?, BONE_BYTES, MAX_BONES)?;
@@ -300,7 +476,7 @@ mod tests {
     use super::*;
     use crate::demo_view::studio::anim::{AnimContext, Animation, BonePose};
     use crate::demo_view::studio::fixture::{
-        AnimSpec, BoneSpec, MdlSpec, MeshSpec, TrackBytes, half_bytes,
+        AnimSpec, BoneSpec, MdlSpec, MeshSpec, SeqSpec, TrackBytes, half_bytes,
     };
 
     fn spec() -> MdlSpec {
@@ -509,5 +685,144 @@ mod tests {
         let mesh0 = model0 + i32_at(model0 as usize + 76);
         let bytes = patched(bytes.clone(), model1 as usize + 76, mesh0 - model1);
         assert!(matches!(parse(bytes), Err(RigLoadError::TooLarge { .. })));
+    }
+
+    fn seq_spec() -> MdlSpec {
+        let anim = |name| AnimSpec::plain(name, 1, Vec::new());
+        let run = SeqSpec {
+            flags: 1,
+            actweight: 2,
+            fade: [0.3, 0.4],
+            grid: [2, 2],
+            params: [1, 0],
+            param_start: [-1., -1.],
+            param_end: [1., 1.],
+            pose_keys: vec![-1., 1., 90., -45.],
+            anims: vec![0, 1, 2, 3],
+            layers: vec![(1, 0, 0x4040, [0., 0.2, 0.8, 1.]), (1, -1, 0, [0.; 4])],
+            weights: Some(vec![1., 0.5]),
+            ..SeqSpec::new("run_PRIMARY", "ACT_MP_RUN_primary", None)
+        };
+        let later = SeqSpec {
+            flags: 0x800,
+            ..SeqSpec::new("later", "ACT_MP_STAND_MELEE", None)
+        };
+        MdlSpec {
+            seqs: vec![run, SeqSpec::new("aim", "", Some(1)), later],
+            anims: vec![anim("a"), anim("b"), anim("c"), anim("d")],
+            ..spec()
+        }
+    }
+
+    #[test]
+    fn a_sequence_reads_its_grid_params_keys_layers_and_weights() {
+        let file = parse(seq_spec().bytes()).unwrap();
+        let [run, aim, later] = file.seqs.as_slice() else {
+            panic!("three sequences")
+        };
+        assert_eq!(
+            (
+                run.label.as_str(),
+                run.activity.as_str(),
+                run.flags,
+                run.actweight
+            ),
+            ("run_PRIMARY", "ACT_MP_RUN_primary", 1, 2)
+        );
+        assert_eq!(
+            (run.fade_in, run.fade_out, run.grid, run.params),
+            (0.3, 0.4, [2, 2], [Some(1), Some(0)])
+        );
+        assert_eq!((run.param_start, run.param_end), ([-1., -1.], [1., 1.]));
+        assert_eq!(run.pose_keys, Some([vec![-1., 1.], vec![90., -45.]]));
+        assert_eq!(run.anims, [0, 1, 2, 3]);
+        let layers: Vec<_> = run
+            .layers
+            .iter()
+            .map(|l| (l.seq, l.pose, l.flags, [l.start, l.peak, l.tail, l.end]))
+            .collect();
+        assert_eq!(
+            layers,
+            [
+                (1, Some(0), 0x4040, [0., 0.2, 0.8, 1.]),
+                (1, None, 0, [0.; 4])
+            ]
+        );
+        assert_eq!(run.weights, [1., 0.5]);
+        assert_eq!(
+            (aim.activity.as_str(), aim.grid, aim.params),
+            ("", [1, 1], [None, None])
+        );
+        assert_eq!(aim.anims, [1]);
+        assert!(aim.pose_keys.is_none());
+        assert_eq!(
+            aim.weights,
+            [1., 1.],
+            "no weight list weighs every bone fully"
+        );
+        assert_eq!(
+            (later.grid, later.anims.len(), later.flags),
+            ([0, 0], 0, 0x800),
+            "a forward declaration"
+        );
+    }
+
+    #[test]
+    fn bad_sequences_are_refused() {
+        let with = |edit: fn(&mut SeqSpec)| {
+            let mut s = seq_spec();
+            edit(&mut s.seqs[0]);
+            parse(s.bytes())
+        };
+        assert!(
+            is_malformed(with(|s| s.anims[3] = 4)),
+            "an animation the file lacks"
+        );
+        assert!(
+            is_malformed(with(|s| s.anims[3] = -1)),
+            "a negative animation"
+        );
+        assert!(
+            is_malformed(with(|s| s.layers[0].0 = 3)),
+            "a layer sequence the file lacks"
+        );
+        assert!(
+            is_malformed(with(|s| s.layers[0].1 = 2)),
+            "a layer pose the file lacks"
+        );
+        assert!(
+            is_malformed(with(|s| s.params[0] = 2)),
+            "a pose parameter the file lacks"
+        );
+        assert!(is_malformed(with(|s| s.grid = [-1, 2])), "a negative grid");
+        assert!(
+            matches!(
+                with(|s| s.grid = [100, 100]),
+                Err(RigLoadError::TooLarge { .. })
+            ),
+            "a grid over the cap"
+        );
+    }
+
+    #[test]
+    fn sequence_entries_past_the_file_total_are_too_large() {
+        // Each grid is within the per-sequence cap; seventeen of them pass the file total.
+        let full = SeqSpec {
+            grid: [MAX_TABLE as i32, 1],
+            anims: vec![0; MAX_TABLE],
+            ..SeqSpec::new("full", "", None)
+        };
+        let mut many = seq_spec();
+        many.seqs = vec![full; MAX_SEQ_ENTRIES / MAX_TABLE + 1];
+        assert!(matches!(
+            parse(many.bytes()),
+            Err(RigLoadError::TooLarge { .. })
+        ));
+        many.seqs.pop();
+        assert_eq!(
+            parse(many.bytes()).unwrap().seqs.len(),
+            16,
+            "exactly the total parses"
+        );
     }
 }

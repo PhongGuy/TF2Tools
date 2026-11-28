@@ -210,6 +210,7 @@ pub(crate) struct MdlSpec {
     pub(crate) skin0: Vec<i16>,
     /// Body parts; each holds its models as (vertexindex in bytes, meshes).
     pub(crate) parts: Vec<Vec<(i32, Vec<MeshSpec>)>>,
+    pub(crate) seqs: Vec<SeqSpec>,
 }
 
 impl MdlSpec {
@@ -224,6 +225,7 @@ impl MdlSpec {
             textures: Vec::new(),
             skin0: Vec::new(),
             parts: Vec::new(),
+            seqs: Vec::new(),
         }
     }
 
@@ -308,6 +310,53 @@ impl MdlSpec {
                 }
             }
         }
+        let seqs = b.zeros(212 * self.seqs.len());
+        b.set_i32(188, self.seqs.len() as i32);
+        b.set_i32(192, seqs as i32);
+        for (i, s) in self.seqs.iter().enumerate() {
+            let at = seqs + 212 * i;
+            let label = b.cstr(s.label);
+            b.set_rel(at + 4, at, label);
+            if !s.activity.is_empty() {
+                let activity = b.cstr(s.activity);
+                b.set_rel(at + 8, at, activity);
+            }
+            b.set_i32(at + 12, s.flags);
+            b.set_i32(at + 20, s.actweight);
+            b.set_i32(at + 56, s.anims.len() as i32);
+            let anims = b.zeros(2 * s.anims.len());
+            for (k, a) in s.anims.iter().enumerate() {
+                b.set_i16(anims + 2 * k, *a);
+            }
+            b.set_rel(at + 60, at, anims);
+            b.set_i32(at + 68, s.grid[0]);
+            b.set_i32(at + 72, s.grid[1]);
+            b.set_i32(at + 76, s.params[0]);
+            b.set_i32(at + 80, s.params[1]);
+            b.set_f32s(at + 84, &s.param_start);
+            b.set_f32s(at + 92, &s.param_end);
+            b.set_f32s(at + 104, &s.fade);
+            let layers = b.zeros(24 * s.layers.len());
+            b.set_i32(at + 148, s.layers.len() as i32);
+            b.set_rel(at + 152, at, layers);
+            for (k, (seq, pose, flags, times)) in s.layers.iter().enumerate() {
+                let l = layers + 24 * k;
+                b.set_i16(l, *seq);
+                b.set_i16(l + 2, *pose);
+                b.set_i32(l + 4, *flags);
+                b.set_f32s(l + 8, times);
+            }
+            if let Some(weights) = &s.weights {
+                let w = b.zeros(4 * weights.len());
+                b.set_f32s(w, weights);
+                b.set_rel(at + 156, at, w);
+            }
+            if !s.pose_keys.is_empty() {
+                let k = b.zeros(4 * s.pose_keys.len());
+                b.set_f32s(k, &s.pose_keys);
+                b.set_rel(at + 160, at, k);
+            }
+        }
         let len = b.0.len() as i32;
         b.set_i32(76, len);
         b.0
@@ -320,4 +369,45 @@ pub(crate) struct MeshSpec {
     pub(crate) vertex_offset: i32,
     pub(crate) vertex_count: i32,
     pub(crate) material_type: i32,
+}
+
+#[derive(Clone)]
+pub(crate) struct SeqSpec {
+    pub(crate) label: &'static str,
+    pub(crate) activity: &'static str,
+    pub(crate) flags: i32,
+    pub(crate) actweight: i32,
+    pub(crate) fade: [f32; 2],
+    pub(crate) grid: [i32; 2],
+    pub(crate) params: [i32; 2],
+    pub(crate) param_start: [f32; 2],
+    pub(crate) param_end: [f32; 2],
+    /// Raw pose keys as the file stores them (`grid[0] + grid[1]` floats); empty writes none.
+    pub(crate) pose_keys: Vec<f32>,
+    pub(crate) anims: Vec<i16>,
+    /// (sequence, pose, flags, [start, peak, tail, end]).
+    pub(crate) layers: Vec<(i16, i16, i32, [f32; 4])>,
+    /// None writes no weight list.
+    pub(crate) weights: Option<Vec<f32>>,
+}
+
+impl SeqSpec {
+    /// A 1x1 sequence playing local animation `anim`, or an empty forward declaration when None.
+    pub(crate) fn new(label: &'static str, activity: &'static str, anim: Option<i16>) -> SeqSpec {
+        SeqSpec {
+            label,
+            activity,
+            flags: 0,
+            actweight: 0,
+            fade: [0.2, 0.2],
+            grid: if anim.is_some() { [1, 1] } else { [0, 0] },
+            params: [-1, -1],
+            param_start: [0.; 2],
+            param_end: [0.; 2],
+            pose_keys: Vec::new(),
+            anims: anim.into_iter().collect(),
+            layers: Vec::new(),
+            weights: None,
+        }
+    }
 }
